@@ -1,0 +1,108 @@
+import { NextResponse } from 'next/server';
+import { prospectScopeWhere } from '@/lib/auth';
+import { deriveFromMaterials, isResponse, requireUser } from '@/lib/api-helpers';
+import { prisma } from '@/lib/prisma';
+import { emitCrmEvent } from '@/lib/socket';
+import type { Material, SafeUser } from '@/lib/types';
+
+async function assertInScope(user: SafeUser, id: string) {
+  const existing = await prisma.prospect.findUnique({ where: { id } });
+  if (!existing) return { error: NextResponse.json({ error: 'Prospek tidak ditemukan' }, { status: 404 }) };
+  if (user.role === 'sales' && (existing.se || '').toUpperCase() !== (user.se || '').toUpperCase()) {
+    return { error: NextResponse.json({ error: 'Tidak diizinkan' }, { status: 403 }) };
+  }
+  if (user.role === 'bm' && (existing.cabang || '').toUpperCase() !== (user.cabang || '').toUpperCase()) {
+    return { error: NextResponse.json({ error: 'Tidak diizinkan' }, { status: 403 }) };
+  }
+  if (user.role === 'rm' && String(existing.reg || '') !== String(user.reg || '')) {
+    return { error: NextResponse.json({ error: 'Tidak diizinkan' }, { status: 403 }) };
+  }
+  return { existing };
+}
+
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  if (isResponse(user)) return user;
+  const { id } = await params;
+
+  const scoped = await assertInScope(user, id);
+  if (scoped.error) return scoped.error;
+
+  const body = await req.json().catch(() => null);
+  const customer = String(body?.customer || '').trim();
+  if (!customer) return NextResponse.json({ error: 'Nama customer wajib diisi' }, { status: 400 });
+
+  const materials: Material[] = Array.isArray(body?.materials) ? body.materials : [];
+  if (!materials.some((m) => (m.uraian || '').trim())) {
+    return NextResponse.json({ error: 'Isi minimal satu uraian material' }, { status: 400 });
+  }
+  const derived = deriveFromMaterials(materials);
+
+  const isSales = user.role === 'sales';
+  const cabang = (isSales ? user.cabang || '' : String(body?.cabang || '')).trim().toUpperCase();
+  const se = (isSales ? user.se || '' : String(body?.se || '')).trim().toUpperCase();
+
+  const prospect = await prisma.prospect.update({
+    where: { id },
+    data: {
+      reg: body?.reg != null ? Number(body.reg) : null,
+      cabang,
+      se,
+      customer,
+      phone: String(body?.phone || '').trim(),
+      tglPenawaran: body?.tglPenawaran || null,
+      tglPO: body?.tglPO || null,
+      tglDelivery: body?.tglDelivery || null,
+      ...derived,
+      kondisiStock: String(body?.kondisiStock || '').trim(),
+      keterangan: String(body?.keterangan || '').trim(),
+      status: Number(body?.status) || 0,
+      penawaranTerkirim: !!body?.penawaranTerkirim,
+      qcdQuality: body?.qcdQuality ?? undefined,
+      qcdCost: body?.qcdCost ?? undefined,
+      qcdDelivery: body?.qcdDelivery ?? undefined,
+      qcdKompetitor: body?.qcdKompetitor ?? undefined,
+      qcdCatatan: body?.qcdCatatan ?? undefined,
+    },
+  });
+
+  emitCrmEvent('prospect:updated', prospect);
+  return NextResponse.json({ prospect });
+}
+
+// Partial update — used for lightweight mutations that shouldn't require the
+// full form payload: kanban drag status change, QCD popup save, phone edit
+// from the follow-up modal, and "mark quotation sent".
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  if (isResponse(user)) return user;
+  const { id } = await params;
+
+  const scoped = await assertInScope(user, id);
+  if (scoped.error) return scoped.error;
+
+  const body = await req.json().catch(() => null);
+  const data: Record<string, unknown> = {};
+  const allowed = ['status', 'penawaranTerkirim', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan'];
+  for (const key of allowed) {
+    if (body && Object.prototype.hasOwnProperty.call(body, key)) data[key] = body[key];
+  }
+  if (Object.keys(data).length === 0) return NextResponse.json({ error: 'Tidak ada perubahan' }, { status: 400 });
+
+  const prospect = await prisma.prospect.update({ where: { id }, data });
+  emitCrmEvent('prospect:updated', prospect);
+  return NextResponse.json({ prospect });
+}
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  if (isResponse(user)) return user;
+  const { id } = await params;
+
+  const scoped = await assertInScope(user, id);
+  if (scoped.error) return scoped.error;
+
+  await prisma.prospect.delete({ where: { id } });
+  emitCrmEvent('prospect:deleted', { id });
+  return NextResponse.json({ ok: true });
+}

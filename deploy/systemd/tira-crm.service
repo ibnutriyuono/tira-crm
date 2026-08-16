@@ -1,0 +1,19 @@
+[Unit]
+Description=CRM TIRA (Next.js + Socket.IO)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+# Adjust these two paths to match where you deployed the repo and your Node binary.
+WorkingDirectory=/var/www/tira-crm
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=3
+User=www-data
+Group=www-data
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=/var/www/tira-crm/.env
+
+[Install]
+WantedBy=multi-user.target
