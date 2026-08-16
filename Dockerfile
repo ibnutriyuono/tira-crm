@@ -46,6 +46,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.js ./next.config.js
 COPY --from=builder /app/server.js ./server.js
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 # Apply any pending migrations, then start. Safe to re-run: `migrate deploy`
 # is a no-op when the schema is already up to date.
