@@ -1,0 +1,109 @@
+import { NextResponse } from 'next/server';
+import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
+import { prisma } from '@/lib/prisma';
+import { emitCrmEvent } from '@/lib/socket';
+import type { Prisma } from '@prisma/client';
+
+// Full destructive restore from a .json backup produced by /api/database/export.
+// Admin-only, matches the original app's "Pulihkan Database dari Backup" flow.
+export async function POST(req: Request) {
+  const user = await requireUser();
+  if (isResponse(user)) return user;
+  const adminErr = requireAdmin(user);
+  if (adminErr) return adminErr;
+
+  const body = await req.json().catch(() => null);
+  if (!body || !Array.isArray(body.prospects)) {
+    return NextResponse.json({ error: 'File backup tidak valid: format tidak dikenali.' }, { status: 400 });
+  }
+
+  const prospects = body.prospects as Array<Record<string, unknown>>;
+  const customers = Array.isArray(body.customers) ? (body.customers as Array<Record<string, unknown>>) : [];
+  const rfqs = Array.isArray(body.rfqs) ? (body.rfqs as Array<Record<string, unknown>>) : [];
+  const users = Array.isArray(body.users) ? (body.users as Array<Record<string, unknown>>) : [];
+
+  await prisma.$transaction(async (tx) => {
+    await tx.prospect.deleteMany({});
+    if (prospects.length > 0) {
+      await tx.prospect.createMany({
+        data: prospects.map((p) => ({
+          id: String(p.id),
+          reg: p.reg == null ? null : Number(p.reg),
+          cabang: (p.cabang as string) ?? '',
+          se: (p.se as string) ?? '',
+          customer: (p.customer as string) ?? '',
+          phone: (p.phone as string) ?? '',
+          tglPenawaran: (p.tglPenawaran as string) ?? null,
+          tglPO: (p.tglPO as string) ?? null,
+          tglDelivery: (p.tglDelivery as string) ?? null,
+          line: (p.line as string) ?? '',
+          uraian: (p.uraian as string) ?? '',
+          qty: Number(p.qty) || 0,
+          value: Number(p.value) || 0,
+          materials: (p.materials ?? []) as Prisma.InputJsonValue,
+          kondisiStock: (p.kondisiStock as string) ?? '',
+          keterangan: (p.keterangan as string) ?? '',
+          status: Number(p.status) || 0,
+          penawaranTerkirim: !!p.penawaranTerkirim,
+          qcdQuality: (p.qcdQuality as string) ?? '',
+          qcdCost: (p.qcdCost as string) ?? '',
+          qcdDelivery: (p.qcdDelivery as string) ?? '',
+          qcdKompetitor: (p.qcdKompetitor as string) ?? '',
+          qcdCatatan: (p.qcdCatatan as string) ?? '',
+        })),
+      });
+    }
+
+    await tx.customer.deleteMany({});
+    if (customers.length > 0) {
+      await tx.customer.createMany({
+        data: customers.map((c) => ({
+          id: String(c.id),
+          name: (c.name as string) ?? '',
+          cabang: (c.cabang as string) ?? '',
+          pic: (c.pic as string) ?? '',
+          phone: (c.phone as string) ?? '',
+          email: (c.email as string) ?? '',
+          address: (c.address as string) ?? '',
+          catatan: (c.catatan as string) ?? '',
+        })),
+      });
+    }
+
+    await tx.rfq.deleteMany({});
+    if (rfqs.length > 0) {
+      await tx.rfq.createMany({
+        data: rfqs.map((r) => ({
+          id: String(r.id),
+          noRfq: (r.noRfq as string) ?? '',
+          tglRfq: (r.tglRfq as string) ?? '',
+          cabang: (r.cabang as string) ?? '',
+          customer: (r.customer as string) ?? '',
+          requestedBy: (r.requestedBy as string) ?? '',
+          prospectId: (r.prospectId as string) ?? null,
+          items: (r.items ?? []) as Prisma.InputJsonValue,
+          status: (r.status as string) ?? 'Draft',
+        })),
+      });
+    }
+
+    if (users.length > 0) {
+      await tx.user.deleteMany({});
+      await tx.user.createMany({
+        data: users.map((u) => ({
+          id: String(u.id),
+          username: String(u.username),
+          name: (u.name as string) ?? '',
+          role: (u.role as 'admin' | 'gm' | 'rm' | 'bm' | 'sales') ?? 'sales',
+          se: (u.se as string) ?? '',
+          cabang: (u.cabang as string) ?? '',
+          reg: u.reg == null || u.reg === '' ? null : Number(u.reg),
+          passwordHash: String(u.passwordHash),
+        })),
+      });
+    }
+  });
+
+  emitCrmEvent('database:restored', { at: new Date().toISOString() });
+  return NextResponse.json({ ok: true });
+}
