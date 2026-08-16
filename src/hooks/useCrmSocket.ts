@@ -1,18 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { io, type Socket } from 'socket.io-client';
+import { getSocket } from '@/lib/socket-client';
 import { useDataStore } from '@/store/useDataStore';
 import type { Customer, Prospect, PurchasingContact, Rfq, SafeUser } from '@/lib/types';
-
-let socket: Socket | null = null;
-
-function getSocket(): Socket {
-  if (!socket) {
-    socket = io({ path: '/socket.io' });
-  }
-  return socket;
-}
 
 /**
  * Subscribes the shared data store to server-pushed change events so every

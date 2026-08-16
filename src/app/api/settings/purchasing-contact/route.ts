@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
+import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -29,5 +30,12 @@ export async function PUT(req: Request) {
   });
 
   emitCrmEvent('purchasingContact:updated', contact);
+  await logActivity({
+    user,
+    action: 'update',
+    entity: 'setting',
+    entityId: KEY,
+    summary: `Mengubah kontak Purchasing (WA: ${contact.wa || '-'}, Email: ${contact.email || '-'})`,
+  });
   return NextResponse.json({ purchasingContact: contact });
 }

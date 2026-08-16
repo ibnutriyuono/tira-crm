@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity';
 import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 
@@ -14,6 +15,15 @@ export async function GET() {
     prisma.rfq.findMany(),
     prisma.user.findMany(),
   ]);
+
+  // A full export carries every password hash off the server — worth an audit
+  // entry on its own, not just the mutations.
+  await logActivity({
+    user,
+    action: 'export',
+    entity: 'database',
+    summary: `Mengunduh backup database (${prospects.length} prospek, ${customers.length} customer, ${rfqs.length} RFQ, ${users.length} user)`,
+  });
 
   return NextResponse.json({
     app: 'CRM Prospect Steel Division',

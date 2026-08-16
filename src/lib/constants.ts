@@ -19,6 +19,31 @@ export const BULAN_LIST = [
   { v: '09', l: 'September' }, { v: '10', l: 'Oktober' }, { v: '11', l: 'November' }, { v: '12', l: 'Desember' },
 ];
 
+// Client-safe activity-log labels. Kept here rather than in src/lib/activity.ts
+// because that module pulls in Prisma and must stay server-only.
+export const ACTIVITY_ACTION_META: Record<string, { label: string; color: string }> = {
+  login: { label: 'Login', color: 'steel' },
+  login_failed: { label: 'Login Gagal', color: 'rust' },
+  logout: { label: 'Logout', color: 'slate' },
+  create: { label: 'Tambah', color: 'green' },
+  update: { label: 'Ubah', color: 'amber' },
+  status_change: { label: 'Ubah Status', color: 'amber' },
+  delete: { label: 'Hapus', color: 'rust' },
+  import: { label: 'Import', color: 'steel' },
+  export: { label: 'Export', color: 'slate' },
+  restore: { label: 'Pulihkan', color: 'rust' },
+};
+
+export const ACTIVITY_ENTITY_LABEL: Record<string, string> = {
+  prospect: 'Prospek',
+  customer: 'Customer',
+  rfq: 'RFQ',
+  user: 'User',
+  setting: 'Pengaturan',
+  database: 'Database',
+  session: 'Sesi',
+};
+
 export const RFQ_LOKAL_OPTIONS = [
   { v: 'LOKAL', l: 'Lokal' },
   { v: 'IMPORT', l: 'Import' },

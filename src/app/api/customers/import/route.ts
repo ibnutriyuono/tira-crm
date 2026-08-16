@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity';
 import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -44,5 +45,11 @@ export async function POST(req: Request) {
   });
 
   emitCrmEvent('customer:bulk-imported', { mode, count: created.length });
+  await logActivity({
+    user,
+    action: 'import',
+    entity: 'customer',
+    summary: `Import Excel ${created.length} customer (mode: ${mode === 'replace' ? 'ganti semua data' : 'tambahkan'})`,
+  });
   return NextResponse.json({ count: created.length });
 }

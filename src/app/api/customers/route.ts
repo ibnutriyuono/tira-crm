@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -31,5 +32,6 @@ export async function POST(req: Request) {
   });
 
   emitCrmEvent('customer:created', customer);
+  await logActivity({ user, action: 'create', entity: 'customer', entityId: customer.id, summary: `Menambah customer "${customer.name}"` });
   return NextResponse.json({ customer }, { status: 201 });
 }

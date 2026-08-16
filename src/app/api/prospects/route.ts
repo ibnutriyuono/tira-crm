@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prospectScopeWhere } from '@/lib/auth';
+import { logActivity } from '@/lib/activity';
 import { deriveFromMaterials, isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -58,5 +59,12 @@ export async function POST(req: Request) {
   });
 
   emitCrmEvent('prospect:created', prospect);
+  await logActivity({
+    user,
+    action: 'create',
+    entity: 'prospect',
+    entityId: prospect.id,
+    summary: `Menambah prospek "${prospect.customer}"`,
+  });
   return NextResponse.json({ prospect }, { status: 201 });
 }

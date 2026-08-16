@@ -15,6 +15,7 @@ export type ModalKey =
   | 'rfq'
   | 'qcd'
   | 'quotation'
+  | 'activity'
   | null;
 
 export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq';

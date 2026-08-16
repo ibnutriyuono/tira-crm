@@ -1,9 +1,21 @@
 import bcrypt from 'bcryptjs';
 import { NextResponse } from 'next/server';
 import { toSafeUser } from '@/lib/auth';
+import { diffFields, logActivity, USER_FIELD_LABELS } from '@/lib/activity';
 import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import type { ActivityChanges } from '@/lib/types';
+
+/**
+ * The audit log is readable by more people than the user table is, so a
+ * password change is recorded as *that it happened* and never as the hashes
+ * themselves — those would otherwise sit in `changes` in plain view.
+ */
+function redactPassword(changes: ActivityChanges | null): ActivityChanges | null {
+  if (!changes?.passwordHash) return changes;
+  return { ...changes, passwordHash: { label: 'Password', from: '••••••', to: '•••••• (diubah)' } };
+}
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -46,6 +58,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const safe = toSafeUser(updated);
   emitCrmEvent('user:updated', safe);
+  await logActivity({
+    user,
+    action: 'update',
+    entity: 'user',
+    entityId: safe.id,
+    summary: `Mengubah user "${safe.username}" (${safe.name})`,
+    changes: redactPassword(diffFields(target, updated, USER_FIELD_LABELS)),
+  });
   return NextResponse.json({ user: safe });
 }
 
@@ -67,5 +87,12 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   await prisma.user.delete({ where: { id } });
   emitCrmEvent('user:deleted', { id });
+  await logActivity({
+    user,
+    action: 'delete',
+    entity: 'user',
+    entityId: id,
+    summary: `Menghapus user "${target.username}" (${target.name})`,
+  });
   return NextResponse.json({ ok: true });
 }

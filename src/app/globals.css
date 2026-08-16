@@ -246,6 +246,7 @@ td.center{text-align:center;}
 .overlay.show{display:flex;}
 .modal{background:var(--surface); border-radius:8px; width:100%; max-width:640px; box-shadow:var(--shadow-2); max-height:92vh; display:flex; flex-direction:column;}
 .modal.wide{max-width:640px;}
+.modal.xwide{max-width:1140px;}
 .modal-head{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border); flex:0 0 auto;}
 .modal > form{display:flex; flex-direction:column; flex:1 1 auto; min-height:0; overflow:hidden;}
 .modal-head h3{margin:0; font-size:20px; font-weight:600;}
@@ -293,6 +294,27 @@ td.center{text-align:center;}
 .simple-table td{padding:8px 6px; border-bottom:1px solid var(--border); font-size:12.8px;}
 .toolbar-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px;}
 .toolbar-row .search-grow{margin-left:auto; min-width:200px;}
+
+/* ===== Activity log ===== */
+.activity-filters{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;}
+.activity-filters .search-field{min-width:200px;}
+.activity-table-wrap{overflow-x:auto;}
+.activity-table{min-width:900px;}
+.activity-table td{vertical-align:top;}
+.activity-when{white-space:nowrap; font-size:11.5px; color:var(--text-soft);}
+.activity-ip{white-space:nowrap; font-size:11.5px; color:var(--text-soft);}
+.activity-actor{font-weight:600;}
+.activity-actor-sub{font-size:11px; color:var(--text-soft);}
+.activity-empty{text-align:center; color:var(--text-soft); padding:40px 10px;}
+.activity-toggle{
+  background:none; border:none; padding:2px 0; margin-top:3px;
+  font-size:11px; font-weight:600; color:var(--steel-600); text-decoration:underline;
+}
+.activity-changes{margin:6px 0 2px; padding:8px 10px; list-style:none; background:var(--bg); border:1px solid var(--border); border-radius:5px;}
+.activity-changes li{font-size:11.5px; line-height:1.7; word-break:break-word;}
+.activity-changes b{color:var(--graphite-900);}
+.activity-changes .from{color:var(--rust-600); text-decoration:line-through;}
+.activity-changes .to{color:var(--green-600); font-weight:600;}
 
 /* ===== Toast ===== */
 #toastHost{position:fixed; bottom:20px; right:20px; z-index:200; display:flex; flex-direction:column; gap:8px;}

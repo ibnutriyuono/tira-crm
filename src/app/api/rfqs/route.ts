@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -29,5 +30,12 @@ export async function POST(req: Request) {
   });
 
   emitCrmEvent('rfq:created', rfq);
+  await logActivity({
+    user,
+    action: 'create',
+    entity: 'rfq',
+    entityId: rfq.id,
+    summary: `Membuat RFQ ${rfq.noRfq || '(tanpa nomor)'} untuk "${rfq.customer || '-'}" (${rfq.status})`,
+  });
   return NextResponse.json({ rfq }, { status: 201 });
 }
