@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { prospectScopeWhere } from '@/lib/auth';
+import { diffFields, logActivity, PROSPECT_FIELD_LABELS } from '@/lib/activity';
 import { deriveFromMaterials, isResponse, requireUser } from '@/lib/api-helpers';
+import { STATUS_META } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Material, SafeUser } from '@/lib/types';
+
+const statusLabel = (v: unknown) => STATUS_META[Number(v)]?.label ?? String(v);
 
 async function assertInScope(user: SafeUser, id: string) {
   const existing = await prisma.prospect.findUnique({ where: { id } });
@@ -67,6 +70,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   });
 
   emitCrmEvent('prospect:updated', prospect);
+  await logActivity({
+    user,
+    action: 'update',
+    entity: 'prospect',
+    entityId: prospect.id,
+    summary: `Mengubah prospek "${prospect.customer}"`,
+    changes: diffFields(scoped.existing, prospect, PROSPECT_FIELD_LABELS),
+  });
   return NextResponse.json({ prospect });
 }
 
@@ -91,6 +102,24 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const prospect = await prisma.prospect.update({ where: { id }, data });
   emitCrmEvent('prospect:updated', prospect);
+
+  // A bare status flip is the kanban drag (or the inline status dropdown), and
+  // it's the single most useful thing to see in the audit trail — give it its
+  // own action and a summary that names both ends of the move.
+  const changes = diffFields(scoped.existing, prospect, PROSPECT_FIELD_LABELS);
+  const movedStatus = changes?.status;
+  await logActivity({
+    user,
+    action: movedStatus ? 'status_change' : 'update',
+    entity: 'prospect',
+    entityId: prospect.id,
+    summary: movedStatus
+      ? `Memindahkan prospek "${prospect.customer}" dari "${statusLabel(movedStatus.from)}" ke "${statusLabel(movedStatus.to)}"`
+      : changes?.penawaranTerkirim
+        ? `Menandai penawaran prospek "${prospect.customer}" sebagai ${prospect.penawaranTerkirim ? 'Terkirim' : 'Pending'}`
+        : `Mengubah prospek "${prospect.customer}"`,
+    changes,
+  });
   return NextResponse.json({ prospect });
 }
 
@@ -104,5 +133,12 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   await prisma.prospect.delete({ where: { id } });
   emitCrmEvent('prospect:deleted', { id });
+  await logActivity({
+    user,
+    action: 'delete',
+    entity: 'prospect',
+    entityId: id,
+    summary: `Menghapus prospek "${scoped.existing.customer}"`,
+  });
   return NextResponse.json({ ok: true });
 }

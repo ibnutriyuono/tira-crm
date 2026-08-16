@@ -7,7 +7,7 @@ import { useUiStore } from '@/store/useUiStore';
 import { api } from '@/lib/api-client';
 import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { classify, num, todayStr } from '@/lib/format';
-import { IconCustomers, IconDatabase, IconDownload, IconPlus, IconRfq, IconSave, IconUpload, IconUsers } from './icons';
+import { IconActivity, IconCustomers, IconDatabase, IconDownload, IconPlus, IconRfq, IconSave, IconUpload, IconUsers } from './icons';
 
 const ROLE_LABEL: Record<string, { label: string; color: string }> = {
   admin: { label: 'Admin', color: 'amber' },
@@ -123,6 +123,11 @@ export function TopBar() {
           <button className="btn btn-ghost-dark" onClick={() => openModal('rfqManage')}>
             <IconRfq />
             Kelola RFQ
+          </button>
+          {/* Open to every role — the API scopes what each one is allowed to read. */}
+          <button className="btn btn-ghost-dark" onClick={() => openModal('activity')}>
+            <IconActivity />
+            Log Aktivitas
           </button>
           <button className="btn btn-ghost-dark" onClick={downloadTemplate}>
             <IconDownload />

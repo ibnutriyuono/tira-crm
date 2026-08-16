@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { CUSTOMER_FIELD_LABELS, diffFields, logActivity } from '@/lib/activity';
 import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -11,6 +12,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const body = await req.json().catch(() => null);
   const name = String(body?.name || '').trim();
   if (!name) return NextResponse.json({ error: 'Nama customer wajib diisi' }, { status: 400 });
+
+  const existing = await prisma.customer.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: 'Customer tidak ditemukan' }, { status: 404 });
 
   const customer = await prisma.customer.update({
     where: { id },
@@ -26,6 +30,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   });
 
   emitCrmEvent('customer:updated', customer);
+  await logActivity({
+    user,
+    action: 'update',
+    entity: 'customer',
+    entityId: customer.id,
+    summary: `Mengubah customer "${customer.name}"`,
+    changes: diffFields(existing, customer, CUSTOMER_FIELD_LABELS),
+  });
   return NextResponse.json({ customer });
 }
 
@@ -37,8 +49,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const body = await req.json().catch(() => null);
   if (typeof body?.phone !== 'string') return NextResponse.json({ error: 'Tidak ada perubahan' }, { status: 400 });
 
+  const existing = await prisma.customer.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: 'Customer tidak ditemukan' }, { status: 404 });
+
   const customer = await prisma.customer.update({ where: { id }, data: { phone: body.phone } });
   emitCrmEvent('customer:updated', customer);
+  await logActivity({
+    user,
+    action: 'update',
+    entity: 'customer',
+    entityId: customer.id,
+    summary: `Mengubah nomor WhatsApp customer "${customer.name}"`,
+    changes: diffFields(existing, customer, CUSTOMER_FIELD_LABELS),
+  });
   return NextResponse.json({ customer });
 }
 
@@ -49,7 +72,15 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (adminErr) return adminErr;
   const { id } = await params;
 
+  const existing = await prisma.customer.findUnique({ where: { id } });
   await prisma.customer.delete({ where: { id } });
   emitCrmEvent('customer:deleted', { id });
+  await logActivity({
+    user,
+    action: 'delete',
+    entity: 'customer',
+    entityId: id,
+    summary: `Menghapus customer "${existing?.name ?? id}"`,
+  });
   return NextResponse.json({ ok: true });
 }

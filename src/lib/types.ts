@@ -90,3 +90,36 @@ export interface PurchasingContact {
 }
 
 export type Klasifikasi = 'Aktif' | 'Won' | 'Lost';
+
+export type ActivityAction =
+  | 'login'
+  | 'login_failed'
+  | 'logout'
+  | 'create'
+  | 'update'
+  | 'status_change'
+  | 'delete'
+  | 'import'
+  | 'export'
+  | 'restore';
+
+export type ActivityEntity = 'prospect' | 'customer' | 'rfq' | 'user' | 'setting' | 'database' | 'session';
+
+export type ActivityChanges = Record<string, { label: string; from: unknown; to: unknown }>;
+
+export interface ActivityLog {
+  id: string;
+  createdAt: string;
+  userId: string | null;
+  username: string;
+  actorName: string;
+  role: Role | null;
+  actorCabang: string | null;
+  actorReg: number | null;
+  action: ActivityAction;
+  entity: ActivityEntity;
+  entityId: string | null;
+  summary: string;
+  changes: ActivityChanges | null;
+  ip: string | null;
+}

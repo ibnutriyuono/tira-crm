@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logActivity } from '@/lib/activity';
 import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -104,6 +105,15 @@ export async function POST(req: Request) {
     }
   });
 
+  // ActivityLog is intentionally left untouched by the restore: an audit trail
+  // that a restore can erase is not an audit trail. It has no FK to User, so
+  // the user.deleteMany above doesn't cascade into it either.
   emitCrmEvent('database:restored', { at: new Date().toISOString() });
+  await logActivity({
+    user,
+    action: 'restore',
+    entity: 'database',
+    summary: `Memulihkan database dari backup (${prospects.length} prospek, ${customers.length} customer, ${rfqs.length} RFQ, ${users.length} user)`,
+  });
   return NextResponse.json({ ok: true });
 }

@@ -22,6 +22,7 @@ import { CustomerFormModal } from './modals/CustomerFormModal';
 import { ImportModal } from './modals/ImportModal';
 import { DatabaseModal } from './modals/DatabaseModal';
 import { DbImportConfirmModal } from './modals/DbImportConfirmModal';
+import { ActivityLogModal } from './modals/ActivityLogModal';
 import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -98,6 +99,7 @@ export function CrmApp() {
       <RfqModal />
       <QcdModal />
       <QuotationModal />
+      <ActivityLogModal />
       <ToastHost />
     </>
   );

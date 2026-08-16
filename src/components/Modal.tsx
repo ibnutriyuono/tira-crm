@@ -8,13 +8,15 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   wide?: boolean;
+  /** Wider still — for the activity log's six-column table. */
+  xwide?: boolean;
   children: ReactNode;
   footer?: ReactNode;
   /** When provided the body+footer render inside a <form> and this fires on submit. */
   onSubmit?: (e: React.FormEvent<HTMLFormElement>) => void;
 }
 
-export function Modal({ show, onClose, title, wide, children, footer, onSubmit }: ModalProps) {
+export function Modal({ show, onClose, title, wide, xwide, children, footer, onSubmit }: ModalProps) {
   useEffect(() => {
     if (!show) return;
     const onKey = (e: KeyboardEvent) => {
@@ -40,7 +42,7 @@ export function Modal({ show, onClose, title, wide, children, footer, onSubmit }
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className={`modal${wide ? ' wide' : ''}`}>
+      <div className={`modal${wide ? ' wide' : ''}${xwide ? ' xwide' : ''}`}>
         <div className="modal-head">
           <h3>{title}</h3>
           <button type="button" className="close-x" onClick={onClose}>

@@ -97,3 +97,61 @@ model Setting {
   key   String @id
   value Json
 }
+
+enum ActivityAction {
+  login
+  login_failed
+  logout
+  create
+  update
+  status_change
+  delete
+  import
+  export
+  restore
+}
+
+enum ActivityEntity {
+  prospect
+  customer
+  rfq
+  user
+  setting
+  database
+  session
+}
+
+// Append-only audit trail. Every actor field is a *snapshot* taken at write
+// time rather than a relation: an audit log has to stay readable after the
+// user row is renamed, re-scoped, or deleted, so there is deliberately no
+// foreign key back to User. actorCabang/actorReg are copied for the same
+// reason — they let rm/bm read their own team's history (see
+// activityScopeWhere) without joining a row that may no longer exist.
+model ActivityLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId      String?
+  username    String
+  actorName   String
+  role        Role?
+  actorCabang String?
+  actorReg    Int?
+
+  action   ActivityAction
+  entity   ActivityEntity
+  entityId String?
+  /// Pre-rendered Indonesian one-liner, so the UI never has to reconstruct
+  /// what an old record used to mean after labels or code change.
+  summary  String
+  /// Field-level diff for updates: { field: { from, to } }. Null otherwise.
+  changes  Json?
+  ip       String?
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([action])
+  @@index([actorCabang])
+  @@index([actorReg])
+}

@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { NextResponse } from 'next/server';
 import { toSafeUser } from '@/lib/auth';
+import { logActivity } from '@/lib/activity';
 import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -48,5 +49,12 @@ export async function POST(req: Request) {
 
   const safe = toSafeUser(created);
   emitCrmEvent('user:created', safe);
+  await logActivity({
+    user,
+    action: 'create',
+    entity: 'user',
+    entityId: safe.id,
+    summary: `Menambah user "${safe.username}" (${safe.name}) dengan role ${safe.role}`,
+  });
   return NextResponse.json({ user: safe }, { status: 201 });
 }
