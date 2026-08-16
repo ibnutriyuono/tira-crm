@@ -1,0 +1,49 @@
+# CRM TIRA — app in Docker, PostgreSQL on the host (outside Docker).
+#
+# Uses host networking so the container can reach the host's Postgres on
+# plain `localhost:5432` with NO changes to postgresql.conf or pg_hba.conf.
+# The app therefore binds PORT directly on the host — nginx keeps proxying
+# to 127.0.0.1:3000 exactly as it does for the systemd setup.
+#
+# Trade-off: `network_mode: host` is Linux-only (it does not behave the same
+# on Docker Desktop for Mac/Windows) and skips container network isolation.
+# For a single-app VPS that's a reasonable deal. See the commented bridge
+# alternative at the bottom if you'd rather keep isolation.
+
+services:
+  app:
+    build: .
+    image: tira-crm:latest
+    container_name: tira-crm
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+# ---------------------------------------------------------------------------
+# Bridge-network alternative (keeps isolation, needs Postgres config changes):
+#
+#   services:
+#     app:
+#       build: .
+#       restart: unless-stopped
+#       ports:
+#         - "3031:3000"          # nginx no longer required
+#       env_file: [.env]
+#       extra_hosts:
+#         - "host.docker.internal:host-gateway"
+#
+# Then in .env point the DB at the host gateway instead of localhost:
+#   DATABASE_URL="postgresql://tira_crm:PASS@host.docker.internal:5432/tira_crm?schema=public"
+#
+# ...and allow the Docker bridge subnet to reach Postgres on the host:
+#   /etc/postgresql/*/main/postgresql.conf ->  listen_addresses = 'localhost,172.17.0.1'
+#   /etc/postgresql/*/main/pg_hba.conf     ->  host all all 172.16.0.0/12 scram-sha-256
+#   sudo systemctl restart postgresql
+# ---------------------------------------------------------------------------

@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  gm
+  rm
+  bm
+  sales
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  name         String
+  role         Role
+  se           String?
+  cabang       String?
+  reg          Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  cabang    String?
+  pic       String?
+  phone     String?
+  email     String?
+  address   String?
+  catatan   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// A single material line item inside Prospect.materials / Rfq.items is stored
+// as JSON (see src/lib/types.ts for the shape) rather than a child table —
+// it mirrors the original app's in-record arrays and keeps CRUD to one write.
+model Prospect {
+  id                String   @id @default(cuid())
+  reg               Int?
+  cabang            String?
+  se                String?
+  customer          String
+  phone             String?
+  tglPenawaran      String?
+  tglPO             String?
+  tglDelivery       String?
+  line              String?
+  uraian            String?
+  qty               Float    @default(0)
+  value             Float    @default(0)
+  materials         Json
+  kondisiStock      String?
+  keterangan        String?
+  status            Int      @default(0)
+  penawaranTerkirim Boolean  @default(false)
+  qcdQuality        String?
+  qcdCost           String?
+  qcdDelivery       String?
+  qcdKompetitor     String?
+  qcdCatatan        String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([status])
+  @@index([cabang])
+  @@index([se])
+  @@index([reg])
+}
+
+model Rfq {
+  id          String   @id @default(cuid())
+  noRfq       String?
+  tglRfq      String?
+  cabang      String?
+  customer    String?
+  requestedBy String?
+  prospectId  String?
+  items       Json
+  status      String   @default("Draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Small key/value bag for app-wide settings — currently just the
+// remembered Purchasing WhatsApp/email contact used to prefill the RFQ modal.
+model Setting {
+  key   String @id
+  value Json
+}
+
+enum ActivityAction {
+  login
+  login_failed
+  logout
+  create
+  update
+  status_change
+  delete
+  import
+  export
+  restore
+}
+
+enum ActivityEntity {
+  prospect
+  customer
+  rfq
+  user
+  setting
+  database
+  session
+}
+
+// Append-only audit trail. Every actor field is a *snapshot* taken at write
+// time rather than a relation: an audit log has to stay readable after the
+// user row is renamed, re-scoped, or deleted, so there is deliberately no
+// foreign key back to User. actorCabang/actorReg are copied for the same
+// reason — they let rm/bm read their own team's history (see
+// activityScopeWhere) without joining a row that may no longer exist.
+model ActivityLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId      String?
+  username    String
+  actorName   String
+  role        Role?
+  actorCabang String?
+  actorReg    Int?
+
+  action   ActivityAction
+  entity   ActivityEntity
+  entityId String?
+  /// Pre-rendered Indonesian one-liner, so the UI never has to reconstruct
+  /// what an old record used to mean after labels or code change.
+  summary  String
+  /// Field-level diff for updates: { field: { from, to } }. Null otherwise.
+  changes  Json?
+  ip       String?
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([action])
+  @@index([actorCabang])
+  @@index([actorReg])
+}
