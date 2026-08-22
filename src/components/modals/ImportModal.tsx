@@ -5,7 +5,7 @@ import type { WorkBook } from 'xlsx';
 import { Modal } from '../Modal';
 import { IconUpload } from '../icons';
 import { formatRupiah, num } from '@/lib/format';
-import { parseSheetToCustomerRecords, parseSheetToRecords, type ParseResult } from '@/lib/excel-import';
+import { parseSheetToCustomerRecords, parseSheetToRecords, parseSheetToVendorRecords, type ParseResult } from '@/lib/excel-import';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -18,6 +18,7 @@ export function ImportModal() {
 
   const refetchProspects = useDataStore((s) => s.refetchProspects);
   const refetchCustomers = useDataStore((s) => s.refetchCustomers);
+  const refetchVendors = useDataStore((s) => s.refetchVendors);
   const toast = useDataStore((s) => s.toast);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -43,7 +44,9 @@ export function ImportModal() {
   }
 
   function parseFor(aoa: unknown[][]): ParseResult {
-    return target === 'customer' ? parseSheetToCustomerRecords(aoa) : parseSheetToRecords(aoa);
+    if (target === 'customer') return parseSheetToCustomerRecords(aoa);
+    if (target === 'vendor') return parseSheetToVendorRecords(aoa);
+    return parseSheetToRecords(aoa);
   }
 
   function applyPreview(wb: WorkBook, sheet: string, XLSXmod: typeof import('xlsx')) {
@@ -99,7 +102,11 @@ export function ImportModal() {
     if (parsed.length === 0) return toast('Tidak ada data untuk diimport', 'error');
     setBusy(true);
     try {
-      if (target === 'customer') {
+      if (target === 'vendor') {
+        const { count } = await api.post<{ count: number }>('/api/vendors/import', { records: parsed, mode });
+        await refetchVendors();
+        toast(`Import berhasil: ${count} data vendor ${mode === 'replace' ? 'menggantikan' : 'ditambahkan ke'} database`, 'success');
+      } else if (target === 'customer') {
         const { count } = await api.post<{ count: number }>('/api/customers/import', { records: parsed, mode });
         await refetchCustomers();
         toast(`Import berhasil: ${count} data customer ${mode === 'replace' ? 'menggantikan' : 'ditambahkan ke'} database`, 'success');
@@ -117,8 +124,14 @@ export function ImportModal() {
     }
   }
 
-  const title = target === 'customer' ? 'Import Data Customer dari Excel' : 'Import Data Prospek dari Excel';
-  const hint = target === 'customer' ? 'Header sheet harus memiliki kolom NAMA CUSTOMER (atau CUSTOMER / NAMA)' : 'Mendukung file dengan format seperti PROSPECT LIST (header berisi kolom CUSTOMER)';
+  const title =
+    target === 'vendor' ? 'Import Data Vendor dari Excel' : target === 'customer' ? 'Import Data Customer dari Excel' : 'Import Data Prospek dari Excel';
+  const hint =
+    target === 'vendor'
+      ? 'Header sheet harus memiliki kolom NAMA VENDOR (atau VENDOR / SUPPLIER)'
+      : target === 'customer'
+        ? 'Header sheet harus memiliki kolom NAMA CUSTOMER (atau CUSTOMER / NAMA)'
+        : 'Mendukung file dengan format seperti PROSPECT LIST (header berisi kolom CUSTOMER)';
 
   return (
     <Modal
@@ -193,6 +206,10 @@ export function ImportModal() {
             {parseError ? (
               <>
                 <b style={{ color: 'var(--rust-500)' }}>Gagal membaca sheet:</b> {parseError}
+              </>
+            ) : target === 'vendor' ? (
+              <>
+                Ditemukan <b>{parsed.length}</b> baris data vendor pada sheet &quot;<b>{sheetName}</b>&quot;.
               </>
             ) : target === 'customer' ? (
               <>

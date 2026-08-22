@@ -9,6 +9,7 @@ const DEMO_USERS: { username: string; name: string; role: Role; se?: string; cab
   { username: 'rm', name: 'Regional Manager Demo', role: 'rm', reg: 2, password: 'rm123' },
   { username: 'bm', name: 'Branch Manager Demo', role: 'bm', cabang: 'DKI', password: 'bm123' },
   { username: 'sales', name: 'Sales Demo', role: 'sales', se: 'DEMO', cabang: 'DKI', password: 'sales123' },
+  { username: 'purchasing', name: 'Purchasing Demo', role: 'purchasing', password: 'purchasing123' },
 ];
 
 // Same seed prospect rows as the original single-file app, so a fresh install

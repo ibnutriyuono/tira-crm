@@ -16,9 +16,17 @@ export type ModalKey =
   | 'qcd'
   | 'quotation'
   | 'activity'
+  | 'vendors'
+  | 'vendorForm'
+  | 'fupa'
+  | 'fupaManage'
+  | 'purchasing'
+  | 'customerIntel'
+  | 'competitorLog'
+  | 'forecast'
   | null;
 
-export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq';
+export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq' | 'vendor' | 'fupa';
 
 export interface DeleteCtx {
   mode: DeleteMode;
@@ -72,10 +80,12 @@ interface UiState {
   followUpCtx: FollowUpCtx | null;
   userEditId: string | null;
   customerEditId: string | null;
+  vendorEditId: string | null;
+  fupaCtx: { fupaId: string | null; sourceRfqId: string | null } | null;
   quotationProspectId: string | null;
   rfqCtx: RfqCtx | null;
   qcdCtx: QcdCtx | null;
-  importTarget: 'prospect' | 'customer';
+  importTarget: 'prospect' | 'customer' | 'vendor';
   /** Staged QCD answers for a prospect still being created/edited in the form modal — committed together on Save. */
   pendingProspectQCD: { quality: string; cost: string; delivery: string; kompetitor: string; catatan: string };
 
@@ -144,6 +154,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   followUpCtx: null,
   userEditId: null,
   customerEditId: null,
+  vendorEditId: null,
+  fupaCtx: null,
   quotationProspectId: null,
   rfqCtx: null,
   qcdCtx: null,

@@ -36,6 +36,17 @@ export const CUSTOMER_COL_ALIASES: Record<string, string[]> = {
 };
 export const CUSTOMER_FIELD_TYPES: Record<string, string> = { name: 'string', cabang: 'upper', pic: 'string', phone: 'string', email: 'string', address: 'string', catatan: 'string' };
 
+export const VENDOR_COL_ALIASES: Record<string, string[]> = {
+  nama: ['NAMA VENDOR', 'VENDOR', 'NAMA', 'SUPPLIER', 'NAMA SUPPLIER'],
+  pic: ['PIC', 'KONTAK', 'CONTACT PERSON', 'NAMA PIC'],
+  wa: ['NO WHATSAPP', 'NO WA', 'WHATSAPP', 'NO TELP', 'TELEPON', 'NO HP', 'PHONE'],
+  email: ['EMAIL', 'E MAIL'],
+  kategori: ['KATEGORI', 'CATEGORY', 'JENIS', 'PRODUK'],
+  alamat: ['ALAMAT', 'ADDRESS'],
+  catatan: ['CATATAN', 'NOTES', 'KETERANGAN'],
+};
+export const VENDOR_FIELD_TYPES: Record<string, string> = { nama: 'string', pic: 'string', wa: 'string', email: 'string', kategori: 'string', alamat: 'string', catatan: 'string' };
+
 function normHeader(v: unknown): string {
   return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
 }
@@ -117,4 +128,7 @@ export function parseSheetToRecords(aoa: unknown[][]): ParseResult {
 }
 export function parseSheetToCustomerRecords(aoa: unknown[][]): ParseResult {
   return parseSheetGeneric(aoa, CUSTOMER_COL_ALIASES, CUSTOMER_FIELD_TYPES, 'name', 'NAMA CUSTOMER');
+}
+export function parseSheetToVendorRecords(aoa: unknown[][]): ParseResult {
+  return parseSheetGeneric(aoa, VENDOR_COL_ALIASES, VENDOR_FIELD_TYPES, 'nama', 'NAMA VENDOR');
 }

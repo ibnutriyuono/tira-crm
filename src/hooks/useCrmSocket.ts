@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { getSocket } from '@/lib/socket-client';
 import { useDataStore } from '@/store/useDataStore';
-import type { Customer, Prospect, PurchasingContact, Rfq, SafeUser } from '@/lib/types';
+import type { BudgetTarget, Customer, Fupa, Prospect, PurchasingContact, Rfq, SafeUser, Vendor } from '@/lib/types';
 
 /**
  * Subscribes the shared data store to server-pushed change events so every
@@ -26,6 +26,15 @@ export function useCrmSocket() {
 
     const onRfqUpsert = (r: Rfq) => useDataStore.getState().upsertRfq(r);
     const onRfqDelete = ({ id }: { id: string }) => useDataStore.getState().removeRfq(id);
+
+    const onFupaUpsert = (f: Fupa) => useDataStore.getState().upsertFupa(f);
+    const onFupaDelete = ({ id }: { id: string }) => useDataStore.getState().removeFupa(id);
+
+    const onBudgetUpsert = (b: BudgetTarget) => useDataStore.getState().upsertBudgetTarget(b);
+
+    const onVendorUpsert = (v: Vendor) => useDataStore.getState().upsertVendor(v);
+    const onVendorDelete = ({ id }: { id: string }) => useDataStore.getState().removeVendor(id);
+    const onVendorBulk = () => useDataStore.getState().refetchVendors();
 
     const onUserUpsert = (u: SafeUser) => useDataStore.getState().upsertUser(u);
     const onUserDelete = ({ id }: { id: string }) => useDataStore.getState().removeUser(id);
@@ -50,6 +59,17 @@ export function useCrmSocket() {
     s.on('rfq:updated', onRfqUpsert);
     s.on('rfq:deleted', onRfqDelete);
 
+    s.on('fupa:created', onFupaUpsert);
+    s.on('fupa:updated', onFupaUpsert);
+    s.on('fupa:deleted', onFupaDelete);
+
+    s.on('budget:updated', onBudgetUpsert);
+
+    s.on('vendor:created', onVendorUpsert);
+    s.on('vendor:updated', onVendorUpsert);
+    s.on('vendor:deleted', onVendorDelete);
+    s.on('vendor:bulk-imported', onVendorBulk);
+
     s.on('user:created', onUserUpsert);
     s.on('user:updated', onUserUpsert);
     s.on('user:deleted', onUserDelete);
@@ -66,6 +86,14 @@ export function useCrmSocket() {
       s.off('customer:updated', onCustomerUpsert);
       s.off('customer:deleted', onCustomerDelete);
       s.off('customer:bulk-imported', onCustomerBulk);
+      s.off('fupa:created', onFupaUpsert);
+      s.off('fupa:updated', onFupaUpsert);
+      s.off('fupa:deleted', onFupaDelete);
+      s.off('budget:updated', onBudgetUpsert);
+      s.off('vendor:created', onVendorUpsert);
+      s.off('vendor:updated', onVendorUpsert);
+      s.off('vendor:deleted', onVendorDelete);
+      s.off('vendor:bulk-imported', onVendorBulk);
       s.off('rfq:created', onRfqUpsert);
       s.off('rfq:updated', onRfqUpsert);
       s.off('rfq:deleted', onRfqDelete);

@@ -124,6 +124,32 @@ export function TopBar() {
             <IconRfq />
             Kelola RFQ
           </button>
+          <button className="btn btn-ghost-dark" onClick={() => openModal('purchasing')}>
+            <IconRfq />
+            Monitor Purchasing
+          </button>
+          <button className="btn btn-ghost-dark" onClick={() => openModal('fupaManage')}>
+            <IconRfq />
+            Kelola FUP A
+          </button>
+          {/* Readable by every role so anyone can see who was asked to quote;
+              the API restricts writes to purchasing/admin. */}
+          <button className="btn btn-ghost-dark" onClick={() => openModal('vendors')}>
+            <IconCustomers />
+            Kelola Vendor
+          </button>
+          <button className="btn btn-ghost-dark" onClick={() => openModal('forecast')}>
+            <IconActivity />
+            Forecast &amp; Target
+          </button>
+          <button className="btn btn-ghost-dark" onClick={() => openModal('customerIntel')}>
+            <IconCustomers />
+            Customer Intel
+          </button>
+          <button className="btn btn-ghost-dark" onClick={() => openModal('competitorLog')}>
+            <IconActivity />
+            Log Kompetitor
+          </button>
           {/* Open to every role — the API scopes what each one is allowed to read. */}
           <button className="btn btn-ghost-dark" onClick={() => openModal('activity')}>
             <IconActivity />

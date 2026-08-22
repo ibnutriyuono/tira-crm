@@ -4,6 +4,7 @@ import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Prisma } from '@prisma/client';
+import type { Role } from '@/lib/types';
 
 // Full destructive restore from a .json backup produced by /api/database/export.
 // Admin-only, matches the original app's "Pulihkan Database dari Backup" flow.
@@ -95,7 +96,7 @@ export async function POST(req: Request) {
           id: String(u.id),
           username: String(u.username),
           name: (u.name as string) ?? '',
-          role: (u.role as 'admin' | 'gm' | 'rm' | 'bm' | 'sales') ?? 'sales',
+          role: (u.role as Role) ?? 'sales',
           se: (u.se as string) ?? '',
           cabang: (u.cabang as string) ?? '',
           reg: u.reg == null || u.reg === '' ? null : Number(u.reg),

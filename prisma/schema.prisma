@@ -13,6 +13,7 @@ enum Role {
   rm
   bm
   sales
+  purchasing
 }
 
 model User {
@@ -77,18 +78,184 @@ model Prospect {
   @@index([reg])
 }
 
+// `reg` is denormalized off the source Prospect at write time rather than
+// joined at read time: rm-scoped queries filter on it directly, and a region
+// can't be derived in SQL from `cabang` alone.
 model Rfq {
   id          String   @id @default(cuid())
   noRfq       String?
   tglRfq      String?
   cabang      String?
+  reg         Int?
   customer    String?
   requestedBy String?
   prospectId  String?
   items       Json
   status      String   @default("Draft")
+  // Purchasing-side ladder (PSTATUS_META), independent of the sales `status`.
+  purchStatus Int      @default(0)
+  // Set once this RFQ has been promoted into a FUP A purchase request.
+  fupaId      String?
+  quotations  Quotation[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([cabang])
+  @@index([reg])
+  @@index([requestedBy])
+  @@index([purchStatus])
+}
+
+// Supplier directory for the purchasing module. National, not branch-scoped:
+// purchasing sources for every cabang from the same vendor list.
+model Vendor {
+  id        String   @id @default(cuid())
+  nama      String
+  pic       String?
+  wa        String?
+  email     String?
+  kategori  String?
+  alamat    String?
+  catatan    String?
+  quotations Quotation[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([nama])
+  @@index([kategori])
+}
+
+// FUP A — "Permintaan Pembelian", the purchase request raised from an RFQ the
+// sales side has won. Shares the RfqItem shape (src/lib/types.ts) so the same
+// line-item editor serves both documents.
+model Fupa {
+  id          String   @id @default(cuid())
+  noFupa      String?
+  tglFupa     String?
+  sourceRfqId String?
+  sourceNoRfq String?
+  cabang      String?
+  reg         Int?
+  customer    String?
+  requestedBy String?
+  prospectId  String?
+  items       Json
+  catatan     String?
+  status      String   @default("Draft")
+  purchStatus Int      @default(0)
+  quotations  Quotation[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([cabang])
+  @@index([reg])
+  @@index([requestedBy])
+  @@index([purchStatus])
+  @@index([sourceRfqId])
+}
+
+// One vendor's price response for an RFQ or FUP A. A real table rather than the
+// prototype's embedded array: it keeps the vendor foreign key, makes "every
+// quote from vendor X" answerable, and stops purchasing and sales clobbering
+// each other's edits on the parent document.
+model Quotation {
+  id          String   @id @default(cuid())
+  vendorId    String
+  vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  rfqId       String?
+  rfq         Rfq?     @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  fupaId      String?
+  fupa        Fupa?    @relation(fields: [fupaId], references: [id], onDelete: Cascade)
+  tglDiminta  String?
+  channel     String?
+  harga       Float    @default(0)
+  leadTime    Int      @default(0)
+  catatan     String?
+  isWinner    Boolean  @default(false)
+  requestedBy String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([vendorId])
+  @@index([rfqId])
+  @@index([fupaId])
+}
+
+// Per-branch sales target for one period (YYYY-MM). Editable by admin/gm
+// anywhere and by rm within their own region — see canEditBudgetTarget.
+model BudgetTarget {
+  id        String   @id @default(cuid())
+  cabang    String
+  periode   String
+  amount    Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cabang, periode])
+  @@index([periode])
+}
+
+// Team chat. Replaces the prototype's polling (an 8s timer over a single
+// JSON blob) with rows pushed over the existing Socket.IO connection.
+// `members` holds usernames rather than user ids so a conversation survives
+// a user row being recreated, matching how ActivityLog snapshots its actor.
+model Conversation {
+  id        String   @id @default(cuid())
+  type      String
+  name      String?
+  members   String[]
+  createdBy String
+  messages  Message[]
+  reads     ConversationRead[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author         String
+  authorUsername String
+  role           String?
+  text           String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+// Per-user read cursor, kept out of Conversation so one person opening a
+// thread never writes to a row everyone else is reading.
+model ConversationRead {
+  id             String       @id @default(cuid())
+  username       String
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime     @default(now())
+
+  @@unique([username, conversationId])
+  @@index([username])
+}
+
+// File attachments for RFQ / FUP A. Bytes live in S3-compatible object storage
+// (see src/lib/s3.ts); only the key and display metadata are stored here. The
+// single-file prototype inlined 1.5MB base64 data URLs in the record itself,
+// which is why its limit was so low.
+model Attachment {
+  id         String   @id @default(cuid())
+  rfqId      String?
+  fupaId     String?
+  name       String
+  type       String?
+  size       Int      @default(0)
+  key        String   @unique
+  uploadedBy String?
+  createdAt  DateTime @default(now())
+
+  @@index([rfqId])
+  @@index([fupaId])
 }
 
 // Small key/value bag for app-wide settings — currently just the
@@ -119,6 +286,11 @@ enum ActivityEntity {
   setting
   database
   session
+  vendor
+  fupa
+  quotation
+  budget
+  chat
 }
 
 // Append-only audit trail. Every actor field is a *snapshot* taken at write

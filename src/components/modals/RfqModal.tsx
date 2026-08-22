@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
+import { AttachmentList } from '../AttachmentList';
 import { IconDownload, IconMail, IconPlus, IconSave, IconTrash, IconWa } from '../icons';
 import { RFQ_LOKAL_OPTIONS } from '@/lib/constants';
 import { formatDateID, getProspectMaterials, normalizePhone, num, todayStr } from '@/lib/format';
@@ -312,6 +313,10 @@ export function RfqModal() {
         <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 4 }} onClick={() => setItems((prev) => [...prev, emptyItem()])}>
           <IconPlus /> Tambah Material
         </button>
+      </div>
+      <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+        <label style={{ display: 'block', marginBottom: 8 }}>Lampiran</label>
+        <AttachmentList rfqId={rfqId} />
       </div>
       <div className="form-grid" style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <div>

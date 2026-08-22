@@ -11,7 +11,7 @@ export function DeleteConfirmModal() {
   const show = modal === 'delete';
   const ctx = useUiStore((s) => s.deleteCtx);
   const closeModal = useUiStore((s) => s.closeModal);
-  const { removeProspect, removeUser, removeCustomer, removeRfq, toast } = useDataStore();
+  const { removeProspect, removeUser, removeCustomer, removeRfq, removeVendor, removeFupa, toast } = useDataStore();
   const [busy, setBusy] = useState(false);
 
   if (!ctx) return null;
@@ -27,6 +27,14 @@ export function DeleteConfirmModal() {
         await api.del(`/api/customers/${ctx!.id}`);
         removeCustomer(ctx!.id);
         toast('Customer dihapus', 'success');
+      } else if (ctx!.mode === 'fupa') {
+        await api.del(`/api/fupas/${ctx!.id}`);
+        removeFupa(ctx!.id);
+        toast('FUP A dihapus', 'success');
+      } else if (ctx!.mode === 'vendor') {
+        await api.del(`/api/vendors/${ctx!.id}`);
+        removeVendor(ctx!.id);
+        toast('Vendor dihapus', 'success');
       } else if (ctx!.mode === 'rfq') {
         await api.del(`/api/rfqs/${ctx!.id}`);
         removeRfq(ctx!.id);

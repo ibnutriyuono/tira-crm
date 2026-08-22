@@ -72,5 +72,53 @@ export function prospectScopeWhere(user: SafeUser) {
   if (user.role === 'sales') return { se: { equals: user.se || '', mode: 'insensitive' as const } };
   if (user.role === 'bm') return { cabang: { equals: user.cabang || '', mode: 'insensitive' as const } };
   if (user.role === 'rm') return { reg: user.reg ?? -1 };
+  // Purchasing works the whole country's demand, so it reads every prospect.
+  // Listed explicitly rather than left to the fallthrough so that adding a
+  // future role doesn't silently grant it access to everything.
+  if (user.role === 'purchasing') return {};
   return {}; // gm & admin see everything
+}
+
+/**
+ * Per-role scoping for the purchasing documents (RFQ, FUP A), mirroring the
+ * single-file app's rfqOrFupaScopedForRole(). Unlike prospects — which sales
+ * owns via the `se` initials — these are scoped by who raised the request, so
+ * the caller names the fields on the model being queried.
+ *
+ * rm relies on the denormalized `reg` column written at create time; the
+ * prototype rebuilt a cabang->reg map from prospect rows on every render,
+ * which has no SQL equivalent.
+ */
+export function docScopeWhere(
+  user: SafeUser,
+  fields: { cabangField?: string; requestedByField?: string; regField?: string } = {},
+) {
+  const { cabangField = 'cabang', requestedByField = 'requestedBy', regField = 'reg' } = fields;
+  if (user.role === 'sales') return { [requestedByField]: { equals: user.name, mode: 'insensitive' as const } };
+  if (user.role === 'bm') return { [cabangField]: { equals: user.cabang || '', mode: 'insensitive' as const } };
+  if (user.role === 'rm') return { [regField]: user.reg ?? -1 };
+  return {}; // gm, admin & purchasing see everything
+}
+
+/** Write-side permission for the purchasing module (vendors, quotations, status moves). */
+export function canEditPurchasing(user: SafeUser) {
+  return user.role === 'purchasing' || user.role === 'admin';
+}
+
+/** Who may fill in the purchasing answer on an RFQ / FUP A. */
+export function canEditRfqAnswer(user: SafeUser) {
+  return canEditPurchasing(user) || user.role === 'gm';
+}
+
+/**
+ * Who may set a branch's sales target. rm is limited to branches in their own
+ * region, resolved through the prospect data (a branch has no standalone row).
+ */
+export function canEditBudgetTarget(user: SafeUser, cabang: string, cabangReg?: Record<string, number | null>) {
+  if (user.role === 'admin' || user.role === 'gm') return true;
+  if (user.role === 'rm') {
+    if (!cabangReg) return true; // caller could not resolve the map; region check happens client-side
+    return cabangReg[cabang.toUpperCase()] === (user.reg ?? -1);
+  }
+  return false;
 }

@@ -68,3 +68,10 @@ export function uid(): string {
 export function escapeForFilename(s: string): string {
   return String(s || '').replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 40);
 }
+
+export function formatFileSize(bytes: number): string {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}

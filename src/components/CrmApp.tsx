@@ -8,6 +8,7 @@ import { Filters } from './Filters';
 import { ProspectTable } from './ProspectTable';
 import { KanbanBoard } from './KanbanBoard';
 import { ToastHost } from './ToastHost';
+import { TeamChatWidget } from './TeamChatWidget';
 import { ProspectFormModal } from './modals/ProspectFormModal';
 import { QcdModal } from './modals/QcdModal';
 import { FollowUpModal } from './modals/FollowUpModal';
@@ -18,6 +19,14 @@ import { RfqManageModal } from './modals/RfqManageModal';
 import { UsersModal } from './modals/UsersModal';
 import { UserFormModal } from './modals/UserFormModal';
 import { CustomersModal } from './modals/CustomersModal';
+import { VendorsModal } from './modals/VendorsModal';
+import { VendorFormModal } from './modals/VendorFormModal';
+import { FupaModal } from './modals/FupaModal';
+import { FupaManageModal } from './modals/FupaManageModal';
+import { PurchasingMonitorModal } from './modals/PurchasingMonitorModal';
+import { CustomerIntelModal } from './modals/CustomerIntelModal';
+import { CompetitorLogModal } from './modals/CompetitorLogModal';
+import { ForecastModal } from './modals/ForecastModal';
 import { CustomerFormModal } from './modals/CustomerFormModal';
 import { ImportModal } from './modals/ImportModal';
 import { DatabaseModal } from './modals/DatabaseModal';
@@ -93,6 +102,14 @@ export function CrmApp() {
       <UserFormModal />
       <CustomersModal />
       <CustomerFormModal />
+      <VendorsModal />
+      <VendorFormModal />
+      <FupaModal />
+      <FupaManageModal />
+      <PurchasingMonitorModal />
+      <CustomerIntelModal />
+      <CompetitorLogModal />
+      <ForecastModal />
       <DatabaseModal />
       <DbImportConfirmModal />
       <RfqManageModal />
@@ -101,6 +118,7 @@ export function CrmApp() {
       <QuotationModal />
       <ActivityLogModal />
       <ToastHost />
+      <TeamChatWidget />
     </>
   );
 }

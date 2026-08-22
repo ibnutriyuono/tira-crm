@@ -119,6 +119,7 @@ export function UserFormModal() {
             <option value="bm">BM (Branch Manager)</option>
             <option value="rm">RM (Regional Manager)</option>
             <option value="gm">GM (General Manager)</option>
+            <option value="purchasing">Purchasing</option>
             <option value="admin">Admin</option>
           </select>
         </div>
@@ -152,7 +153,7 @@ export function UserFormModal() {
         </div>
       </div>
       <div className="import-summary" style={{ marginTop: 14 }}>
-        Cakupan data per role: <b>Sales</b> — isi Kode SE (hanya melihat prospek miliknya). <b>BM</b> — isi Cabang (melihat semua sales di cabangnya). <b>RM</b> — isi Regional (melihat semua cabang di regionalnya). <b>GM</b> &amp; <b>Admin</b> — melihat seluruh data, field lain tidak perlu diisi.
+        Cakupan data per role: <b>Sales</b> — isi Kode SE (hanya melihat prospek miliknya). <b>BM</b> — isi Cabang (melihat semua sales di cabangnya). <b>RM</b> — isi Regional (melihat semua cabang di regionalnya). <b>Purchasing</b> — melihat seluruh prospek dan RFQ/FUP A, serta mengelola vendor dan penawaran. <b>GM</b> &amp; <b>Admin</b> — melihat seluruh data, field lain tidak perlu diisi.
       </div>
     </Modal>
   );

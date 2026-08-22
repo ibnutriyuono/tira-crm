@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Customer, Prospect, PurchasingContact, Rfq, SafeUser } from '@/lib/types';
+import type { BudgetTarget, Customer, Fupa, Prospect, PurchasingContact, Rfq, SafeUser, Vendor } from '@/lib/types';
 
 interface Toast {
   id: number;
@@ -12,6 +12,9 @@ interface DataState {
   prospects: Prospect[];
   customers: Customer[];
   rfqs: Rfq[];
+  fupas: Fupa[];
+  vendors: Vendor[];
+  budgetTargets: BudgetTarget[];
   users: SafeUser[]; // only populated for admins when Kelola User modal opens
   purchasingContact: PurchasingContact;
   loaded: boolean;
@@ -26,6 +29,13 @@ interface DataState {
   removeCustomer: (id: string) => void;
   upsertRfq: (r: Rfq) => void;
   removeRfq: (id: string) => void;
+  upsertFupa: (f: Fupa) => void;
+  removeFupa: (id: string) => void;
+  refetchFupas: () => Promise<void>;
+  upsertBudgetTarget: (b: BudgetTarget) => void;
+  upsertVendor: (v: Vendor) => void;
+  removeVendor: (id: string) => void;
+  refetchVendors: () => Promise<void>;
   upsertUser: (u: SafeUser) => void;
   removeUser: (id: string) => void;
   setPurchasingContact: (c: PurchasingContact) => void;
@@ -44,6 +54,9 @@ export const useDataStore = create<DataState>((set, get) => ({
   prospects: [],
   customers: [],
   rfqs: [],
+  fupas: [],
+  vendors: [],
+  budgetTargets: [],
   users: [],
   purchasingContact: { wa: '', email: '' },
   loaded: false,
@@ -58,6 +71,9 @@ export const useDataStore = create<DataState>((set, get) => ({
       prospects: data.prospects,
       customers: data.customers,
       rfqs: data.rfqs,
+      fupas: data.fupas ?? [],
+      vendors: data.vendors ?? [],
+      budgetTargets: data.budgetTargets ?? [],
       purchasingContact: data.purchasingContact,
       loaded: true,
     });
@@ -95,6 +111,41 @@ export const useDataStore = create<DataState>((set, get) => ({
     }),
   removeRfq: (id) => set((s) => ({ rfqs: s.rfqs.filter((x) => x.id !== id) })),
 
+  upsertFupa: (f) =>
+    set((s) => {
+      const idx = s.fupas.findIndex((x) => x.id === f.id);
+      if (idx === -1) return { fupas: [f, ...s.fupas] };
+      const next = s.fupas.slice();
+      next[idx] = f;
+      return { fupas: next };
+    }),
+  removeFupa: (id) => set((s) => ({ fupas: s.fupas.filter((x) => x.id !== id) })),
+  refetchFupas: async () => {
+    const res = await fetch('/api/fupas');
+    if (!res.ok) return;
+    const data = await res.json();
+    set({ fupas: data.fupas });
+  },
+
+  upsertBudgetTarget: (b) =>
+    set((s) => {
+      const idx = s.budgetTargets.findIndex((x) => x.cabang === b.cabang && x.periode === b.periode);
+      if (idx === -1) return { budgetTargets: [...s.budgetTargets, b] };
+      const next = s.budgetTargets.slice();
+      next[idx] = b;
+      return { budgetTargets: next };
+    }),
+
+  upsertVendor: (v) =>
+    set((s) => {
+      const idx = s.vendors.findIndex((x) => x.id === v.id);
+      // Vendors render as an alphabetical directory, so keep the list sorted
+      // rather than prepending the way the dated entities do.
+      const next = idx === -1 ? [...s.vendors, v] : s.vendors.map((x) => (x.id === v.id ? v : x));
+      return { vendors: next.sort((a, b) => a.nama.localeCompare(b.nama)) };
+    }),
+  removeVendor: (id) => set((s) => ({ vendors: s.vendors.filter((x) => x.id !== id) })),
+
   upsertUser: (u) =>
     set((s) => {
       const idx = s.users.findIndex((x) => x.id === u.id);
@@ -112,6 +163,12 @@ export const useDataStore = create<DataState>((set, get) => ({
     if (!res.ok) return;
     const data = await res.json();
     set({ prospects: data.prospects });
+  },
+  refetchVendors: async () => {
+    const res = await fetch('/api/vendors');
+    if (!res.ok) return;
+    const data = await res.json();
+    set({ vendors: data.vendors });
   },
   refetchCustomers: async () => {
     const res = await fetch('/api/customers');

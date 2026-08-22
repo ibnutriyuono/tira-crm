@@ -5,6 +5,7 @@ import { logActivity } from '@/lib/activity';
 import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import type { Role } from '@/lib/types';
 
 export async function GET() {
   const user = await requireUser();
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
     data: {
       username,
       name,
-      role: role as 'admin' | 'gm' | 'rm' | 'bm' | 'sales',
+      role: role as Role,
       se: String(body?.se || '').trim().toUpperCase(),
       cabang: String(body?.cabang || '').trim().toUpperCase(),
       reg: body?.reg ? Number(body.reg) : null,

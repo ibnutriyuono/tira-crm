@@ -122,14 +122,41 @@ export const CUSTOMER_FIELD_LABELS: Record<string, string> = {
   catatan: 'Catatan',
 };
 
+export const FUPA_FIELD_LABELS: Record<string, string> = {
+  noFupa: 'No. FUP A',
+  tglFupa: 'Tgl. FUP A',
+  sourceNoRfq: 'Ref. RFQ',
+  cabang: 'Cabang',
+  reg: 'Regional',
+  customer: 'Customer',
+  requestedBy: 'Diminta Oleh',
+  items: 'Item',
+  catatan: 'Catatan',
+  status: 'Status',
+  purchStatus: 'Status Pembelian',
+};
+
+export const VENDOR_FIELD_LABELS: Record<string, string> = {
+  nama: 'Nama Vendor',
+  pic: 'PIC',
+  wa: 'No. WhatsApp',
+  email: 'Email',
+  kategori: 'Kategori',
+  alamat: 'Alamat',
+  catatan: 'Catatan',
+};
+
 export const RFQ_FIELD_LABELS: Record<string, string> = {
   noRfq: 'No. RFQ',
   tglRfq: 'Tgl. RFQ',
   cabang: 'Cabang',
+  reg: 'Regional',
   customer: 'Customer',
   requestedBy: 'Diminta Oleh',
   items: 'Item',
   status: 'Status',
+  purchStatus: 'Status Pembelian',
+  fupaId: 'FUP A Terkait',
 };
 
 export const USER_FIELD_LABELS: Record<string, string> = {

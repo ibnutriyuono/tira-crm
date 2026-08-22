@@ -6,6 +6,7 @@ import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { ActivityChanges } from '@/lib/types';
+import type { Role } from '@/lib/types';
 
 /**
  * The audit log is readable by more people than the user table is, so a
@@ -48,7 +49,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     where: { id },
     data: {
       name,
-      role: role as 'admin' | 'gm' | 'rm' | 'bm' | 'sales',
+      role: role as Role,
       se: String(body?.se || '').trim().toUpperCase(),
       cabang: String(body?.cabang || '').trim().toUpperCase(),
       reg: body?.reg ? Number(body.reg) : null,

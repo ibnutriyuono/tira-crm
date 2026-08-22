@@ -42,7 +42,55 @@ export const ACTIVITY_ENTITY_LABEL: Record<string, string> = {
   setting: 'Pengaturan',
   database: 'Database',
   session: 'Sesi',
+  vendor: 'Vendor',
+  fupa: 'FUP A',
+  quotation: 'Penawaran Vendor',
+  budget: 'Target Budget',
+  chat: 'Chat',
 };
+
+// Purchasing-side status ladder for RFQ / FUP A, ported from the single-file
+// app's PSTATUS_META. Independent of the sales-side STATUS_META above: a
+// prospect can sit at "Negosiasi" while its RFQ is already "PO Diterbitkan".
+export const PSTATUS_META: Record<number, { label: string; color: string }> = {
+  0: { label: 'Baru', color: 'slate' },
+  1: { label: 'Diminta Penawaran', color: 'steel' },
+  2: { label: 'Penawaran Masuk', color: 'amber' },
+  3: { label: 'PO Diterbitkan', color: 'steel' },
+  4: { label: 'Selesai', color: 'green' },
+  5: { label: 'Dibatalkan', color: 'rust' },
+};
+
+export const PSTATUS_BARU = 0;
+export const PSTATUS_DIMINTA = 1;
+export const PSTATUS_MASUK = 2;
+export const PSTATUS_PO = 3;
+
+// Stage-weighted pipeline value, used by the forecast panel.
+export const STAGE_PROBABILITY: Record<number, number> = {
+  0: 0, 1: 0.1, 2: 0.3, 3: 0.6, 4: 0.9, 5: 1, 6: 0,
+};
+
+// A prospect with no movement for this long is flagged as aging.
+export const AGING_THRESHOLD_DAYS = 14;
+
+export const ROLE_LABELS: Record<string, string> = {
+  purchasing: 'Purchasing',
+  admin: 'Admin',
+  gm: 'GM',
+  rm: 'RM',
+  bm: 'BM',
+  sales: 'Sales',
+};
+
+export const BROADCAST_ROLE_OPTIONS = [
+  { v: 'sales', l: 'Sales' },
+  { v: 'bm', l: 'BM (Branch Manager)' },
+  { v: 'rm', l: 'RM (Regional Manager)' },
+  { v: 'gm', l: 'GM (General Manager)' },
+  { v: 'purchasing', l: 'Purchasing' },
+  { v: 'admin', l: 'Admin' },
+];
 
 export const RFQ_LOKAL_OPTIONS = [
   { v: 'LOKAL', l: 'Lokal' },

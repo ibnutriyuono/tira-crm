@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "node server.js",
+    "dev": "cross-env NODE_ENV=development node server.js",
     "build": "next build",
     "start": "cross-env NODE_ENV=production node server.js",
     "lint": "next lint",
@@ -16,6 +16,8 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1116.0",
+    "@aws-sdk/s3-request-presigner": "^3.1116.0",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "3.0.3",
     "jose": "6.2.9",

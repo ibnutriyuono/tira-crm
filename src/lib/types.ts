@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'gm' | 'rm' | 'bm' | 'sales';
+export type Role = 'admin' | 'gm' | 'rm' | 'bm' | 'sales' | 'purchasing';
 
 export interface SafeUser {
   id: string;
@@ -70,18 +70,121 @@ export interface RfqItem {
   estimasi: string;
 }
 
+export interface Quotation {
+  id: string;
+  vendorId: string;
+  vendorNama?: string;
+  rfqId: string | null;
+  fupaId: string | null;
+  tglDiminta: string | null;
+  channel: string | null;
+  harga: number;
+  leadTime: number;
+  catatan: string | null;
+  isWinner: boolean;
+  requestedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The two document types the purchasing module works on. */
+export type PurchDocType = 'RFQ' | 'FUPA';
+
+export interface Fupa {
+  id: string;
+  noFupa: string | null;
+  tglFupa: string | null;
+  sourceRfqId: string | null;
+  sourceNoRfq: string | null;
+  cabang: string | null;
+  reg: number | null;
+  customer: string | null;
+  requestedBy: string | null;
+  prospectId: string | null;
+  items: RfqItem[];
+  catatan: string | null;
+  status: 'Draft' | 'Terkirim' | 'Selesai';
+  purchStatus: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Rfq {
   id: string;
   noRfq: string | null;
   tglRfq: string | null;
   cabang: string | null;
+  reg: number | null;
   customer: string | null;
   requestedBy: string | null;
   prospectId: string | null;
   items: RfqItem[];
   status: 'Draft' | 'Terkirim' | 'Selesai';
+  purchStatus: number;
+  fupaId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Vendor {
+  id: string;
+  nama: string;
+  pic: string | null;
+  wa: string | null;
+  email: string | null;
+  kategori: string | null;
+  alamat: string | null;
+  catatan: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Attachment {
+  id: string;
+  rfqId: string | null;
+  fupaId: string | null;
+  name: string;
+  type: string | null;
+  size: number;
+  key: string;
+  uploadedBy: string | null;
+  createdAt: string;
+}
+
+export interface RosterUser {
+  id: string;
+  username: string;
+  name: string;
+  role: Role;
+  cabang: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  author: string;
+  authorUsername: string;
+  role: string | null;
+  text: string;
+  createdAt: string;
+}
+
+export interface ChatConversation {
+  id: string;
+  type: 'dm' | 'group' | 'broadcast';
+  name: string | null;
+  members: string[];
+  createdBy: string;
+  updatedAt: string;
+  lastMessage: { text: string; author: string; createdAt: string } | null;
+  unread: number;
+}
+
+export interface BudgetTarget {
+  id: string;
+  cabang: string;
+  periode: string;
+  amount: number;
 }
 
 export interface PurchasingContact {
@@ -103,7 +206,19 @@ export type ActivityAction =
   | 'export'
   | 'restore';
 
-export type ActivityEntity = 'prospect' | 'customer' | 'rfq' | 'user' | 'setting' | 'database' | 'session';
+export type ActivityEntity =
+  | 'prospect'
+  | 'customer'
+  | 'rfq'
+  | 'user'
+  | 'setting'
+  | 'database'
+  | 'session'
+  | 'vendor'
+  | 'fupa'
+  | 'quotation'
+  | 'budget'
+  | 'chat';
 
 export type ActivityChanges = Record<string, { label: string; from: unknown; to: unknown }>;
 
