@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
+import { AttachNoteBadges } from '../AttachNoteBadges';
+import { ItemChatBadge, useItemChatCounts } from '../ItemChatBadge';
 import { IconCheck, IconEdit, IconTrash } from '../icons';
 import { PSTATUS_META } from '@/lib/constants';
 import { formatDateID } from '@/lib/format';
@@ -24,6 +26,7 @@ export function FupaManageModal() {
   const upsertFupa = useDataStore((s) => s.upsertFupa);
   const toast = useDataStore((s) => s.toast);
 
+  const chatCounts = useItemChatCounts('fupa', show);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
@@ -90,6 +93,7 @@ export function FupaManageModal() {
                 <th>Customer</th>
                 <th>Cabang</th>
                 <th>Item</th>
+                <th>Lampiran</th>
                 <th>Status</th>
                 <th>Pembelian</th>
                 <th>Aksi</th>
@@ -100,12 +104,13 @@ export function FupaManageModal() {
                 const pmeta = PSTATUS_META[f.purchStatus] || PSTATUS_META[0];
                 return (
                   <tr key={f.id}>
-                    <td className="mono" style={{ fontWeight: 600 }}>{f.noFupa || '-'}</td>
+                    <td className="mono" style={{ fontWeight: 600 }}>{f.noFupa || '-'}<ItemChatBadge count={chatCounts[f.id]} /></td>
                     <td>{formatDateID(f.tglFupa)}</td>
                     <td className="mono">{f.sourceNoRfq || '-'}</td>
                     <td>{f.customer || '-'}</td>
                     <td>{f.cabang || '-'}</td>
                     <td className="center">{f.items?.length ?? 0}</td>
+                    <td><AttachNoteBadges fupaId={f.id} catatan={f.catatan} /></td>
                     <td><span className={`badge ${statusColor(f.status)}`}>{f.status}</span></td>
                     <td><span className={`badge ${pmeta.color}`}>{pmeta.label}</span></td>
                     <td>

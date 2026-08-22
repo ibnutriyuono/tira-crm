@@ -96,6 +96,10 @@ model Rfq {
   purchStatus Int      @default(0)
   // Set once this RFQ has been promoted into a FUP A purchase request.
   fupaId      String?
+  // Purchasing's answer (per-item harga/COO lives inside `items`); these two
+  // record that the answer was sent back to Sales.
+  jawabanRfqDikirim Boolean  @default(false)
+  jawabanRfqAt      DateTime?
   quotations  Quotation[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -236,6 +240,35 @@ model ConversationRead {
   lastReadAt     DateTime     @default(now())
 
   @@unique([username, conversationId])
+  @@index([username])
+}
+
+// Per-record discussion thread on a prospect / RFQ / FUP A. Kept separate from
+// the team-chat Conversation model: these threads are attached to a document
+// rather than to a set of people, and everyone who can see the document can
+// read them, so there is no membership list.
+model ItemMessage {
+  id             String   @id @default(cuid())
+  entity         String
+  entityId       String
+  author         String
+  authorUsername String
+  role           String?
+  text           String
+  createdAt      DateTime @default(now())
+
+  @@index([entity, entityId, createdAt])
+}
+
+// Per-user read cursor for one item thread.
+model ItemRead {
+  id         String   @id @default(cuid())
+  username   String
+  entity     String
+  entityId   String
+  lastReadAt DateTime @default(now())
+
+  @@unique([username, entity, entityId])
   @@index([username])
 }
 

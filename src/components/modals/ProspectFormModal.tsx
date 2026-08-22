@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
+import { ItemChat } from '../ItemChat';
 import { IconPlus, IconTrash } from '../icons';
 import { CABANG_LIST } from '@/lib/constants';
 import { formatRupiah, getProspectMaterials, num } from '@/lib/format';
@@ -289,6 +290,10 @@ export function ProspectFormModal() {
           <label>Keterangan</label>
           <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="Catatan / progres terbaru" />
         </div>
+      </div>
+      <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+        <label style={{ display: 'block', marginBottom: 8 }}>Diskusi</label>
+        <ItemChat entity="prospect" entityId={editId} />
       </div>
     </Modal>
   );

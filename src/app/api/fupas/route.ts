@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
-import { docScopeWhere } from '@/lib/auth';
+import { cabangRegMap, docScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
-  const fupas = await prisma.fupa.findMany({ where: docScopeWhere(user), orderBy: { createdAt: 'desc' } });
+  const fupas = await prisma.fupa.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } });
   return NextResponse.json({ fupas });
 }
 
@@ -27,6 +27,8 @@ export async function POST(req: Request) {
   if (reg == null && prospectId) {
     reg = (await prisma.prospect.findUnique({ where: { id: prospectId }, select: { reg: true } }))?.reg ?? null;
   }
+  const cabangKey = String(body?.cabang || sourceRfq?.cabang || '').trim().toUpperCase();
+  if (reg == null && cabangKey) reg = (await cabangRegMap())[cabangKey] ?? null;
   if (reg == null) reg = user.reg ?? null;
 
   const fupa = await prisma.fupa.create({

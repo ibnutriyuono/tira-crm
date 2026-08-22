@@ -24,6 +24,7 @@ export type ModalKey =
   | 'customerIntel'
   | 'competitorLog'
   | 'forecast'
+  | 'qcdRecap'
   | null;
 
 export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq' | 'vendor' | 'fupa';

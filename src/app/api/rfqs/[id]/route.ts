@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { diffFields, logActivity, RFQ_FIELD_LABELS } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
-import { canEditPurchasing } from '@/lib/auth';
+import { canEditPurchasing, canEditRfqAnswer } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import type { RfqItem } from '@/lib/types';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -54,6 +55,45 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (isResponse(user)) return user;
   const { id } = await params;
   const body = await req.json().catch(() => null);
+
+  // Purchasing fills harga/COO onto the RFQ's items and sends the answer back
+  // to Sales. Gated by canEditRfqAnswer (purchasing, admin, gm).
+  if (body?.action === 'answer' || body?.action === 'send-jawaban') {
+    if (!canEditRfqAnswer(user)) {
+      return NextResponse.json({ error: 'Anda tidak berhak mengisi jawaban RFQ.' }, { status: 403 });
+    }
+    const prev = await prisma.rfq.findUnique({ where: { id } });
+    if (!prev) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
+
+    const items = Array.isArray(body?.items) ? body.items : ((prev.items as unknown as RfqItem[]) ?? []);
+
+    if (body.action === 'send-jawaban') {
+      const hasHarga = items.some((it: RfqItem) => Number(it.hargaPurchasing) > 0);
+      if (!hasHarga) {
+        return NextResponse.json({ error: 'Isi minimal satu Harga sebelum mengirim jawaban RFQ.' }, { status: 400 });
+      }
+    }
+
+    const rfq = await prisma.rfq.update({
+      where: { id },
+      data: {
+        items,
+        ...(body.action === 'send-jawaban' ? { jawabanRfqDikirim: true, jawabanRfqAt: new Date() } : {}),
+      },
+    });
+    emitCrmEvent('rfq:updated', rfq);
+    await logActivity({
+      user,
+      action: body.action === 'send-jawaban' ? 'status_change' : 'update',
+      entity: 'rfq',
+      entityId: rfq.id,
+      summary:
+        body.action === 'send-jawaban'
+          ? `Mengirim jawaban RFQ ${rfq.noRfq || '(tanpa nomor)'} ke Sales`
+          : `Mengisi jawaban Purchasing pada RFQ ${rfq.noRfq || '(tanpa nomor)'}`,
+    });
+    return NextResponse.json({ rfq });
+  }
 
   // Purchasing-side status ladder, gated separately from the sales status.
   if (typeof body?.purchStatus === 'number') {

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { formatRupiah, num } from '@/lib/format';
-import { buildForecast } from '@/lib/reports';
+import { buildForecast, buildForecastBySe } from '@/lib/reports';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -45,6 +45,7 @@ export function ForecastModal() {
   };
 
   const rows = useMemo(() => buildForecast(records, budgetTargets, periode), [records, budgetTargets, periode]);
+  const seRows = useMemo(() => buildForecastBySe(records, periode), [records, periode]);
 
   const totals = rows.reduce(
     (acc, r) => ({ target: acc.target + r.target, won: acc.won + r.won, weighted: acc.weighted + r.weighted, aging: acc.aging + r.agingCount }),
@@ -107,6 +108,31 @@ export function ForecastModal() {
                   <td className="mono">{formatRupiah(r.weighted)}</td>
                   <td className="center">{r.openCount}</td>
                   <td className="center">{r.agingCount > 0 ? <span className="badge rust">{r.agingCount}</span> : '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h4 style={{ marginTop: 18, marginBottom: 6 }}>Per Sales Engineer</h4>
+      {seRows.length === 0 ? (
+        <div className="import-summary" style={{ marginTop: 0 }}>Belum ada aktivitas SE pada periode ini.</div>
+      ) : (
+        <div className="table-wrap" style={{ borderTop: 'none' }}>
+          <table className="simple-table">
+            <thead>
+              <tr><th>SE</th><th>Cabang</th><th>Won</th><th>Deal Won</th><th>Pipeline Berbobot</th><th>Open</th></tr>
+            </thead>
+            <tbody>
+              {seRows.map((r) => (
+                <tr key={r.se}>
+                  <td style={{ fontWeight: 600 }}>{r.se}</td>
+                  <td>{r.cabang}</td>
+                  <td className="mono">{formatRupiah(r.won)}</td>
+                  <td className="center">{r.wonCount}</td>
+                  <td className="mono">{formatRupiah(r.weighted)}</td>
+                  <td className="center">{r.openCount}</td>
                 </tr>
               ))}
             </tbody>

@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../Modal';
 import { AttachmentList } from '../AttachmentList';
-import { IconPlus, IconSave, IconTrash } from '../icons';
+import { ItemChat } from '../ItemChat';
+import { IconDownload, IconMail, IconPlus, IconSave, IconTrash, IconWa } from '../icons';
 import { RFQ_LOKAL_OPTIONS } from '@/lib/constants';
-import { todayStr } from '@/lib/format';
+import { normalizePhone, todayStr } from '@/lib/format';
+import { buildPurchaseRequestMessage, downloadPurchaseRequestExcel } from '@/lib/purchase-request';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -20,6 +22,8 @@ export function FupaModal() {
   const closeModal = useUiStore((s) => s.closeModal);
 
   const rfqs = useDataStore((s) => s.rfqs);
+  const purchasingContact = useDataStore((s) => s.purchasingContact);
+  const currentUser = useDataStore((s) => s.currentUser);
   const fupas = useDataStore((s) => s.fupas);
   const upsertFupa = useDataStore((s) => s.upsertFupa);
   const upsertRfq = useDataStore((s) => s.upsertRfq);
@@ -68,6 +72,53 @@ export function FupaModal() {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   }
 
+  function docPayload() {
+    return {
+      no: noFupa,
+      tgl: tglFupa,
+      cabang,
+      customer,
+      requestedBy: currentUser?.name || '',
+      items,
+      catatan,
+    };
+  }
+
+  const messageText = () => buildPurchaseRequestMessage('FUP A - PERMINTAAN PEMBELIAN', docPayload());
+
+  async function sendWa() {
+    if (!items.some((it) => (it.material || '').trim())) return toast('Isi minimal satu material permintaan pembelian', 'error');
+    const phone = normalizePhone(purchasingContact.wa);
+    if (phone.length < 9) return toast('Nomor WhatsApp Purchasing tidak valid. Isi dulu lewat modal RFQ.', 'error');
+    await save(true);
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(messageText())}`, '_blank');
+  }
+
+  async function sendEmail() {
+    if (!items.some((it) => (it.material || '').trim())) return toast('Isi minimal satu material permintaan pembelian', 'error');
+    if (!purchasingContact.email) return toast('Email Purchasing belum diisi. Isi dulu lewat modal RFQ.', 'error');
+    await save(true);
+    const subject = encodeURIComponent(`FUP A ${noFupa || ''} - ${cabang || ''} - ${customer || ''}`);
+    const body = `${messageText()}\n\nMohon lampirkan file Excel FUP A hasil unduhan pada email ini sebelum dikirim.`;
+    window.open(`mailto:${purchasingContact.email}?subject=${subject}&body=${encodeURIComponent(body)}`, '_blank');
+  }
+
+  async function exportExcel() {
+    if (!items.some((it) => (it.material || '').trim())) return toast('Isi minimal satu material permintaan pembelian', 'error');
+    try {
+      await downloadPurchaseRequestExcel(
+        'FUP A',
+        'FUP A',
+        docPayload(),
+        `FUPA_${(noFupa || 'draft').replace(/[^a-zA-Z0-9]+/g, '_')}_${todayStr()}.xlsx`,
+      );
+      await save(false);
+      toast('File Excel FUP A berhasil diunduh', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mengexport FUP A', 'error');
+    }
+  }
+
   async function save(markSent: boolean) {
     if (!items.some((it) => (it.material || '').trim())) {
       return toast('Isi minimal satu material permintaan pembelian', 'error');
@@ -105,8 +156,14 @@ export function FupaModal() {
           <button type="button" className="btn btn-outline" disabled={busy} onClick={() => save(false)}>
             <IconSave /> Simpan Draft
           </button>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => save(true)}>
-            Tandai Terkirim
+          <button type="button" className="btn btn-outline" disabled={busy} onClick={exportExcel}>
+            <IconDownload /> Excel
+          </button>
+          <button type="button" className="btn btn-outline" disabled={busy} onClick={sendEmail}>
+            <IconMail /> Email
+          </button>
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={sendWa}>
+            <IconWa /> Kirim WhatsApp
           </button>
         </>
       }
@@ -167,6 +224,10 @@ export function FupaModal() {
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>Lampiran</label>
         <AttachmentList fupaId={fupaId} />
+      </div>
+      <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+        <label style={{ display: 'block', marginBottom: 8 }}>Diskusi</label>
+        <ItemChat entity="fupa" entityId={fupaId} />
       </div>
     </Modal>
   );

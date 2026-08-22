@@ -498,3 +498,29 @@ td.center{text-align:center;}
   .tc-panel{ right:10px; left:10px; width:auto; bottom:78px; height:70vh; }
   .chat-fab{ right:14px; bottom:14px; }
 }
+
+/* ===== Value-based highlight (prospek bernilai besar) ===== */
+tr.hl-green td{ background:rgba(47,122,85,.10); }
+tr.hl-green:hover td{ background:rgba(47,122,85,.16); }
+tr.hl-yellow td{ background:rgba(201,130,46,.12); }
+tr.hl-yellow:hover td{ background:rgba(201,130,46,.18); }
+.kanban-card.hl-green{ background:rgba(47,122,85,.08); border-left-color:var(--green-500); }
+.kanban-card.hl-yellow{ background:rgba(201,130,46,.10); border-left-color:var(--amber-500); }
+.hl-value-badge{ font-size:9.5px; font-weight:700; padding:1px 6px; border-radius:9px; margin-left:6px; vertical-align:middle; }
+.hl-value-badge.hl-green{ background:var(--green-500); color:#fff; }
+.hl-value-badge.hl-yellow{ background:var(--amber-500); color:#fff; }
+
+/* Attachment / note badges on RFQ & FUP A rows */
+.badge.attach-count{ background:var(--steel-100); color:var(--steel-600); font-weight:700; }
+
+/* Item chat (per prospect / RFQ / FUP A) reuses the team-chat bubble styles */
+.item-chat-body{
+  display:flex; flex-direction:column; gap:8px;
+  max-height:260px; overflow-y:auto; padding:8px 2px;
+}
+.item-chat-bubble{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:18px; height:18px; padding:0 5px; border-radius:9px;
+  background:var(--rust-500); color:#fff; font-size:10.5px; font-weight:700;
+  margin-left:6px; vertical-align:middle;
+}

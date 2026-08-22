@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
-import { docScopeWhere } from '@/lib/auth';
+import { cabangRegMap, docScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
-  const rfqs = await prisma.rfq.findMany({ where: docScopeWhere(user), orderBy: { createdAt: 'desc' } });
+  const rfqs = await prisma.rfq.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } });
   return NextResponse.json({ rfqs });
 }
 
@@ -22,12 +22,19 @@ export async function POST(req: Request) {
   // filter on the RFQ alone; fall back to the acting user's own region.
   const sourceProspect = prospectId ? await prisma.prospect.findUnique({ where: { id: prospectId }, select: { reg: true } }) : null;
 
+  // Without a source prospect, derive the region from the branch so the row
+  // never lands with a NULL reg (which would hide it from its own RM).
+  const cabang = String(body?.cabang || '').trim().toUpperCase();
+  let reg: number | null = sourceProspect?.reg ?? null;
+  if (reg == null && cabang) reg = (await cabangRegMap())[cabang] ?? null;
+  if (reg == null) reg = user.reg ?? null;
+
   const rfq = await prisma.rfq.create({
     data: {
       noRfq: body?.noRfq || '',
       tglRfq: body?.tglRfq || '',
-      cabang: body?.cabang || '',
-      reg: sourceProspect?.reg ?? user.reg ?? null,
+      cabang,
+      reg,
       customer: body?.customer || '',
       requestedBy: body?.requestedBy || user.name,
       prospectId,

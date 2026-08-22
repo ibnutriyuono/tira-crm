@@ -27,6 +27,7 @@ import { PurchasingMonitorModal } from './modals/PurchasingMonitorModal';
 import { CustomerIntelModal } from './modals/CustomerIntelModal';
 import { CompetitorLogModal } from './modals/CompetitorLogModal';
 import { ForecastModal } from './modals/ForecastModal';
+import { QcdRecapModal } from './modals/QcdRecapModal';
 import { CustomerFormModal } from './modals/CustomerFormModal';
 import { ImportModal } from './modals/ImportModal';
 import { DatabaseModal } from './modals/DatabaseModal';
@@ -110,6 +111,7 @@ export function CrmApp() {
       <CustomerIntelModal />
       <CompetitorLogModal />
       <ForecastModal />
+      <QcdRecapModal />
       <DatabaseModal />
       <DbImportConfirmModal />
       <RfqManageModal />

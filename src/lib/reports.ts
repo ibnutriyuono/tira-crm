@@ -12,6 +12,7 @@ function daysSince(iso: string): number {
 }
 
 export interface CustomerIntelRow {
+  records: Prospect[];
   name: string;
   cabang: string;
   total: number;
@@ -58,6 +59,7 @@ export function buildCustomerIntel(records: Prospect[]): CustomerIntelRow[] {
 
     const decided = won.length + lost.length;
     out.push({
+      records: entry.records,
       name: entry.name,
       cabang: entry.cabang,
       total: entry.records.length,
@@ -77,6 +79,7 @@ export function buildCustomerIntel(records: Prospect[]): CustomerIntelRow[] {
 }
 
 export interface CompetitorRow {
+  records: Prospect[];
   name: string;
   lostCount: number;
   lostValue: number;
@@ -109,6 +112,7 @@ export function buildCompetitorLog(records: Prospect[]): CompetitorRow[] {
       lineCount[ln] = (lineCount[ln] || 0) + 1;
     });
     out.push({
+      records: entry.records,
       name: entry.name,
       lostCount: entry.records.length,
       lostValue: entry.records.reduce((s, r) => s + num(r.value), 0),
@@ -172,4 +176,49 @@ export function buildForecast(records: Prospect[], targets: BudgetTarget[], peri
   });
 
   return out.sort((a, b) => a.cabang.localeCompare(b.cabang));
+}
+
+export interface ForecastSeRow {
+  se: string;
+  cabang: string;
+  won: number;
+  weighted: number;
+  openCount: number;
+  wonCount: number;
+}
+
+/** Per sales-engineer breakdown for `periode`, mirroring forecastSeTable. */
+export function buildForecastBySe(records: Prospect[], periode: string): ForecastSeRow[] {
+  const inPeriod = (r: Prospect) => (recordDate(r) || '').slice(0, 7) === periode;
+  const map = new Map<string, Prospect[]>();
+  records.filter(inPeriod).forEach((r) => {
+    const se = (r.se || '-').toUpperCase();
+    if (!map.has(se)) map.set(se, []);
+    map.get(se)!.push(r);
+  });
+
+  const out: ForecastSeRow[] = [];
+  map.forEach((list, se) => {
+    const won = list.filter((r) => classify(r) === 'Won');
+    const open = list.filter((r) => classify(r) === 'Aktif');
+    out.push({
+      se,
+      cabang: list.find((r) => r.cabang)?.cabang || '-',
+      won: won.reduce((s, r) => s + num(r.value), 0),
+      weighted: open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[r.status] ?? 0), 0),
+      openCount: open.length,
+      wonCount: won.length,
+    });
+  });
+  return out.sort((a, b) => b.won - a.won);
+}
+
+/**
+ * Prospects eligible for the QCD recap: only closed ones (PO/Kontrak or Lose
+ * Order) carry a meaningful Quality/Cost/Delivery post-mortem.
+ */
+export function buildQcdRecap(records: Prospect[]): Prospect[] {
+  return records
+    .filter((r) => Number(r.status) === 4 || Number(r.status) === 6)
+    .sort((a, b) => (b.tglPenawaran || '').localeCompare(a.tglPenawaran || ''));
 }

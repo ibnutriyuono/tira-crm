@@ -80,23 +80,62 @@ export function prospectScopeWhere(user: SafeUser) {
 }
 
 /**
- * Per-role scoping for the purchasing documents (RFQ, FUP A), mirroring the
- * single-file app's rfqOrFupaScopedForRole(). Unlike prospects — which sales
- * owns via the `se` initials — these are scoped by who raised the request, so
- * the caller names the fields on the model being queried.
- *
- * rm relies on the denormalized `reg` column written at create time; the
- * prototype rebuilt a cabang->reg map from prospect rows on every render,
- * which has no SQL equivalent.
+ * Branch -> region lookup, rebuilt from the prospect table. A branch has no
+ * standalone row, so its region is only knowable from the prospects filed
+ * against it — this mirrors the single-file app's cabangRegMap().
  */
-export function docScopeWhere(
+export async function cabangRegMap(): Promise<Record<string, number>> {
+  const rows = await prisma.prospect.findMany({
+    where: { cabang: { not: null }, reg: { not: null } },
+    select: { cabang: true, reg: true },
+    distinct: ['cabang'],
+  });
+  const map: Record<string, number> = {};
+  rows.forEach((r) => {
+    if (r.cabang && r.reg != null) map[r.cabang.toUpperCase()] = r.reg;
+  });
+  return map;
+}
+
+/**
+ * Per-role scoping for the purchasing documents (RFQ, FUP A), mirroring the
+ * single-file app's rfqOrFupaScopedForRole().
+ *
+ * sales matches on `requestedBy`, which stores the user's display name. We
+ * accept either the name or the username so a renamed account doesn't lose
+ * sight of its own documents.
+ *
+ * rm matches the denormalized `reg` OR any branch that maps into their region
+ * — rows created without a source prospect have a NULL reg, and filtering on
+ * that column alone silently hid them.
+ */
+export async function docScopeWhere(
   user: SafeUser,
   fields: { cabangField?: string; requestedByField?: string; regField?: string } = {},
 ) {
   const { cabangField = 'cabang', requestedByField = 'requestedBy', regField = 'reg' } = fields;
-  if (user.role === 'sales') return { [requestedByField]: { equals: user.name, mode: 'insensitive' as const } };
-  if (user.role === 'bm') return { [cabangField]: { equals: user.cabang || '', mode: 'insensitive' as const } };
-  if (user.role === 'rm') return { [regField]: user.reg ?? -1 };
+
+  if (user.role === 'sales') {
+    return {
+      OR: [
+        { [requestedByField]: { equals: user.name, mode: 'insensitive' as const } },
+        { [requestedByField]: { equals: user.username, mode: 'insensitive' as const } },
+      ],
+    };
+  }
+  if (user.role === 'bm') {
+    return { [cabangField]: { equals: user.cabang || '', mode: 'insensitive' as const } };
+  }
+  if (user.role === 'rm') {
+    const map = await cabangRegMap();
+    const myCabangs = Object.keys(map).filter((c) => map[c] === (user.reg ?? -1));
+    return {
+      OR: [
+        { [regField]: user.reg ?? -1 },
+        { AND: [{ [regField]: null }, { [cabangField]: { in: myCabangs, mode: 'insensitive' as const } }] },
+      ],
+    };
+  }
   return {}; // gm, admin & purchasing see everything
 }
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { KANBAN_STATUSES, STATUS_META } from '@/lib/constants';
-import { classify, formatRupiah, klasBadgeColor, num } from '@/lib/format';
+import { classify, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -18,7 +18,7 @@ function KanbanCard({ r }: { r: Prospect }) {
 
   return (
     <div
-      className={`kanban-card${dragging ? ' dragging' : ''}`}
+      className={`kanban-card${dragging ? ' dragging' : ''}${valueHighlightClass(r.value) ? ' ' + valueHighlightClass(r.value) : ''}`}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', r.id);

@@ -71,6 +71,11 @@ export const STAGE_PROBABILITY: Record<number, number> = {
   0: 0, 1: 0.1, 2: 0.3, 3: 0.6, 4: 0.9, 5: 1, 6: 0,
 };
 
+// Prospects above these values get a highlighted row / card, so the big
+// deals stand out in a long list.
+export const VALUE_HL_GREEN = 1_000_000_000;
+export const VALUE_HL_YELLOW = 3_000_000_000;
+
 // A prospect with no movement for this long is flagged as aging.
 export const AGING_THRESHOLD_DAYS = 14;
 

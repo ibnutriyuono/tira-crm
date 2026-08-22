@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { AttachmentList } from '../AttachmentList';
+import { ItemChat } from '../ItemChat';
 import { IconDownload, IconMail, IconPlus, IconSave, IconTrash, IconWa } from '../icons';
 import { RFQ_LOKAL_OPTIONS } from '@/lib/constants';
-import { formatDateID, getProspectMaterials, normalizePhone, num, todayStr } from '@/lib/format';
+import { formatDateID, formatRupiah, getProspectMaterials, normalizePhone, num, todayStr } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -250,6 +251,12 @@ export function RfqModal() {
         <label>Daftar Material yang Diminta</label>
         {items.map((it, idx) => (
           <div className="rfq-item-card" key={idx}>
+            {(it.hargaPurchasing || it.coo) && (
+              <div className="import-summary" style={{ marginTop: 0, marginBottom: 8 }}>
+                <b>Jawaban Purchasing:</b> {it.hargaPurchasing ? formatRupiah(it.hargaPurchasing) : '-'}
+                {it.coo ? ` · COO: ${it.coo}` : ''}
+              </div>
+            )}
             <div className="rfq-item-head">
               <span>Material #{idx + 1}</span>
               <button type="button" className="icon-btn danger" disabled={items.length <= 1} onClick={() => removeItem(idx)} title="Hapus material">
@@ -317,6 +324,10 @@ export function RfqModal() {
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>Lampiran</label>
         <AttachmentList rfqId={rfqId} />
+      </div>
+      <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+        <label style={{ display: 'block', marginBottom: 8 }}>Diskusi</label>
+        <ItemChat entity="rfq" entityId={rfqId} />
       </div>
       <div className="form-grid" style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <div>

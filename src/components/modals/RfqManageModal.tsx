@@ -2,12 +2,23 @@
 
 import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
+import { AttachNoteBadges } from '../AttachNoteBadges';
+import { ItemChatBadge, useItemChatCounts } from '../ItemChatBadge';
 import { IconCheck, IconEdit, IconTrash } from '../icons';
-import { formatDateID } from '@/lib/format';
+import { formatDateID, formatRupiah } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
-import type { Rfq } from '@/lib/types';
+import type { Rfq, RfqItem } from '@/lib/types';
+
+/** Mirrors the single-file app's rfqJawabanSummary(). */
+function jawabanSummary(items: RfqItem[]): string {
+  const answered = (items || []).filter((it) => it.hargaPurchasing || it.coo);
+  if (answered.length === 0) return '-';
+  const first = answered[0];
+  const label = `${first.hargaPurchasing ? formatRupiah(first.hargaPurchasing) : '-'}${first.coo ? ` · ${first.coo}` : ''}`;
+  return answered.length > 1 ? `${label} (+${answered.length - 1} lainnya)` : label;
+}
 
 function statusColor(status: string): string {
   return status === 'Selesai' ? 'green' : status === 'Terkirim' ? 'steel' : 'slate';
@@ -23,6 +34,7 @@ export function RfqManageModal() {
   const upsertRfq = useDataStore((s) => s.upsertRfq);
   const toast = useDataStore((s) => s.toast);
 
+  const chatCounts = useItemChatCounts('rfq', show);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
@@ -82,6 +94,8 @@ export function RfqManageModal() {
                 <th>Customer</th>
                 <th>Material</th>
                 <th>Status</th>
+                <th>Lampiran</th>
+                <th>Jawaban Purchasing</th>
                 <th>Dibuat Oleh</th>
                 <th>Aksi</th>
               </tr>
@@ -89,13 +103,22 @@ export function RfqManageModal() {
             <tbody>
               {list.map((r) => (
                 <tr key={r.id}>
-                  <td className="mono">{r.noRfq || '-'}</td>
+                  <td className="mono">{r.noRfq || '-'}<ItemChatBadge count={chatCounts[r.id]} /></td>
                   <td className="mono">{formatDateID(r.tglRfq)}</td>
                   <td>{r.cabang || '-'}</td>
                   <td>{r.customer || '-'}</td>
                   <td className="center">{(r.items || []).length}</td>
                   <td>
                     <span className={`badge ${statusColor(r.status)}`}>{r.status || 'Draft'}</span>
+                  </td>
+                  <td><AttachNoteBadges rfqId={r.id} /></td>
+                  <td>
+                    {r.jawabanRfqDikirim ? (
+                      <span className="badge green" title={formatDateID(r.jawabanRfqAt)}>Terkirim</span>
+                    ) : (
+                      <span className="badge slate">Belum</span>
+                    )}
+                    <div className="text-muted" style={{ fontSize: 11 }}>{jawabanSummary(r.items)}</div>
                   </td>
                   <td>{r.requestedBy || '-'}</td>
                   <td>

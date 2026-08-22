@@ -157,6 +157,7 @@ export const RFQ_FIELD_LABELS: Record<string, string> = {
   status: 'Status',
   purchStatus: 'Status Pembelian',
   fupaId: 'FUP A Terkait',
+  jawabanRfqDikirim: 'Jawaban RFQ Terkirim',
 };
 
 export const USER_FIELD_LABELS: Record<string, string> = {

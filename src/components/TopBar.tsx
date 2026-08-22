@@ -142,6 +142,10 @@ export function TopBar() {
             <IconActivity />
             Forecast &amp; Target
           </button>
+          <button className="btn btn-ghost-dark" onClick={() => openModal('qcdRecap')}>
+            <IconActivity />
+            Kelola QCD
+          </button>
           <button className="btn btn-ghost-dark" onClick={() => openModal('customerIntel')}>
             <IconCustomers />
             Customer Intel

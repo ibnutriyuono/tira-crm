@@ -13,8 +13,8 @@ export async function GET() {
   const [prospects, customers, rfqs, fupas, vendors, budgetTargets, settingRow] = await Promise.all([
     prisma.prospect.findMany({ where: prospectScopeWhere(user), orderBy: { createdAt: 'desc' } }),
     prisma.customer.findMany({ orderBy: { createdAt: 'desc' } }),
-    prisma.rfq.findMany({ where: docScopeWhere(user), orderBy: { createdAt: 'desc' } }),
-    prisma.fupa.findMany({ where: docScopeWhere(user), orderBy: { createdAt: 'desc' } }),
+    prisma.rfq.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } }),
+    prisma.fupa.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } }),
     prisma.vendor.findMany({ orderBy: { nama: 'asc' } }),
     prisma.budgetTarget.findMany({ orderBy: [{ periode: 'desc' }, { cabang: 'asc' }] }),
     prisma.setting.findUnique({ where: { key: 'purchasingContact' } }),

@@ -6,7 +6,7 @@ import { PSTATUS_META } from '@/lib/constants';
 import { formatDateID, formatRupiah, normalizePhone, num } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
-import type { Fupa, PurchDocType, Quotation, Rfq } from '@/lib/types';
+import type { Fupa, PurchDocType, Quotation, Rfq, RfqItem } from '@/lib/types';
 
 type Tab = 'dashboard' | 'masuk' | 'vendor';
 
@@ -20,6 +20,8 @@ interface PurchDoc {
   customer: string;
   requestedBy: string;
   itemCount: number;
+  /** First material plus a "+N lainnya" tail — mirrors purchMaterialSummary(). */
+  materialSummary: string;
   purchStatus: number;
 }
 
@@ -34,6 +36,12 @@ function toDoc(r: Rfq | Fupa, jenis: PurchDocType): PurchDoc {
     customer: r.customer || '',
     requestedBy: r.requestedBy || '',
     itemCount: r.items?.length ?? 0,
+    materialSummary: (() => {
+      const items = r.items ?? [];
+      if (items.length === 0) return '-';
+      const extra = items.length > 1 ? ` (+${items.length - 1} lainnya)` : '';
+      return `${items[0].material || '-'}${extra}`;
+    })(),
     purchStatus: r.purchStatus ?? 0,
   };
 }
@@ -137,7 +145,7 @@ export function PurchasingBoard({ readOnly = false }: { readOnly?: boolean }) {
               <table className="simple-table">
                 <thead>
                   <tr>
-                    <th>Jenis</th><th>No.</th><th>Tanggal</th><th>Cabang</th><th>Customer</th><th>Diminta Oleh</th><th>Item</th><th>Status</th><th></th>
+                    <th>Jenis</th><th>No.</th><th>Tanggal</th><th>Cabang</th><th>Customer</th><th>Material</th><th>Diminta Oleh</th><th>Item</th><th>Status</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -150,6 +158,7 @@ export function PurchasingBoard({ readOnly = false }: { readOnly?: boolean }) {
                         <td>{formatDateID(d.tglDoc)}</td>
                         <td>{d.cabang || '-'}</td>
                         <td>{d.customer || '-'}</td>
+                        <td>{d.materialSummary}</td>
                         <td>{d.requestedBy || '-'}</td>
                         <td className="center">{d.itemCount}</td>
                         <td><span className={`badge ${meta.color}`}>{meta.label}</span></td>
@@ -290,7 +299,7 @@ function PurchDetail({
           <button type="button" className="close-x" onClick={onClose}>×</button>
         </div>
         <div className="import-summary">
-          <b>{doc.customer || '-'}</b> · Cabang {doc.cabang || '-'} · {doc.itemCount} item · Diminta oleh {doc.requestedBy || '-'}
+          <b>{doc.customer || '-'}</b> · Cabang {doc.cabang || '-'} · {doc.materialSummary} · {doc.itemCount} item · Diminta oleh {doc.requestedBy || '-'}
         </div>
 
         {!readOnly && (
@@ -309,6 +318,8 @@ function PurchDetail({
             </button>
           </div>
         )}
+
+        {doc.jenis === 'RFQ' && <RfqAnswerPanel rfqId={doc.id} readOnly={readOnly} />}
 
         <h4 style={{ marginTop: 16 }}>Penawaran Vendor ({quotes.length})</h4>
         {quotes.length === 0 ? (
@@ -376,6 +387,116 @@ function PurchDetail({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+
+/**
+ * Purchasing's answer back to Sales: harga + COO per material line, then
+ * "Kirim Jawaban". Ported from the single-file app's RFQ answer table.
+ */
+function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean }) {
+  const rfqs = useDataStore((s) => s.rfqs);
+  const upsertRfq = useDataStore((s) => s.upsertRfq);
+  const currentUser = useDataStore((s) => s.currentUser);
+  const toast = useDataStore((s) => s.toast);
+
+  const rfq = rfqs.find((r) => r.id === rfqId);
+  const [items, setItems] = useState<RfqItem[]>(rfq?.items ?? []);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setItems(rfq?.items ?? []);
+  }, [rfq?.id, rfq?.items]);
+
+  if (!rfq) return null;
+  // gm may answer too, so this is broader than canEditPurchasing.
+  const canAnswer = !readOnly && !!currentUser && ['purchasing', 'admin', 'gm'].includes(currentUser.role);
+
+  function setItem(idx: number, patch: Partial<RfqItem>) {
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  }
+
+  async function save(action: 'answer' | 'send-jawaban') {
+    setBusy(true);
+    try {
+      const res = await api.patch<{ rfq: Rfq }>(`/api/rfqs/${rfqId}`, { action, items });
+      upsertRfq(res.rfq);
+      toast(action === 'send-jawaban' ? 'Jawaban RFQ dikirim ke Sales' : 'Jawaban Purchasing disimpan', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal menyimpan jawaban', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <h4 style={{ marginBottom: 6 }}>Jawaban Purchasing</h4>
+      <div className="import-summary" style={{ marginTop: 0 }}>
+        Jawaban RFQ ke Sales:{' '}
+        {rfq.jawabanRfqDikirim ? (
+          <span className="badge green">Terkirim {formatDateID(rfq.jawabanRfqAt)}</span>
+        ) : (
+          <span className="badge slate">Belum Dikirim</span>
+        )}
+      </div>
+      <table className="simple-table" style={{ marginTop: 8 }}>
+        <thead>
+          <tr><th>Material</th><th>Pcs</th><th>Harga</th><th>COO</th></tr>
+        </thead>
+        <tbody>
+          {items.length === 0 ? (
+            <tr><td colSpan={4} className="text-muted">RFQ ini belum punya baris material.</td></tr>
+          ) : (
+            items.map((it, idx) => (
+              <tr key={idx}>
+                <td>{it.material || '-'}</td>
+                <td className="center">{it.pcs || '-'}</td>
+                <td>
+                  {canAnswer ? (
+                    <input
+                      type="number"
+                      min="0"
+                      className="mono"
+                      value={it.hargaPurchasing ?? ''}
+                      placeholder="0"
+                      onChange={(e) => setItem(idx, { hargaPurchasing: num(e.target.value) })}
+                      style={{ width: 120 }}
+                    />
+                  ) : (
+                    <span className="mono">{it.hargaPurchasing ? formatRupiah(it.hargaPurchasing) : '-'}</span>
+                  )}
+                </td>
+                <td>
+                  {canAnswer ? (
+                    <input
+                      type="text"
+                      value={it.coo ?? ''}
+                      placeholder="cth. China"
+                      onChange={(e) => setItem(idx, { coo: e.target.value })}
+                      style={{ width: 120 }}
+                    />
+                  ) : (
+                    it.coo || '-'
+                  )}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+      {canAnswer && items.length > 0 && (
+        <div className="toolbar-row" style={{ marginTop: 8 }}>
+          <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => save('answer')}>
+            Simpan Jawaban
+          </button>
+          <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => save('send-jawaban')}>
+            Kirim Jawaban ke Sales
+          </button>
+        </div>
+      )}
     </div>
   );
 }

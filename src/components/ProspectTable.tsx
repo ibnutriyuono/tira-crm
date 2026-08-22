@@ -1,6 +1,6 @@
 'use client';
 
-import { classify, formatDateID, formatRupiah, klasBadgeColor, num } from '@/lib/format';
+import { classify, formatDateID, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
 import { STATUS_META } from '@/lib/constants';
 import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
@@ -82,7 +82,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
               const klas = classify(r);
               const stMeta = STATUS_META[num(r.status)] || STATUS_META[0];
               return (
-                <tr key={r.id}>
+                <tr key={r.id} className={valueHighlightClass(r.value)}>
                   <td className="num">{startIdx + idx + 1}</td>
                   <td className="center">{r.reg || '-'}</td>
                   <td>{r.cabang || '-'}</td>

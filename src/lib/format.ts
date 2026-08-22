@@ -75,3 +75,11 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
+
+/** Row/card highlight class for high-value prospects (see VALUE_HL_* ). */
+export function valueHighlightClass(value: unknown): string {
+  const v = num(value);
+  if (v > 3_000_000_000) return 'hl-yellow';
+  if (v >= 1_000_000_000) return 'hl-green';
+  return '';
+}

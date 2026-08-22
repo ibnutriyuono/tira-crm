@@ -68,6 +68,9 @@ export interface RfqItem {
   berat: number | string;
   lokal: string;
   estimasi: string;
+  /** Purchasing's answer, filled in from the purchasing module. */
+  hargaPurchasing?: number;
+  coo?: string;
 }
 
 export interface Quotation {
@@ -122,6 +125,8 @@ export interface Rfq {
   status: 'Draft' | 'Terkirim' | 'Selesai';
   purchStatus: number;
   fupaId: string | null;
+  jawabanRfqDikirim: boolean;
+  jawabanRfqAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -157,6 +162,19 @@ export interface RosterUser {
   name: string;
   role: Role;
   cabang: string | null;
+}
+
+export type ItemEntity = 'prospect' | 'rfq' | 'fupa';
+
+export interface ItemChatMessage {
+  id: string;
+  entity: ItemEntity;
+  entityId: string;
+  author: string;
+  authorUsername: string;
+  role: string | null;
+  text: string;
+  createdAt: string;
 }
 
 export interface ChatMessage {
