@@ -8,12 +8,13 @@ export async function GET() {
   const adminErr = requireAdmin(user);
   if (adminErr) return adminErr;
 
-  const [prospects, customers, rfqs, users] = await Promise.all([
+  const [prospects, customers, rfqs, fupas, users] = await Promise.all([
     prisma.prospect.count(),
     prisma.customer.count(),
     prisma.rfq.count(),
+    prisma.fupa.count(),
     prisma.user.count(),
   ]);
 
-  return NextResponse.json({ prospects, customers, rfqs, users });
+  return NextResponse.json({ prospects, customers, rfqs, fupas, users });
 }

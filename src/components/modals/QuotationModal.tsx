@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { IconDownload, IconMail, IconPlus, IconTrash } from '../icons';
-import { escapeForFilename, formatDateLongID, formatRupiah, getProspectMaterials, num, todayStr } from '@/lib/format';
+import { escapeForFilename, formatDateLongID, formatRupiah, getProspectMaterials, materialUnitPrice, num, todayStr } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -44,7 +44,7 @@ export function QuotationModal() {
   const [pic, setPic] = useState('');
   const [alamat, setAlamat] = useState('');
   const [perihal, setPerihal] = useState('');
-  const [items, setItems] = useState<Material[]>([{ line: '', uraian: '', qty: 1, harga: 0 }]);
+  const [items, setItems] = useState<Material[]>([{ line: '', uraian: '', qty: 1, beratPc: 0, hargaKg: 0, harga: 0 }]);
   const [ppn, setPpn] = useState(false);
   const [pembayaran, setPembayaran] = useState('30 hari setelah invoice diterima');
   const [pengiriman, setPengiriman] = useState('2-4 minggu setelah PO diterima / sesuai kondisi stock');
@@ -72,7 +72,18 @@ export function QuotationModal() {
   }, [show, prospectId]);
 
   const collected = useMemo((): { items: QItem[]; total: number } => {
-    const list = items.map((it) => ({ line: (it.line || '').trim(), uraian: (it.uraian || '').trim(), qty: num(it.qty), harga: num(it.harga), total: num(it.qty) * num(it.harga) }));
+    const list = items.map((it) => {
+      const unit = materialUnitPrice(it);
+      return {
+        line: (it.line || '').trim(),
+        uraian: (it.uraian || '').trim(),
+        qty: num(it.qty),
+        beratPc: num(it.beratPc),
+        hargaKg: num(it.hargaKg),
+        harga: unit,
+        total: num(it.qty) * unit,
+      };
+    });
     return { items: list, total: list.reduce((s, it) => s + it.total, 0) };
   }, [items]);
 
@@ -270,7 +281,7 @@ export function QuotationModal() {
               </button>
             </div>
           ))}
-          <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 6 }} onClick={() => setItems((prev) => [...prev, { line: '', uraian: '', qty: 1, harga: 0 }])}>
+          <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 6 }} onClick={() => setItems((prev) => [...prev, { line: '', uraian: '', qty: 1, beratPc: 0, hargaKg: 0, harga: 0 }])}>
             <IconPlus /> Tambah Material
           </button>
         </div>

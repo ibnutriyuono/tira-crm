@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { TopBar } from './TopBar';
 import { KpiGrid } from './KpiGrid';
 import { FunnelPanel } from './FunnelPanel';
@@ -42,6 +43,8 @@ export function CrmApp() {
   const loaded = useDataStore((s) => s.loaded);
   const bootstrap = useDataStore((s) => s.bootstrap);
   const records = useDataStore((s) => s.prospects);
+  const currentUser = useDataStore((s) => s.currentUser);
+  const router = useRouter();
   const ui = useUiStore();
   const hydrateViewState = useUiStore((s) => s.hydrateViewState);
 
@@ -52,6 +55,12 @@ export function CrmApp() {
     bootstrap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Purchasing works a different job to Sales, so it lands on the purchasing
+  // workspace rather than the prospect pipeline (matches the single-file app).
+  useEffect(() => {
+    if (currentUser?.role === 'purchasing') router.replace('/purchasing');
+  }, [currentUser?.role, router]);
 
   // Deliberately depends on the individual filter/sort fields rather than `ui`
   // as a whole — `ui` also carries page/viewMode/modal state that shouldn't

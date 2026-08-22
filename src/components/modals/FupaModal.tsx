@@ -119,9 +119,10 @@ export function FupaModal() {
     }
   }
 
-  async function save(markSent: boolean) {
+  async function save(markSent: boolean): Promise<string | null> {
     if (!items.some((it) => (it.material || '').trim())) {
-      return toast('Isi minimal satu material permintaan pembelian', 'error');
+      toast('Isi minimal satu material permintaan pembelian', 'error');
+      return null;
     }
     setBusy(true);
     try {
@@ -137,8 +138,10 @@ export function FupaModal() {
         if (src && src.fupaId !== fupa.id) upsertRfq({ ...src, fupaId: fupa.id });
       }
       toast(markSent ? 'FUP A ditandai terkirim' : 'FUP A disimpan', 'success');
+      return fupa.id;
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal menyimpan FUP A', 'error');
+      return null;
     } finally {
       setBusy(false);
     }
@@ -149,7 +152,7 @@ export function FupaModal() {
       show={show}
       onClose={closeModal}
       title={fupaId ? 'Edit FUP A' : 'Buat FUP A (Permintaan Pembelian)'}
-      wide
+      wide2
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>
@@ -178,7 +181,7 @@ export function FupaModal() {
           <input type="date" value={tglFupa} onChange={(e) => setTglFupa(e.target.value)} />
         </div>
         <div>
-          <label>Ref. No. RFQ</label>
+          <label>No. RFQ Rujukan</label>
           <input type="text" value={sourceNoRfq} onChange={(e) => setSourceNoRfq(e.target.value)} placeholder="RFQ asal" />
         </div>
         <div>
@@ -186,27 +189,53 @@ export function FupaModal() {
           <input type="text" value={cabang} onChange={(e) => setCabang(e.target.value.toUpperCase())} />
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
-          <label>Customer</label>
+          <label>Customer (Cust)</label>
           <input type="text" value={customer} onChange={(e) => setCustomer(e.target.value)} />
         </div>
       </div>
 
+      <div className="import-summary" style={{ marginTop: 0 }}>
+        FUP A hanya dibuat untuk prospek yang sudah Won (PO/Kontrak atau DO). Pilih No. RFQ yang sudah dibuat
+        sebelumnya saat prospek masih Aktif — data cabang, customer, dan material akan terisi otomatis.
+      </div>
+
       <div style={{ marginTop: 16 }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>Material yang Diminta</label>
+        <label style={{ display: 'block', marginBottom: 8 }}>Daftar Material Permintaan Pembelian</label>
         {items.map((it, idx) => (
-          <div key={idx} className="rfq-item-row">
-            <input type="text" placeholder="Line" value={it.line} onChange={(e) => setItem(idx, { line: e.target.value })} style={{ maxWidth: 70 }} />
-            <input type="text" placeholder="Grade" value={it.grade} onChange={(e) => setItem(idx, { grade: e.target.value })} style={{ maxWidth: 110 }} />
-            <input type="text" placeholder="Material" value={it.material} onChange={(e) => setItem(idx, { material: e.target.value })} />
-            <input type="number" placeholder="Pcs" value={it.pcs} onChange={(e) => setItem(idx, { pcs: e.target.value })} style={{ maxWidth: 80 }} />
-            <select value={it.lokal} onChange={(e) => setItem(idx, { lokal: e.target.value })} style={{ maxWidth: 160 }}>
-              {RFQ_LOKAL_OPTIONS.map((o) => (
-                <option key={o.v} value={o.v}>{o.l}</option>
-              ))}
-            </select>
-            <button type="button" className="icon-btn danger" title="Hapus baris" onClick={() => setItems((prev) => (prev.length === 1 ? [emptyItem()] : prev.filter((_, i) => i !== idx)))}>
-              <IconTrash />
-            </button>
+          <div className="rfq-item-card" key={idx}>
+            <div className="rfq-item-head">
+              <span>Material #{idx + 1}</span>
+              <button
+                type="button"
+                className="icon-btn danger"
+                disabled={items.length <= 1}
+                onClick={() => setItems((prev) => (prev.length === 1 ? [emptyItem()] : prev.filter((_, i) => i !== idx)))}
+                title="Hapus material"
+              >
+                <IconTrash />
+              </button>
+            </div>
+            <div className="form-grid">
+              <div><label>Line</label><input type="text" value={it.line} onChange={(e) => setItem(idx, { line: e.target.value })} /></div>
+              <div><label>Grade</label><input type="text" value={it.grade} onChange={(e) => setItem(idx, { grade: e.target.value })} /></div>
+              <div className="full">
+                <label>Material / Spesifikasi</label>
+                <input type="text" value={it.material} onChange={(e) => setItem(idx, { material: e.target.value })} placeholder="cth. 12 MM X 320 MM X 1333 MM" />
+              </div>
+              <div><label>Dia (mm)</label><input type="number" step="any" min={0} value={it.dia} onChange={(e) => setItem(idx, { dia: e.target.value })} /></div>
+              <div><label>Thick (mm)</label><input type="number" step="any" min={0} value={it.thick} onChange={(e) => setItem(idx, { thick: e.target.value })} /></div>
+              <div><label>Width (mm)</label><input type="number" step="any" min={0} value={it.width} onChange={(e) => setItem(idx, { width: e.target.value })} /></div>
+              <div><label>Length (mm)</label><input type="number" step="any" min={0} value={it.length} onChange={(e) => setItem(idx, { length: e.target.value })} /></div>
+              <div><label>PCS</label><input type="number" step="any" min={0} value={it.pcs} onChange={(e) => setItem(idx, { pcs: e.target.value })} /></div>
+              <div><label>Berat (KGS)</label><input type="number" step="any" min={0} value={it.berat} onChange={(e) => setItem(idx, { berat: e.target.value })} /></div>
+              <div>
+                <label>Lokal/Import</label>
+                <select value={it.lokal} onChange={(e) => setItem(idx, { lokal: e.target.value })}>
+                  {RFQ_LOKAL_OPTIONS.map((o) => (<option key={o.v} value={o.v}>{o.l}</option>))}
+                </select>
+              </div>
+              <div><label>Estimasi Kebutuhan</label><input type="date" value={String(it.estimasi || '')} onChange={(e) => setItem(idx, { estimasi: e.target.value })} /></div>
+            </div>
           </div>
         ))}
         <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 4 }} onClick={() => setItems((prev) => [...prev, emptyItem()])}>
@@ -221,9 +250,21 @@ export function FupaModal() {
         </div>
       </div>
 
+      {(() => {
+        const rec = fupaId ? fupas.find((f) => f.id === fupaId) : null;
+        return rec?.purchJawaban ? (
+          <div className="import-summary" style={{ marginTop: 16 }}>
+            <b>Jawaban Purchasing:</b> {rec.purchJawaban}
+          </div>
+        ) : null;
+      })()}
+      <div className="import-summary">
+        Nomor WhatsApp &amp; email Purchasing di atas otomatis diingat untuk dokumen berikutnya. Setelah export Excel,
+        lampirkan filenya secara manual pada email sebelum dikirim.
+      </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>Lampiran</label>
-        <AttachmentList fupaId={fupaId} />
+        <label style={{ display: 'block', marginBottom: 8 }}>Lampiran File (maks. 3 file, 1.5MB/file)</label>
+        <AttachmentList fupaId={fupaId} ensureParentId={() => save(false)} />
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>Diskusi</label>

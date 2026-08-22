@@ -10,6 +10,11 @@ interface Props {
   rfqId?: string | null;
   fupaId?: string | null;
   readOnly?: boolean;
+  /**
+   * Saves the parent as a draft and returns its id. Lets the user attach files
+   * to a document they haven't saved yet, the way the single-file app does.
+   */
+  ensureParentId?: () => Promise<string | null>;
 }
 
 /**
@@ -17,7 +22,7 @@ interface Props {
  * object storage through /api/attachments; downloads go through a redirect to a
  * short-lived presigned URL, so the bucket never has to be public.
  */
-export function AttachmentList({ rfqId, fupaId, readOnly }: Props) {
+export function AttachmentList({ rfqId, fupaId, readOnly, ensureParentId }: Props) {
   const parentId = rfqId || fupaId || null;
   const query = rfqId ? `rfqId=${rfqId}` : `fupaId=${fupaId}`;
 
@@ -45,13 +50,19 @@ export function AttachmentList({ rfqId, fupaId, readOnly }: Props) {
   }, [load]);
 
   const upload = async (files: FileList | null) => {
-    if (!files || !parentId || readOnly) return;
+    if (!files || readOnly) return;
+    // Attaching to an unsaved document saves it first.
+    let target = parentId;
+    if (!target && ensureParentId) target = await ensureParentId();
+    if (!target) return;
+    // Which column to file it under is decided by the prop the caller passed,
+    // not by its value — a brand-new document has a null id either way.
+    const field = fupaId !== undefined ? 'fupaId' : 'rfqId';
     setBusy(true);
     for (const file of Array.from(files)) {
       const body = new FormData();
       body.append('file', file);
-      if (rfqId) body.append('rfqId', rfqId);
-      if (fupaId) body.append('fupaId', fupaId);
+      body.append(field, target);
       try {
         // Deliberately raw fetch: api-client forces a JSON content-type, which
         // would break the multipart boundary.
@@ -78,7 +89,7 @@ export function AttachmentList({ rfqId, fupaId, readOnly }: Props) {
     }
   };
 
-  if (!parentId) {
+  if (!parentId && !ensureParentId) {
     return <div className="import-summary">Simpan dokumen terlebih dahulu untuk menambahkan lampiran.</div>;
   }
 
@@ -100,7 +111,7 @@ export function AttachmentList({ rfqId, fupaId, readOnly }: Props) {
           onClick={() => inputRef.current?.click()}
         >
           <IconUpload />
-          <span>{busy ? 'Mengunggah…' : 'Tarik file ke sini atau klik untuk memilih'}</span>
+          <span>{busy ? 'Mengunggah…' : 'Klik atau tarik file ke sini untuk melampirkan (foto, PDF, dokumen)'}</span>
           <input ref={inputRef} type="file" multiple hidden onChange={(e) => upload(e.target.files)} />
         </div>
       )}

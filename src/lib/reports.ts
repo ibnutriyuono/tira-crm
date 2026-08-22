@@ -49,12 +49,14 @@ export function buildCustomerIntel(records: Prospect[]): CustomerIntelRow[] {
     const lastOrderDate = dates.length ? dates[dates.length - 1] : null;
     const d = lastOrderDate ? daysSince(lastOrderDate) : null;
 
+    // Thresholds match the single-file app: Aktif <=45d, Menghangat 46-90d,
+    // Dingin >90d. Using 90/180 here made every account look healthier.
     let health = 'Belum Pernah Order';
     let healthColor = 'slate';
     if (d != null) {
-      if (d <= 90) { health = 'Aktif'; healthColor = 'green'; }
-      else if (d <= 180) { health = 'Melambat'; healthColor = 'amber'; }
-      else { health = 'Dorman'; healthColor = 'rust'; }
+      if (d <= 45) { health = 'Aktif'; healthColor = 'green'; }
+      else if (d <= 90) { health = 'Menghangat'; healthColor = 'amber'; }
+      else { health = 'Dingin (Follow-up)'; healthColor = 'rust'; }
     }
 
     const decided = won.length + lost.length;
@@ -85,6 +87,8 @@ export interface CompetitorRow {
   lostValue: number;
   topCabang: string;
   topLine: string;
+  /** Most recent date we lost to this competitor. */
+  lastSeen: string | null;
 }
 
 /** Lost deals grouped by the competitor recorded in the QCD form. */
@@ -118,6 +122,7 @@ export function buildCompetitorLog(records: Prospect[]): CompetitorRow[] {
       lostValue: entry.records.reduce((s, r) => s + num(r.value), 0),
       topCabang: top(cabangCount),
       topLine: top(lineCount),
+      lastSeen: entry.records.map(recordDate).filter(Boolean).sort().pop() ?? null,
     });
   });
 
@@ -139,43 +144,50 @@ export interface ForecastRow {
  * (YYYY-MM). "Weighted" applies STAGE_PROBABILITY to open deals; "aging"
  * counts open deals untouched beyond AGING_THRESHOLD_DAYS.
  */
-export function buildForecast(records: Prospect[], targets: BudgetTarget[], periode: string): ForecastRow[] {
+export function buildForecast(
+  records: Prospect[],
+  targets: BudgetTarget[],
+  periode: string,
+  cabangList: string[] = [],
+): ForecastRow[] {
+  // Every branch in scope appears, not just those with activity this period —
+  // otherwise a branch with a target but no deals silently vanishes and the
+  // table stops reconciling with the KPI cards above it.
+  const dataCabangs = records.map((r) => (r.cabang || '').trim().toUpperCase()).filter(Boolean);
+  const cabangs = Array.from(new Set([...cabangList.map((c) => c.toUpperCase()), ...dataCabangs]));
+
   const inPeriod = (r: Prospect) => (recordDate(r) || '').slice(0, 7) === periode;
-  const byCabang = new Map<string, Prospect[]>();
-  records.filter(inPeriod).forEach((r) => {
-    const cb = (r.cabang || '-').toUpperCase();
-    if (!byCabang.has(cb)) byCabang.set(cb, []);
-    byCabang.get(cb)!.push(r);
-  });
 
-  // Include branches that have a target but no activity this period.
-  targets.filter((t) => t.periode === periode).forEach((t) => {
-    if (!byCabang.has(t.cabang)) byCabang.set(t.cabang, []);
-  });
+  return cabangs
+    .map((cabang) => {
+      const cList = records.filter((r) => (r.cabang || '').trim().toUpperCase() === cabang);
+      // Weighted forecast covers the whole live pipeline; only Won and Target
+      // are scoped to the selected month.
+      const open = cList.filter((r) => classify(r) === 'Aktif');
+      const weighted = open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[r.status] ?? 0), 0);
+      const won = cList.filter((r) => classify(r) === 'Won' && inPeriod(r)).reduce((s, r) => s + num(r.value), 0);
+      const target = targets.find((t) => t.cabang === cabang && t.periode === periode)?.amount ?? 0;
+      const agingCount = open.filter((r) => daysSince(String(r.updatedAt).slice(0, 10)) > AGING_THRESHOLD_DAYS).length;
 
-  const out: ForecastRow[] = [];
-  byCabang.forEach((list, cabang) => {
-    const target = targets.find((t) => t.cabang === cabang && t.periode === periode)?.amount ?? 0;
-    const won = list.filter((r) => classify(r) === 'Won').reduce((s, r) => s + num(r.value), 0);
-    const open = list.filter((r) => classify(r) === 'Aktif');
-    const weighted = open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[r.status] ?? 0), 0);
-    const agingCount = open.filter((r) => {
-      const d = recordDate(r);
-      return d ? daysSince(d) > AGING_THRESHOLD_DAYS : false;
-    }).length;
-
-    out.push({
-      cabang,
-      target,
-      won,
-      weighted,
-      openCount: open.length,
-      agingCount,
-      achievement: target > 0 ? Math.round((won / target) * 100) : 0,
+      return {
+        cabang,
+        target,
+        won,
+        weighted,
+        openCount: open.length,
+        agingCount,
+        achievement: target > 0 ? Math.round((won / target) * 100) : 0,
+      };
+    })
+    // Keep the company's own branch ordering rather than sorting alphabetically.
+    .sort((a, b) => {
+      const ia = cabangList.indexOf(a.cabang);
+      const ib = cabangList.indexOf(b.cabang);
+      if (ia === -1 && ib === -1) return a.cabang.localeCompare(b.cabang);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
     });
-  });
-
-  return out.sort((a, b) => a.cabang.localeCompare(b.cabang));
 }
 
 export interface ForecastSeRow {
@@ -221,4 +233,21 @@ export function buildQcdRecap(records: Prospect[]): Prospect[] {
   return records
     .filter((r) => Number(r.status) === 4 || Number(r.status) === 6)
     .sort((a, b) => (b.tglPenawaran || '').localeCompare(a.tglPenawaran || ''));
+}
+
+export interface AgingRow {
+  record: Prospect;
+  days: number;
+}
+
+/**
+ * Open deals with no movement past AGING_THRESHOLD_DAYS, newest-stalest first.
+ * The forecast panel previously only counted these; the prototype lists them.
+ */
+export function buildAgingList(records: Prospect[]): AgingRow[] {
+  return records
+    .filter((r) => classify(r) === 'Aktif')
+    .map((r) => ({ record: r, days: daysSince(String(r.updatedAt).slice(0, 10)) }))
+    .filter((x) => x.days > AGING_THRESHOLD_DAYS)
+    .sort((a, b) => b.days - a.days);
 }

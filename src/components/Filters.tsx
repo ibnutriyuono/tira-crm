@@ -95,6 +95,7 @@ export function Filters() {
           <option value="Aktif">Aktif</option>
           <option value="Won">Won</option>
           <option value="Lost">Lost</option>
+            <option value="Activity">Sales Activity</option>
         </select>
       </div>
       <div className="field">

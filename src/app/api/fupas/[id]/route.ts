@@ -66,6 +66,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ fupa });
   }
 
+  if (typeof body?.purchNotes === 'string' || typeof body?.purchJawaban === 'string') {
+    if (!canEditPurchasing(user)) {
+      return NextResponse.json({ error: 'Hanya Purchasing dan Admin yang dapat mengisi catatan pembelian.' }, { status: 403 });
+    }
+    const fupa = await prisma.fupa.update({
+      where: { id },
+      data: {
+        ...(typeof body.purchNotes === 'string' ? { purchNotes: body.purchNotes } : {}),
+        ...(typeof body.purchJawaban === 'string' ? { purchJawaban: body.purchJawaban } : {}),
+      },
+    });
+    emitCrmEvent('fupa:updated', fupa);
+    await logActivity({
+      user,
+      action: 'update',
+      entity: 'fupa',
+      entityId: id,
+      summary: `Mengisi catatan/jawaban Purchasing pada FUP A ${fupa.noFupa || '(tanpa nomor)'}`,
+    });
+    return NextResponse.json({ fupa });
+  }
+
   if (typeof body?.status === 'string') {
     const fupa = await prisma.fupa.update({ where: { id }, data: { status: body.status } });
     emitCrmEvent('fupa:updated', fupa);

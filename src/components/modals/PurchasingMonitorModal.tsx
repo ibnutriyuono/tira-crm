@@ -18,7 +18,7 @@ export function PurchasingMonitorModal() {
   const canEdit = currentUser?.role === 'purchasing' || currentUser?.role === 'admin';
 
   return (
-    <Modal show={show} onClose={closeModal} title="Monitor Purchasing" wide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title="Purchasing" xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
       {show && <PurchasingBoard readOnly={!canEdit} />}
     </Modal>
   );

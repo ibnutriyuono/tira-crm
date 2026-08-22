@@ -14,6 +14,11 @@ export interface Material {
   line: string;
   uraian: string;
   qty: number;
+  /** Kg per piece. With hargaKg it derives the unit price. */
+  beratPc: number;
+  /** Rp per kg. */
+  hargaKg: number;
+  /** Flat unit price, used when beratPc/hargaKg aren't filled in. */
   harga: number;
 }
 
@@ -36,6 +41,8 @@ export interface Prospect {
   keterangan: string | null;
   status: number;
   penawaranTerkirim: boolean;
+  /** DO invoiced — splits Omzet (true) from GIT (false). */
+  terfaktur: boolean;
   qcdQuality: string | null;
   qcdCost: string | null;
   qcdDelivery: string | null;
@@ -108,6 +115,8 @@ export interface Fupa {
   catatan: string | null;
   status: 'Draft' | 'Terkirim' | 'Selesai';
   purchStatus: number;
+  purchNotes: string | null;
+  purchJawaban: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -122,11 +131,14 @@ export interface Rfq {
   requestedBy: string | null;
   prospectId: string | null;
   items: RfqItem[];
+  catatan: string | null;
   status: 'Draft' | 'Terkirim' | 'Selesai';
   purchStatus: number;
   fupaId: string | null;
   jawabanRfqDikirim: boolean;
   jawabanRfqAt: string | null;
+  purchNotes: string | null;
+  purchJawaban: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -210,7 +222,7 @@ export interface PurchasingContact {
   email: string;
 }
 
-export type Klasifikasi = 'Aktif' | 'Won' | 'Lost';
+export type Klasifikasi = 'Aktif' | 'Won' | 'Lost' | 'Activity';
 
 export type ActivityAction =
   | 'login'

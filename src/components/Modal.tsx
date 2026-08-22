@@ -8,6 +8,8 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   wide?: boolean;
+  /** 840px — forms with a multi-column material grid. */
+  wide2?: boolean;
   /** Wider still — for the activity log's six-column table. */
   xwide?: boolean;
   children: ReactNode;
@@ -16,7 +18,7 @@ interface ModalProps {
   onSubmit?: (e: React.FormEvent<HTMLFormElement>) => void;
 }
 
-export function Modal({ show, onClose, title, wide, xwide, children, footer, onSubmit }: ModalProps) {
+export function Modal({ show, onClose, title, wide, wide2, xwide, children, footer, onSubmit }: ModalProps) {
   useEffect(() => {
     if (!show) return;
     const onKey = (e: KeyboardEvent) => {
@@ -42,7 +44,7 @@ export function Modal({ show, onClose, title, wide, xwide, children, footer, onS
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className={`modal${wide ? ' wide' : ''}${xwide ? ' xwide' : ''}`}>
+      <div className={`modal${wide ? ' wide' : ''}${wide2 ? ' wide2' : ''}${xwide ? ' xwide' : ''}`}>
         <div className="modal-head">
           <h3>{title}</h3>
           <button type="button" className="close-x" onClick={onClose}>

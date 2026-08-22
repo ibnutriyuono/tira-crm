@@ -7,7 +7,7 @@ import { useUiStore } from '@/store/useUiStore';
 import { api } from '@/lib/api-client';
 import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { classify, num, todayStr } from '@/lib/format';
-import { IconActivity, IconCustomers, IconDatabase, IconDownload, IconPlus, IconRfq, IconSave, IconUpload, IconUsers } from './icons';
+import { IconActivity, IconBag, IconBarChart, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconExport, IconImport, IconPlus, IconRfq, IconSave, IconSearch, IconTemplate, IconUsers } from './icons';
 
 const ROLE_LABEL: Record<string, { label: string; color: string }> = {
   admin: { label: 'Admin', color: 'amber' },
@@ -55,7 +55,7 @@ export function TopBar() {
     ws['!cols'] = [{ wch: 5 }, { wch: 8 }, { wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 13 }, { wch: 12 }, { wch: 13 }, { wch: 6 }, { wch: 32 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 24 }, { wch: 8 }, { wch: 10 }, { wch: 14 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'PROSPECT LIST');
-    const legend = [['STATUS', 'KETERANGAN'], [0, 'Belum Ditentukan'], [1, 'Permintaan'], [2, 'Penawaran Harga'], [3, 'Negosiasi'], [4, 'PO / Kontrak'], [5, 'DO'], [6, 'Lose Order / Batal']];
+    const legend = [['STATUS', 'KETERANGAN'], [0, 'Sales Activity'], [1, 'Permintaan'], [2, 'Penawaran Harga'], [3, 'Negosiasi'], [4, 'PO / Kontrak'], [5, 'DO'], [6, 'Lose Order / Batal']];
     const wsLegend = XLSX.utils.aoa_to_sheet(legend);
     wsLegend['!cols'] = [{ wch: 10 }, { wch: 24 }];
     XLSX.utils.book_append_sheet(wb, wsLegend, 'Legend Status');
@@ -104,6 +104,11 @@ export function TopBar() {
         </div>
         <span style={{ fontSize: 11, color: 'var(--slate-300)', fontFamily: "var(--font-ibm-plex-mono), monospace" }}>{savedLabel}</span>
         <div className="topbar-actions">
+          {/* Deliberate divergence from the single-file app, which shows these to
+              every role: Kelola Database, Kelola User and Import Excel are
+              admin-only here. Their APIs already enforce requireAdmin, so
+              showing them to Sales would just open modals that 403. Decided
+              2026-08-23 — do not "fix" this to match the mockup. */}
           {currentUser.role === 'admin' && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('database')}>
               <IconDatabase />
@@ -124,43 +129,32 @@ export function TopBar() {
             <IconRfq />
             Kelola RFQ
           </button>
-          <button className="btn btn-ghost-dark" onClick={() => openModal('purchasing')}>
-            <IconRfq />
-            Monitor Purchasing
-          </button>
           <button className="btn btn-ghost-dark" onClick={() => openModal('fupaManage')}>
-            <IconRfq />
+            <IconCart />
             Kelola FUP A
           </button>
-          {/* Readable by every role so anyone can see who was asked to quote;
-              the API restricts writes to purchasing/admin. */}
-          <button className="btn btn-ghost-dark" onClick={() => openModal('vendors')}>
-            <IconCustomers />
-            Kelola Vendor
+          <button className="btn btn-ghost-dark" onClick={() => openModal('qcdRecap')}>
+            <IconCheckSquare />
+            Hasil QCD
           </button>
           <button className="btn btn-ghost-dark" onClick={() => openModal('forecast')}>
-            <IconActivity />
-            Forecast &amp; Target
-          </button>
-          <button className="btn btn-ghost-dark" onClick={() => openModal('qcdRecap')}>
-            <IconActivity />
-            Kelola QCD
+            <IconChartLine />
+            Forecast
           </button>
           <button className="btn btn-ghost-dark" onClick={() => openModal('customerIntel')}>
-            <IconCustomers />
-            Customer Intel
+            <IconSearch />
+            Customer Intelligence
           </button>
           <button className="btn btn-ghost-dark" onClick={() => openModal('competitorLog')}>
-            <IconActivity />
+            <IconBarChart />
             Log Kompetitor
           </button>
-          {/* Open to every role — the API scopes what each one is allowed to read. */}
-          <button className="btn btn-ghost-dark" onClick={() => openModal('activity')}>
-            <IconActivity />
-            Log Aktivitas
+          <button className="btn btn-ghost-dark" onClick={() => openModal('purchasing')}>
+            <IconBag />
+            Purchasing
           </button>
           <button className="btn btn-ghost-dark" onClick={downloadTemplate}>
-            <IconDownload />
+            <IconTemplate />
             Template
           </button>
           {currentUser.role === 'admin' && (
@@ -171,13 +165,19 @@ export function TopBar() {
                 openModal('import');
               }}
             >
-              <IconUpload />
+              <IconImport />
               Import Excel
             </button>
           )}
           <button className="btn btn-ghost-dark" onClick={exportExcel}>
-            <IconDownload />
+            <IconExport />
             Export Excel
+          </button>
+          {/* Not in the single-file app's toolbar — this build's own addition,
+              kept last so the shared buttons match it 1:1. */}
+          <button className="btn btn-ghost-dark" onClick={() => openModal('activity')}>
+            <IconActivity />
+            Log Aktivitas
           </button>
           <button className="btn btn-outline" onClick={saveAllNow}>
             <IconSave />

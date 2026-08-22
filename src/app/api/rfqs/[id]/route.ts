@@ -34,6 +34,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       requestedBy: body?.requestedBy ?? existing.requestedBy,
       prospectId,
       items: Array.isArray(body?.items) ? body.items : existing.items ?? undefined,
+      catatan: body?.catatan ?? existing.catatan,
       status: body?.markSent ? 'Terkirim' : body?.status ?? existing.status,
     },
   });
@@ -78,6 +79,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       where: { id },
       data: {
         items,
+        ...(typeof body.purchNotes === 'string' ? { purchNotes: body.purchNotes } : {}),
+        ...(typeof body.purchJawaban === 'string' ? { purchJawaban: body.purchJawaban } : {}),
         ...(body.action === 'send-jawaban' ? { jawabanRfqDikirim: true, jawabanRfqAt: new Date() } : {}),
       },
     });

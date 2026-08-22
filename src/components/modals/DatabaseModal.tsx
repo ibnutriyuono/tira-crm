@@ -12,6 +12,7 @@ interface Stats {
   prospects: number;
   customers: number;
   rfqs: number;
+  fupas?: number;
   users: number;
 }
 
@@ -77,7 +78,7 @@ export function DatabaseModal() {
       <div className="import-summary" style={{ marginBottom: 14 }}>
         {stats ? (
           <>
-            Total Prospek: <b>{stats.prospects}</b> &nbsp;|&nbsp; Total Customer: <b>{stats.customers}</b> &nbsp;|&nbsp; Total RFQ: <b>{stats.rfqs}</b> &nbsp;|&nbsp; Total User: <b>{stats.users}</b>
+            Total Prospek: <b>{stats.prospects}</b> &nbsp;|&nbsp; Total Customer: <b>{stats.customers}</b> &nbsp;|&nbsp; Total RFQ: <b>{stats.rfqs}</b> &nbsp;|&nbsp; Total FUP A: <b>{stats.fupas ?? 0}</b> &nbsp;|&nbsp; Total User: <b>{stats.users}</b>
             <br />
             Penyimpanan: <b>PostgreSQL (realtime, tersinkron ke semua user)</b>
           </>

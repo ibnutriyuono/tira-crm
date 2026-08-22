@@ -40,6 +40,13 @@ function KanbanCard({ r }: { r: Prospect }) {
       <div className="kc-meta-row">
         <span className={`badge ${r.penawaranTerkirim ? 'green' : 'rust pending-dot'}`}>{r.penawaranTerkirim ? 'Penawaran Terkirim' : 'Penawaran Pending'}</span>
       </div>
+      {num(r.status) === 5 && (
+        <div className="kc-meta-row">
+          <span className={`badge ${r.terfaktur ? 'green' : 'amber'}`}>
+            {r.terfaktur ? 'Omzet (Terfaktur)' : 'GIT (Belum Terfaktur)'}
+          </span>
+        </div>
+      )}
       <div className="kc-actions">
         <button
           className="icon-btn wa-btn"

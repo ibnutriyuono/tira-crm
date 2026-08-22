@@ -24,12 +24,24 @@ export function num(v: unknown): number {
 
 /** Derives the flattened legacy fields (line/uraian/qty/value) from a materials array — mirrors the original form submit handler. */
 export function deriveFromMaterials(materials: Material[]) {
-  const clean = materials.map((m) => ({ line: (m.line || '').trim(), uraian: (m.uraian || '').trim(), qty: num(m.qty), harga: num(m.harga) })).filter((m) => m.uraian || m.qty || m.harga);
+  const clean = materials
+    .map((m) => ({
+      line: (m.line || '').trim(),
+      uraian: (m.uraian || '').trim(),
+      qty: num(m.qty),
+      beratPc: num(m.beratPc),
+      hargaKg: num(m.hargaKg),
+      harga: num(m.harga),
+    }))
+    .filter((m) => m.uraian || m.qty || m.harga || m.beratPc || m.hargaKg);
+  // Same unit-price rule as the client (see materialUnitPrice).
+  const unit = (m: { beratPc: number; hargaKg: number; harga: number }) =>
+    m.beratPc > 0 && m.hargaKg > 0 ? m.beratPc * m.hargaKg : m.harga;
   return {
     materials: clean,
     line: Array.from(new Set(clean.map((m) => m.line).filter(Boolean))).join(', '),
     uraian: clean.map((m) => m.uraian).filter(Boolean).join('; '),
     qty: clean.reduce((s, m) => s + m.qty, 0),
-    value: clean.reduce((s, m) => s + m.qty * m.harga, 0),
+    value: clean.reduce((s, m) => s + m.qty * unit(m), 0),
   };
 }

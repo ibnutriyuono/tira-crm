@@ -1,7 +1,7 @@
 export const CABANG_LIST = ['BLP', 'MDN', 'SBY', 'PKB', 'CLG', 'BDG', 'MKS', 'CLP', 'PLB', 'PDG', 'DKI', 'BJM', 'SMG'];
 
 export const STATUS_META: Record<number, { label: string; color: string }> = {
-  0: { label: 'Belum Ditentukan', color: 'slate' },
+  0: { label: 'Sales Activity', color: 'slate' },
   1: { label: 'Permintaan', color: 'steel' },
   2: { label: 'Penawaran Harga', color: 'steel' },
   3: { label: 'Negosiasi', color: 'amber' },

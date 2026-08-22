@@ -246,6 +246,8 @@ td.center{text-align:center;}
 .overlay.show{display:flex;}
 .modal{background:var(--surface); border-radius:8px; width:100%; max-width:640px; box-shadow:var(--shadow-2); max-height:92vh; display:flex; flex-direction:column;}
 .modal.wide{max-width:640px;}
+.modal.wide2{max-width:840px;}
+.modal.xwide{max-width:1040px;}
 .modal.xwide{max-width:1140px;}
 .modal-head{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border); flex:0 0 auto;}
 .modal > form{display:flex; flex-direction:column; flex:1 1 auto; min-height:0; overflow:hidden;}
@@ -524,3 +526,21 @@ tr.hl-yellow:hover td{ background:rgba(201,130,46,.18); }
   background:var(--rust-500); color:#fff; font-size:10.5px; font-weight:700;
   margin-left:6px; vertical-align:middle;
 }
+
+/* Omzet / GIT KPI accents (match the single-file app) */
+.kpi.omzet{ border-left-color:var(--green-500); }
+.kpi.git{ border-left-color:var(--amber-500); }
+
+/* Purchasing "Kartu" view for the incoming-request list */
+.purch-card-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:10px; }
+.purch-card{
+  border:1px solid var(--border); border-left:3px solid var(--steel-500);
+  border-radius:var(--radius); padding:12px; background:var(--surface); cursor:pointer;
+  display:flex; flex-direction:column; gap:6px;
+}
+.purch-card:hover{ box-shadow:var(--shadow-1); }
+.purch-card-head{ display:flex; gap:6px; flex-wrap:wrap; }
+.purch-card-no{ font-weight:700; font-size:13px; color:var(--graphite-900); }
+.purch-card-meta{ display:flex; flex-direction:column; font-size:11.5px; color:var(--text-soft); }
+.purch-card-mat{ font-size:12px; }
+.purch-card-foot{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:4px; }

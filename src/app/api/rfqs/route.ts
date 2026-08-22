@@ -39,6 +39,7 @@ export async function POST(req: Request) {
       requestedBy: body?.requestedBy || user.name,
       prospectId,
       items: Array.isArray(body?.items) ? body.items : [],
+      catatan: String(body?.catatan || ''),
       status: body?.markSent ? 'Terkirim' : 'Draft',
     },
   });

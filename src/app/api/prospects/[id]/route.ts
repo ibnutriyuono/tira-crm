@@ -61,6 +61,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       keterangan: String(body?.keterangan || '').trim(),
       status: Number(body?.status) || 0,
       penawaranTerkirim: !!body?.penawaranTerkirim,
+      terfaktur: !!body?.terfaktur,
       qcdQuality: body?.qcdQuality ?? undefined,
       qcdCost: body?.qcdCost ?? undefined,
       qcdDelivery: body?.qcdDelivery ?? undefined,
@@ -94,7 +95,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const body = await req.json().catch(() => null);
   const data: Record<string, unknown> = {};
-  const allowed = ['status', 'penawaranTerkirim', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan'];
+  const allowed = ['status', 'penawaranTerkirim', 'terfaktur', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan'];
   for (const key of allowed) {
     if (body && Object.prototype.hasOwnProperty.call(body, key)) data[key] = body[key];
   }

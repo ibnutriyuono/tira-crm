@@ -71,7 +71,7 @@ export function ItemChat({ entity, entityId }: { entity: ItemEntity; entityId: s
   }
 
   if (!entityId) {
-    return <div className="import-summary">Simpan dokumen terlebih dahulu untuk memulai diskusi.</div>;
+    return <div className="import-summary">Simpan prospek ini terlebih dahulu untuk mulai berdiskusi.</div>;
   }
 
   return (

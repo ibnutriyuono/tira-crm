@@ -50,6 +50,7 @@ export async function POST(req: Request) {
       keterangan: String(body?.keterangan || '').trim(),
       status: Number(body?.status) || 0,
       penawaranTerkirim: !!body?.penawaranTerkirim,
+      terfaktur: !!body?.terfaktur,
       qcdQuality: body?.qcdQuality || '',
       qcdCost: body?.qcdCost || '',
       qcdDelivery: body?.qcdDelivery || '',

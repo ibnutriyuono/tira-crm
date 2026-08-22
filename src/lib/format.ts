@@ -31,6 +31,9 @@ export function todayStr(): string {
 export function classify(r: Pick<Prospect, 'status' | 'keterangan'>): Klasifikasi {
   const status = num(r.status);
   const k = (r.keterangan || '').toLowerCase();
+  // Status 0 is a logged sales activity, not a live pipeline deal — counting it
+  // as 'Aktif' inflated Aktif Pipeline against the single-file app.
+  if (status === 0) return 'Activity';
   if (status === 6) return 'Lost';
   if (/kalah|lose|lost|batal|cancel|loss/.test(k)) return 'Lost';
   if (status === 4 || status === 5) return 'Won';
@@ -39,7 +42,7 @@ export function classify(r: Pick<Prospect, 'status' | 'keterangan'>): Klasifikas
 }
 
 export function klasBadgeColor(klas: Klasifikasi): string {
-  return klas === 'Won' ? 'green' : klas === 'Lost' ? 'rust' : 'steel';
+  return klas === 'Won' ? 'green' : klas === 'Lost' ? 'rust' : klas === 'Activity' ? 'slate' : 'steel';
 }
 
 export function normalizePhone(p?: string | null): string {
@@ -54,11 +57,11 @@ export function normalizePhone(p?: string | null): string {
 // missing/empty `materials` array still renders something sensible.
 export function getProspectMaterials(r: Pick<Prospect, 'materials' | 'qty' | 'value' | 'line' | 'uraian'>): Material[] {
   if (Array.isArray(r.materials) && r.materials.length > 0) {
-    return r.materials.map((m) => ({ line: m.line || '', uraian: m.uraian || '', qty: num(m.qty) || 0, harga: num(m.harga) || 0 }));
+    return r.materials.map((m) => ({ line: m.line || '', uraian: m.uraian || '', qty: num(m.qty) || 0, beratPc: num(m.beratPc) || 0, hargaKg: num(m.hargaKg) || 0, harga: num(m.harga) || 0 }));
   }
   const qty = num(r.qty) || 1;
   const harga = qty > 0 ? Math.round(num(r.value) / qty) : num(r.value);
-  return [{ line: r.line || '', uraian: r.uraian || '', qty, harga }];
+  return [{ line: r.line || '', uraian: r.uraian || '', qty, beratPc: 0, hargaKg: 0, harga }];
 }
 
 export function uid(): string {
@@ -82,4 +85,15 @@ export function valueHighlightClass(value: unknown): string {
   if (v > 3_000_000_000) return 'hl-yellow';
   if (v >= 1_000_000_000) return 'hl-green';
   return '';
+}
+
+/**
+ * Unit price for a prospect material row: weight x price-per-kg when both are
+ * given, otherwise the flat `harga`. Mirrors the single-file app so totals
+ * match what Sales sees today.
+ */
+export function materialUnitPrice(m: { beratPc?: unknown; hargaKg?: unknown; harga?: unknown }): number {
+  const beratPc = num(m.beratPc);
+  const hargaKg = num(m.hargaKg);
+  return beratPc > 0 && hargaKg > 0 ? beratPc * hargaKg : num(m.harga);
 }

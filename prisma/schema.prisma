@@ -64,6 +64,7 @@ model Prospect {
   keterangan        String?
   status            Int      @default(0)
   penawaranTerkirim Boolean  @default(false)
+  terfaktur         Boolean  @default(false)
   qcdQuality        String?
   qcdCost           String?
   qcdDelivery       String?
@@ -91,6 +92,7 @@ model Rfq {
   requestedBy String?
   prospectId  String?
   items       Json
+  catatan     String?
   status      String   @default("Draft")
   // Purchasing-side ladder (PSTATUS_META), independent of the sales `status`.
   purchStatus Int      @default(0)
@@ -100,6 +102,10 @@ model Rfq {
   // record that the answer was sent back to Sales.
   jawabanRfqDikirim Boolean  @default(false)
   jawabanRfqAt      DateTime?
+  /// Internal purchasing notes — not shown to Sales.
+  purchNotes        String?
+  /// Purchasing's written reply, visible to the Sales requester.
+  purchJawaban      String?
   quotations  Quotation[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -145,11 +151,13 @@ model Fupa {
   prospectId  String?
   items       Json
   catatan     String?
-  status      String   @default("Draft")
-  purchStatus Int      @default(0)
-  quotations  Quotation[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status       String   @default("Draft")
+  purchStatus  Int      @default(0)
+  purchNotes   String?
+  purchJawaban String?
+  quotations   Quotation[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([cabang])
   @@index([reg])

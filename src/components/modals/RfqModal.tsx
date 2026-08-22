@@ -34,6 +34,7 @@ export function RfqModal() {
   const [cabang, setCabang] = useState('');
   const [cust, setCust] = useState('');
   const [items, setItems] = useState<RfqItem[]>([emptyItem()]);
+  const [catatan, setCatatan] = useState('');
   const [purchWa, setPurchWa] = useState('');
   const [purchEmail, setPurchEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -52,6 +53,7 @@ export function RfqModal() {
         setCabang(r.cabang || '');
         setCust(r.customer || '');
         setItems(r.items && r.items.length > 0 ? r.items.map((it) => ({ ...it })) : [emptyItem()]);
+        setCatatan(r.catatan || '');
       }
     } else if (ctx.prospectId) {
       const r = records.find((x) => x.id === ctx.prospectId);
@@ -121,7 +123,7 @@ export function RfqModal() {
   }
 
   async function saveOrUpdateRecord(markSent: boolean): Promise<Rfq> {
-    const body = { noRfq, tglRfq, cabang, customer: cust, requestedBy, prospectId: ctx!.prospectId, items, markSent };
+    const body = { noRfq, tglRfq, cabang, customer: cust, requestedBy, prospectId: ctx!.prospectId, items, catatan, markSent };
     const { rfq } = rfqId ? await api.put<{ rfq: Rfq }>(`/api/rfqs/${rfqId}`, body) : await api.post<{ rfq: Rfq }>('/api/rfqs', body);
     upsertRfq(rfq);
     if (!rfqId) setRfqId(rfq.id);
@@ -208,7 +210,7 @@ export function RfqModal() {
       show={show}
       onClose={closeModal}
       title="Buat RFQ ke Purchasing"
-      wide
+      wide2
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
@@ -321,9 +323,23 @@ export function RfqModal() {
           <IconPlus /> Tambah Material
         </button>
       </div>
+      <div className="form-grid" style={{ marginTop: 12 }}>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label>Catatan</label>
+          <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Catatan tambahan untuk Purchasing..." />
+        </div>
+      </div>
+      {(() => {
+        const rec = rfqId ? rfqs.find((r) => r.id === rfqId) : null;
+        return rec?.purchJawaban ? (
+          <div className="import-summary" style={{ marginTop: 16 }}>
+            <b>Jawaban Purchasing:</b> {rec.purchJawaban}
+          </div>
+        ) : null;
+      })()}
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>Lampiran</label>
-        <AttachmentList rfqId={rfqId} />
+        <label style={{ display: 'block', marginBottom: 8 }}>Lampiran File (maks. 3 file, 1.5MB/file)</label>
+        <AttachmentList rfqId={rfqId} ensureParentId={async () => (await saveOrUpdateRecord(false)).id} />
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>Diskusi</label>
