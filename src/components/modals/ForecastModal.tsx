@@ -42,6 +42,7 @@ export function ForecastModal() {
     if (!currentUser) return false;
     if (currentUser.role === 'admin' || currentUser.role === 'gm') return true;
     if (currentUser.role === 'rm') return cabangReg[cabang.toUpperCase()] === currentUser.reg;
+    if (currentUser.role === 'bm') return (currentUser.cabang || '').toUpperCase() === cabang.toUpperCase();
     return false;
   };
 

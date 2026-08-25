@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Prospect" ADD COLUMN     "statusChangedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

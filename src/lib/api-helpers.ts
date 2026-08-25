@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from './auth';
-import type { SafeUser, Material } from './types';
+import type { SafeUser, Material, RfqItem } from './types';
 
 export async function requireUser(): Promise<SafeUser | NextResponse> {
   const user = await getCurrentUser();
@@ -44,4 +44,36 @@ export function deriveFromMaterials(materials: Material[]) {
     qty: clean.reduce((s, m) => s + m.qty, 0),
     value: clean.reduce((s, m) => s + m.qty * unit(m), 0),
   };
+}
+
+/**
+ * Carries Purchasing's answer (hargaPurchasing / coo) across a Sales edit.
+ *
+ * Sales edits an RFQ through PUT and sends only the fields its form knows
+ * about, so a naive overwrite silently erases the price Purchasing already
+ * filled in. Items are matched on line+material rather than array position,
+ * so inserting or reordering a material row doesn't shift the answer onto the
+ * wrong item. There is deliberately no positional fallback: an item with no
+ * match is new (or its material was rewritten), and inheriting a price from
+ * whatever previously sat at that index would attach the wrong figure. An
+ * answer present in the payload always wins.
+ */
+export function mergeRfqItemsPreservingAnswer(existing: RfqItem[] | null | undefined, incoming: RfqItem[]): RfqItem[] {
+  const prev = Array.isArray(existing) ? existing : [];
+  const keyOf = (it: RfqItem) => `${(it.line || '').trim().toLowerCase()}|${(it.material || '').trim().toLowerCase()}`;
+
+  const byKey = new Map<string, RfqItem>();
+  prev.forEach((it) => {
+    const k = keyOf(it);
+    if (k !== '|' && !byKey.has(k)) byKey.set(k, it);
+  });
+
+  return incoming.map((item) => {
+    const match = byKey.get(keyOf(item));
+    return {
+      ...item,
+      hargaPurchasing: item.hargaPurchasing ?? match?.hargaPurchasing,
+      coo: item.coo ?? match?.coo,
+    };
+  });
 }

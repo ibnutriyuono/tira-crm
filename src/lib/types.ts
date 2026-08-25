@@ -43,6 +43,7 @@ export interface Prospect {
   penawaranTerkirim: boolean;
   /** DO invoiced — splits Omzet (true) from GIT (false). */
   terfaktur: boolean;
+  statusChangedAt: string;
   qcdQuality: string | null;
   qcdCost: string | null;
   qcdDelivery: string | null;
@@ -135,6 +136,7 @@ export interface Rfq {
   status: 'Draft' | 'Terkirim' | 'Selesai';
   purchStatus: number;
   fupaId: string | null;
+  sentToPurchasingAt: string | null;
   jawabanRfqDikirim: boolean;
   jawabanRfqAt: string | null;
   purchNotes: string | null;

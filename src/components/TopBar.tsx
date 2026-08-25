@@ -31,6 +31,7 @@ export function TopBar() {
 
   async function logout() {
     await api.post('/api/auth/logout');
+    useDataStore.getState().reset();
     router.replace('/login');
     router.refresh();
   }

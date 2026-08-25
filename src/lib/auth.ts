@@ -139,6 +139,15 @@ export async function docScopeWhere(
   return {}; // gm, admin & purchasing see everything
 }
 
+/**
+ * Deleting a prospect is restricted to GM and Admin — Sales and BM can edit
+ * their own rows but not remove pipeline history. Mirrors the single-file
+ * app's canDeleteProspect().
+ */
+export function canDeleteProspect(user: SafeUser) {
+  return user.role === 'gm' || user.role === 'admin';
+}
+
 /** Write-side permission for the purchasing module (vendors, quotations, status moves). */
 export function canEditPurchasing(user: SafeUser) {
   return user.role === 'purchasing' || user.role === 'admin';
@@ -153,11 +162,16 @@ export function canEditRfqAnswer(user: SafeUser) {
  * Who may set a branch's sales target. rm is limited to branches in their own
  * region, resolved through the prospect data (a branch has no standalone row).
  */
-export function canEditBudgetTarget(user: SafeUser, cabang: string, cabangReg?: Record<string, number | null>) {
+export async function canEditBudgetTarget(user: SafeUser, cabang: string): Promise<boolean> {
+  const target = (cabang || '').toUpperCase();
   if (user.role === 'admin' || user.role === 'gm') return true;
   if (user.role === 'rm') {
-    if (!cabangReg) return true; // caller could not resolve the map; region check happens client-side
-    return cabangReg[cabang.toUpperCase()] === (user.reg ?? -1);
+    // Resolved here rather than taken as an optional argument: the previous
+    // signature defaulted to "allowed" when the caller omitted the map, which
+    // let any RM edit any branch's target.
+    const map = await cabangRegMap();
+    return map[target] === (user.reg ?? -1);
   }
+  if (user.role === 'bm') return (user.cabang || '').toUpperCase() === target;
   return false;
 }

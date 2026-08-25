@@ -23,7 +23,7 @@ export async function PUT(req: Request) {
   if (!cabang || !/^\d{4}-\d{2}$/.test(periode)) {
     return NextResponse.json({ error: 'Cabang dan periode (YYYY-MM) wajib diisi' }, { status: 400 });
   }
-  if (!canEditBudgetTarget(user, cabang)) {
+  if (!(await canEditBudgetTarget(user, cabang))) {
     return NextResponse.json({ error: 'Anda tidak berhak mengubah target cabang ini.' }, { status: 403 });
   }
 

@@ -65,6 +65,9 @@ model Prospect {
   status            Int      @default(0)
   penawaranTerkirim Boolean  @default(false)
   terfaktur         Boolean  @default(false)
+  /// Bumped only when `status` actually changes — aging measures time without
+  /// progress, so a note edit must not reset the clock.
+  statusChangedAt   DateTime @default(now())
   qcdQuality        String?
   qcdCost           String?
   qcdDelivery       String?
@@ -100,6 +103,8 @@ model Rfq {
   fupaId      String?
   // Purchasing's answer (per-item harga/COO lives inside `items`); these two
   // record that the answer was sent back to Sales.
+  /// Stamped the first time the RFQ is marked Terkirim to Purchasing.
+  sentToPurchasingAt DateTime?
   jawabanRfqDikirim Boolean  @default(false)
   jawabanRfqAt      DateTime?
   /// Internal purchasing notes — not shown to Sales.

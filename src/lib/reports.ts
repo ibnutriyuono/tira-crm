@@ -167,7 +167,7 @@ export function buildForecast(
       const weighted = open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[r.status] ?? 0), 0);
       const won = cList.filter((r) => classify(r) === 'Won' && inPeriod(r)).reduce((s, r) => s + num(r.value), 0);
       const target = targets.find((t) => t.cabang === cabang && t.periode === periode)?.amount ?? 0;
-      const agingCount = open.filter((r) => daysSince(String(r.updatedAt).slice(0, 10)) > AGING_THRESHOLD_DAYS).length;
+      const agingCount = open.filter((r) => daysSince(String(r.statusChangedAt ?? r.updatedAt).slice(0, 10)) > AGING_THRESHOLD_DAYS).length;
 
       return {
         cabang,
@@ -247,7 +247,7 @@ export interface AgingRow {
 export function buildAgingList(records: Prospect[]): AgingRow[] {
   return records
     .filter((r) => classify(r) === 'Aktif')
-    .map((r) => ({ record: r, days: daysSince(String(r.updatedAt).slice(0, 10)) }))
+    .map((r) => ({ record: r, days: daysSince(String(r.statusChangedAt ?? r.updatedAt).slice(0, 10)) }))
     .filter((x) => x.days > AGING_THRESHOLD_DAYS)
     .sort((a, b) => b.days - a.days);
 }

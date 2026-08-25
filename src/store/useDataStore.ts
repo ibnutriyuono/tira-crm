@@ -21,6 +21,9 @@ interface DataState {
   toasts: Toast[];
 
   bootstrap: () => Promise<void>;
+  /** Wipes all cached data — call on logout so the next user never sees
+      the previous one's records, and no stale role drives a redirect. */
+  reset: () => void;
   setCurrentUser: (u: SafeUser | null) => void;
 
   upsertProspect: (p: Prospect) => void;
@@ -61,6 +64,21 @@ export const useDataStore = create<DataState>((set, get) => ({
   purchasingContact: { wa: '', email: '' },
   loaded: false,
   toasts: [],
+
+  reset: () =>
+    set({
+      currentUser: null,
+      prospects: [],
+      customers: [],
+      rfqs: [],
+      fupas: [],
+      vendors: [],
+      budgetTargets: [],
+      users: [],
+      purchasingContact: { wa: '', email: '' },
+      loaded: false,
+      toasts: [],
+    }),
 
   bootstrap: async () => {
     const res = await fetch('/api/bootstrap');

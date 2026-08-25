@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { diffFields, logActivity, RFQ_FIELD_LABELS } from '@/lib/activity';
-import { isResponse, requireUser } from '@/lib/api-helpers';
+import { isResponse, mergeRfqItemsPreservingAnswer, requireUser } from '@/lib/api-helpers';
 import { canEditPurchasing, canEditRfqAnswer } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import type { Prisma } from '@prisma/client';
 import type { RfqItem } from '@/lib/types';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -33,9 +34,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       customer: body?.customer ?? existing.customer,
       requestedBy: body?.requestedBy ?? existing.requestedBy,
       prospectId,
-      items: Array.isArray(body?.items) ? body.items : existing.items ?? undefined,
+      items: Array.isArray(body?.items)
+        ? (mergeRfqItemsPreservingAnswer(existing.items as unknown as RfqItem[], body.items) as unknown as Prisma.InputJsonValue)
+        : existing.items ?? undefined,
       catatan: body?.catatan ?? existing.catatan,
       status: body?.markSent ? 'Terkirim' : body?.status ?? existing.status,
+      // Stamp only the first send, so re-saving a sent RFQ keeps the original date.
+      ...(body?.markSent && !existing.sentToPurchasingAt ? { sentToPurchasingAt: new Date() } : {}),
     },
   });
 

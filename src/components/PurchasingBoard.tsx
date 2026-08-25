@@ -58,7 +58,15 @@ function toDoc(r: Rfq | Fupa, jenis: PurchDocType, quoteCount = 0): PurchDoc {
  * inside a modal (readOnly) for everyone else — one tree rather than the
  * prototype's two parallel implementations of the same data.
  */
-export function PurchasingBoard({ readOnly = false }: { readOnly?: boolean }) {
+export function PurchasingBoard({
+  readOnly = false,
+  standalone = false,
+}: {
+  readOnly?: boolean;
+  /** True on the dedicated /purchasing page; false inside the monitor modal.
+      The single-file app words the empty dashboard differently in each. */
+  standalone?: boolean;
+}) {
   const rfqs = useDataStore((s) => s.rfqs);
   const fupas = useDataStore((s) => s.fupas);
   const vendors = useDataStore((s) => s.vendors);
@@ -159,7 +167,7 @@ export function PurchasingBoard({ readOnly = false }: { readOnly?: boolean }) {
 
   return (
     <div>
-      <div className="purch-tabs">
+      <div className={`purch-tabs${standalone ? ' pagebar' : ''}`}>
         <button type="button" className={tab === 'dashboard' ? 'active' : ''} onClick={() => setTab('dashboard')}>Dashboard</button>
         <button type="button" className={tab === 'masuk' ? 'active' : ''} onClick={() => setTab('masuk')}>Permintaan Masuk</button>
         <button type="button" className={tab === 'vendor' ? 'active' : ''} onClick={() => setTab('vendor')}>Database Vendor</button>
@@ -167,21 +175,23 @@ export function PurchasingBoard({ readOnly = false }: { readOnly?: boolean }) {
 
       {tab === 'dashboard' && (
         <>
-          <div className="purch-kpis">
-            <div className="purch-kpi"><div className="k">Total RFQ</div><div className="v">{rfqs.length}</div></div>
-            <div className="purch-kpi"><div className="k">Total FUP A</div><div className="v">{fupas.length}</div></div>
-            <div className="purch-kpi"><div className="k">Baru</div><div className="v">{counts[0] || 0}</div></div>
-            <div className="purch-kpi"><div className="k">Diproses Vendor</div><div className="v">{(counts[1] || 0) + (counts[2] || 0)}</div></div>
-            <div className="purch-kpi"><div className="k">Selesai</div><div className="v">{(counts[3] || 0) + (counts[4] || 0)}</div></div>
-            <div className="purch-kpi"><div className="k">Dibatalkan</div><div className="v">{counts[5] || 0}</div></div>
-            <div className="purch-kpi"><div className="k">Total Vendor</div><div className="v">{vendors.length}</div></div>
+          <div className="kpi-grid">
+            <div className="kpi steel"><div className="label">Total RFQ</div><div className="value">{rfqs.length}</div></div>
+            <div className="kpi amber"><div className="label">Total FUP A</div><div className="value">{fupas.length}</div></div>
+            <div className="kpi slate"><div className="label">Baru</div><div className="value">{counts[0] || 0}</div></div>
+            <div className="kpi steel"><div className="label">Diproses Vendor</div><div className="value">{(counts[1] || 0) + (counts[2] || 0)}</div></div>
+            <div className="kpi green"><div className="label">Selesai</div><div className="value">{counts[4] || 0}</div></div>
+            <div className="kpi rust"><div className="label">Dibatalkan</div><div className="value">{counts[5] || 0}</div></div>
+            <div className="kpi steel"><div className="label">Total Vendor</div><div className="value">{vendors.length}</div></div>
           </div>
 
-          <h4 style={{ marginTop: 16, marginBottom: 6 }}>Permintaan Terbaru</h4>
+          <div className="panel">
+            <div className="panel-head"><h2>Permintaan Terbaru</h2></div>
+            <div className="panel-body">
           {docs.length === 0 ? (
             <div className="empty-state" style={{ padding: '28px 10px' }}>
               <h3>Belum ada data</h3>
-              <p>Belum ada RFQ/FUP A pada cakupan Anda.</p>
+              <p>{standalone ? 'RFQ dan FUP A dari Sales akan otomatis muncul di sini.' : 'Belum ada RFQ/FUP A pada cakupan Anda.'}</p>
             </div>
           ) : (
             <div className="table-wrap" style={{ borderTop: 'none' }}>
@@ -208,6 +218,8 @@ export function PurchasingBoard({ readOnly = false }: { readOnly?: boolean }) {
               </table>
             </div>
           )}
+            </div>
+          </div>
           {readOnly && (
             <div className="import-summary">Tampilan ini hanya-baca; perubahan dilakukan oleh tim Purchasing.</div>
           )}

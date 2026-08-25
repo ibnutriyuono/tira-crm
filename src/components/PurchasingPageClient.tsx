@@ -1,8 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PurchasingBoard } from './PurchasingBoard';
+import { IconBag } from './icons';
+import { ROLE_LABELS } from '@/lib/constants';
+import { api } from '@/lib/api-client';
 import { ToastHost } from './ToastHost';
 import { TeamChatWidget } from './TeamChatWidget';
 import { useDataStore } from '@/store/useDataStore';
@@ -16,6 +20,18 @@ export function PurchasingPageClient() {
   const loaded = useDataStore((s) => s.loaded);
   const bootstrap = useDataStore((s) => s.bootstrap);
   const currentUser = useDataStore((s) => s.currentUser);
+
+  const router = useRouter();
+
+  async function logout() {
+    try {
+      await api.post('/api/auth/logout');
+    } finally {
+      useDataStore.getState().reset();
+      router.replace('/login');
+      router.refresh();
+    }
+  }
 
   useCrmSocket();
 
@@ -31,26 +47,32 @@ export function PurchasingPageClient() {
   return (
     <>
       <div className="topbar">
-        <div className="topbar-inner">
           <div className="brand">
-            <span className="brand-mark">TIRA</span>
-            <span className="brand-sub">Purchasing</span>
+            <span className="logo-chip" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26 }}>
+              <IconBag />
+            </span>
+            <div>
+              <h1 style={{ margin: 0 }}>Purchasing TIRA</h1>
+              <span className="sub">Steel Division · PT Tira Austenite</span>
+            </div>
           </div>
-          <div className="topbar-actions">
-            <Link className="btn btn-ghost-dark" href="/">← Kembali ke CRM</Link>
+          <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span className="pic-chip">
+              {currentUser?.name} · <b>{ROLE_LABELS[currentUser?.role ?? ''] || currentUser?.role}</b>
+            </span>
+            {/* Purchasing lives only in this workspace; other roles arrive from
+                the CRM and need a way back. */}
+            {currentUser?.role !== 'purchasing' && (
+              <Link className="btn btn-ghost-dark btn-sm" href="/">← Kembali ke CRM</Link>
+            )}
+            <button type="button" className="btn btn-outline-dark btn-sm" onClick={logout}>Keluar</button>
+            <span style={{ fontSize: 11, color: 'var(--slate-300)', fontFamily: 'var(--font-ibm-plex-mono), monospace' }}>
+              Tersimpan {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+            </span>
           </div>
-        </div>
       </div>
       <div className="wrap">
-        <div className="panel">
-          <div className="panel-head">
-            <h2>Permintaan Pembelian</h2>
-            <span className="hint">{canEdit ? 'Anda dapat meminta dan mengisi penawaran vendor.' : 'Hanya-baca — perubahan dilakukan oleh tim Purchasing.'}</span>
-          </div>
-          <div style={{ padding: 14 }}>
-            <PurchasingBoard readOnly={!canEdit} />
-          </div>
-        </div>
+        <PurchasingBoard readOnly={!canEdit} standalone />
       </div>
       <ToastHost />
       <TeamChatWidget />

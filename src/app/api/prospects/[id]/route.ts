@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { diffFields, logActivity, PROSPECT_FIELD_LABELS } from '@/lib/activity';
 import { deriveFromMaterials, isResponse, requireUser } from '@/lib/api-helpers';
 import { STATUS_META } from '@/lib/constants';
+import { canDeleteProspect } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Material, SafeUser } from '@/lib/types';
@@ -101,6 +102,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   if (Object.keys(data).length === 0) return NextResponse.json({ error: 'Tidak ada perubahan' }, { status: 400 });
 
+  // Aging measures time without progress, so the clock only resets on a real
+  // status move — not when a note or phone number is edited.
+  if ('status' in data && Number(data.status) !== Number(scoped.existing?.status)) {
+    data.statusChangedAt = new Date();
+  }
+
   const prospect = await prisma.prospect.update({ where: { id }, data });
   emitCrmEvent('prospect:updated', prospect);
 
@@ -127,6 +134,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  if (!canDeleteProspect(user)) {
+    return NextResponse.json({ error: 'Hanya role GM dan Admin yang dapat menghapus prospek.' }, { status: 403 });
+  }
   const { id } = await params;
 
   const scoped = await assertInScope(user, id);

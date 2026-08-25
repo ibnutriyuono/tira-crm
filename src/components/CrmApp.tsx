@@ -59,8 +59,10 @@ export function CrmApp() {
   // Purchasing works a different job to Sales, so it lands on the purchasing
   // workspace rather than the prospect pipeline (matches the single-file app).
   useEffect(() => {
-    if (currentUser?.role === 'purchasing') router.replace('/purchasing');
-  }, [currentUser?.role, router]);
+    // Gate on `loaded` so the redirect can never fire on a role left over from
+    // a previous session before bootstrap() has replaced it.
+    if (loaded && currentUser?.role === 'purchasing') router.replace('/purchasing');
+  }, [loaded, currentUser?.role, router]);
 
   // Deliberately depends on the individual filter/sort fields rather than `ui`
   // as a whole — `ui` also carries page/viewMode/modal state that shouldn't
