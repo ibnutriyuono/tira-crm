@@ -219,6 +219,8 @@ td.center{text-align:center;}
 .icon-btn:hover{border-color:var(--steel-500); color:var(--steel-600);}
 .icon-btn.danger:hover{border-color:var(--rust-500); color:var(--rust-500);}
 .icon-btn.wa-btn:hover{border-color:var(--wa-500); color:var(--wa-600);}
+.icon-btn:disabled{opacity:.38; cursor:not-allowed;}
+.icon-btn:disabled:hover{border-color:var(--border); color:inherit;}
 .empty-state{padding:60px 20px; text-align:center; color:var(--text-soft);}
 .empty-state h3{color:var(--graphite-900); margin-bottom:6px;}
 .empty-state .btn{margin-top:14px;}

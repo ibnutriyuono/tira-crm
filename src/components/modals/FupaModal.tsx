@@ -22,6 +22,7 @@ export function FupaModal() {
   const closeModal = useUiStore((s) => s.closeModal);
 
   const rfqs = useDataStore((s) => s.rfqs);
+  const prospects = useDataStore((s) => s.prospects);
   const purchasingContact = useDataStore((s) => s.purchasingContact);
   const currentUser = useDataStore((s) => s.currentUser);
   const fupas = useDataStore((s) => s.fupas);
@@ -56,17 +57,20 @@ export function FupaModal() {
       }
     } else {
       // Fresh FUP A promoted from a won RFQ — carry its header and lines over.
+      // Started from a Kanban card instead, there is no RFQ, so seed the header
+      // from the prospect and leave the material lines for the user to fill in.
       const src = ctx.sourceRfqId ? rfqs.find((r) => r.id === ctx.sourceRfqId) : null;
+      const prospect = !src && ctx.prospectId ? prospects.find((p) => p.id === ctx.prospectId) : null;
       setNoFupa('');
       setTglFupa(todayStr());
       setSourceNoRfq(src?.noRfq || '');
-      setCabang(src?.cabang || '');
-      setCustomer(src?.customer || '');
+      setCabang(src?.cabang || prospect?.cabang || '');
+      setCustomer(src?.customer || prospect?.customer || '');
       setCatatan('');
       setItems(src?.items?.length ? src.items.map((it) => ({ ...it })) : [emptyItem()]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [show, ctx?.fupaId, ctx?.sourceRfqId]);
+  }, [show, ctx?.fupaId, ctx?.sourceRfqId, ctx?.prospectId]);
 
   function setItem(idx: number, patch: Partial<RfqItem>) {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -119,14 +123,14 @@ export function FupaModal() {
     }
   }
 
-  async function save(markSent: boolean): Promise<string | null> {
+  async function save(markSent: boolean, successMessage?: string): Promise<string | null> {
     if (!items.some((it) => (it.material || '').trim())) {
       toast('Isi minimal satu material permintaan pembelian', 'error');
       return null;
     }
     setBusy(true);
     try {
-      const payload = { noFupa, tglFupa, sourceRfqId: ctx?.sourceRfqId ?? null, sourceNoRfq, cabang, customer, catatan, items, markSent };
+      const payload = { noFupa, tglFupa, sourceRfqId: ctx?.sourceRfqId ?? null, prospectId: ctx?.prospectId ?? null, sourceNoRfq, cabang, customer, catatan, items, markSent };
       const { fupa } = fupaId
         ? await api.put<{ fupa: Fupa }>(`/api/fupas/${fupaId}`, payload)
         : await api.post<{ fupa: Fupa }>('/api/fupas', payload);
@@ -137,7 +141,7 @@ export function FupaModal() {
         const src = rfqs.find((r) => r.id === fupa.sourceRfqId);
         if (src && src.fupaId !== fupa.id) upsertRfq({ ...src, fupaId: fupa.id });
       }
-      toast(markSent ? 'FUP A ditandai terkirim' : 'FUP A disimpan', 'success');
+      toast(successMessage ?? (markSent ? 'FUP A ditandai terkirim' : 'FUP A disimpan'), 'success');
       return fupa.id;
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal menyimpan FUP A', 'error');
@@ -145,6 +149,15 @@ export function FupaModal() {
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * Hands the FUP A to the internal Purchasing module. Same `markSent` write as
+   * the WA/Email buttons — those additionally open an outgoing message to the
+   * external Purchasing contact, this one stays inside the system.
+   */
+  async function sendToPurchasing() {
+    await save(true, 'FUP A berhasil dikirim ke modul Purchasing');
   }
 
   return (
@@ -165,8 +178,11 @@ export function FupaModal() {
           <button type="button" className="btn btn-outline" disabled={busy} onClick={sendEmail}>
             <IconMail /> Email
           </button>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={sendWa}>
+          <button type="button" className="btn btn-wa" disabled={busy} onClick={sendWa}>
             <IconWa /> Kirim WhatsApp
+          </button>
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={sendToPurchasing}>
+            Kirim ke Purchasing
           </button>
         </>
       }

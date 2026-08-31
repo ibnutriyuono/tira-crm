@@ -7,13 +7,17 @@ import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
-import { IconDoc, IconEdit, IconRfq, IconTrash, IconWa } from './icons';
+import { IconCart, IconDoc, IconEdit, IconRfq, IconTrash, IconWa } from './icons';
 
 const CAP = 40;
 
 function KanbanCard({ r }: { r: Prospect }) {
   const openModal = useUiStore((s) => s.openModal);
+  const currentUser = useDataStore((s) => s.currentUser);
   const klas = classify(r);
+  // Mirrors auth.ts#canDeleteProspect, which the DELETE route still enforces —
+  // this only hides a button that would 403 for everyone else.
+  const canDelete = currentUser?.role === 'gm' || currentUser?.role === 'admin';
   const [dragging, setDragging] = useState(false);
 
   return (
@@ -82,6 +86,18 @@ function KanbanCard({ r }: { r: Prospect }) {
           <IconRfq />
         </button>
         <button
+          className="icon-btn fupa-btn"
+          title={klas === 'Won' ? 'Buat FUP A (Permintaan Pembelian)' : 'FUP A hanya tersedia untuk prospek berstatus Won (PO/Kontrak atau DO)'}
+          disabled={klas !== 'Won'}
+          onClick={(e) => {
+            e.stopPropagation();
+            useUiStore.setState({ fupaCtx: { fupaId: null, sourceRfqId: null, prospectId: r.id } });
+            openModal('fupa');
+          }}
+        >
+          <IconCart />
+        </button>
+        <button
           className="icon-btn"
           title="Edit"
           onClick={(e) => {
@@ -92,17 +108,19 @@ function KanbanCard({ r }: { r: Prospect }) {
         >
           <IconEdit />
         </button>
-        <button
-          className="icon-btn danger"
-          title="Hapus"
-          onClick={(e) => {
-            e.stopPropagation();
-            useUiStore.setState({ deleteCtx: { mode: 'prospect', id: r.id, title: 'Hapus Prospek', message: `Yakin ingin menghapus prospek "${r.customer}"? Tindakan ini tidak dapat dibatalkan.` } });
-            openModal('delete');
-          }}
-        >
-          <IconTrash />
-        </button>
+        {canDelete && (
+          <button
+            className="icon-btn danger"
+            title="Hapus"
+            onClick={(e) => {
+              e.stopPropagation();
+              useUiStore.setState({ deleteCtx: { mode: 'prospect', id: r.id, title: 'Hapus Prospek', message: `Yakin ingin menghapus prospek "${r.customer}"? Tindakan ini tidak dapat dibatalkan.` } });
+              openModal('delete');
+            }}
+          >
+            <IconTrash />
+          </button>
+        )}
       </div>
     </div>
   );

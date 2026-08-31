@@ -181,6 +181,24 @@ export function RfqModal() {
     }
   }
 
+  /**
+   * Hands the RFQ to the internal Purchasing module. Same `markSent` write as
+   * the WA/Email buttons (status -> Terkirim, stamps sentToPurchasingAt), minus
+   * the outgoing message to the external Purchasing contact.
+   */
+  async function onSendPurchasing() {
+    if (!hasMaterial()) return toast('Isi minimal satu material yang diminta', 'error');
+    setBusy(true);
+    try {
+      await saveOrUpdateRecord(true);
+      toast('RFQ berhasil dikirim ke modul Purchasing', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mengirim RFQ ke Purchasing', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onExportExcel() {
     if (!hasMaterial()) return toast('Isi minimal satu material yang diminta', 'error');
     setBusy(true);
@@ -227,6 +245,9 @@ export function RfqModal() {
           </button>
           <button type="button" className="btn btn-wa" disabled={busy} onClick={onSendWa}>
             <IconWa /> Kirim via WhatsApp
+          </button>
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={onSendPurchasing}>
+            Kirim ke Purchasing
           </button>
         </>
       }

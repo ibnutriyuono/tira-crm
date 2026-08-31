@@ -82,7 +82,9 @@ interface UiState {
   userEditId: string | null;
   customerEditId: string | null;
   vendorEditId: string | null;
-  fupaCtx: { fupaId: string | null; sourceRfqId: string | null } | null;
+  /** `sourceRfqId` promotes a won RFQ; `prospectId` starts one straight from a
+      Kanban card, where there is no RFQ to carry the header over from. */
+  fupaCtx: { fupaId: string | null; sourceRfqId: string | null; prospectId?: string | null } | null;
   quotationProspectId: string | null;
   rfqCtx: RfqCtx | null;
   qcdCtx: QcdCtx | null;
