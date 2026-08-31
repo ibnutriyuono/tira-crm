@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { IconCheck, IconEdit, IconTrash, IconWa } from './icons';
 import { PSTATUS_META } from '@/lib/constants';
 import { formatDateID, formatRupiah, normalizePhone, num, todayStr } from '@/lib/format';
@@ -24,6 +24,9 @@ interface PurchDoc {
   /** First material plus a "+N lainnya" tail — mirrors purchMaterialSummary(). */
   materialSummary: string;
   purchStatus: number;
+  /** Sales-side document status; 'Selesai' short-circuits the workflow stage. */
+  status: Rfq['status'];
+  purchNotes: string | null;
   sourceNoRfq?: string;
   items: RfqItem[];
   quoteCount: number;
@@ -47,10 +50,91 @@ function toDoc(r: Rfq | Fupa, jenis: PurchDocType, quoteCount = 0): PurchDoc {
       return `${items[0].material || '-'}${extra}`;
     })(),
     purchStatus: r.purchStatus ?? 0,
+    status: r.status,
+    purchNotes: r.purchNotes,
     sourceNoRfq: isRfq ? undefined : (r as Fupa).sourceNoRfq || '-',
     items: r.items ?? [],
     quoteCount,
   };
+}
+
+// Simplified 4-stage document workflow for the "Permintaan Masuk" list —
+// distinct from purchStatus (0-5, which tracks the *vendor quotation* process
+// and is still shown and editable in PurchDetail). This one tracks where the
+// document itself sits in Purchasing's own queue: 1 Diterima (baru masuk,
+// belum ada tindakan) -> 2 Diproses (Purchasing sudah mulai bekerja: ada
+// catatan, status vendor sudah digerakkan, atau penawaran sudah diminta) ->
+// 3 Dijawab (otomatis begitu Harga/COO terisi pada minimal satu item — tidak
+// bisa diset manual) -> 4 Selesai (dokumen ditandai selesai).
+type WorkflowStage = 1 | 2 | 3 | 4;
+
+const WORKFLOW_META: Record<WorkflowStage, { label: string; color: string }> = {
+  1: { label: '1. Diterima', color: 'slate' },
+  2: { label: '2. Diproses', color: 'steel' },
+  3: { label: '3. Dijawab', color: 'amber' },
+  4: { label: '4. Selesai', color: 'green' },
+};
+
+function workflowStage(d: PurchDoc): WorkflowStage {
+  if (d.status === 'Selesai') return 4;
+  if (d.items.some((m) => m.hargaPurchasing || m.coo)) return 3;
+  if (d.purchStatus > 0 || (d.purchNotes || '').trim() !== '' || d.quoteCount > 0) return 2;
+  return 1;
+}
+
+// Line values are freeform text Sales types in (e.g. '01'..'05'), not a fixed
+// enum, so lines get a *stable* color by hashing the value into a fixed
+// palette rather than assigning colors in encounter order — the latter would
+// shift every time the underlying data changes.
+const LINE_PALETTE = ['steel', 'amber', 'green', 'rust', 'violet', 'teal', 'pink', 'slate'];
+
+function lineColor(line: string): string {
+  if (!line) return 'slate';
+  let hash = 0;
+  for (let i = 0; i < line.length; i++) hash = (hash * 31 + line.charCodeAt(i)) >>> 0;
+  return LINE_PALETTE[hash % LINE_PALETTE.length];
+}
+
+function recordLines(d: PurchDoc): string[] {
+  return Array.from(new Set(d.items.map((m) => (m.line || '').trim()).filter(Boolean)));
+}
+
+function recordLineKey(d: PurchDoc): string {
+  const lines = recordLines(d);
+  return lines.length > 0 ? lines.join(', ') : '(Tanpa Line)';
+}
+
+/** One row of the worklist, shared by the flat and grouped renderings. */
+function PurchasingRow({ d, onDetail }: { d: PurchDoc; onDetail: (d: PurchDoc) => void }) {
+  const meta = WORKFLOW_META[workflowStage(d)];
+  const lines = recordLines(d);
+  return (
+    <tr>
+      <td><span className={`badge ${d.jenis === 'RFQ' ? 'steel' : 'amber'}`}>{d.jenis === 'RFQ' ? 'RFQ' : 'FUP A'}</span></td>
+      <td className="mono" style={{ fontWeight: 600 }}>{d.noDoc || '-'}</td>
+      <td>{formatDateID(d.tglDoc)}</td>
+      <td>
+        {lines.length === 0
+          ? '-'
+          : lines.map((ln) => (
+              <span key={ln} style={{ display: 'inline-flex', alignItems: 'center', marginRight: 8 }}>
+                <span className={`line-dot ${lineColor(ln)}`} />
+                {ln}
+              </span>
+            ))}
+      </td>
+      <td>{d.cabang || '-'}</td>
+      <td>{d.customer || '-'}</td>
+      <td>{d.materialSummary}</td>
+      <td className="center">{d.quoteCount ? `${d.quoteCount} vendor` : '-'}</td>
+      <td>{d.requestedBy || '-'}</td>
+      <td className="center">{d.itemCount}</td>
+      <td><span className={`badge ${meta.color}`}>{meta.label}</span></td>
+      <td>
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => onDetail(d)}>Detail</button>
+      </td>
+    </tr>
+  );
 }
 
 /**
@@ -80,24 +164,54 @@ export function PurchasingBoard({
   const [statusFilter, setStatusFilter] = useState('');
   const [jenisFilter, setJenisFilter] = useState('');
   const [masukView, setMasukView] = useState<'table' | 'card'>('table');
+  const [groupBy, setGroupBy] = useState<'' | 'line' | 'status'>('');
+  const [sortBy, setSortBy] = useState<'waktu' | 'line'>('waktu');
   const [quoteCounts, setQuoteCounts] = useState<Record<string, number>>({});
   const [detail, setDetail] = useState<PurchDoc | null>(null);
 
   const docs = useMemo(
-    () => [...rfqs.map((r) => toDoc(r, 'RFQ')), ...fupas.map((f) => toDoc(f, 'FUPA'))].sort((a, b) => (b.tglDoc || '').localeCompare(a.tglDoc || '')),
-    [rfqs, fupas],
+    () =>
+      [
+        ...rfqs.map((r) => toDoc(r, 'RFQ', quoteCounts[r.id] || 0)),
+        ...fupas.map((f) => toDoc(f, 'FUPA', quoteCounts[f.id] || 0)),
+      ].sort((a, b) => (b.tglDoc || '').localeCompare(a.tglDoc || '')),
+    [rfqs, fupas, quoteCounts],
   );
 
   const filtered = useMemo(() => {
     let l = docs;
     if (jenisFilter) l = l.filter((d) => d.jenis === jenisFilter);
-    if (statusFilter !== '') l = l.filter((d) => d.purchStatus === Number(statusFilter));
+    if (statusFilter !== '') l = l.filter((d) => String(workflowStage(d)) === statusFilter);
     if (search) {
       const q = search.toLowerCase();
       l = l.filter((d) => d.noDoc.toLowerCase().includes(q) || d.customer.toLowerCase().includes(q) || d.cabang.toLowerCase().includes(q));
     }
     return l;
   }, [docs, jenisFilter, statusFilter, search]);
+
+  // groupBy 'line'/'status' takes over ordering entirely (rows are shown
+  // section by section, newest first within each section); otherwise the flat
+  // list follows sortBy — 'waktu' is the docs default (newest tglDoc first),
+  // 'line' re-sorts that same list by line instead.
+  const sortedFlat = useMemo(() => {
+    if (sortBy === 'line') {
+      return [...filtered].sort(
+        (a, b) => recordLineKey(a).localeCompare(recordLineKey(b)) || (b.tglDoc || '').localeCompare(a.tglDoc || ''),
+      );
+    }
+    return filtered;
+  }, [filtered, sortBy]);
+
+  const groupedSections = useMemo(() => {
+    if (!groupBy) return null;
+    const map = new Map<string, PurchDoc[]>();
+    filtered.forEach((d) => {
+      const key = groupBy === 'line' ? recordLineKey(d) : WORKFLOW_META[workflowStage(d)].label;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(d);
+    });
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filtered, groupBy]);
 
   const counts = useMemo(() => {
     const by: Record<number, number> = {};
@@ -236,7 +350,7 @@ export function PurchasingBoard({
             </select>
             <select className="btn-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">Semua Status</option>
-              {Object.entries(PSTATUS_META).map(([k, meta]) => (
+              {Object.entries(WORKFLOW_META).map(([k, meta]) => (
                 <option key={k} value={k}>{meta.label}</option>
               ))}
             </select>
@@ -246,12 +360,27 @@ export function PurchasingBoard({
               <button type="button" className={masukView === 'card' ? 'active' : ''} onClick={() => setMasukView('card')}>Kartu</button>
             </div>
           </div>
+          {masukView === 'table' && (
+            <div className="toolbar-row">
+              <label style={{ fontSize: 12, color: 'var(--text-soft)', fontWeight: 600 }}>Kelompokkan:</label>
+              <select className="btn-sm" value={groupBy} onChange={(e) => setGroupBy(e.target.value as typeof groupBy)}>
+                <option value="">Tidak dikelompokkan</option>
+                <option value="line">Berdasar Line</option>
+                <option value="status">Berdasar Status</option>
+              </select>
+              <label style={{ fontSize: 12, color: 'var(--text-soft)', fontWeight: 600, marginLeft: 10 }}>Urutkan:</label>
+              <select className="btn-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} disabled={!!groupBy}>
+                <option value="waktu">Waktu Terbaru</option>
+                <option value="line">Line</option>
+              </select>
+            </div>
+          )}
           <div className="import-summary">Menampilkan <b>{filtered.length}</b> dari <b>{docs.length}</b> permintaan</div>
 
           {filtered.length > 0 && masukView === 'card' ? (
             <div className="purch-card-grid">
               {filtered.map((d) => {
-                const meta = PSTATUS_META[d.purchStatus] || PSTATUS_META[0];
+                const meta = WORKFLOW_META[workflowStage(d)];
                 const head = d.items.slice(0, 2).map((m) => `${m.line || '-'} · ${m.material || '-'}`);
                 return (
                   <div key={`card-${d.jenis}-${d.id}`} className="purch-card" onClick={() => setDetail(d)}>
@@ -269,7 +398,7 @@ export function PurchasingBoard({
                       {d.items.length > 2 && <div className="text-muted">+{d.items.length - 2} material lainnya</div>}
                     </div>
                     <div className="purch-card-foot">
-                      <span className="text-muted">{quoteCounts[d.id] ? `${quoteCounts[d.id]} vendor diminta` : 'Belum ada vendor'}</span>
+                      <span className="text-muted">{d.quoteCount ? `${d.quoteCount} vendor diminta` : 'Belum ada vendor'}</span>
                       <button type="button" className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); setDetail(d); }}>Detail</button>
                     </div>
                   </div>
@@ -286,30 +415,28 @@ export function PurchasingBoard({
               <table className="simple-table">
                 <thead>
                   <tr>
-                    <th>Jenis</th><th>No.</th><th>Tanggal</th><th>Cabang</th><th>Customer</th><th>Material</th><th>Vendor Diminta</th><th>Diminta Oleh</th><th>Item</th><th>Status</th><th></th>
+                    <th>Jenis</th><th>No.</th><th>Tanggal</th><th>Line</th><th>Cabang</th><th>Customer</th><th>Material</th><th>Vendor Diminta</th><th>Diminta Oleh</th><th>Item</th><th>Status</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((d) => {
-                    const meta = PSTATUS_META[d.purchStatus] || PSTATUS_META[0];
-                    return (
-                      <tr key={`${d.jenis}-${d.id}`}>
-                        <td><span className={`badge ${d.jenis === 'RFQ' ? 'steel' : 'amber'}`}>{d.jenis === 'RFQ' ? 'RFQ' : 'FUP A'}</span></td>
-                        <td className="mono" style={{ fontWeight: 600 }}>{d.noDoc || '-'}</td>
-                        <td>{formatDateID(d.tglDoc)}</td>
-                        <td>{d.cabang || '-'}</td>
-                        <td>{d.customer || '-'}</td>
-                        <td>{d.materialSummary}</td>
-                        <td className="center">{quoteCounts[d.id] ? `${quoteCounts[d.id]} vendor` : '-'}</td>
-                        <td>{d.requestedBy || '-'}</td>
-                        <td className="center">{d.itemCount}</td>
-                        <td><span className={`badge ${meta.color}`}>{meta.label}</span></td>
-                        <td>
-                          <button type="button" className="btn btn-outline btn-sm" onClick={() => setDetail(d)}>Detail</button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {groupedSections
+                    ? groupedSections.map(([sectionLabel, rows]) => (
+                        <Fragment key={sectionLabel}>
+                          <tr className="group-header-row">
+                            <td colSpan={12}>
+                              {groupBy === 'line' && sectionLabel !== '(Tanpa Line)' && (
+                                <span className={`line-dot ${lineColor(sectionLabel.split(', ')[0])}`} />
+                              )}
+                              {sectionLabel}{' '}
+                              <span style={{ fontWeight: 400, textTransform: 'none', color: 'var(--text-soft)' }}>({rows.length})</span>
+                            </td>
+                          </tr>
+                          {rows.map((d) => (
+                            <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} onDetail={setDetail} />
+                          ))}
+                        </Fragment>
+                      ))
+                    : sortedFlat.map((d) => <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} onDetail={setDetail} />)}
                 </tbody>
               </table>
             </div>

@@ -21,6 +21,15 @@
   --slate-600:#4B5560;
   --slate-500:#6B7684;
   --slate-300:#B9C2CB;
+  --violet-600:#5B4B96;
+  --violet-500:#7060AD;
+  --violet-100:#EDEAF7;
+  --teal-600:#1D6E6E;
+  --teal-500:#2A8888;
+  --teal-100:#E3F3F3;
+  --pink-600:#A13D6B;
+  --pink-500:#BC5083;
+  --pink-100:#FBEAF2;
   --border:#DCE3E8;
   --text:#1A222B;
   --text-soft:#5B6672;
@@ -199,6 +208,9 @@ td.center{text-align:center;}
 .badge.amber{background:var(--amber-100); color:var(--amber-600);}
 .badge.green{background:var(--green-100); color:var(--green-600);}
 .badge.rust{background:var(--rust-100); color:var(--rust-600);}
+.badge.violet{background:var(--violet-100); color:var(--violet-600);}
+.badge.teal{background:var(--teal-100); color:var(--teal-600);}
+.badge.pink{background:var(--pink-100); color:var(--pink-600);}
 .row-actions{display:flex; gap:6px;}
 .icon-btn{
   border:1px solid var(--border); background:var(--surface); border-radius:5px; padding:5px; display:inline-flex;
@@ -296,6 +308,16 @@ td.center{text-align:center;}
 .simple-table td{padding:8px 6px; border-bottom:1px solid var(--border); font-size:12.8px;}
 .toolbar-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px;}
 .toolbar-row .search-grow{margin-left:auto; min-width:200px;}
+.group-header-row td{background:var(--steel-100); font-weight:700; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--graphite-800); padding:7px 10px; border-bottom:1px solid var(--border);}
+.line-dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle;}
+.line-dot.slate{background:var(--slate-500);}
+.line-dot.steel{background:var(--steel-500);}
+.line-dot.amber{background:var(--amber-500);}
+.line-dot.green{background:var(--green-500);}
+.line-dot.rust{background:var(--rust-500);}
+.line-dot.violet{background:var(--violet-500);}
+.line-dot.teal{background:var(--teal-500);}
+.line-dot.pink{background:var(--pink-500);}
 
 /* ===== Activity log ===== */
 .activity-filters{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;}
