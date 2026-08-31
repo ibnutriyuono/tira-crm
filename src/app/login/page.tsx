@@ -57,19 +57,6 @@ export default function LoginPage() {
             {busy ? 'Memproses...' : 'Masuk'}
           </button>
         </form>
-        <div className="auth-hint">
-          Akun demo &mdash; Admin: <b>admin</b> / <b>admin123</b>
-          <br />
-          Akun demo &mdash; GM: <b>gm</b> / <b>gm123</b> (lihat semua)
-          <br />
-          Akun demo &mdash; RM: <b>rm</b> / <b>rm123</b> (Regional 2)
-          <br />
-          Akun demo &mdash; BM: <b>bm</b> / <b>bm123</b> (Cabang DKI)
-          <br />
-          Akun demo &mdash; Sales: <b>sales</b> / <b>sales123</b>
-          <br />
-          Admin dapat menambah/menghapus akun melalui menu <b>Kelola User</b>.
-        </div>
       </div>
     </div>
   );
