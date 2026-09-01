@@ -6,7 +6,7 @@ import { getSocket } from '@/lib/socket-client';
 import { api } from '@/lib/api-client';
 import { BROADCAST_ROLE_OPTIONS, ROLE_LABELS } from '@/lib/constants';
 import { useDataStore } from '@/store/useDataStore';
-import type { ChatConversation, ChatMessage, RosterUser } from '@/lib/types';
+import type { ChatConversation, ChatMessage, RosterUser, SafeUser } from '@/lib/types';
 
 type Picker = 'dm' | 'group' | 'broadcast' | null;
 
@@ -124,11 +124,31 @@ export function TeamChatWidget() {
       }
     };
     const onConversation = () => loadConvs();
+
+    // Keep the directory live. loadRoster() only fetches once (and only when
+    // the widget mounts), so without this a user added or renamed through
+    // Kelola User stays invisible in the pickers — and unresolved in DM
+    // titles — for every session that was already open.
+    const onUserUpsert = (u: SafeUser) => {
+      const row: RosterUser = { id: u.id, username: u.username, name: u.name, role: u.role, cabang: u.cabang };
+      setRoster((prev) => {
+        const next = prev.some((x) => x.id === row.id) ? prev.map((x) => (x.id === row.id ? row : x)) : [...prev, row];
+        return next.sort((a, b) => a.name.localeCompare(b.name));
+      });
+    };
+    const onUserDelete = ({ id }: { id: string }) => setRoster((prev) => prev.filter((u) => u.id !== id));
+
     s.on('chat:message', onMessage);
     s.on('chat:conversation', onConversation);
+    s.on('user:created', onUserUpsert);
+    s.on('user:updated', onUserUpsert);
+    s.on('user:deleted', onUserDelete);
     return () => {
       s.off('chat:message', onMessage);
       s.off('chat:conversation', onConversation);
+      s.off('user:created', onUserUpsert);
+      s.off('user:updated', onUserUpsert);
+      s.off('user:deleted', onUserDelete);
     };
   }, [currentUser, activeId, loadConvs]);
 

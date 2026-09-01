@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { IconCheck, IconEdit, IconTrash, IconWa } from './icons';
 import { PSTATUS_META } from '@/lib/constants';
+import { WORKFLOW_META, workflowStage } from '@/lib/purchasing-workflow';
 import { formatDateID, formatRupiah, normalizePhone, num, todayStr } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
@@ -28,6 +29,8 @@ interface PurchDoc {
   status: Rfq['status'];
   purchNotes: string | null;
   sentToPurchasingAt: string | null;
+  /** FUP A only — how the shared stager knows a FUP A has been answered. */
+  jawabanFupaDikirim?: boolean;
   sourceNoRfq?: string;
   items: RfqItem[];
   quoteCount: number;
@@ -54,34 +57,11 @@ function toDoc(r: Rfq | Fupa, jenis: PurchDocType, quoteCount = 0): PurchDoc {
     status: r.status,
     purchNotes: r.purchNotes,
     sentToPurchasingAt: r.sentToPurchasingAt,
+    jawabanFupaDikirim: isRfq ? undefined : (r as Fupa).jawabanFupaDikirim,
     sourceNoRfq: isRfq ? undefined : (r as Fupa).sourceNoRfq || '-',
     items: r.items ?? [],
     quoteCount,
   };
-}
-
-// Simplified 4-stage document workflow for the "Permintaan Masuk" list —
-// distinct from purchStatus (0-5, which tracks the *vendor quotation* process
-// and is still shown and editable in PurchDetail). This one tracks where the
-// document itself sits in Purchasing's own queue: 1 Diterima (baru masuk,
-// belum ada tindakan) -> 2 Diproses (Purchasing sudah mulai bekerja: ada
-// catatan, status vendor sudah digerakkan, atau penawaran sudah diminta) ->
-// 3 Dijawab (otomatis begitu Harga/COO terisi pada minimal satu item — tidak
-// bisa diset manual) -> 4 Selesai (dokumen ditandai selesai).
-type WorkflowStage = 1 | 2 | 3 | 4;
-
-const WORKFLOW_META: Record<WorkflowStage, { label: string; color: string }> = {
-  1: { label: '1. Diterima', color: 'slate' },
-  2: { label: '2. Diproses', color: 'steel' },
-  3: { label: '3. Dijawab', color: 'amber' },
-  4: { label: '4. Selesai', color: 'green' },
-};
-
-function workflowStage(d: PurchDoc): WorkflowStage {
-  if (d.status === 'Selesai') return 4;
-  if (d.items.some((m) => m.hargaPurchasing || m.coo)) return 3;
-  if (d.purchStatus > 0 || (d.purchNotes || '').trim() !== '' || d.quoteCount > 0) return 2;
-  return 1;
 }
 
 // Line values are freeform text Sales types in (e.g. '01'..'05'), not a fixed
@@ -179,6 +159,19 @@ export function PurchasingBoard({
       ].sort((a, b) => (b.tglDoc || '').localeCompare(a.tglDoc || '')),
     [rfqs, fupas, quoteCounts],
   );
+
+  // A notification toast can ask for one document's detail. Runs off `docs` so
+  // it still resolves when the request lands before bootstrap has filled the
+  // stores; cleared once consumed so re-opening the board doesn't reopen it.
+  const purchDetailCtx = useUiStore((s) => s.purchDetailCtx);
+  useEffect(() => {
+    if (!purchDetailCtx) return;
+    const target = docs.find((d) => d.jenis === purchDetailCtx.jenis && d.id === purchDetailCtx.id);
+    if (!target) return;
+    setTab('masuk');
+    setDetail(target);
+    useUiStore.setState({ purchDetailCtx: null });
+  }, [purchDetailCtx, docs]);
 
   const filtered = useMemo(() => {
     let l = docs;

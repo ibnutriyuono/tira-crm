@@ -7,6 +7,7 @@ import { useUiStore } from '@/store/useUiStore';
 import { api } from '@/lib/api-client';
 import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { classify, num, todayStr } from '@/lib/format';
+import { countNewPurchasingItems } from '@/lib/purchasing-workflow';
 import { IconActivity, IconBag, IconBarChart, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconExport, IconImport, IconPlus, IconRfq, IconSave, IconSearch, IconTemplate, IconUsers } from './icons';
 
 const ROLE_LABEL: Record<string, { label: string; color: string }> = {
@@ -21,6 +22,11 @@ export function TopBar() {
   const router = useRouter();
   const currentUser = useDataStore((s) => s.currentUser);
   const toast = useDataStore((s) => s.toast);
+  const rfqs = useDataStore((s) => s.rfqs);
+  const fupas = useDataStore((s) => s.fupas);
+  // RFQ/FUP A sitting in Purchasing's queue untouched — the same stage-1 count
+  // the worklist shows, so the badge and the list can never disagree.
+  const newPurchasingCount = countNewPurchasingItems(rfqs, fupas);
   const openModal = useUiStore((s) => s.openModal);
   const [savedLabel, setSavedLabel] = useState('');
 
@@ -150,9 +156,14 @@ export function TopBar() {
             <IconBarChart />
             Log Kompetitor
           </button>
-          <button className="btn btn-ghost-dark" onClick={() => openModal('purchasing')}>
+          <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('purchasing')}>
             <IconBag />
             Purchasing
+            {newPurchasingCount > 0 && (
+              <span className="topbar-badge" title={`${newPurchasingCount} RFQ/FUP A baru belum diproses`}>
+                {newPurchasingCount > 9 ? '9+' : newPurchasingCount}
+              </span>
+            )}
           </button>
           <button className="btn btn-ghost-dark" onClick={downloadTemplate}>
             <IconTemplate />

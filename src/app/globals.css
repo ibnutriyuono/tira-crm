@@ -349,6 +349,20 @@ td.center{text-align:center;}
 }
 .toast.success{border-left-color:var(--green-500);}
 .toast.error{border-left-color:var(--rust-500);}
+/* Actionable toast: rendered as a <button>, so the base .toast styling has to be
+   re-stated against the UA button defaults (font, width, text alignment). */
+.toast-action{
+  cursor:pointer; font-family:inherit; text-align:left; width:100%;
+  justify-content:space-between; gap:14px;
+}
+.toast-action:hover{background:var(--graphite-800);}
+.toast-cta{font-size:11.5px; font-weight:600; opacity:.85; white-space:nowrap;}
+/* Unread-count pip on a topbar entry point; the button needs position:relative. */
+.topbar-badge{
+  position:absolute; top:-5px; right:-5px; background:var(--rust-500); color:#fff;
+  font-size:10px; font-weight:700; min-width:17px; height:17px; border-radius:9px;
+  display:flex; align-items:center; justify-content:center; padding:0 4px; line-height:1;
+}
 @keyframes slideIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
 
 @media (prefers-reduced-motion: reduce){

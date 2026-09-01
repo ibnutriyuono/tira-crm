@@ -87,6 +87,9 @@ interface UiState {
   fupaCtx: { fupaId: string | null; sourceRfqId: string | null; prospectId?: string | null } | null;
   quotationProspectId: string | null;
   rfqCtx: RfqCtx | null;
+  /** Ask the purchasing board to open one document's detail. Set from outside
+      the board (a notification toast); the board consumes and clears it. */
+  purchDetailCtx: { jenis: 'RFQ' | 'FUPA'; id: string } | null;
   qcdCtx: QcdCtx | null;
   importTarget: 'prospect' | 'customer' | 'vendor';
   /** Staged QCD answers for a prospect still being created/edited in the form modal — committed together on Save. */
@@ -161,6 +164,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   fupaCtx: null,
   quotationProspectId: null,
   rfqCtx: null,
+  purchDetailCtx: null,
   qcdCtx: null,
   importTarget: 'prospect',
   pendingProspectQCD: { quality: '', cost: '', delivery: '', kompetitor: '', catatan: '' },

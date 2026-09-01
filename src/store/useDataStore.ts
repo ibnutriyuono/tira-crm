@@ -5,6 +5,8 @@ interface Toast {
   id: number;
   message: string;
   type: 'success' | 'error' | 'info';
+  /** Optional follow-through: makes the toast clickable and dismisses it on click. */
+  onClick?: () => void;
 }
 
 interface DataState {
@@ -46,7 +48,7 @@ interface DataState {
   refetchCustomers: () => Promise<void>;
   loadUsers: () => Promise<void>;
 
-  toast: (message: string, type?: Toast['type']) => void;
+  toast: (message: string, type?: Toast['type'], onClick?: () => void) => void;
   dismissToast: (id: number) => void;
 }
 
@@ -201,9 +203,9 @@ export const useDataStore = create<DataState>((set, get) => ({
     set({ users: data.users });
   },
 
-  toast: (message, type = 'info') => {
+  toast: (message, type = 'info', onClick) => {
     const id = toastSeq++;
-    set((s) => ({ toasts: [...s.toasts, { id, message, type }] }));
+    set((s) => ({ toasts: [...s.toasts, { id, message, type, onClick }] }));
     setTimeout(() => get().dismissToast(id), 3200);
   },
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
