@@ -118,6 +118,9 @@ export interface Fupa {
   purchStatus: number;
   purchNotes: string | null;
   purchJawaban: string | null;
+  sentToPurchasingAt: string | null;
+  jawabanFupaDikirim: boolean;
+  jawabanFupaAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

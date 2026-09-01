@@ -6,12 +6,12 @@ import { AttachmentList } from '../AttachmentList';
 import { ItemChat } from '../ItemChat';
 import { IconDownload, IconMail, IconPlus, IconSave, IconTrash, IconWa } from '../icons';
 import { RFQ_LOKAL_OPTIONS } from '@/lib/constants';
-import { normalizePhone, todayStr } from '@/lib/format';
+import { getProspectMaterials, normalizePhone, num, todayStr } from '@/lib/format';
 import { buildPurchaseRequestMessage, downloadPurchaseRequestExcel } from '@/lib/purchase-request';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
-import type { Fupa, RfqItem } from '@/lib/types';
+import type { Fupa, Rfq, RfqItem } from '@/lib/types';
 
 const emptyItem = (): RfqItem => ({ line: '', grade: '', material: '', dia: '', thick: '', width: '', length: '', pcs: 1, berat: '', lokal: 'LOKAL ATAU IMPORT', estimasi: '' });
 
@@ -56,18 +56,38 @@ export function FupaModal() {
         setItems(f.items?.length ? f.items.map((it) => ({ ...it })) : [emptyItem()]);
       }
     } else {
-      // Fresh FUP A promoted from a won RFQ — carry its header and lines over.
-      // Started from a Kanban card instead, there is no RFQ, so seed the header
-      // from the prospect and leave the material lines for the user to fill in.
-      const src = ctx.sourceRfqId ? rfqs.find((r) => r.id === ctx.sourceRfqId) : null;
-      const prospect = !src && ctx.prospectId ? prospects.find((p) => p.id === ctx.prospectId) : null;
+      // Fresh FUP A. Three ways to get here, in order of how much detail they
+      // carry: promoted from a specific RFQ; started from a Kanban card, where
+      // we look for an RFQ already raised against that prospect (its lines
+      // carry the Line/Grade/dimension detail Purchasing needs) and fall back
+      // to the prospect's own materials; or opened cold from Kelola FUP A.
+      const explicitRfq = ctx.sourceRfqId ? rfqs.find((r) => r.id === ctx.sourceRfqId) : null;
+      const prospect = ctx.prospectId ? prospects.find((p) => p.id === ctx.prospectId) : null;
+      const prospectRfq = !explicitRfq && prospect
+        ? rfqs
+            .filter((r) => r.prospectId === prospect.id && r.items?.length)
+            .reduce<Rfq | null>((latest, cur) => (!latest || cur.createdAt > latest.createdAt ? cur : latest), null)
+        : null;
+      const src = explicitRfq ?? prospectRfq;
+
       setNoFupa('');
       setTglFupa(todayStr());
       setSourceNoRfq(src?.noRfq || '');
       setCabang(src?.cabang || prospect?.cabang || '');
       setCustomer(src?.customer || prospect?.customer || '');
       setCatatan('');
-      setItems(src?.items?.length ? src.items.map((it) => ({ ...it })) : [emptyItem()]);
+      if (src?.items?.length) {
+        setItems(src.items.map((it) => ({ ...it })));
+      } else if (prospect) {
+        setItems(
+          getProspectMaterials(prospect).map((m) => ({
+            line: m.line || '', grade: '', material: m.uraian || '', dia: '', thick: '', width: '', length: '',
+            pcs: num(m.qty) || 1, berat: '', lokal: 'LOKAL ATAU IMPORT', estimasi: prospect.tglPO || '',
+          })),
+        );
+      } else {
+        setItems([emptyItem()]);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, ctx?.fupaId, ctx?.sourceRfqId, ctx?.prospectId]);

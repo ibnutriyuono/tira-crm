@@ -27,6 +27,7 @@ interface PurchDoc {
   /** Sales-side document status; 'Selesai' short-circuits the workflow stage. */
   status: Rfq['status'];
   purchNotes: string | null;
+  sentToPurchasingAt: string | null;
   sourceNoRfq?: string;
   items: RfqItem[];
   quoteCount: number;
@@ -52,6 +53,7 @@ function toDoc(r: Rfq | Fupa, jenis: PurchDocType, quoteCount = 0): PurchDoc {
     purchStatus: r.purchStatus ?? 0,
     status: r.status,
     purchNotes: r.purchNotes,
+    sentToPurchasingAt: r.sentToPurchasingAt,
     sourceNoRfq: isRfq ? undefined : (r as Fupa).sourceNoRfq || '-',
     items: r.items ?? [],
     quoteCount,
@@ -628,6 +630,14 @@ function PurchDetail({
           <div><label>Cabang</label><div>{doc.cabang || '-'}</div></div>
           <div><label>Customer</label><div>{doc.customer || '-'}</div></div>
           <div><label>Diminta oleh (Sales)</label><div>{doc.requestedBy || '-'}</div></div>
+          <div>
+            <label>Dikirim ke Purchasing</label>
+            <div>
+              {doc.sentToPurchasingAt
+                ? <span className="badge green">{formatDateID(doc.sentToPurchasingAt)}</span>
+                : <span className="badge slate">Belum dikirim</span>}
+            </div>
+          </div>
           {doc.jenis === 'FUPA' && (
             <div><label>No. RFQ Rujukan</label><div className="mono">{doc.sourceNoRfq || '-'}</div></div>
           )}
@@ -764,8 +774,10 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
   }, [rfq?.id, rfq?.items]);
 
   if (!rfq) return null;
-  // gm may answer too, so this is broader than canEditPurchasing.
-  const canAnswer = !readOnly && !!currentUser && ['purchasing', 'admin', 'gm'].includes(currentUser.role);
+  // Mirrors auth.ts#canEditRfqAnswer, which the PATCH route enforces. Deliberately
+  // NOT gated on `readOnly`: gm reaches this panel through the monitor modal, which
+  // is read-only for vendors/quotations/status, yet gm may still fill in the answer.
+  const canAnswer = !!currentUser && ['purchasing', 'admin', 'gm'].includes(currentUser.role);
 
   function setItem(idx: number, patch: Partial<RfqItem>) {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -929,6 +941,16 @@ function PurchNotes({ doc, readOnly }: { doc: PurchDoc; readOnly: boolean }) {
           placeholder="cth. Sudah PO ke vendor X, estimasi barang datang 10 hari..."
           onChange={(e) => setJawaban(e.target.value)}
         />
+        {/* RFQ tracks its answer through the Harga/COO panel below; FUP A has no
+            such columns, so the written reply is what marks it answered. */}
+        {doc.jenis === 'FUPA' && (
+          <div style={{ marginTop: 6 }}>
+            Jawaban ke Sales:{' '}
+            {(record as Fupa | undefined)?.jawabanFupaDikirim
+              ? <span className="badge green">Terkirim {formatDateID((record as Fupa).jawabanFupaAt)}</span>
+              : <span className="badge slate">Belum Dijawab</span>}
+          </div>
+        )}
         <div className="text-muted" style={{ fontSize: 11, marginTop: 4 }}>
           Kolom ini terlihat oleh Sales yang mengajukan permintaan, berbeda dari catatan internal di atas.
         </div>

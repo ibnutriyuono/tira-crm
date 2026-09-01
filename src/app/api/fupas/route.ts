@@ -45,6 +45,7 @@ export async function POST(req: Request) {
       items: Array.isArray(body?.items) ? body.items : [],
       catatan: String(body?.catatan || ''),
       status: body?.markSent ? 'Terkirim' : 'Draft',
+      sentToPurchasingAt: body?.markSent ? new Date() : null,
     },
   });
 

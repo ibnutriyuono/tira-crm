@@ -160,6 +160,13 @@ model Fupa {
   purchStatus  Int      @default(0)
   purchNotes   String?
   purchJawaban String?
+  /// Stamped when the FUP A is handed to Purchasing — mirrors Rfq.sentToPurchasingAt.
+  sentToPurchasingAt DateTime?
+  /// Set the first time Purchasing saves a non-empty purchJawaban. FUP A has no
+  /// Harga/COO columns to key off the way Rfq does, so the written reply is the
+  /// only signal that an answer was actually given.
+  jawabanFupaDikirim Boolean  @default(false)
+  jawabanFupaAt      DateTime?
   quotations   Quotation[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

@@ -24,6 +24,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       catatan: body?.catatan ?? existing.catatan,
       items: Array.isArray(body?.items) ? body.items : existing.items ?? undefined,
       status: body?.markSent ? 'Terkirim' : body?.status ?? existing.status,
+      // First hand-off only, so re-sending doesn't reset the original stamp.
+      ...(body?.markSent && !existing.sentToPurchasingAt ? { sentToPurchasingAt: new Date() } : {}),
     },
   });
 
@@ -70,11 +72,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!canEditPurchasing(user)) {
       return NextResponse.json({ error: 'Hanya Purchasing dan Admin yang dapat mengisi catatan pembelian.' }, { status: 403 });
     }
+    // FUP A has no Harga/COO columns to key an "answered" signal off the way Rfq
+    // does, so the written reply is the trigger. Stamped once, on the first
+    // non-empty save — later edits refine the same answer, they aren't new ones.
+    const answering = typeof body.purchJawaban === 'string' && body.purchJawaban.trim() !== '' && !existing.jawabanFupaDikirim;
     const fupa = await prisma.fupa.update({
       where: { id },
       data: {
         ...(typeof body.purchNotes === 'string' ? { purchNotes: body.purchNotes } : {}),
         ...(typeof body.purchJawaban === 'string' ? { purchJawaban: body.purchJawaban } : {}),
+        ...(answering ? { jawabanFupaDikirim: true, jawabanFupaAt: new Date() } : {}),
       },
     });
     emitCrmEvent('fupa:updated', fupa);
