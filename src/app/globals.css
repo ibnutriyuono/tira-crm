@@ -562,6 +562,9 @@ tr.hl-yellow:hover td{ background:rgba(201,130,46,.18); }
   background:var(--rust-500); color:#fff; font-size:10.5px; font-weight:700;
   margin-left:6px; vertical-align:middle;
 }
+/* RFQ/FUP A roll-up on a prospect row — steel, so it stays readable next to the
+   red discussion bubble when a prospect has both. */
+.item-chat-bubble.purch{background:var(--steel-500);}
 
 /* Omzet / GIT KPI accents (match the single-file app) */
 /* The accent is drawn by the ::before bar, driven by --bar-color — setting

@@ -1,34 +1,42 @@
 import type { Fupa, Rfq, RfqItem } from './types';
 
 /**
- * Simplified 4-stage document workflow for Purchasing's "Permintaan Masuk"
- * list — distinct from purchStatus (0-5, which tracks the *vendor quotation*
- * process and is still shown and editable in the detail modal). This one
- * tracks where the document itself sits in Purchasing's own queue:
- * 1 Diterima (baru masuk, belum ada tindakan) -> 2 Diproses (Purchasing sudah
- * mulai bekerja: ada catatan, atau status vendor sudah digerakkan) ->
- * 3 Dijawab (otomatis, tidak bisa diset manual) -> 4 Selesai.
+ * Automatic 5-stage Purchasing status for a document — distinct from the
+ * legacy `purchStatus` ladder, which is no longer surfaced anywhere.
+ *
+ *   1 Baru       belum ada tindakan
+ *   2 Diterima   Purchasing sudah membuka detail dokumennya
+ *   3 Dijawab    jawaban sudah diisi (otomatis, tidak bisa diset manual)
+ *   4 Selesai    dokumen ditandai selesai
+ *   5 No Quote   tidak ada vendor yang bisa memberi harga (satu-satunya
+ *                tahap manual, dicentang sendiri oleh Purchasing)
+ *
+ * Dijawab/Selesai outrank No Quote so a document that got resolved never
+ * slides back to No Quote because the flag was set earlier.
  */
-export type WorkflowStage = 1 | 2 | 3 | 4;
+export type WorkflowStage = 1 | 2 | 3 | 4 | 5;
 
 export const WORKFLOW_META: Record<WorkflowStage, { label: string; color: string }> = {
-  1: { label: '1. Diterima', color: 'slate' },
-  2: { label: '2. Diproses', color: 'steel' },
+  1: { label: '1. Baru', color: 'slate' },
+  2: { label: '2. Diterima', color: 'steel' },
   3: { label: '3. Dijawab', color: 'amber' },
   4: { label: '4. Selesai', color: 'green' },
+  5: { label: '5. No Quote', color: 'rust' },
 };
+
+/** Stage order used by the dashboard KPI row and the status filter. */
+export const WORKFLOW_STAGES: WorkflowStage[] = [1, 2, 3, 4, 5];
 
 /**
  * The minimum a record needs for staging. Satisfied both by the board's own
- * row type and by a raw Rfq/Fupa, so the badge can be counted without the
- * board's quotation tally.
+ * row type and by a raw Rfq/Fupa, so the badge can be counted anywhere.
  */
 export interface WorkflowDoc {
   jenis: 'RFQ' | 'FUPA';
   status: string;
-  purchStatus: number;
-  purchNotes: string | null;
   items: Pick<RfqItem, 'hargaPurchasing' | 'coo'>[];
+  openedByPurchasingAt: string | null;
+  noQuote: boolean;
   /** FUP A only — see below. */
   jawabanFupaDikirim?: boolean;
 }
@@ -40,23 +48,28 @@ export function workflowStage(d: WorkflowDoc): WorkflowStage {
   // which is what jawabanFupaDikirim records.
   const answered = d.jenis === 'RFQ' ? d.items.some((m) => m.hargaPurchasing || m.coo) : !!d.jawabanFupaDikirim;
   if (answered) return 3;
-  // Requesting a quotation moves purchStatus to PSTATUS_DIMINTA server-side, so
-  // purchStatus already covers the "penawaran sudah diminta" case on its own.
-  if (d.purchStatus > 0 || (d.purchNotes || '').trim() !== '') return 2;
+  if (d.noQuote) return 5;
+  if (d.openedByPurchasingAt) return 2;
   return 1;
 }
 
 export function rfqAsWorkflowDoc(r: Rfq): WorkflowDoc {
-  return { jenis: 'RFQ', status: r.status, purchStatus: r.purchStatus ?? 0, purchNotes: r.purchNotes, items: r.items ?? [] };
+  return {
+    jenis: 'RFQ',
+    status: r.status,
+    items: r.items ?? [],
+    openedByPurchasingAt: r.openedByPurchasingAt,
+    noQuote: r.noQuote,
+  };
 }
 
 export function fupaAsWorkflowDoc(f: Fupa): WorkflowDoc {
   return {
     jenis: 'FUPA',
     status: f.status,
-    purchStatus: f.purchStatus ?? 0,
-    purchNotes: f.purchNotes,
     items: f.items ?? [],
+    openedByPurchasingAt: f.openedByPurchasingAt,
+    noQuote: f.noQuote,
     jawabanFupaDikirim: f.jawabanFupaDikirim,
   };
 }

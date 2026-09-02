@@ -16,6 +16,18 @@ export function formatDateID(iso?: string | null): string {
   return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+/**
+ * Date + time for audit stamps. Unlike formatDateID these values are full
+ * timestamps rather than bare YYYY-MM-DD, so they are parsed as-is instead of
+ * being pinned to local midnight.
+ */
+export function formatDateTimeID(iso?: string | null): string {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 export function formatDateLongID(iso?: string | null): string {
   if (!iso) return '';
   const bulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];

@@ -105,6 +105,13 @@ model Rfq {
   // record that the answer was sent back to Sales.
   /// Stamped the first time the RFQ is marked Terkirim to Purchasing.
   sentToPurchasingAt DateTime?
+  /// Stamped once, the first time a Purchasing/Admin user opens this
+  /// document's detail — drives stage 2 "Diterima". Never re-stamped.
+  openedByPurchasingAt DateTime?
+  /// The only manually-set stage: Purchasing marks this when no vendor can
+  /// quote at all. Loses to Dijawab/Selesai so a finished document never
+  /// reverts. See lib/purchasing-workflow.ts.
+  noQuote            Boolean   @default(false)
   jawabanRfqDikirim Boolean  @default(false)
   jawabanRfqAt      DateTime?
   /// Internal purchasing notes — not shown to Sales.
@@ -162,6 +169,13 @@ model Fupa {
   purchJawaban String?
   /// Stamped when the FUP A is handed to Purchasing — mirrors Rfq.sentToPurchasingAt.
   sentToPurchasingAt DateTime?
+  /// Stamped once, the first time a Purchasing/Admin user opens this
+  /// document's detail — drives stage 2 "Diterima". Never re-stamped.
+  openedByPurchasingAt DateTime?
+  /// The only manually-set stage: Purchasing marks this when no vendor can
+  /// quote at all. Loses to Dijawab/Selesai so a finished document never
+  /// reverts. See lib/purchasing-workflow.ts.
+  noQuote            Boolean   @default(false)
   /// Set the first time Purchasing saves a non-empty purchJawaban. FUP A has no
   /// Harga/COO columns to key off the way Rfq does, so the written reply is the
   /// only signal that an answer was actually given.

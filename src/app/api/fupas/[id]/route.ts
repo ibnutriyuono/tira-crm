@@ -51,6 +51,33 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const existing = await prisma.fupa.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: 'FUP A tidak ditemukan' }, { status: 404 });
 
+  // Opening the detail is what moves a FUP A to stage 2 "Diterima" — stamped
+  // once, and only for Purchasing/Admin.
+  if (body?.action === 'mark-opened') {
+    if (!canEditPurchasing(user)) return NextResponse.json({ ok: false }, { status: 403 });
+    if (existing.openedByPurchasingAt) return NextResponse.json({ ok: true });
+    const fupa = await prisma.fupa.update({ where: { id }, data: { openedByPurchasingAt: new Date() } });
+    emitCrmEvent('fupa:updated', fupa);
+    return NextResponse.json({ fupa });
+  }
+
+  // "No Quote" — the one Purchasing stage that is set by hand.
+  if (typeof body?.noQuote === 'boolean') {
+    if (!canEditPurchasing(user)) {
+      return NextResponse.json({ error: 'Hanya Purchasing dan Admin yang dapat menandai No Quote.' }, { status: 403 });
+    }
+    const fupa = await prisma.fupa.update({ where: { id }, data: { noQuote: body.noQuote } });
+    emitCrmEvent('fupa:updated', fupa);
+    await logActivity({
+      user,
+      action: 'status_change',
+      entity: 'fupa',
+      entityId: id,
+      summary: `${body.noQuote ? 'Menandai' : 'Membatalkan tanda'} No Quote pada FUP A ${fupa.noFupa || '(tanpa nomor)'}`,
+    });
+    return NextResponse.json({ fupa });
+  }
+
   if (typeof body?.purchStatus === 'number') {
     if (!canEditPurchasing(user)) {
       return NextResponse.json({ error: 'Hanya Purchasing dan Admin yang dapat mengubah status pembelian.' }, { status: 403 });

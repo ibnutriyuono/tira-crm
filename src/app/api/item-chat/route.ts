@@ -35,7 +35,12 @@ export async function GET(req: Request) {
       const seenAt = readMap.get(m.entityId);
       if (!seenAt || m.createdAt > seenAt) counts[m.entityId] = (counts[m.entityId] || 0) + 1;
     });
-    return NextResponse.json({ counts });
+    // The read cursors travel with the counts so callers can also judge
+    // non-message events — e.g. "has Purchasing's answer arrived since I last
+    // looked at this document" — without a second round trip.
+    const readCursors: Record<string, string> = {};
+    readMap.forEach((at, entityId) => { readCursors[entityId] = at.toISOString(); });
+    return NextResponse.json({ counts, reads: readCursors });
   }
 
   const entityId = searchParams.get('entityId');

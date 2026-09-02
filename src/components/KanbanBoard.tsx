@@ -8,10 +8,11 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
 import { IconCart, IconDoc, IconEdit, IconRfq, IconTrash, IconWa } from './icons';
+import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './ProspectPurchasingBubble';
 
 const CAP = 40;
 
-function KanbanCard({ r }: { r: Prospect }) {
+function KanbanCard({ r, purchCount }: { r: Prospect; purchCount?: number }) {
   const openModal = useUiStore((s) => s.openModal);
   const currentUser = useDataStore((s) => s.currentUser);
   const klas = classify(r);
@@ -31,7 +32,7 @@ function KanbanCard({ r }: { r: Prospect }) {
       onDragEnd={() => setDragging(false)}
     >
       <div className="kc-top">
-        <span className="kc-customer">{r.customer}</span>
+        <span className="kc-customer">{r.customer}<ProspectPurchasingBubble count={purchCount} /></span>
         <span className={`badge ${klasBadgeColor(klas)}`}>{klas}</span>
       </div>
       <div className="kc-produk">{r.uraian || '-'}</div>
@@ -128,6 +129,7 @@ function KanbanCard({ r }: { r: Prospect }) {
 
 export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
   const openModal = useUiStore((s) => s.openModal);
+  const purchCounts = useProspectPurchasingCounts(true);
   const upsertProspect = useDataStore((s) => s.upsertProspect);
   const toast = useDataStore((s) => s.toast);
   const [dragOverStatus, setDragOverStatus] = useState<number | null>(null);
@@ -184,7 +186,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                 {shown.length === 0 ? (
                   <div className="kanban-empty">Tidak ada data</div>
                 ) : (
-                  shown.map((r) => <KanbanCard key={r.id} r={r} />)
+                  shown.map((r) => <KanbanCard key={r.id} r={r} purchCount={purchCounts[r.id]} />)
                 )}
                 {items.length > CAP && <div className="kanban-more">+{items.length - CAP} lainnya — persempit dengan filter</div>}
               </div>

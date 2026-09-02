@@ -119,6 +119,8 @@ export interface Fupa {
   purchNotes: string | null;
   purchJawaban: string | null;
   sentToPurchasingAt: string | null;
+  openedByPurchasingAt: string | null;
+  noQuote: boolean;
   jawabanFupaDikirim: boolean;
   jawabanFupaAt: string | null;
   createdAt: string;
@@ -140,6 +142,8 @@ export interface Rfq {
   purchStatus: number;
   fupaId: string | null;
   sentToPurchasingAt: string | null;
+  openedByPurchasingAt: string | null;
+  noQuote: boolean;
   jawabanRfqDikirim: boolean;
   jawabanRfqAt: string | null;
   purchNotes: string | null;

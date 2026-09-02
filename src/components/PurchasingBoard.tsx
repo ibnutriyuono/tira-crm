@@ -2,9 +2,8 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { IconCheck, IconEdit, IconTrash, IconWa } from './icons';
-import { PSTATUS_META } from '@/lib/constants';
-import { WORKFLOW_META, workflowStage } from '@/lib/purchasing-workflow';
-import { formatDateID, formatRupiah, normalizePhone, num, todayStr } from '@/lib/format';
+import { WORKFLOW_META, WORKFLOW_STAGES, workflowStage } from '@/lib/purchasing-workflow';
+import { formatDateID, formatDateTimeID, formatRupiah, normalizePhone, num, todayStr } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -29,6 +28,8 @@ interface PurchDoc {
   status: Rfq['status'];
   purchNotes: string | null;
   sentToPurchasingAt: string | null;
+  openedByPurchasingAt: string | null;
+  noQuote: boolean;
   /** FUP A only — how the shared stager knows a FUP A has been answered. */
   jawabanFupaDikirim?: boolean;
   sourceNoRfq?: string;
@@ -57,6 +58,8 @@ function toDoc(r: Rfq | Fupa, jenis: PurchDocType, quoteCount = 0): PurchDoc {
     status: r.status,
     purchNotes: r.purchNotes,
     sentToPurchasingAt: r.sentToPurchasingAt,
+    openedByPurchasingAt: r.openedByPurchasingAt,
+    noQuote: r.noQuote,
     jawabanFupaDikirim: isRfq ? undefined : (r as Fupa).jawabanFupaDikirim,
     sourceNoRfq: isRfq ? undefined : (r as Fupa).sourceNoRfq || '-',
     items: r.items ?? [],
@@ -160,6 +163,27 @@ export function PurchasingBoard({
     [rfqs, fupas, quoteCounts],
   );
 
+  /**
+   * Opening a document is what advances it to stage 2 "Diterima". Fire-and-forget
+   * and Purchasing/Admin only — the route ignores repeats, and a non-Purchasing
+   * viewer must not make the document look picked up.
+   */
+  const openDetail = useCallback(
+    (d: PurchDoc) => {
+      setDetail(d);
+      if (readOnly || d.openedByPurchasingAt) return;
+      const url = d.jenis === 'RFQ' ? `/api/rfqs/${d.id}` : `/api/fupas/${d.id}`;
+      api
+        .patch<{ rfq?: Rfq; fupa?: Fupa }>(url, { action: 'mark-opened' })
+        .then((res) => {
+          if (res.rfq) upsertRfq(res.rfq);
+          if (res.fupa) upsertFupa(res.fupa);
+        })
+        .catch(() => {});
+    },
+    [readOnly, upsertRfq, upsertFupa],
+  );
+
   // A notification toast can ask for one document's detail. Runs off `docs` so
   // it still resolves when the request lands before bootstrap has filled the
   // stores; cleared once consumed so re-opening the board doesn't reopen it.
@@ -169,9 +193,9 @@ export function PurchasingBoard({
     const target = docs.find((d) => d.jenis === purchDetailCtx.jenis && d.id === purchDetailCtx.id);
     if (!target) return;
     setTab('masuk');
-    setDetail(target);
+    openDetail(target);
     useUiStore.setState({ purchDetailCtx: null });
-  }, [purchDetailCtx, docs]);
+  }, [purchDetailCtx, docs, openDetail]);
 
   const filtered = useMemo(() => {
     let l = docs;
@@ -208,9 +232,10 @@ export function PurchasingBoard({
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [filtered, groupBy]);
 
-  const counts = useMemo(() => {
+  // Dashboard KPI tallies, on the same 5 automatic stages the worklist shows.
+  const stageCounts = useMemo(() => {
     const by: Record<number, number> = {};
-    docs.forEach((d) => { by[d.purchStatus] = (by[d.purchStatus] || 0) + 1; });
+    docs.forEach((d) => { const st = workflowStage(d); by[st] = (by[st] || 0) + 1; });
     return by;
   }, [docs]);
 
@@ -261,6 +286,19 @@ export function PurchasingBoard({
     toast('Template vendor berhasil diunduh', 'success');
   }
 
+  async function setNoQuote(doc: PurchDoc, noQuote: boolean) {
+    try {
+      const url = doc.jenis === 'RFQ' ? `/api/rfqs/${doc.id}` : `/api/fupas/${doc.id}`;
+      const res = await api.patch<{ rfq?: Rfq; fupa?: Fupa }>(url, { noQuote });
+      if (res.rfq) upsertRfq(res.rfq);
+      if (res.fupa) upsertFupa(res.fupa);
+      setDetail((d) => (d ? { ...d, noQuote } : d));
+      toast(noQuote ? 'Ditandai No Quote' : 'Tanda No Quote dibatalkan', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal memperbarui No Quote', 'error');
+    }
+  }
+
   async function moveStatus(doc: PurchDoc, purchStatus: number) {
     try {
       const url = doc.jenis === 'RFQ' ? `/api/rfqs/${doc.id}` : `/api/fupas/${doc.id}`;
@@ -287,10 +325,12 @@ export function PurchasingBoard({
           <div className="kpi-grid">
             <div className="kpi steel"><div className="label">Total RFQ</div><div className="value">{rfqs.length}</div></div>
             <div className="kpi amber"><div className="label">Total FUP A</div><div className="value">{fupas.length}</div></div>
-            <div className="kpi slate"><div className="label">Baru</div><div className="value">{counts[0] || 0}</div></div>
-            <div className="kpi steel"><div className="label">Diproses Vendor</div><div className="value">{(counts[1] || 0) + (counts[2] || 0)}</div></div>
-            <div className="kpi green"><div className="label">Selesai</div><div className="value">{counts[4] || 0}</div></div>
-            <div className="kpi rust"><div className="label">Dibatalkan</div><div className="value">{counts[5] || 0}</div></div>
+            {WORKFLOW_STAGES.map((st) => (
+              <div key={st} className={`kpi ${WORKFLOW_META[st].color}`}>
+                <div className="label">{WORKFLOW_META[st].label.replace(/^\d+\.\s*/, '')}</div>
+                <div className="value">{stageCounts[st] || 0}</div>
+              </div>
+            ))}
             <div className="kpi steel"><div className="label">Total Vendor</div><div className="value">{vendors.length}</div></div>
           </div>
 
@@ -310,7 +350,7 @@ export function PurchasingBoard({
                 </thead>
                 <tbody>
                   {docs.slice(0, 8).map((d) => {
-                    const meta = PSTATUS_META[d.purchStatus] || PSTATUS_META[0];
+                    const meta = WORKFLOW_META[workflowStage(d)];
                     return (
                       <tr key={`recent-${d.jenis}-${d.id}`}>
                         <td><span className={`badge ${d.jenis === 'RFQ' ? 'steel' : 'amber'}`}>{d.jenis === 'RFQ' ? 'RFQ' : 'FUP A'}</span></td>
@@ -378,7 +418,7 @@ export function PurchasingBoard({
                 const meta = WORKFLOW_META[workflowStage(d)];
                 const head = d.items.slice(0, 2).map((m) => `${m.line || '-'} · ${m.material || '-'}`);
                 return (
-                  <div key={`card-${d.jenis}-${d.id}`} className="purch-card" onClick={() => setDetail(d)}>
+                  <div key={`card-${d.jenis}-${d.id}`} className="purch-card" onClick={() => openDetail(d)}>
                     <div className="purch-card-head">
                       <span className={`badge ${d.jenis === 'RFQ' ? 'steel' : 'amber'}`}>{d.jenis === 'RFQ' ? 'RFQ' : 'FUP A'}</span>
                       <span className={`badge ${meta.color}`}>{meta.label}</span>
@@ -394,7 +434,7 @@ export function PurchasingBoard({
                     </div>
                     <div className="purch-card-foot">
                       <span className="text-muted">{d.quoteCount ? `${d.quoteCount} vendor diminta` : 'Belum ada vendor'}</span>
-                      <button type="button" className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); setDetail(d); }}>Detail</button>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); openDetail(d); }}>Detail</button>
                     </div>
                   </div>
                 );
@@ -427,11 +467,11 @@ export function PurchasingBoard({
                             </td>
                           </tr>
                           {rows.map((d) => (
-                            <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} onDetail={setDetail} />
+                            <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} onDetail={openDetail} />
                           ))}
                         </Fragment>
                       ))
-                    : sortedFlat.map((d) => <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} onDetail={setDetail} />)}
+                    : sortedFlat.map((d) => <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} onDetail={openDetail} />)}
                 </tbody>
               </table>
             </div>
@@ -522,7 +562,7 @@ export function PurchasingBoard({
         </>
       )}
 
-      {detail && <PurchDetail doc={detail} readOnly={readOnly} onClose={() => setDetail(null)} onMoveStatus={moveStatus} />}
+      {detail && <PurchDetail doc={detail} readOnly={readOnly} onClose={() => setDetail(null)} onMoveStatus={moveStatus} onSetNoQuote={setNoQuote} />}
     </div>
   );
 }
@@ -533,11 +573,13 @@ function PurchDetail({
   readOnly,
   onClose,
   onMoveStatus,
+  onSetNoQuote,
 }: {
   doc: PurchDoc;
   readOnly: boolean;
   onClose: () => void;
   onMoveStatus: (doc: PurchDoc, status: number) => void;
+  onSetNoQuote: (doc: PurchDoc, noQuote: boolean) => void;
 }) {
   const vendors = useDataStore((s) => s.vendors);
   const toast = useDataStore((s) => s.toast);
@@ -634,18 +676,26 @@ function PurchDetail({
           {doc.jenis === 'FUPA' && (
             <div><label>No. RFQ Rujukan</label><div className="mono">{doc.sourceNoRfq || '-'}</div></div>
           )}
+          {/* The old manual purchStatus dropdown lived here. It was removed once the
+              automatic stage badge landed: two status systems side by side, both
+              with a "Baru" and a "Selesai" meaning different things, read as a bug.
+              purchStatus is still written server-side as internal bookkeeping. */}
           <div style={{ gridColumn: '1 / -1' }}>
             <label>Status Purchasing</label>
-            <select
-              value={doc.purchStatus}
-              disabled={readOnly}
-              onChange={(e) => onMoveStatus(doc, Number(e.target.value))}
-              style={{ width: 220 }}
-            >
-              {Object.entries(PSTATUS_META).map(([k, meta]) => (
-                <option key={k} value={k}>{meta.label}</option>
-              ))}
-            </select>
+            <div>
+              <span className={`badge ${WORKFLOW_META[workflowStage(doc)].color}`}>{WORKFLOW_META[workflowStage(doc)].label}</span>
+            </div>
+            {doc.openedByPurchasingAt && (
+              <div className="text-muted" style={{ fontSize: 11, marginTop: 4 }}>
+                Dibuka Purchasing {formatDateTimeID(doc.openedByPurchasingAt)}
+              </div>
+            )}
+            {!readOnly && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontWeight: 400 }}>
+                <input type="checkbox" checked={doc.noQuote} onChange={(e) => onSetNoQuote(doc, e.target.checked)} />
+                Tandai <b>No Quote</b> (tidak ada vendor yang bisa memberi harga)
+              </label>
+            )}
           </div>
         </div>
 

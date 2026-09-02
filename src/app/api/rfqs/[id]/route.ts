@@ -62,6 +62,36 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const body = await req.json().catch(() => null);
 
+  // Opening the detail is what moves an RFQ to stage 2 "Diterima". Stamped once
+  // and only for Purchasing/Admin — a Sales user peeking at their own document
+  // must not make it look like Purchasing picked it up.
+  if (body?.action === 'mark-opened') {
+    if (!canEditPurchasing(user)) return NextResponse.json({ ok: false }, { status: 403 });
+    const prev = await prisma.rfq.findUnique({ where: { id }, select: { openedByPurchasingAt: true } });
+    if (!prev) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
+    if (prev.openedByPurchasingAt) return NextResponse.json({ ok: true });
+    const rfq = await prisma.rfq.update({ where: { id }, data: { openedByPurchasingAt: new Date() } });
+    emitCrmEvent('rfq:updated', rfq);
+    return NextResponse.json({ rfq });
+  }
+
+  // "No Quote" — the one Purchasing stage that is set by hand.
+  if (typeof body?.noQuote === 'boolean') {
+    if (!canEditPurchasing(user)) {
+      return NextResponse.json({ error: 'Hanya Purchasing dan Admin yang dapat menandai No Quote.' }, { status: 403 });
+    }
+    const rfq = await prisma.rfq.update({ where: { id }, data: { noQuote: body.noQuote } });
+    emitCrmEvent('rfq:updated', rfq);
+    await logActivity({
+      user,
+      action: 'status_change',
+      entity: 'rfq',
+      entityId: id,
+      summary: `${body.noQuote ? 'Menandai' : 'Membatalkan tanda'} No Quote pada RFQ ${rfq.noRfq || '(tanpa nomor)'}`,
+    });
+    return NextResponse.json({ rfq });
+  }
+
   // Purchasing fills harga/COO onto the RFQ's items and sends the answer back
   // to Sales. Gated by canEditRfqAnswer (purchasing, admin, gm).
   if (body?.action === 'answer' || body?.action === 'send-jawaban') {
