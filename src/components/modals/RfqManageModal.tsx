@@ -5,8 +5,8 @@ import { Modal } from '../Modal';
 import { AttachNoteBadges } from '../AttachNoteBadges';
 import { ItemChatBadge, useItemChatCounts } from '../ItemChatBadge';
 import { IconCheck, IconEdit, IconTrash } from '../icons';
-import { PSTATUS_META } from '@/lib/constants';
-import { formatDateID, formatRupiah, todayStr } from '@/lib/format';
+import { formatDateID, formatDateTimeID, formatRupiah, todayStr } from '@/lib/format';
+import { WORKFLOW_META, rfqAsWorkflowDoc, workflowStage } from '@/lib/purchasing-workflow';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -52,7 +52,7 @@ export function RfqManageModal() {
   async function exportExcel() {
     if (list.length === 0) return toast('Tidak ada data RFQ untuk diexport.', 'error');
     const XLSX = await import('xlsx');
-    const header = ['NO', 'NO RFQ', 'TANGGAL', 'CABANG', 'CUSTOMER', 'LINE', 'GRADE', 'MATERIAL', 'DIA (mm)', 'THICK (mm)', 'WIDTH (mm)', 'LENGTH (mm)', 'PCS', 'BERAT (KGS)', 'LOKAL/IMPORT', 'ESTIMASI KEBUTUHAN', 'HARGA (PURCHASING)', 'COO', 'STATUS', 'TERKIRIM KE PURCHASING', 'JAWABAN RFQ', 'DIBUAT OLEH'];
+    const header = ['NO', 'NO RFQ', 'TANGGAL', 'CABANG', 'CUSTOMER', 'LINE', 'GRADE', 'MATERIAL', 'DIA (mm)', 'THICK (mm)', 'WIDTH (mm)', 'LENGTH (mm)', 'PCS', 'BERAT (KGS)', 'LOKAL/IMPORT', 'ESTIMASI KEBUTUHAN', 'HARGA (PURCHASING)', 'COO', 'STATUS', 'STATUS PURCHASING', 'TERKIRIM KE PURCHASING', 'JAWABAN RFQ', 'DIBUAT OLEH'];
     const aoa: unknown[][] = [header];
     let no = 1;
     list.forEach((r) => {
@@ -65,6 +65,7 @@ export function RfqManageModal() {
           it.pcs || '', it.berat || '', it.lokal || '', it.estimasi || '',
           it.hargaPurchasing || '', it.coo || '',
           idx === 0 ? r.status || 'Draft' : '',
+          idx === 0 ? WORKFLOW_META[workflowStage(rfqAsWorkflowDoc(r))].label : '',
           idx === 0 ? (r.sentToPurchasingAt ? formatDateID(r.sentToPurchasingAt) : 'Belum') : '',
           idx === 0 ? (r.jawabanRfqDikirim ? formatDateID(r.jawabanRfqAt) : 'Belum') : '',
           idx === 0 ? r.requestedBy || '' : '',
@@ -73,7 +74,7 @@ export function RfqManageModal() {
       no++;
     });
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 4 }, { wch: 10 }, { wch: 11 }, { wch: 8 }, { wch: 22 }, { wch: 6 }, { wch: 10 }, { wch: 24 }, { wch: 9 }, { wch: 9 }, { wch: 9 }, { wch: 9 }, { wch: 6 }, { wch: 11 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 16 }];
+    ws['!cols'] = [{ wch: 4 }, { wch: 10 }, { wch: 11 }, { wch: 8 }, { wch: 22 }, { wch: 6 }, { wch: 10 }, { wch: 24 }, { wch: 9 }, { wch: 9 }, { wch: 9 }, { wch: 9 }, { wch: 6 }, { wch: 11 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'RFQ');
     XLSX.writeFile(wb, `Kelola_RFQ_${todayStr()}.xlsx`);
@@ -155,9 +156,16 @@ export function RfqManageModal() {
                     {r.fupaId ? <span className="badge amber">Ada</span> : <span className="badge slate">-</span>}
                   </td>
                   <td>
-                    <span className={`badge ${(PSTATUS_META[r.purchStatus] || PSTATUS_META[0]).color}`}>
-                      {(PSTATUS_META[r.purchStatus] || PSTATUS_META[0]).label}
+                    {/* The real 5-stage Purchasing status, same as the detail
+                        screen and Permintaan Masuk. This column used to show the
+                        retired purchStatus ladder, so a row could read Status
+                        "Selesai" while Purchasing still said "Baru". */}
+                    <span className={`badge ${WORKFLOW_META[workflowStage(rfqAsWorkflowDoc(r))].color}`}>
+                      {WORKFLOW_META[workflowStage(rfqAsWorkflowDoc(r))].label}
                     </span>
+                    <div className="text-muted" style={{ fontSize: 10.5, marginTop: 3 }}>
+                      {r.sentToPurchasingAt ? `Dikirim ${formatDateTimeID(r.sentToPurchasingAt)}` : 'Belum dikirim'}
+                    </div>
                   </td>
                   <td><AttachNoteBadges rfqId={r.id} /></td>
                   <td>

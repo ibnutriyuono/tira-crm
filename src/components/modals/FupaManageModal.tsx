@@ -5,8 +5,8 @@ import { Modal } from '../Modal';
 import { AttachNoteBadges } from '../AttachNoteBadges';
 import { ItemChatBadge, useItemChatCounts } from '../ItemChatBadge';
 import { IconCheck, IconEdit, IconTrash } from '../icons';
-import { PSTATUS_META } from '@/lib/constants';
-import { formatDateID, todayStr } from '@/lib/format';
+import { formatDateID, formatDateTimeID, todayStr } from '@/lib/format';
+import { WORKFLOW_META, fupaAsWorkflowDoc, workflowStage } from '@/lib/purchasing-workflow';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -49,7 +49,7 @@ export function FupaManageModal() {
   async function exportExcel() {
     if (list.length === 0) return toast('Tidak ada data FUP A untuk diexport.', 'error');
     const XLSX = await import('xlsx');
-    const header = ['NO', 'NO FUP A', 'TANGGAL', 'REF. RFQ', 'CABANG', 'CUSTOMER', 'LINE', 'GRADE', 'MATERIAL', 'PCS', 'BERAT (KGS)', 'LOKAL/IMPORT', 'ESTIMASI KEBUTUHAN', 'STATUS', 'DIMINTA OLEH', 'CATATAN'];
+    const header = ['NO', 'NO FUP A', 'TANGGAL', 'REF. RFQ', 'CABANG', 'CUSTOMER', 'LINE', 'GRADE', 'MATERIAL', 'PCS', 'BERAT (KGS)', 'LOKAL/IMPORT', 'ESTIMASI KEBUTUHAN', 'STATUS', 'STATUS PURCHASING', 'DIMINTA OLEH', 'CATATAN'];
     const aoa: unknown[][] = [header];
     let no = 1;
     list.forEach((f) => {
@@ -59,13 +59,14 @@ export function FupaManageModal() {
           idx === 0 ? no : '', idx === 0 ? f.noFupa || '' : '', idx === 0 ? formatDateID(f.tglFupa) : '',
           idx === 0 ? f.sourceNoRfq || '' : '', idx === 0 ? f.cabang || '' : '', idx === 0 ? f.customer || '' : '',
           it.line || '', it.grade || '', it.material || '', it.pcs || '', it.berat || '', it.lokal || '', it.estimasi || '',
-          idx === 0 ? f.status : '', idx === 0 ? f.requestedBy || '' : '', idx === 0 ? f.catatan || '' : '',
+          idx === 0 ? f.status : '', idx === 0 ? WORKFLOW_META[workflowStage(fupaAsWorkflowDoc(f))].label : '',
+          idx === 0 ? f.requestedBy || '' : '', idx === 0 ? f.catatan || '' : '',
         ]);
       });
       no++;
     });
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 4 }, { wch: 12 }, { wch: 11 }, { wch: 12 }, { wch: 8 }, { wch: 22 }, { wch: 6 }, { wch: 10 }, { wch: 24 }, { wch: 6 }, { wch: 11 }, { wch: 14 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 24 }];
+    ws['!cols'] = [{ wch: 4 }, { wch: 12 }, { wch: 11 }, { wch: 12 }, { wch: 8 }, { wch: 22 }, { wch: 6 }, { wch: 10 }, { wch: 24 }, { wch: 6 }, { wch: 11 }, { wch: 14 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 24 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'FUP A');
     XLSX.writeFile(wb, `Kelola_FUPA_${todayStr()}.xlsx`);
@@ -132,7 +133,7 @@ export function FupaManageModal() {
             </thead>
             <tbody>
               {list.map((f) => {
-                const pmeta = PSTATUS_META[f.purchStatus] || PSTATUS_META[0];
+                const pmeta = WORKFLOW_META[workflowStage(fupaAsWorkflowDoc(f))];
                 return (
                   <tr key={f.id}>
                     <td className="mono" style={{ fontWeight: 600 }}>{f.noFupa || '-'}<ItemChatBadge count={chatCounts[f.id]} /></td>
@@ -143,7 +144,14 @@ export function FupaManageModal() {
                     <td className="center">{f.items?.length ?? 0}</td>
                     <td><AttachNoteBadges fupaId={f.id} catatan={f.catatan} /></td>
                     <td><span className={`badge ${statusColor(f.status)}`}>{f.status}</span></td>
-                    <td><span className={`badge ${pmeta.color}`}>{pmeta.label}</span></td>
+                    <td>
+                      {/* Real 5-stage Purchasing status, matching the detail screen —
+                          this used to render the retired purchStatus ladder. */}
+                      <span className={`badge ${pmeta.color}`}>{pmeta.label}</span>
+                      <div className="text-muted" style={{ fontSize: 10.5, marginTop: 3 }}>
+                        {f.sentToPurchasingAt ? `Dikirim ${formatDateTimeID(f.sentToPurchasingAt)}` : 'Belum dikirim'}
+                      </div>
+                    </td>
                     <td>
                       <div className="row-actions">
                         <button
