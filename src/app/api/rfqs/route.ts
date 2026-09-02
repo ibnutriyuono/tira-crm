@@ -17,6 +17,11 @@ export async function POST(req: Request) {
   if (isResponse(user)) return user;
 
   const body = await req.json().catch(() => null);
+  // Required so the RFQ never reaches Purchasing as "(tanpa nomor)" and always
+  // gives a FUP A something to reference. Mirrored in RfqModal.
+  if (!String(body?.noRfq || '').trim()) {
+    return NextResponse.json({ error: 'No. RFQ wajib diisi' }, { status: 400 });
+  }
   const prospectId = body?.prospectId || null;
   // Denormalize the region from the source prospect so rm-scoped queries can
   // filter on the RFQ alone; fall back to the acting user's own region.

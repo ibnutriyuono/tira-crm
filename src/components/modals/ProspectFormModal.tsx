@@ -30,6 +30,28 @@ export function ProspectFormModal() {
   const isSales = currentUser?.role === 'sales';
   const editing = editId ? records.find((r) => r.id === editId) || null : null;
 
+  // Mirrors api-helpers.ts#prospectScopeLocks, which the write routes enforce —
+  // this only saves the user from filling in a field that would be overridden.
+  const locks =
+    currentUser?.role === 'sales' ? { reg: true, cabang: true, se: true }
+    : currentUser?.role === 'bm' ? { reg: true, cabang: true, se: false }
+    : currentUser?.role === 'rm' ? { reg: true, cabang: false, se: false }
+    : { reg: false, cabang: false, se: false };
+
+  /**
+   * Sales/BM accounts store a cabang but no reg, so their region is derived from
+   * the cabang -> reg mapping in loaded prospects. An unseen branch leaves the
+   * field open rather than locking it to a wrong guess.
+   */
+  const lockedReg = useMemo(() => {
+    if (!locks.reg || !currentUser) return null;
+    if (currentUser.reg != null) return String(currentUser.reg);
+    const cab = (currentUser.cabang || '').trim().toUpperCase();
+    if (!cab) return null;
+    const match = records.find((r) => (r.cabang || '').trim().toUpperCase() === cab && r.reg != null);
+    return match?.reg != null ? String(match.reg) : null;
+  }, [locks.reg, currentUser, records]);
+
   const [reg, setReg] = useState('1');
   const [cabang, setCabang] = useState('');
   const [se, setSe] = useState('');
@@ -73,9 +95,9 @@ export function ProspectFormModal() {
         },
       });
     } else {
-      setReg('1');
-      setCabang(isSales ? currentUser?.cabang || '' : '');
-      setSe(isSales ? currentUser?.se || '' : '');
+      setReg(lockedReg ?? '1');
+      setCabang(locks.cabang ? currentUser?.cabang || '' : '');
+      setSe(locks.se ? currentUser?.se || '' : '');
       setStatus('0');
       setCustomer('');
       setPhone('');
@@ -191,24 +213,27 @@ export function ProspectFormModal() {
       <div className="form-grid">
         <div>
           <label>Regional</label>
-          <select value={reg} onChange={(e) => setReg(e.target.value)}>
+          <select value={reg} disabled={locks.reg} onChange={(e) => setReg(e.target.value)}>
             <option value="1">Regional 1</option>
             <option value="2">Regional 2</option>
             <option value="3">Regional 3</option>
           </select>
+          {locks.reg && <div className="field-note">Terkunci sesuai akun Anda</div>}
         </div>
         <div>
           <label>Cabang</label>
-          <input list="cabangList" value={cabang} readOnly={isSales} onChange={(e) => setCabang(e.target.value)} placeholder="cth. DKI" />
+          <input list="cabangList" value={cabang} readOnly={locks.cabang} onChange={(e) => setCabang(e.target.value)} placeholder="cth. DKI" />
           <datalist id="cabangList">
             {cabangOptions.map((c) => (
               <option key={c} value={c} />
             ))}
           </datalist>
+          {locks.cabang && <div className="field-note">Terkunci sesuai akun Anda</div>}
         </div>
         <div>
           <label>Sales Engineer (SE)</label>
-          <input type="text" value={se} readOnly={isSales} onChange={(e) => setSe(e.target.value)} placeholder="Inisial SE" />
+          <input type="text" value={se} readOnly={locks.se} onChange={(e) => setSe(e.target.value)} placeholder="Inisial SE" />
+          {locks.se && <div className="field-note">Terkunci sesuai akun Anda</div>}
         </div>
         <div>
           <label>Status Pipeline</label>

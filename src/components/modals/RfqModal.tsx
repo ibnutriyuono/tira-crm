@@ -130,12 +130,30 @@ export function RfqModal() {
     return rfq;
   }
 
+  /**
+   * Both requirements for any action that persists the RFQ. Applied to all five
+   * buttons rather than just Save: an RFQ that reaches Purchasing without a
+   * number shows as "(tanpa nomor)" everywhere and gives FUP A nothing to
+   * reference. The server enforces the same rule.
+   */
+  function validate(): boolean {
+    if (!noRfq.trim()) {
+      toast('No. RFQ wajib diisi', 'error');
+      return false;
+    }
+    if (!hasMaterial()) {
+      toast('Isi minimal satu material yang diminta', 'error');
+      return false;
+    }
+    return true;
+  }
+
   function hasMaterial() {
     return items.some((it) => (it.material || '').trim());
   }
 
   async function onSaveDraft() {
-    if (!hasMaterial()) return toast('Isi minimal satu material yang diminta', 'error');
+    if (!validate()) return;
     setBusy(true);
     try {
       await saveOrUpdateRecord(false);
@@ -148,7 +166,7 @@ export function RfqModal() {
   }
 
   async function onSendWa() {
-    if (!hasMaterial()) return toast('Isi minimal satu material yang diminta', 'error');
+    if (!validate()) return;
     const phone = normalizePhone(purchWa);
     if (phone.length < 9) return toast('Nomor WhatsApp Purchasing tidak valid.', 'error');
     setBusy(true);
@@ -165,7 +183,7 @@ export function RfqModal() {
   }
 
   async function onSendEmail() {
-    if (!hasMaterial()) return toast('Isi minimal satu material yang diminta', 'error');
+    if (!validate()) return;
     setBusy(true);
     try {
       await persistPurchasingContactIfChanged();
@@ -187,7 +205,7 @@ export function RfqModal() {
    * the outgoing message to the external Purchasing contact.
    */
   async function onSendPurchasing() {
-    if (!hasMaterial()) return toast('Isi minimal satu material yang diminta', 'error');
+    if (!validate()) return;
     setBusy(true);
     try {
       await saveOrUpdateRecord(true);
@@ -200,7 +218,7 @@ export function RfqModal() {
   }
 
   async function onExportExcel() {
-    if (!hasMaterial()) return toast('Isi minimal satu material yang diminta', 'error');
+    if (!validate()) return;
     setBusy(true);
     try {
       const XLSX = await import('xlsx');
@@ -254,7 +272,7 @@ export function RfqModal() {
     >
       <div className="form-grid">
         <div>
-          <label>No. RFQ</label>
+          <label>No. RFQ *</label>
           <input type="text" value={noRfq} onChange={(e) => setNoRfq(e.target.value)} placeholder="cth. 001" />
         </div>
         <div>

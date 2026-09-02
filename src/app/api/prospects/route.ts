@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prospectScopeWhere } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
-import { deriveFromMaterials, isResponse, requireUser } from '@/lib/api-helpers';
+import { deriveFromMaterials, isResponse, requireUser, resolveProspectScope } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Material } from '@/lib/types';
@@ -31,13 +31,13 @@ export async function POST(req: Request) {
   }
   const derived = deriveFromMaterials(materials);
 
-  const isSales = user.role === 'sales';
-  const cabang = (isSales ? user.cabang || '' : String(body?.cabang || '')).trim().toUpperCase();
-  const se = (isSales ? user.se || '' : String(body?.se || '')).trim().toUpperCase();
+  // Locked scope fields come from the account, not the request — see
+  // api-helpers.ts#prospectScopeLocks.
+  const { reg, cabang, se } = await resolveProspectScope(user, body);
 
   const prospect = await prisma.prospect.create({
     data: {
-      reg: body?.reg != null ? Number(body.reg) : null,
+      reg,
       cabang,
       se,
       customer,

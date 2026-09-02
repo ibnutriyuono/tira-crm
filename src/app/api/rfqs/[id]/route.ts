@@ -16,6 +16,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!existing) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
 
   const body = await req.json().catch(() => null);
+  // Same rule as create — an edit must not be able to blank the number out.
+  if (body?.noRfq !== undefined && !String(body.noRfq || '').trim()) {
+    return NextResponse.json({ error: 'No. RFQ wajib diisi' }, { status: 400 });
+  }
   const prospectId = body?.prospectId ?? existing.prospectId;
   // Re-derive the denormalized region whenever the RFQ is repointed at a
   // different prospect, so rm scoping doesn't drift from the source record.
