@@ -76,9 +76,22 @@ export interface RfqItem {
   berat: number | string;
   lokal: string;
   estimasi: string;
-  /** Purchasing's answer, filled in from the purchasing module. */
+  // Purchasing's answer, filled in from the purchasing module. All of it lives
+  // inside the `items` JSON column, so adding fields here needs no migration —
+  // older rows simply have them undefined and render as '-'.
   hargaPurchasing?: number;
+  currency?: string;
+  uom?: string;
+  deliveryTime?: string;
+  /** Country of origin. Briefly relabelled "Keterangan" until `note` existed. */
   coo?: string;
+  note?: string;
+  /**
+   * Per-material "cannot be quoted". Supersedes the document-level
+   * Rfq.noQuote / Fupa.noQuote flag, which is still read as a fallback for
+   * records marked before this became per-material.
+   */
+  noQuote?: boolean;
 }
 
 export interface Quotation {

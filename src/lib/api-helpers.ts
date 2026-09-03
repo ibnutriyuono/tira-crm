@@ -73,7 +73,12 @@ export function mergeRfqItemsPreservingAnswer(existing: RfqItem[] | null | undef
     return {
       ...item,
       hargaPurchasing: item.hargaPurchasing ?? match?.hargaPurchasing,
+      currency: item.currency ?? match?.currency,
+      uom: item.uom ?? match?.uom,
+      deliveryTime: item.deliveryTime ?? match?.deliveryTime,
       coo: item.coo ?? match?.coo,
+      note: item.note ?? match?.note,
+      noQuote: item.noQuote ?? match?.noQuote,
     };
   });
 }

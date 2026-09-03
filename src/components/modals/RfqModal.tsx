@@ -295,10 +295,20 @@ export function RfqModal() {
         <label>Daftar Material yang Diminta</label>
         {items.map((it, idx) => (
           <div className="rfq-item-card" key={idx}>
-            {(it.hargaPurchasing || it.coo) && (
+            {(it.hargaPurchasing || it.coo || it.note || it.deliveryTime || it.noQuote) && (
               <div className="import-summary" style={{ marginTop: 0, marginBottom: 8 }}>
-                <b>Jawaban Purchasing:</b> {it.hargaPurchasing ? formatRupiah(it.hargaPurchasing) : '-'}
-                {it.coo ? ` · Keterangan: ${it.coo}` : ''}
+                <b>Jawaban Purchasing:</b>{' '}
+                {it.noQuote ? (
+                  <span className="badge rust">No Quote</span>
+                ) : (
+                  <>
+                    {it.hargaPurchasing ? `${it.currency || 'IDR'} ${Math.round(it.hargaPurchasing).toLocaleString('id-ID')}` : '-'}
+                    {it.uom ? ` / ${it.uom}` : ''}
+                    {it.deliveryTime ? ` · Delivery: ${it.deliveryTime}` : ''}
+                    {it.coo ? ` · Origin: ${it.coo}` : ''}
+                    {it.note ? ` · ${it.note}` : ''}
+                  </>
+                )}
               </div>
             )}
             <div className="rfq-item-head">

@@ -34,7 +34,7 @@ export const WORKFLOW_STAGES: WorkflowStage[] = [1, 2, 3, 4, 5];
 export interface WorkflowDoc {
   jenis: 'RFQ' | 'FUPA';
   status: string;
-  items: Pick<RfqItem, 'hargaPurchasing' | 'coo'>[];
+  items: Pick<RfqItem, 'hargaPurchasing' | 'coo' | 'noQuote'>[];
   openedByPurchasingAt: string | null;
   noQuote: boolean;
   /** FUP A only — see below. */
@@ -48,7 +48,12 @@ export function workflowStage(d: WorkflowDoc): WorkflowStage {
   // which is what jawabanFupaDikirim records.
   const answered = d.jenis === 'RFQ' ? d.items.some((m) => m.hargaPurchasing || m.coo) : !!d.jawabanFupaDikirim;
   if (answered) return 3;
-  if (d.noQuote) return 5;
+  // No Quote is a per-material flag now, so the document only counts as No
+  // Quote when *every* material is unquotable — a partly quotable RFQ still has
+  // a real answer to send and shouldn't be filed as a dead end. The old
+  // document-level flag is still honoured for records marked before the change.
+  const mats = d.items;
+  if ((mats.length > 0 && mats.every((m) => m.noQuote)) || d.noQuote) return 5;
   if (d.openedByPurchasingAt) return 2;
   return 1;
 }

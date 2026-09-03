@@ -96,7 +96,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ rfq });
   }
 
-  // Purchasing fills harga/COO onto the RFQ's items and sends the answer back
+  // Purchasing fills the per-material answer onto the RFQ's items and sends it back
   // to Sales. Gated by canEditRfqAnswer (purchasing, admin, gm).
   if (body?.action === 'answer' || body?.action === 'send-jawaban') {
     if (!canEditRfqAnswer(user)) {
@@ -108,9 +108,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const items = Array.isArray(body?.items) ? body.items : ((prev.items as unknown as RfqItem[]) ?? []);
 
     if (body.action === 'send-jawaban') {
-      const hasHarga = items.some((it: RfqItem) => Number(it.hargaPurchasing) > 0);
-      if (!hasHarga) {
-        return NextResponse.json({ error: 'Isi minimal satu Harga sebelum mengirim jawaban RFQ.' }, { status: 400 });
+      // An answer counts as given once a material is resolved either way —
+      // priced, or explicitly unquotable. Demanding a price outright would
+      // block the legitimate "nothing can be quoted" reply.
+      const resolved = items.some((it: RfqItem) => Number(it.hargaPurchasing) > 0 || it.noQuote);
+      if (!resolved) {
+        return NextResponse.json(
+          { error: 'Isi minimal satu Harga, atau tandai material sebagai No Quote, sebelum mengirim jawaban RFQ.' },
+          { status: 400 },
+        );
       }
     }
 

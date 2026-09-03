@@ -88,6 +88,9 @@ function recordLineKey(d: PurchDoc): string {
   return lines.length > 0 ? lines.join(', ') : '(Tanpa Line)';
 }
 
+const CURRENCY_OPTIONS = ['IDR', 'USD', 'EUR', 'SGD', 'CNY', 'JPY'];
+const UOM_OPTIONS = ['KG', 'PCS', 'MT', 'LOT', 'M', 'BATANG', 'LEMBAR'];
+
 /** One row of the worklist, shared by the flat and grouped renderings. */
 function PurchasingRow({ d, chatCount, onDetail }: { d: PurchDoc; chatCount: number; onDetail: (d: PurchDoc) => void }) {
   const meta = WORKFLOW_META[workflowStage(d)];
@@ -293,19 +296,6 @@ export function PurchasingBoard({
     XLSX.utils.book_append_sheet(wb, ws, 'Template Vendor');
     XLSX.writeFile(wb, 'CRM_Vendor_Template.xlsx');
     toast('Template vendor berhasil diunduh', 'success');
-  }
-
-  async function setNoQuote(doc: PurchDoc, noQuote: boolean) {
-    try {
-      const url = doc.jenis === 'RFQ' ? `/api/rfqs/${doc.id}` : `/api/fupas/${doc.id}`;
-      const res = await api.patch<{ rfq?: Rfq; fupa?: Fupa }>(url, { noQuote });
-      if (res.rfq) upsertRfq(res.rfq);
-      if (res.fupa) upsertFupa(res.fupa);
-      setDetail((d) => (d ? { ...d, noQuote } : d));
-      toast(noQuote ? 'Ditandai No Quote' : 'Tanda No Quote dibatalkan', 'success');
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal memperbarui No Quote', 'error');
-    }
   }
 
   return (
@@ -558,7 +548,7 @@ export function PurchasingBoard({
         </>
       )}
 
-      {detail && <PurchDetail doc={detail} readOnly={readOnly} onClose={() => setDetail(null)} onSetNoQuote={setNoQuote} />}
+      {detail && <PurchDetail doc={detail} readOnly={readOnly} onClose={() => setDetail(null)} />}
     </div>
   );
 }
@@ -568,12 +558,10 @@ function PurchDetail({
   doc,
   readOnly,
   onClose,
-  onSetNoQuote,
 }: {
   doc: PurchDoc;
   readOnly: boolean;
   onClose: () => void;
-  onSetNoQuote: (doc: PurchDoc, noQuote: boolean) => void;
 }) {
   const toast = useDataStore((s) => s.toast);
 
@@ -616,12 +604,6 @@ function PurchDetail({
               <div className="text-muted" style={{ fontSize: 11, marginTop: 4 }}>
                 Dibuka Purchasing {formatDateTimeID(doc.openedByPurchasingAt)}
               </div>
-            )}
-            {!readOnly && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontWeight: 400 }}>
-                <input type="checkbox" checked={doc.noQuote} onChange={(e) => onSetNoQuote(doc, e.target.checked)} />
-                Tandai <b>No Quote</b> (tidak ada vendor yang bisa memberi harga)
-              </label>
             )}
           </div>
         </div>
@@ -739,12 +721,12 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
           <tr>
             <th>Line</th><th>Grade</th><th>Material</th><th>Dimensi</th><th>PCS</th>
             <th>Berat (KGS)</th><th>Lokal/Import</th><th>Est. Kebutuhan</th>
-            <th>Harga (Purchasing)</th><th>Keterangan</th>
+            <th>Harga</th><th>Currency</th><th>UOM</th><th>Delivery Time</th><th>Origin</th><th>Note</th><th>No Quote</th>
           </tr>
         </thead>
         <tbody>
           {items.length === 0 ? (
-            <tr><td colSpan={10} className="text-muted">Tidak ada rincian material.</td></tr>
+            <tr><td colSpan={15} className="text-muted">Tidak ada rincian material.</td></tr>
           ) : (
             items.map((it, idx) => {
               const dims = [it.dia && `D${it.dia}`, it.thick && `T${it.thick}`, it.width && `W${it.width}`, it.length && `L${it.length}`]
@@ -760,16 +742,17 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
                 <td className="center">{it.berat || 0}</td>
                 <td>{it.lokal || '-'}</td>
                 <td>{it.estimasi ? formatDateID(String(it.estimasi)) : '-'}</td>
+                {/* Marking a material No Quote disables its pricing fields —
+                    except Note, which is exactly where the reason belongs. */}
                 <td>
                   {canAnswer ? (
                     <input
-                      type="number"
-                      min="0"
-                      className="mono"
+                      type="number" min="0" className="mono"
                       value={it.hargaPurchasing ?? ''}
                       placeholder="0"
+                      disabled={!!it.noQuote}
                       onChange={(e) => setItem(idx, { hargaPurchasing: num(e.target.value) })}
-                      style={{ width: 120 }}
+                      style={{ width: 110 }}
                     />
                   ) : (
                     <span className="mono">{it.hargaPurchasing ? formatRupiah(it.hargaPurchasing) : '-'}</span>
@@ -777,15 +760,50 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
                 </td>
                 <td>
                   {canAnswer ? (
-                    <input
-                      type="text"
-                      value={it.coo ?? ''}
-                      placeholder="cth. Stok ready, indent 2 minggu"
-                      onChange={(e) => setItem(idx, { coo: e.target.value })}
-                      style={{ width: 240 }}
-                    />
+                    <select value={it.currency ?? 'IDR'} disabled={!!it.noQuote} style={{ width: 82 }} onChange={(e) => setItem(idx, { currency: e.target.value })}>
+                      {CURRENCY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  ) : (
+                    it.currency || '-'
+                  )}
+                </td>
+                <td>
+                  {canAnswer ? (
+                    <select value={it.uom ?? 'KG'} disabled={!!it.noQuote} style={{ width: 90 }} onChange={(e) => setItem(idx, { uom: e.target.value })}>
+                      {UOM_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  ) : (
+                    it.uom || '-'
+                  )}
+                </td>
+                <td>
+                  {canAnswer ? (
+                    <input type="text" value={it.deliveryTime ?? ''} placeholder="cth. 10 hari" disabled={!!it.noQuote} style={{ width: 110 }} onChange={(e) => setItem(idx, { deliveryTime: e.target.value })} />
+                  ) : (
+                    it.deliveryTime || '-'
+                  )}
+                </td>
+                <td>
+                  {canAnswer ? (
+                    <input type="text" value={it.coo ?? ''} placeholder="cth. China" disabled={!!it.noQuote} style={{ width: 110 }} onChange={(e) => setItem(idx, { coo: e.target.value })} />
                   ) : (
                     it.coo || '-'
+                  )}
+                </td>
+                <td>
+                  {canAnswer ? (
+                    <input type="text" value={it.note ?? ''} placeholder="cth. stok ready" style={{ width: 170 }} onChange={(e) => setItem(idx, { note: e.target.value })} />
+                  ) : (
+                    it.note || '-'
+                  )}
+                </td>
+                <td className="center">
+                  {canAnswer ? (
+                    <input type="checkbox" checked={!!it.noQuote} onChange={(e) => setItem(idx, { noQuote: e.target.checked })} />
+                  ) : it.noQuote ? (
+                    <span className="badge rust">No Quote</span>
+                  ) : (
+                    '-'
                   )}
                 </td>
               </tr>
