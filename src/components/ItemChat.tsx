@@ -17,7 +17,20 @@ function timeLabel(iso: string) {
  * open the record can read and post — unlike team chat there is no membership
  * list, because the record's own scoping already decides who sees it.
  */
-export function ItemChat({ entity, entityId }: { entity: ItemEntity; entityId: string | null }) {
+export function ItemChat({
+  entity,
+  entityId,
+  onUnreadAtOpen,
+}: {
+  entity: ItemEntity;
+  entityId: string | null;
+  /**
+   * How many messages were unread at the moment this thread was opened.
+   * Reported from inside load() because opening the thread marks it read — read
+   * the count afterwards and it is always zero.
+   */
+  onUnreadAtOpen?: (n: number) => void;
+}) {
   const currentUser = useDataStore((s) => s.currentUser);
   const toast = useDataStore((s) => s.toast);
   const [messages, setMessages] = useState<ItemChatMessage[]>([]);
@@ -27,12 +40,20 @@ export function ItemChat({ entity, entityId }: { entity: ItemEntity; entityId: s
   const load = useCallback(async () => {
     if (!entityId) return;
     try {
+      // Order matters: sample the unread count before the PATCH below clears it.
+      if (onUnreadAtOpen) {
+        const { counts } = await api.get<{ counts: Record<string, number> }>(`/api/item-chat?entity=${entity}&counts=1`);
+        onUnreadAtOpen(counts?.[entityId] || 0);
+      }
       const { messages: rows } = await api.get<{ messages: ItemChatMessage[] }>(`/api/item-chat?entity=${entity}&entityId=${entityId}`);
       setMessages(rows);
       await api.patch('/api/item-chat', { entity, entityId });
     } catch {
       // an empty thread is an acceptable failure mode here
     }
+    // onUnreadAtOpen is a reporting callback; re-running load on a new identity
+    // would refetch the thread and re-clear the badge for no benefit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entity, entityId]);
 
   useEffect(() => {

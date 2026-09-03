@@ -39,10 +39,13 @@ export function FupaModal() {
   const [catatan, setCatatan] = useState('');
   const [items, setItems] = useState<RfqItem[]>([emptyItem()]);
   const [busy, setBusy] = useState(false);
+  /** Unread discussion at the moment the thread was opened, for the heading bubble. */
+  const [chatUnread, setChatUnread] = useState(0);
 
   useEffect(() => {
     if (!show || !ctx) return;
     setFupaId(ctx.fupaId);
+    setChatUnread(0);
 
     if (ctx.fupaId) {
       const f = fupas.find((x) => x.id === ctx.fupaId);
@@ -303,8 +306,11 @@ export function FupaModal() {
         <AttachmentList fupaId={fupaId} ensureParentId={() => save(false)} />
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>Diskusi</label>
-        <ItemChat entity="fupa" entityId={fupaId} />
+        <label style={{ display: 'block', marginBottom: 8 }}>
+          Diskusi
+          {chatUnread > 0 && <span className="item-chat-bubble">{chatUnread > 9 ? '9+' : chatUnread}</span>}
+        </label>
+        <ItemChat entity="fupa" entityId={fupaId} onUnreadAtOpen={setChatUnread} />
       </div>
     </Modal>
   );

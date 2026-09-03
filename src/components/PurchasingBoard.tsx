@@ -1,13 +1,14 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { IconCheck, IconEdit, IconTrash, IconWa } from './icons';
+import { IconEdit, IconTrash, IconWa } from './icons';
 import { WORKFLOW_META, WORKFLOW_STAGES, workflowStage } from '@/lib/purchasing-workflow';
-import { formatDateID, formatDateTimeID, formatRupiah, normalizePhone, num, todayStr } from '@/lib/format';
+import { formatDateID, formatDateTimeID, formatRupiah, num, todayStr } from '@/lib/format';
 import { api } from '@/lib/api-client';
+import { getSocket } from '@/lib/socket-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
-import type { Fupa, PurchDocType, Quotation, Rfq, RfqItem } from '@/lib/types';
+import type { Fupa, PurchDocType, Rfq, RfqItem } from '@/lib/types';
 
 type Tab = 'dashboard' | 'masuk' | 'vendor';
 
@@ -34,10 +35,9 @@ interface PurchDoc {
   jawabanFupaDikirim?: boolean;
   sourceNoRfq?: string;
   items: RfqItem[];
-  quoteCount: number;
 }
 
-function toDoc(r: Rfq | Fupa, jenis: PurchDocType, quoteCount = 0): PurchDoc {
+function toDoc(r: Rfq | Fupa, jenis: PurchDocType): PurchDoc {
   const isRfq = jenis === 'RFQ';
   return {
     id: r.id,
@@ -63,7 +63,6 @@ function toDoc(r: Rfq | Fupa, jenis: PurchDocType, quoteCount = 0): PurchDoc {
     jawabanFupaDikirim: isRfq ? undefined : (r as Fupa).jawabanFupaDikirim,
     sourceNoRfq: isRfq ? undefined : (r as Fupa).sourceNoRfq || '-',
     items: r.items ?? [],
-    quoteCount,
   };
 }
 
@@ -90,7 +89,7 @@ function recordLineKey(d: PurchDoc): string {
 }
 
 /** One row of the worklist, shared by the flat and grouped renderings. */
-function PurchasingRow({ d, onDetail }: { d: PurchDoc; onDetail: (d: PurchDoc) => void }) {
+function PurchasingRow({ d, chatCount, onDetail }: { d: PurchDoc; chatCount: number; onDetail: (d: PurchDoc) => void }) {
   const meta = WORKFLOW_META[workflowStage(d)];
   const lines = recordLines(d);
   return (
@@ -111,7 +110,7 @@ function PurchasingRow({ d, onDetail }: { d: PurchDoc; onDetail: (d: PurchDoc) =
       <td>{d.cabang || '-'}</td>
       <td>{d.customer || '-'}</td>
       <td>{d.materialSummary}</td>
-      <td className="center">{d.quoteCount ? `${d.quoteCount} vendor` : '-'}</td>
+      <td className="center">{chatCount ? <span className="item-chat-bubble">{chatCount > 9 ? '9+' : chatCount}</span> : '-'}</td>
       <td>{d.requestedBy || '-'}</td>
       <td className="center">{d.itemCount}</td>
       <td><span className={`badge ${meta.color}`}>{meta.label}</span></td>
@@ -151,16 +150,16 @@ export function PurchasingBoard({
   const [masukView, setMasukView] = useState<'table' | 'card'>('table');
   const [groupBy, setGroupBy] = useState<'' | 'line' | 'status'>('');
   const [sortBy, setSortBy] = useState<'waktu' | 'line'>('waktu');
-  const [quoteCounts, setQuoteCounts] = useState<Record<string, number>>({});
+  const [chatCounts, setChatCounts] = useState<Record<string, number>>({});
   const [detail, setDetail] = useState<PurchDoc | null>(null);
 
   const docs = useMemo(
     () =>
       [
-        ...rfqs.map((r) => toDoc(r, 'RFQ', quoteCounts[r.id] || 0)),
-        ...fupas.map((f) => toDoc(f, 'FUPA', quoteCounts[f.id] || 0)),
+        ...rfqs.map((r) => toDoc(r, 'RFQ')),
+        ...fupas.map((f) => toDoc(f, 'FUPA')),
       ].sort((a, b) => (b.tglDoc || '').localeCompare(a.tglDoc || '')),
-    [rfqs, fupas, quoteCounts],
+    [rfqs, fupas],
   );
 
   /**
@@ -239,26 +238,36 @@ export function PurchasingBoard({
     return by;
   }, [docs]);
 
-  // One request for every quotation, tallied per parent — a per-row fetch would
-  // be N requests on a long worklist.
+  // Unread discussion per document, for the "Diskusi" column. Two requests for
+  // the whole worklist rather than one per row; refreshed when a message lands.
   useEffect(() => {
     let cancelled = false;
-    api
-      .get<{ quotations: Quotation[] }>('/api/quotations')
-      .then((d) => {
-        if (cancelled) return;
-        const counts: Record<string, number> = {};
-        d.quotations.forEach((q) => {
-          const key = q.rfqId || q.fupaId;
-          if (key) counts[key] = (counts[key] || 0) + 1;
-        });
-        setQuoteCounts(counts);
-      })
-      .catch(() => {});
+    const load = () => {
+      (['rfq', 'fupa'] as const).forEach((entity) => {
+        api
+          .get<{ counts: Record<string, number> }>(`/api/item-chat?entity=${entity}&counts=1`)
+          .then((d) => {
+            if (cancelled) return;
+            const jenis = entity === 'rfq' ? 'RFQ' : 'FUPA';
+            setChatCounts((prev) => {
+              const next = { ...prev };
+              Object.entries(d.counts || {}).forEach(([id, n]) => { next[`${jenis}:${id}`] = n; });
+              return next;
+            });
+          })
+          .catch(() => {});
+      });
+    };
+    load();
+
+    const sock = getSocket();
+    const onMessage = () => load();
+    sock.on('itemchat:message', onMessage);
     return () => {
       cancelled = true;
+      sock.off('itemchat:message', onMessage);
     };
-  }, [rfqs, fupas]);
+  }, []);
 
   const VENDOR_HEADER = ['NAMA VENDOR', 'PIC', 'NO WHATSAPP', 'EMAIL', 'KATEGORI', 'ALAMAT', 'CATATAN'];
   const VENDOR_COLS = [{ wch: 30 }, { wch: 18 }, { wch: 16 }, { wch: 26 }, { wch: 20 }, { wch: 36 }, { wch: 26 }];
@@ -296,19 +305,6 @@ export function PurchasingBoard({
       toast(noQuote ? 'Ditandai No Quote' : 'Tanda No Quote dibatalkan', 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal memperbarui No Quote', 'error');
-    }
-  }
-
-  async function moveStatus(doc: PurchDoc, purchStatus: number) {
-    try {
-      const url = doc.jenis === 'RFQ' ? `/api/rfqs/${doc.id}` : `/api/fupas/${doc.id}`;
-      const res = await api.patch<{ rfq?: Rfq; fupa?: Fupa }>(url, { purchStatus });
-      if (res.rfq) upsertRfq(res.rfq);
-      if (res.fupa) upsertFupa(res.fupa);
-      setDetail((d) => (d ? { ...d, purchStatus } : d));
-      toast('Status pembelian diperbarui', 'success');
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal memperbarui status', 'error');
     }
   }
 
@@ -433,7 +429,7 @@ export function PurchasingBoard({
                       {d.items.length > 2 && <div className="text-muted">+{d.items.length - 2} material lainnya</div>}
                     </div>
                     <div className="purch-card-foot">
-                      <span className="text-muted">{d.quoteCount ? `${d.quoteCount} vendor diminta` : 'Belum ada vendor'}</span>
+                      <span className="text-muted">{chatCounts[`${d.jenis}:${d.id}`] ? `${chatCounts[`${d.jenis}:${d.id}`]} pesan baru` : 'Tidak ada pesan baru'}</span>
                       <button type="button" className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); openDetail(d); }}>Detail</button>
                     </div>
                   </div>
@@ -450,7 +446,7 @@ export function PurchasingBoard({
               <table className="simple-table">
                 <thead>
                   <tr>
-                    <th>Jenis</th><th>No.</th><th>Tanggal</th><th>Line</th><th>Cabang</th><th>Customer</th><th>Material</th><th>Vendor Diminta</th><th>Diminta Oleh</th><th>Item</th><th>Status</th><th></th>
+                    <th>Jenis</th><th>No.</th><th>Tanggal</th><th>Line</th><th>Cabang</th><th>Customer</th><th>Material</th><th>Diskusi</th><th>Diminta Oleh</th><th>Item</th><th>Status</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -467,11 +463,11 @@ export function PurchasingBoard({
                             </td>
                           </tr>
                           {rows.map((d) => (
-                            <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} onDetail={openDetail} />
+                            <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} chatCount={chatCounts[`${d.jenis}:${d.id}`] || 0} onDetail={openDetail} />
                           ))}
                         </Fragment>
                       ))
-                    : sortedFlat.map((d) => <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} onDetail={openDetail} />)}
+                    : sortedFlat.map((d) => <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} chatCount={chatCounts[`${d.jenis}:${d.id}`] || 0} onDetail={openDetail} />)}
                 </tbody>
               </table>
             </div>
@@ -562,93 +558,24 @@ export function PurchasingBoard({
         </>
       )}
 
-      {detail && <PurchDetail doc={detail} readOnly={readOnly} onClose={() => setDetail(null)} onMoveStatus={moveStatus} onSetNoQuote={setNoQuote} />}
+      {detail && <PurchDetail doc={detail} readOnly={readOnly} onClose={() => setDetail(null)} onSetNoQuote={setNoQuote} />}
     </div>
   );
 }
 
-/** Quotation workspace for one RFQ / FUP A. */
+/** Purchasing's working view of one RFQ / FUP A: status, notes and answer. */
 function PurchDetail({
   doc,
   readOnly,
   onClose,
-  onMoveStatus,
   onSetNoQuote,
 }: {
   doc: PurchDoc;
   readOnly: boolean;
   onClose: () => void;
-  onMoveStatus: (doc: PurchDoc, status: number) => void;
   onSetNoQuote: (doc: PurchDoc, noQuote: boolean) => void;
 }) {
-  const vendors = useDataStore((s) => s.vendors);
   const toast = useDataStore((s) => s.toast);
-  const [quotes, setQuotes] = useState<Quotation[]>([]);
-  const [vendorId, setVendorId] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const query = doc.jenis === 'RFQ' ? `rfqId=${doc.id}` : `fupaId=${doc.id}`;
-
-  const load = useCallback(async () => {
-    try {
-      const { quotations } = await api.get<{ quotations: Quotation[] }>(`/api/quotations?${query}`);
-      setQuotes(quotations);
-    } catch {
-      // an empty panel is a fine failure mode here
-    }
-  }, [query]);
-
-  useEffect(() => { load(); }, [load]);
-
-  async function requestQuote(channel: 'WhatsApp' | 'Email') {
-    if (!vendorId) return toast('Pilih vendor terlebih dahulu', 'error');
-    const vendor = vendors.find((v) => v.id === vendorId);
-    if (!vendor) return;
-    setBusy(true);
-    try {
-      await api.post('/api/quotations', { vendorId, ...(doc.jenis === 'RFQ' ? { rfqId: doc.id } : { fupaId: doc.id }), channel });
-      // Open the outgoing message the same way the prototype did.
-      const text = `Mohon penawaran untuk ${doc.noDoc || doc.jenis} - ${doc.customer}`;
-      if (channel === 'WhatsApp' && vendor.wa) window.open(`https://wa.me/${normalizePhone(vendor.wa)}?text=${encodeURIComponent(text)}`, '_blank');
-      if (channel === 'Email' && vendor.email) window.open(`mailto:${vendor.email}?subject=${encodeURIComponent(`Permintaan Penawaran - ${doc.noDoc}`)}&body=${encodeURIComponent(text)}`, '_blank');
-      await load();
-      toast(`Permintaan penawaran ke ${vendor.nama} tercatat`, 'success');
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal meminta penawaran', 'error');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function saveQuote(q: Quotation, patch: Partial<Quotation>) {
-    try {
-      await api.put(`/api/quotations/${q.id}`, patch);
-      await load();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal menyimpan penawaran', 'error');
-    }
-  }
-
-  async function setWinner(q: Quotation) {
-    try {
-      await api.patch(`/api/quotations/${q.id}`, { action: 'set-winner' });
-      await load();
-      onMoveStatus(doc, 3);
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal menetapkan pemenang', 'error');
-    }
-  }
-
-  async function removeQuote(q: Quotation) {
-    try {
-      await api.del(`/api/quotations/${q.id}`);
-      await load();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal menghapus penawaran', 'error');
-    }
-  }
-
-  const cheapest = quotes.filter((q) => q.harga > 0).sort((a, b) => a.harga - b.harga)[0];
 
   return (
     <div className="dialog-backdrop" role="dialog" aria-modal="true" onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(17,22,28,.45)', display: 'grid', placeItems: 'center', zIndex: 60, padding: 16 }}>
@@ -742,55 +669,11 @@ function PurchDetail({
 
         {doc.jenis === 'RFQ' && <RfqAnswerPanel rfqId={doc.id} readOnly={readOnly} />}
 
-        <h4 style={{ marginTop: 16 }}>Penawaran Vendor ({quotes.length})</h4>
-        {quotes.length === 0 ? (
-          <div className="import-summary">Belum ada permintaan penawaran untuk dokumen ini.</div>
-        ) : (
-          quotes.map((q) => (
-            <div key={q.id} className={`quote-card${q.isWinner ? ' winner' : ''}`}>
-              <div className="quote-card-head">
-                <div>
-                  <b>{q.vendorNama}</b>{' '}
-                  <span className="text-muted" style={{ fontSize: 12 }}>
-                    diminta {formatDateID(q.tglDiminta)} via {q.channel}
-                  </span>
-                  {q.isWinner && <span className="badge green" style={{ marginLeft: 8 }}>Pemenang</span>}
-                  {!q.isWinner && cheapest?.id === q.id && <span className="badge amber" style={{ marginLeft: 8 }}>Termurah</span>}
-                </div>
-                {!readOnly && (
-                  <div className="row-actions">
-                    {!q.isWinner && q.harga > 0 && (
-                      <button className="icon-btn" title="Tetapkan pemenang" onClick={() => setWinner(q)}><IconCheck /></button>
-                    )}
-                    <button className="icon-btn danger" title="Hapus penawaran" onClick={() => removeQuote(q)}><IconTrash /></button>
-                  </div>
-                )}
-              </div>
-              {readOnly ? (
-                <div style={{ fontSize: 13 }}>
-                  Harga: <b>{q.harga > 0 ? formatRupiah(q.harga) : 'belum masuk'}</b>
-                  {q.leadTime > 0 && <> · Lead time {q.leadTime} hari</>}
-                  {q.catatan && <> · {q.catatan}</>}
-                </div>
-              ) : (
-                <div className="quote-card-fields">
-                  <div>
-                    <label>Harga</label>
-                    <input type="number" defaultValue={q.harga || ''} onBlur={(e) => saveQuote(q, { harga: num(e.target.value) })} style={{ maxWidth: 160 }} />
-                  </div>
-                  <div>
-                    <label>Lead time (hari)</label>
-                    <input type="number" defaultValue={q.leadTime || ''} onBlur={(e) => saveQuote(q, { leadTime: num(e.target.value) })} style={{ maxWidth: 130 }} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label>Catatan</label>
-                    <input type="text" defaultValue={q.catatan || ''} onBlur={(e) => saveQuote(q, { catatan: e.target.value })} />
-                  </div>
-                </div>
-              )}
-            </div>
-          ))
-        )}
+        {/* The "Penawaran Vendor" block used to sit here — per-vendor quotation
+            cards, harga/lead-time inputs, set-winner and delete. Removed on
+            request. The `quotations` table and its API are deliberately kept so
+            existing history survives and the block can be restored by putting
+            the UI back. */}
 
       </div>
     </div>
@@ -799,7 +682,8 @@ function PurchDetail({
 
 
 /**
- * Purchasing's answer back to Sales: harga + COO per material line, then
+ * Purchasing's answer back to Sales: harga + keterangan per material line,
+ * then
  * "Kirim Jawaban". Ported from the single-file app's RFQ answer table.
  */
 function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean }) {
@@ -855,7 +739,7 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
           <tr>
             <th>Line</th><th>Grade</th><th>Material</th><th>Dimensi</th><th>PCS</th>
             <th>Berat (KGS)</th><th>Lokal/Import</th><th>Est. Kebutuhan</th>
-            <th>Harga (Purchasing)</th><th>COO</th>
+            <th>Harga (Purchasing)</th><th>Keterangan</th>
           </tr>
         </thead>
         <tbody>
@@ -896,9 +780,9 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
                     <input
                       type="text"
                       value={it.coo ?? ''}
-                      placeholder="cth. China"
+                      placeholder="cth. Stok ready, indent 2 minggu"
                       onChange={(e) => setItem(idx, { coo: e.target.value })}
-                      style={{ width: 120 }}
+                      style={{ width: 240 }}
                     />
                   ) : (
                     it.coo || '-'
@@ -984,7 +868,7 @@ function PurchNotes({ doc, readOnly }: { doc: PurchDoc; readOnly: boolean }) {
           placeholder="cth. Sudah PO ke vendor X, estimasi barang datang 10 hari..."
           onChange={(e) => setJawaban(e.target.value)}
         />
-        {/* RFQ tracks its answer through the Harga/COO panel below; FUP A has no
+        {/* RFQ tracks its answer through the Harga/Keterangan panel below; FUP A has no
             such columns, so the written reply is what marks it answered. */}
         {doc.jenis === 'FUPA' && (
           <div style={{ marginTop: 6 }}>

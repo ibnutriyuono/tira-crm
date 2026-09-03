@@ -52,7 +52,7 @@ export function RfqManageModal() {
   async function exportExcel() {
     if (list.length === 0) return toast('Tidak ada data RFQ untuk diexport.', 'error');
     const XLSX = await import('xlsx');
-    const header = ['NO', 'NO RFQ', 'TANGGAL', 'CABANG', 'CUSTOMER', 'LINE', 'GRADE', 'MATERIAL', 'DIA (mm)', 'THICK (mm)', 'WIDTH (mm)', 'LENGTH (mm)', 'PCS', 'BERAT (KGS)', 'LOKAL/IMPORT', 'ESTIMASI KEBUTUHAN', 'HARGA (PURCHASING)', 'COO', 'STATUS', 'STATUS PURCHASING', 'TERKIRIM KE PURCHASING', 'JAWABAN RFQ', 'DIBUAT OLEH'];
+    const header = ['NO', 'NO RFQ', 'TANGGAL', 'CABANG', 'CUSTOMER', 'LINE', 'GRADE', 'MATERIAL', 'DIA (mm)', 'THICK (mm)', 'WIDTH (mm)', 'LENGTH (mm)', 'PCS', 'BERAT (KGS)', 'LOKAL/IMPORT', 'ESTIMASI KEBUTUHAN', 'HARGA (PURCHASING)', 'KETERANGAN', 'STATUS', 'STATUS PURCHASING', 'TERKIRIM KE PURCHASING', 'JAWABAN RFQ', 'DIBUAT OLEH'];
     const aoa: unknown[][] = [header];
     let no = 1;
     list.forEach((r) => {
@@ -136,7 +136,7 @@ export function RfqManageModal() {
                 <th>FUP A</th>
                 <th>Purchasing</th>
                 <th>Lampiran</th>
-                <th>Jawaban Harga/COO</th>
+                <th>Jawaban Harga/Keterangan</th>
                 <th>Dibuat Oleh</th>
                 <th>Aksi</th>
               </tr>

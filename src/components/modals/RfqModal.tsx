@@ -38,10 +38,13 @@ export function RfqModal() {
   const [purchWa, setPurchWa] = useState('');
   const [purchEmail, setPurchEmail] = useState('');
   const [busy, setBusy] = useState(false);
+  /** Unread discussion at the moment the thread was opened, for the heading bubble. */
+  const [chatUnread, setChatUnread] = useState(0);
 
   useEffect(() => {
     if (!show || !ctx) return;
     setRfqId(ctx.rfqId);
+    setChatUnread(0);
     setPurchWa(purchasingContact.wa || '');
     setPurchEmail(purchasingContact.email || '');
 
@@ -295,7 +298,7 @@ export function RfqModal() {
             {(it.hargaPurchasing || it.coo) && (
               <div className="import-summary" style={{ marginTop: 0, marginBottom: 8 }}>
                 <b>Jawaban Purchasing:</b> {it.hargaPurchasing ? formatRupiah(it.hargaPurchasing) : '-'}
-                {it.coo ? ` · COO: ${it.coo}` : ''}
+                {it.coo ? ` · Keterangan: ${it.coo}` : ''}
               </div>
             )}
             <div className="rfq-item-head">
@@ -381,8 +384,11 @@ export function RfqModal() {
         <AttachmentList rfqId={rfqId} ensureParentId={async () => (await saveOrUpdateRecord(false)).id} />
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>Diskusi</label>
-        <ItemChat entity="rfq" entityId={rfqId} />
+        <label style={{ display: 'block', marginBottom: 8 }}>
+          Diskusi
+          {chatUnread > 0 && <span className="item-chat-bubble">{chatUnread > 9 ? '9+' : chatUnread}</span>}
+        </label>
+        <ItemChat entity="rfq" entityId={rfqId} onUnreadAtOpen={setChatUnread} />
       </div>
       <div className="form-grid" style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <div>
