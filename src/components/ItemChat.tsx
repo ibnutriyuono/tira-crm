@@ -7,6 +7,8 @@ import { ROLE_LABELS } from '@/lib/constants';
 import { useDataStore } from '@/store/useDataStore';
 import type { ItemChatMessage, ItemEntity } from '@/lib/types';
 
+const ENTITY_LABELS: Record<ItemEntity, string> = { prospect: 'prospek', rfq: 'RFQ', fupa: 'FUP A' };
+
 function timeLabel(iso: string) {
   const d = new Date(iso);
   return d.toLocaleString('id-ID', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -92,7 +94,7 @@ export function ItemChat({
   }
 
   if (!entityId) {
-    return <div className="import-summary">Simpan prospek ini terlebih dahulu untuk mulai berdiskusi.</div>;
+    return <div className="import-summary">{`Simpan ${ENTITY_LABELS[entity]} ini terlebih dahulu untuk mulai berdiskusi.`}</div>;
   }
 
   return (

@@ -102,3 +102,14 @@ export const RFQ_LOKAL_OPTIONS = [
   { v: 'IMPORT', l: 'Import' },
   { v: 'LOKAL ATAU IMPORT', l: 'Lokal atau Import' },
 ];
+
+/**
+ * Per-file upload ceiling for RFQ / FUP A attachments, shared by the upload
+ * route that enforces it and the form labels that advertise it — the two drifted
+ * apart once before, when the labels still quoted the prototype's 1.5MB base64
+ * limit long after uploads had moved to object storage.
+ *
+ * There is deliberately no file-count limit: pick one with the business first,
+ * and enforce it server-side rather than only stating it in a label.
+ */
+export const ATTACHMENT_MAX_BYTES = 15 * 1024 * 1024;

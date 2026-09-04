@@ -5,8 +5,8 @@ import { Modal } from '../Modal';
 import { AttachmentList } from '../AttachmentList';
 import { ItemChat } from '../ItemChat';
 import { IconDownload, IconMail, IconPlus, IconSave, IconTrash, IconWa } from '../icons';
-import { RFQ_LOKAL_OPTIONS } from '@/lib/constants';
-import { getProspectMaterials, normalizePhone, num, todayStr } from '@/lib/format';
+import { ATTACHMENT_MAX_BYTES, RFQ_LOKAL_OPTIONS } from '@/lib/constants';
+import { formatFileSize, getProspectMaterials, normalizePhone, num, todayStr } from '@/lib/format';
 import { buildPurchaseRequestMessage, downloadPurchaseRequestExcel } from '@/lib/purchase-request';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
@@ -302,7 +302,7 @@ export function FupaModal() {
         lampirkan filenya secara manual pada email sebelum dikirim.
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>Lampiran File (maks. 3 file, 1.5MB/file)</label>
+        <label style={{ display: 'block', marginBottom: 8 }}>Lampiran File (maks. {formatFileSize(ATTACHMENT_MAX_BYTES)}/file)</label>
         <AttachmentList fupaId={fupaId} ensureParentId={() => save(false)} />
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>

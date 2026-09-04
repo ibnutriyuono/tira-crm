@@ -2,13 +2,15 @@ import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
+import { ATTACHMENT_MAX_BYTES } from '@/lib/constants';
 import { buildKey, isS3Configured, putObject } from '@/lib/s3';
 import { emitCrmEvent } from '@/lib/socket';
 
 // Bytes go straight to object storage, so this is generous compared with the
 // prototype's 1.5MB base64 ceiling — but still bounded, since the upload is
-// buffered in the Node process before being forwarded.
-const MAX_BYTES = 15 * 1024 * 1024;
+// buffered in the Node process before being forwarded. Shared with the form
+// labels so what the user is told matches what is enforced.
+const MAX_BYTES = ATTACHMENT_MAX_BYTES;
 
 export async function GET(req: Request) {
   const user = await requireUser();
