@@ -148,6 +148,10 @@ export function TopBar() {
             <IconChartLine />
             Forecast
           </button>
+          <button className="btn btn-ghost-dark" onClick={() => openModal('marketing')}>
+            <IconCustomers />
+            Marketing
+          </button>
           <button className="btn btn-ghost-dark" onClick={() => openModal('customerIntel')}>
             <IconSearch />
             Customer Intelligence

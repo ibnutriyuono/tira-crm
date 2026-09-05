@@ -21,6 +21,7 @@ export type ModalKey =
   | 'fupa'
   | 'fupaManage'
   | 'purchasing'
+  | 'marketing'
   | 'customerIntel'
   | 'competitorLog'
   | 'forecast'
