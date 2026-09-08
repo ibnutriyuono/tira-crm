@@ -8,6 +8,7 @@ import { IconBag } from './icons';
 import { ROLE_LABELS } from '@/lib/constants';
 import { api } from '@/lib/api-client';
 import { ToastHost } from './ToastHost';
+import { CancelDocModal } from './modals/CancelDocModal';
 import { TeamChatWidget } from './TeamChatWidget';
 import { useDataStore } from '@/store/useDataStore';
 import { useCrmSocket } from '@/hooks/useCrmSocket';
@@ -74,6 +75,7 @@ export function PurchasingPageClient() {
       <div className="wrap">
         <PurchasingBoard readOnly={!canEdit} standalone />
       </div>
+      <CancelDocModal />
       <ToastHost />
       <TeamChatWidget />
     </>

@@ -119,6 +119,12 @@ model Rfq {
   /// Purchasing's written reply, visible to the Sales requester.
   purchJawaban      String?
   quotations  Quotation[]
+  /// Pembatalan. Dokumen tetap tampil di daftar dengan status "Dibatalkan"
+  /// beserta alasannya — bukan dihapus, supaya riwayatnya tetap terbaca.
+  cancelledAt   DateTime?
+  cancelledBy   String?
+  cancelReason  String?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -182,6 +188,12 @@ model Fupa {
   jawabanFupaDikirim Boolean  @default(false)
   jawabanFupaAt      DateTime?
   quotations   Quotation[]
+  /// Pembatalan. Dokumen tetap tampil di daftar dengan status "Dibatalkan"
+  /// beserta alasannya — bukan dihapus, supaya riwayatnya tetap terbaca.
+  cancelledAt   DateTime?
+  cancelledBy   String?
+  cancelReason  String?
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

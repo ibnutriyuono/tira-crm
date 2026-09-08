@@ -4,6 +4,7 @@ export type ModalKey =
   | 'prospectForm'
   | 'import'
   | 'delete'
+  | 'cancelDoc'
   | 'followUp'
   | 'users'
   | 'userForm'
@@ -30,6 +31,14 @@ export type ModalKey =
 
 export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq' | 'vendor' | 'fupa';
 
+export interface CancelDocCtx {
+  jenis: 'RFQ' | 'FUPA';
+  id: string;
+  noDoc: string | null;
+  customer: string | null;
+  /** true = dokumen sedang dibatalkan, modal menawarkan pengaktifan kembali. */
+  cancelled: boolean;
+}
 export interface DeleteCtx {
   mode: DeleteMode;
   id: string;
@@ -79,6 +88,7 @@ interface UiState {
   modal: ModalKey;
   editProspectId: string | null;
   deleteCtx: DeleteCtx | null;
+  cancelDocCtx: CancelDocCtx | null;
   followUpCtx: FollowUpCtx | null;
   userEditId: string | null;
   customerEditId: string | null;
@@ -158,6 +168,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   modal: null,
   editProspectId: null,
   deleteCtx: null,
+  cancelDocCtx: null,
   followUpCtx: null,
   userEditId: null,
   customerEditId: null,

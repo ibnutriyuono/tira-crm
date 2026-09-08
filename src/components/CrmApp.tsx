@@ -27,6 +27,7 @@ import { FupaManageModal } from './modals/FupaManageModal';
 import { PurchasingMonitorModal } from './modals/PurchasingMonitorModal';
 import { CustomerIntelModal } from './modals/CustomerIntelModal';
 import { MarketingModal } from './modals/MarketingModal';
+import { CancelDocModal } from './modals/CancelDocModal';
 import { CompetitorLogModal } from './modals/CompetitorLogModal';
 import { ForecastModal } from './modals/ForecastModal';
 import { QcdRecapModal } from './modals/QcdRecapModal';
@@ -122,6 +123,7 @@ export function CrmApp() {
       <PurchasingMonitorModal />
       <CustomerIntelModal />
       <MarketingModal />
+      <CancelDocModal />
       <CompetitorLogModal />
       <ForecastModal />
       <QcdRecapModal />

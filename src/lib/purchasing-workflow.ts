@@ -10,11 +10,13 @@ import type { Fupa, Rfq, RfqItem } from './types';
  *   4 Selesai    dokumen ditandai selesai
  *   5 No Quote   tidak ada vendor yang bisa memberi harga (satu-satunya
  *                tahap manual, dicentang sendiri oleh Purchasing)
+ *   6 Dibatalkan dokumen dibatalkan beserta alasannya; tetap tampil di
+ *                daftar, tidak dihapus
  *
  * Dijawab/Selesai outrank No Quote so a document that got resolved never
  * slides back to No Quote because the flag was set earlier.
  */
-export type WorkflowStage = 1 | 2 | 3 | 4 | 5;
+export type WorkflowStage = 1 | 2 | 3 | 4 | 5 | 6;
 
 export const WORKFLOW_META: Record<WorkflowStage, { label: string; color: string }> = {
   1: { label: '1. Baru', color: 'slate' },
@@ -22,10 +24,11 @@ export const WORKFLOW_META: Record<WorkflowStage, { label: string; color: string
   3: { label: '3. Dijawab', color: 'amber' },
   4: { label: '4. Selesai', color: 'green' },
   5: { label: '5. No Quote', color: 'rust' },
+  6: { label: '6. Dibatalkan', color: 'rust' },
 };
 
 /** Stage order used by the dashboard KPI row and the status filter. */
-export const WORKFLOW_STAGES: WorkflowStage[] = [1, 2, 3, 4, 5];
+export const WORKFLOW_STAGES: WorkflowStage[] = [1, 2, 3, 4, 5, 6];
 
 /**
  * The minimum a record needs for staging. Satisfied both by the board's own
@@ -37,11 +40,15 @@ export interface WorkflowDoc {
   items: Pick<RfqItem, 'hargaPurchasing' | 'coo' | 'noQuote'>[];
   openedByPurchasingAt: string | null;
   noQuote: boolean;
+  cancelledAt?: string | null;
   /** FUP A only — see below. */
   jawabanFupaDikirim?: boolean;
 }
 
 export function workflowStage(d: WorkflowDoc): WorkflowStage {
+  // Pembatalan mengalahkan semuanya: dokumen yang dibatalkan tidak lagi
+  // relevan dikerjakan, apapun progres sebelumnya.
+  if (d.cancelledAt) return 6;
   if (d.status === 'Selesai') return 4;
   // An RFQ is answered once Purchasing fills Harga/COO on any line. FUP A has
   // no such structured pricing step — its answer is the free-text purchJawaban,

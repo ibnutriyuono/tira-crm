@@ -2,6 +2,8 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { IconEdit, IconTrash, IconWa } from './icons';
+import { AttachmentList } from './AttachmentList';
+import { ItemChat } from './ItemChat';
 import { WORKFLOW_META, WORKFLOW_STAGES, workflowStage } from '@/lib/purchasing-workflow';
 import { formatDateID, formatDateTimeID, formatRupiah, num, todayStr } from '@/lib/format';
 import { api } from '@/lib/api-client';
@@ -31,6 +33,9 @@ interface PurchDoc {
   sentToPurchasingAt: string | null;
   openedByPurchasingAt: string | null;
   noQuote: boolean;
+  cancelledAt: string | null;
+  cancelledBy: string | null;
+  cancelReason: string | null;
   /** FUP A only — how the shared stager knows a FUP A has been answered. */
   jawabanFupaDikirim?: boolean;
   sourceNoRfq?: string;
@@ -48,6 +53,9 @@ function toDoc(r: Rfq | Fupa, jenis: PurchDocType): PurchDoc {
     customer: r.customer || '',
     requestedBy: r.requestedBy || '',
     itemCount: r.items?.length ?? 0,
+    cancelledAt: r.cancelledAt ?? null,
+    cancelledBy: r.cancelledBy ?? null,
+    cancelReason: r.cancelReason ?? null,
     materialSummary: (() => {
       const items = r.items ?? [];
       if (items.length === 0) return '-';
@@ -92,7 +100,7 @@ const CURRENCY_OPTIONS = ['IDR', 'USD', 'EUR', 'SGD', 'CNY', 'JPY'];
 const UOM_OPTIONS = ['KG', 'PCS', 'MT', 'LOT', 'M', 'BATANG', 'LEMBAR'];
 
 /** One row of the worklist, shared by the flat and grouped renderings. */
-function PurchasingRow({ d, chatCount, onDetail }: { d: PurchDoc; chatCount: number; onDetail: (d: PurchDoc) => void }) {
+function PurchasingRow({ d, chatCount, onDetail, onCancel }: { d: PurchDoc; chatCount: number; onDetail: (d: PurchDoc) => void; onCancel: ((d: PurchDoc) => void) | null }) {
   const meta = WORKFLOW_META[workflowStage(d)];
   const lines = recordLines(d);
   return (
@@ -118,7 +126,20 @@ function PurchasingRow({ d, chatCount, onDetail }: { d: PurchDoc; chatCount: num
       <td className="center">{d.itemCount}</td>
       <td><span className={`badge ${meta.color}`}>{meta.label}</span></td>
       <td>
-        <button type="button" className="btn btn-outline btn-sm" onClick={() => onDetail(d)}>Detail</button>
+        <div className="row-actions">
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => onDetail(d)}>Detail</button>
+          {onCancel && (
+            d.cancelledAt ? (
+              <button type="button" className="btn btn-outline btn-sm" title={`Dibatalkan oleh ${d.cancelledBy || '-'} — ${d.cancelReason || ''}`} onClick={() => onCancel(d)}>
+                Aktifkan
+              </button>
+            ) : (
+              <button type="button" className="icon-btn danger" title="Batalkan dokumen (wajib isi alasan)" onClick={() => onCancel(d)}>
+                <IconTrash />
+              </button>
+            )
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -189,6 +210,15 @@ export function PurchasingBoard({
   // A notification toast can ask for one document's detail. Runs off `docs` so
   // it still resolves when the request lands before bootstrap has filled the
   // stores; cleared once consumed so re-opening the board doesn't reopen it.
+  const currentUser = useDataStore((s) => s.currentUser);
+  // Membatalkan menghentikan dokumen untuk semua orang, jadi dibatasi ke
+  // peran yang juga berhak mengisi jawabannya.
+  const canCancel = !!currentUser && ['purchasing', 'admin', 'gm'].includes(currentUser.role);
+  const askCancel = useCallback((d: PurchDoc) => {
+    useUiStore.setState({ cancelDocCtx: { jenis: d.jenis, id: d.id, noDoc: d.noDoc, customer: d.customer, cancelled: !!d.cancelledAt } });
+    useUiStore.getState().openModal('cancelDoc');
+  }, []);
+
   const purchDetailCtx = useUiStore((s) => s.purchDetailCtx);
   useEffect(() => {
     if (!purchDetailCtx) return;
@@ -453,11 +483,11 @@ export function PurchasingBoard({
                             </td>
                           </tr>
                           {rows.map((d) => (
-                            <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} chatCount={chatCounts[`${d.jenis}:${d.id}`] || 0} onDetail={openDetail} />
+                            <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} chatCount={chatCounts[`${d.jenis}:${d.id}`] || 0} onDetail={openDetail} onCancel={canCancel ? askCancel : null} />
                           ))}
                         </Fragment>
                       ))
-                    : sortedFlat.map((d) => <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} chatCount={chatCounts[`${d.jenis}:${d.id}`] || 0} onDetail={openDetail} />)}
+                    : sortedFlat.map((d) => <PurchasingRow key={`${d.jenis}-${d.id}`} d={d} chatCount={chatCounts[`${d.jenis}:${d.id}`] || 0} onDetail={openDetail} onCancel={canCancel ? askCancel : null} />)}
                 </tbody>
               </table>
             </div>
@@ -650,6 +680,22 @@ function PurchDetail({
         )}
 
         {doc.jenis === 'RFQ' && <RfqAnswerPanel rfqId={doc.id} readOnly={readOnly} />}
+
+        <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>Lampiran dari Sales</div>
+        {/* readOnly: Purchasing membaca lampiran yang dikirim Sales, tidak
+            mengunggah dari sini — unggahan tetap lewat form RFQ/FUP A. */}
+        <AttachmentList
+          rfqId={doc.jenis === 'RFQ' ? doc.id : undefined}
+          fupaId={doc.jenis === 'FUPA' ? doc.id : undefined}
+          readOnly
+        />
+
+        <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>Diskusi</div>
+        {/* Sisi Purchasing dari thread yang sama dengan yang dilihat Sales di
+            form RFQ/FUP A. Tanpa ini Purchasing hanya melihat badge jumlah
+            pesan di daftar tanpa bisa membaca atau membalasnya. */}
+        <ItemChat entity={doc.jenis === 'RFQ' ? 'rfq' : 'fupa'} entityId={doc.id} />
+
 
         {/* The "Penawaran Vendor" block used to sit here — per-vendor quotation
             cards, harga/lead-time inputs, set-winner and delete. Removed on
