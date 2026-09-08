@@ -20,6 +20,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (body?.noRfq !== undefined && !String(body.noRfq || '').trim()) {
     return NextResponse.json({ error: 'No. RFQ wajib diisi' }, { status: 400 });
   }
+  // noRfq unik di database — cek dulu supaya yang muncul pesan yang bisa
+  // dipahami, bukan error constraint mentah dari Prisma.
+  const nomorBaru = body?.noRfq !== undefined ? String(body.noRfq).trim() : null;
+  if (nomorBaru && nomorBaru !== existing.noRfq) {
+    const bentrok = await prisma.rfq.findUnique({ where: { noRfq: nomorBaru }, select: { id: true } });
+    if (bentrok) {
+      return NextResponse.json({ error: `No. RFQ "${nomorBaru}" sudah dipakai RFQ lain.` }, { status: 409 });
+    }
+  }
   const prospectId = body?.prospectId ?? existing.prospectId;
   // Re-derive the denormalized region whenever the RFQ is repointed at a
   // different prospect, so rm scoping doesn't drift from the source record.

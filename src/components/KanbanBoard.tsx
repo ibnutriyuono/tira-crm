@@ -129,6 +129,11 @@ function KanbanCard({ r, purchCount }: { r: Prospect; purchCount?: number }) {
 
 export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
   const openModal = useUiStore((s) => s.openModal);
+  // Filter bulan per kolom, berdasar KAPAN prospek masuk ke tahap itu
+  // (statusChangedAt) — bukan tanggal dibuat. Jadi "Negosiasi bulan ini"
+  // berarti yang bergerak ke Negosiasi bulan ini, bukan yang kebetulan
+  // dibuat bulan ini dan sekarang ada di Negosiasi.
+  const [bulanPerKolom, setBulanPerKolom] = useState<Record<number, string>>({});
   const purchCounts = useProspectPurchasingCounts(true);
   const upsertProspect = useDataStore((s) => s.upsertProspect);
   const toast = useDataStore((s) => s.toast);
@@ -161,7 +166,12 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
     <>
       <div className="kanban">
         {KANBAN_STATUSES.map((s) => {
-          const items = filtered.filter((r) => num(r.status) === s);
+          const semua = filtered.filter((r) => num(r.status) === s);
+          // Opsi bulan dibangun dari isi kolom itu sendiri, supaya tidak ada
+          // pilihan bulan yang hasilnya pasti kosong.
+          const bulanOptions = Array.from(new Set(semua.map((r) => (r.statusChangedAt || '').slice(0, 7)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+          const bulanAktif = bulanPerKolom[s] || '';
+          const items = bulanAktif ? semua.filter((r) => (r.statusChangedAt || '').slice(0, 7) === bulanAktif) : semua;
           const totalVal = items.reduce((sum, r) => sum + num(r.value), 0);
           const shown = items.slice(0, CAP);
           return (
@@ -172,7 +182,23 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                 </div>
                 <div className="kc-meta">
                   {items.length} prospek · {formatRupiah(totalVal)}
+                  {bulanAktif && semua.length !== items.length && <span> (dari {semua.length})</span>}
                 </div>
+                {bulanOptions.length > 0 && (
+                  <select
+                    className="kc-month"
+                    value={bulanAktif}
+                    onChange={(e) => setBulanPerKolom((prev) => ({ ...prev, [s]: e.target.value }))}
+                    title="Saring berdasar bulan perubahan status ke tahap ini"
+                  >
+                    <option value="">Semua bulan</option>
+                    {bulanOptions.map((m) => (
+                      <option key={m} value={m}>
+                        {new Date(`${m}-01T00:00:00`).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div
                 className={`kanban-col-body${dragOverStatus === s ? ' drag-over' : ''}`}
@@ -184,7 +210,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                 onDrop={(e) => handleDrop(s, e)}
               >
                 {shown.length === 0 ? (
-                  <div className="kanban-empty">Tidak ada data</div>
+                  <div className="kanban-empty">{bulanAktif ? 'Tidak ada perubahan status di bulan ini' : 'Tidak ada data'}</div>
                 ) : (
                   shown.map((r) => <KanbanCard key={r.id} r={r} purchCount={purchCounts[r.id]} />)
                 )}

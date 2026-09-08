@@ -130,20 +130,21 @@ export function RfqModal() {
     const { rfq } = rfqId ? await api.put<{ rfq: Rfq }>(`/api/rfqs/${rfqId}`, body) : await api.post<{ rfq: Rfq }>('/api/rfqs', body);
     upsertRfq(rfq);
     if (!rfqId) setRfqId(rfq.id);
+    // Nomor dibuat server saat kosong — tarik balik ke form, kalau tidak
+    // simpan berikutnya (PUT) mengirim string kosong dan ditolak server.
+    if (rfq.noRfq && rfq.noRfq !== noRfq) setNoRfq(rfq.noRfq);
     return rfq;
   }
 
   /**
-   * Both requirements for any action that persists the RFQ. Applied to all five
-   * buttons rather than just Save: an RFQ that reaches Purchasing without a
-   * number shows as "(tanpa nomor)" everywhere and gives FUP A nothing to
-   * reference. The server enforces the same rule.
+   * Guard for any action that persists the RFQ, applied to all five buttons
+   * rather than just Save. Only the material check remains: the number is now
+   * generated server-side when left blank, so requiring it here would block a
+   * flow that works fine.
    */
   function validate(): boolean {
-    if (!noRfq.trim()) {
-      toast('No. RFQ wajib diisi', 'error');
-      return false;
-    }
+    // No. RFQ tidak lagi wajib diisi manual — server membuatkan nomor urut
+    // otomatis (RFQ-YYYY-NNNN) kalau dikosongkan.
     if (!hasMaterial()) {
       toast('Isi minimal satu material yang diminta', 'error');
       return false;
@@ -275,8 +276,9 @@ export function RfqModal() {
     >
       <div className="form-grid">
         <div>
-          <label>No. RFQ *</label>
-          <input type="text" value={noRfq} onChange={(e) => setNoRfq(e.target.value)} placeholder="cth. 001" />
+          <label>No. RFQ</label>
+          <input type="text" value={noRfq} onChange={(e) => setNoRfq(e.target.value)} placeholder={rfqId ? '' : 'Otomatis saat disimpan'} />
+          {!rfqId && !noRfq.trim() && <div className="field-note">Dikosongkan saja — nomor urut dibuat otomatis (RFQ-{new Date().getFullYear()}-0001). Isi manual hanya jika perlu nomor khusus.</div>}
         </div>
         <div>
           <label>Tgl RFQ</label>

@@ -87,7 +87,10 @@ model Prospect {
 // can't be derived in SQL from `cabang` alone.
 model Rfq {
   id          String   @id @default(cuid())
-  noRfq       String?
+  /// Unik supaya dua RFQ tidak pernah memakai nomor yang sama. Nullable —
+  /// Postgres mengizinkan banyak NULL pada unique index, jadi baris lama yang
+  /// belum bernomor tidak saling bentrok.
+  noRfq       String?  @unique
   tglRfq      String?
   cabang      String?
   reg         Int?

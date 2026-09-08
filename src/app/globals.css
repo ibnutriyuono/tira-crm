@@ -238,6 +238,7 @@ td.center{text-align:center;}
 .kanban-col-head.rust{border-color:var(--rust-500); background:var(--rust-100);}
 .kc-title{font-weight:700; color:var(--graphite-900); font-size:12.5px;}
 .kc-meta{font-family:var(--font-ibm-plex-mono), monospace; font-size:10.8px; color:var(--text-soft); margin-top:2px;}
+.kc-month{width:100%; margin-top:7px; padding:3px 6px; font-size:10.8px; border:1px solid var(--border); border-radius:4px; background:var(--surface); color:var(--text); cursor:pointer;}
 .kanban-col-body{padding:10px; display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1; min-height:80px;}
 .kanban-col-body.drag-over{background:var(--steel-100);}
 .kanban-card{background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--steel-500); border-radius:5px; padding:10px; cursor:grab; box-shadow:var(--shadow-1);}
