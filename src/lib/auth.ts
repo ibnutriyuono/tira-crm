@@ -140,6 +140,50 @@ export async function docScopeWhere(
 }
 
 /**
+ * Read scope for SalesPlan, same cabang->region hierarchy shape as
+ * docScopeWhere but keyed on `se` for the sales role rather than
+ * `requestedBy` — a sales plan belongs to a Sales Engineer, not to whichever
+ * account happened to save it (a BM can fill one in on an SE's behalf).
+ *
+ * purchasing has no reason to see sales planning data, so it (and any future
+ * role not listed) falls through to a filter that matches nothing rather
+ * than inheriting gm/admin's open access by accident.
+ */
+export async function salesPlanScopeWhere(user: SafeUser) {
+  if (user.role === 'admin' || user.role === 'gm') return {};
+  if (user.role === 'sales') {
+    return { se: { equals: user.se || '', mode: 'insensitive' as const } };
+  }
+  if (user.role === 'bm') {
+    return { cabang: { equals: user.cabang || '', mode: 'insensitive' as const } };
+  }
+  if (user.role === 'rm') {
+    const map = await cabangRegMap();
+    const myCabangs = Object.keys(map).filter((c) => map[c] === (user.reg ?? -1));
+    return {
+      OR: [
+        { reg: user.reg ?? -1 },
+        { AND: [{ reg: null }, { cabang: { in: myCabangs, mode: 'insensitive' as const } }] },
+      ],
+    };
+  }
+  return { id: '__none__' };
+}
+
+/**
+ * Who may create/edit a given SE's plan: the SE themself, their own BM (BM
+ * fills plans in on behalf of the SEs in their branch, same convention as
+ * ProspectFormModal's lockCabang for bm), or GM/Admin. RM is read-only here —
+ * they aggregate across several branches they don't individually run.
+ */
+export function canEditSalesPlan(user: SafeUser, targetSe: string, targetCabang: string | null) {
+  if (user.role === 'admin' || user.role === 'gm') return true;
+  if (user.role === 'sales') return (user.se || '').trim().toLowerCase() === targetSe.trim().toLowerCase();
+  if (user.role === 'bm') return (user.cabang || '').trim().toLowerCase() === (targetCabang || '').trim().toLowerCase();
+  return false;
+}
+
+/**
  * Deleting a prospect is restricted to GM and Admin — Sales and BM can edit
  * their own rows but not remove pipeline history. Mirrors the single-file
  * app's canDeleteProspect().

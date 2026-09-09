@@ -28,6 +28,7 @@ import { PurchasingMonitorModal } from './modals/PurchasingMonitorModal';
 import { CustomerIntelModal } from './modals/CustomerIntelModal';
 import { MarketingModal } from './modals/MarketingModal';
 import { CancelDocModal } from './modals/CancelDocModal';
+import { SalesPlanModal } from './modals/SalesPlanModal';
 import { CompetitorLogModal } from './modals/CompetitorLogModal';
 import { ForecastModal } from './modals/ForecastModal';
 import { QcdRecapModal } from './modals/QcdRecapModal';
@@ -124,6 +125,7 @@ export function CrmApp() {
       <CustomerIntelModal />
       <MarketingModal />
       <CancelDocModal />
+      <SalesPlanModal />
       <CompetitorLogModal />
       <ForecastModal />
       <QcdRecapModal />

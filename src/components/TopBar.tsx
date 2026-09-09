@@ -148,6 +148,16 @@ export function TopBar() {
             <IconChartLine />
             Forecast
           </button>
+          <button
+            className="btn btn-ghost-dark"
+            onClick={() => {
+              useUiStore.setState({ salesPlanCtx: null });
+              openModal('salesPlan');
+            }}
+          >
+            <IconChartLine />
+            Rencana Penjualan
+          </button>
           <button className="btn btn-ghost-dark" onClick={() => openModal('marketing')}>
             <IconCustomers />
             Marketing

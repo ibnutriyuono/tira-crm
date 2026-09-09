@@ -9,11 +9,12 @@ export async function GET() {
   const adminErr = requireAdmin(user);
   if (adminErr) return adminErr;
 
-  const [prospects, customers, rfqs, users] = await Promise.all([
+  const [prospects, customers, rfqs, users, salesPlans] = await Promise.all([
     prisma.prospect.findMany(),
     prisma.customer.findMany(),
     prisma.rfq.findMany(),
     prisma.user.findMany(),
+    prisma.salesPlan.findMany(),
   ]);
 
   // A full export carries every password hash off the server — worth an audit
@@ -22,7 +23,7 @@ export async function GET() {
     user,
     action: 'export',
     entity: 'database',
-    summary: `Mengunduh backup database (${prospects.length} prospek, ${customers.length} customer, ${rfqs.length} RFQ, ${users.length} user)`,
+    summary: `Mengunduh backup database (${prospects.length} prospek, ${customers.length} customer, ${rfqs.length} RFQ, ${users.length} user, ${salesPlans.length} rencana penjualan)`,
   });
 
   return NextResponse.json({
@@ -33,5 +34,6 @@ export async function GET() {
     customers,
     rfqs,
     users, // includes passwordHash so a restore doesn't lock everyone out — admin-only export.
+    salesPlans,
   });
 }

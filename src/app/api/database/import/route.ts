@@ -23,6 +23,7 @@ export async function POST(req: Request) {
   const customers = Array.isArray(body.customers) ? (body.customers as Array<Record<string, unknown>>) : [];
   const rfqs = Array.isArray(body.rfqs) ? (body.rfqs as Array<Record<string, unknown>>) : [];
   const users = Array.isArray(body.users) ? (body.users as Array<Record<string, unknown>>) : [];
+  const salesPlans = Array.isArray(body.salesPlans) ? (body.salesPlans as Array<Record<string, unknown>>) : [];
 
   await prisma.$transaction(async (tx) => {
     await tx.prospect.deleteMany({});
@@ -104,6 +105,22 @@ export async function POST(req: Request) {
         })),
       });
     }
+
+    await tx.salesPlan.deleteMany({});
+    if (salesPlans.length > 0) {
+      await tx.salesPlan.createMany({
+        data: salesPlans.map((p) => ({
+          id: String(p.id),
+          periode: (p.periode as string) ?? '',
+          se: (p.se as string) ?? '',
+          cabang: (p.cabang as string) ?? null,
+          reg: p.reg == null ? null : Number(p.reg),
+          items: (p.items ?? []) as Prisma.InputJsonValue,
+          value: Number(p.value) || 0,
+          requestedBy: (p.requestedBy as string) ?? null,
+        })),
+      });
+    }
   });
 
   // ActivityLog is intentionally left untouched by the restore: an audit trail
@@ -114,7 +131,7 @@ export async function POST(req: Request) {
     user,
     action: 'restore',
     entity: 'database',
-    summary: `Memulihkan database dari backup (${prospects.length} prospek, ${customers.length} customer, ${rfqs.length} RFQ, ${users.length} user)`,
+    summary: `Memulihkan database dari backup (${prospects.length} prospek, ${customers.length} customer, ${rfqs.length} RFQ, ${users.length} user, ${salesPlans.length} rencana penjualan)`,
   });
   return NextResponse.json({ ok: true });
 }

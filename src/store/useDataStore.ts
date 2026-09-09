@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { BudgetTarget, Customer, Fupa, Prospect, PurchasingContact, Rfq, SafeUser, Vendor } from '@/lib/types';
+import type { BudgetTarget, Customer, Fupa, Prospect, PurchasingContact, Rfq, SafeUser, SalesPlan, Vendor } from '@/lib/types';
 
 interface Toast {
   id: number;
@@ -17,6 +17,7 @@ interface DataState {
   fupas: Fupa[];
   vendors: Vendor[];
   budgetTargets: BudgetTarget[];
+  salesPlans: SalesPlan[];
   users: SafeUser[]; // only populated for admins when Kelola User modal opens
   purchasingContact: PurchasingContact;
   loaded: boolean;
@@ -38,6 +39,7 @@ interface DataState {
   removeFupa: (id: string) => void;
   refetchFupas: () => Promise<void>;
   upsertBudgetTarget: (b: BudgetTarget) => void;
+  upsertSalesPlan: (p: SalesPlan) => void;
   upsertVendor: (v: Vendor) => void;
   removeVendor: (id: string) => void;
   refetchVendors: () => Promise<void>;
@@ -62,6 +64,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   fupas: [],
   vendors: [],
   budgetTargets: [],
+  salesPlans: [],
   users: [],
   purchasingContact: { wa: '', email: '' },
   loaded: false,
@@ -76,6 +79,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       fupas: [],
       vendors: [],
       budgetTargets: [],
+      salesPlans: [],
       users: [],
       purchasingContact: { wa: '', email: '' },
       loaded: false,
@@ -94,6 +98,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       fupas: data.fupas ?? [],
       vendors: data.vendors ?? [],
       budgetTargets: data.budgetTargets ?? [],
+      salesPlans: data.salesPlans ?? [],
       purchasingContact: data.purchasingContact,
       loaded: true,
     });
@@ -154,6 +159,15 @@ export const useDataStore = create<DataState>((set, get) => ({
       const next = s.budgetTargets.slice();
       next[idx] = b;
       return { budgetTargets: next };
+    }),
+
+  upsertSalesPlan: (p) =>
+    set((s) => {
+      const idx = s.salesPlans.findIndex((x) => x.se === p.se && x.periode === p.periode);
+      if (idx === -1) return { salesPlans: [...s.salesPlans, p] };
+      const next = s.salesPlans.slice();
+      next[idx] = p;
+      return { salesPlans: next };
     }),
 
   upsertVendor: (v) =>

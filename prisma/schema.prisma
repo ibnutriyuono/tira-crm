@@ -236,6 +236,32 @@ model Quotation {
 
 // Per-branch sales target for one period (YYYY-MM). Editable by admin/gm
 // anywhere and by rm within their own region — see canEditBudgetTarget.
+/// Rencana penjualan per Sales Engineer per bulan, dirinci per material.
+/// `value` didenormalisasi (jumlah items[].qty*items[].harga) supaya rollup
+/// cabang->regional->nasional di lib/reports.ts tidak perlu decode JSON tiap
+/// baris saat menjumlah — sama pola dengan Prospect.value dari materials[].
+model SalesPlan {
+  id          String   @id @default(cuid())
+  periode     String // "YYYY-MM"
+  se          String
+  /// Didenormalisasi dari akun/cabang pembuatnya saat disimpan, sama seperti
+  /// Rfq/Fupa, supaya rollup per cabang tidak perlu join ke tabel user.
+  cabang      String?
+  reg         Int?
+  items       Json     @default("[]")
+  value       Float    @default(0)
+  requestedBy String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  /// Satu rencana per SE per bulan — mengisi ulang bulan yang sama meng-
+  /// update baris ini, bukan menambah baris baru.
+  @@unique([se, periode])
+  @@index([periode])
+  @@index([cabang])
+  @@index([reg])
+}
+
 model BudgetTarget {
   id        String   @id @default(cuid())
   cabang    String

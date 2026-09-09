@@ -245,6 +245,26 @@ export interface BudgetTarget {
   amount: number;
 }
 
+export interface SalesPlanItem {
+  line: string;
+  uraian: string;
+  qty: number | string;
+  harga: number | string;
+}
+
+export interface SalesPlan {
+  id: string;
+  periode: string;
+  se: string;
+  cabang: string | null;
+  reg: number | null;
+  items: SalesPlanItem[];
+  value: number;
+  requestedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PurchasingContact {
   wa: string;
   email: string;
@@ -276,6 +296,7 @@ export type ActivityEntity =
   | 'fupa'
   | 'quotation'
   | 'budget'
+  | 'salesPlan'
   | 'chat';
 
 export type ActivityChanges = Record<string, { label: string; from: unknown; to: unknown }>;

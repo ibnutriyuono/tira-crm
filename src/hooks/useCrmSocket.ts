@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { getSocket } from '@/lib/socket-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
-import type { BudgetTarget, Customer, Fupa, ItemChatMessage, Prospect, PurchasingContact, Rfq, SafeUser, Vendor } from '@/lib/types';
+import type { BudgetTarget, SalesPlan, Customer, Fupa, ItemChatMessage, Prospect, PurchasingContact, Rfq, SafeUser, Vendor } from '@/lib/types';
 
 /**
  * Notification toasts open the document they are about. Purchasing works from
@@ -117,6 +117,7 @@ export function useCrmSocket() {
 
 
     const onBudgetUpsert = (b: BudgetTarget) => useDataStore.getState().upsertBudgetTarget(b);
+    const onSalesPlanUpsert = (p: SalesPlan) => useDataStore.getState().upsertSalesPlan(p);
 
     const onVendorUpsert = (v: Vendor) => useDataStore.getState().upsertVendor(v);
     const onVendorDelete = ({ id }: { id: string }) => useDataStore.getState().removeVendor(id);
@@ -152,6 +153,7 @@ export function useCrmSocket() {
     s.on('itemchat:message', onItemChatMessage);
 
     s.on('budget:updated', onBudgetUpsert);
+    s.on('salesPlan:updated', onSalesPlanUpsert);
 
     s.on('vendor:created', onVendorUpsert);
     s.on('vendor:updated', onVendorUpsert);
@@ -178,6 +180,7 @@ export function useCrmSocket() {
       s.off('fupa:updated', onFupaUpsert);
       s.off('fupa:deleted', onFupaDelete);
       s.off('budget:updated', onBudgetUpsert);
+      s.off('salesPlan:updated', onSalesPlanUpsert);
       s.off('vendor:created', onVendorUpsert);
       s.off('vendor:updated', onVendorUpsert);
       s.off('vendor:deleted', onVendorDelete);

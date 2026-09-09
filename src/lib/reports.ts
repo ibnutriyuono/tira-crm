@@ -1,6 +1,6 @@
 import { AGING_THRESHOLD_DAYS, STAGE_PROBABILITY } from './constants';
 import { classify, num } from './format';
-import type { BudgetTarget, Prospect } from './types';
+import type { BudgetTarget, Prospect, SalesPlan } from './types';
 
 /** The date a won prospect actually landed — PO first, then delivery, then offer. */
 function recordDate(r: Prospect): string | null {
@@ -131,24 +131,35 @@ export function buildCompetitorLog(records: Prospect[]): CompetitorRow[] {
 
 export interface ForecastRow {
   cabang: string;
+  /** Region the branch belongs to, derived from whichever prospect rows carry it. Null when no record in scope names this branch's region yet. */
+  reg: number | null;
   target: number;
+  /** Sum of SalesPlan.value for every SE in this branch this month — what Sales itself committed to sell, distinct from the company-set target. */
+  rencana: number;
   won: number;
   weighted: number;
   openCount: number;
   agingCount: number;
+  /** Realisasi (won) against target. */
   achievement: number;
+  /** How much of target the plan even covers — low here means the team hasn't planned enough activity to reach target, regardless of how well they execute. */
+  rencanaVsTarget: number;
+  /** How much of what was planned actually landed — the execution gap, as opposed to the planning gap above. */
+  wonVsRencana: number;
 }
 
 /**
  * Stage-weighted pipeline per branch against its target for `periode`
  * (YYYY-MM). "Weighted" applies STAGE_PROBABILITY to open deals; "aging"
- * counts open deals untouched beyond AGING_THRESHOLD_DAYS.
+ * counts open deals untouched beyond AGING_THRESHOLD_DAYS. `salesPlans`
+ * feeds the Rencana column — pass `[]` where that comparison isn't needed.
  */
 export function buildForecast(
   records: Prospect[],
   targets: BudgetTarget[],
   periode: string,
   cabangList: string[] = [],
+  salesPlans: SalesPlan[] = [],
 ): ForecastRow[] {
   // Every branch in scope appears, not just those with activity this period —
   // otherwise a branch with a target but no deals silently vanishes and the
@@ -157,6 +168,16 @@ export function buildForecast(
   const cabangs = Array.from(new Set([...cabangList.map((c) => c.toUpperCase()), ...dataCabangs]));
 
   const inPeriod = (r: Prospect) => (recordDate(r) || '').slice(0, 7) === periode;
+  const plansInPeriode = salesPlans.filter((p) => p.periode === periode);
+
+  // Region per branch, read off whichever prospect happens to carry it —
+  // there's no first-class Cabang entity, so this is the only source. Used
+  // both per-row (rendered) and by buildForecastByReg (grouping key).
+  const regOf = new Map<string, number | null>();
+  records.forEach((r) => {
+    const cb = (r.cabang || '').trim().toUpperCase();
+    if (cb && r.reg != null && regOf.get(cb) == null) regOf.set(cb, r.reg);
+  });
 
   return cabangs
     .map((cabang) => {
@@ -167,16 +188,21 @@ export function buildForecast(
       const weighted = open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[r.status] ?? 0), 0);
       const won = cList.filter((r) => classify(r) === 'Won' && inPeriod(r)).reduce((s, r) => s + num(r.value), 0);
       const target = targets.find((t) => t.cabang === cabang && t.periode === periode)?.amount ?? 0;
+      const rencana = plansInPeriode.filter((p) => (p.cabang || '').toUpperCase() === cabang).reduce((s, p) => s + num(p.value), 0);
       const agingCount = open.filter((r) => daysSince(String(r.statusChangedAt ?? r.updatedAt).slice(0, 10)) > AGING_THRESHOLD_DAYS).length;
 
       return {
         cabang,
+        reg: regOf.get(cabang) ?? null,
         target,
+        rencana,
         won,
         weighted,
         openCount: open.length,
         agingCount,
         achievement: target > 0 ? Math.round((won / target) * 100) : 0,
+        rencanaVsTarget: target > 0 ? Math.round((rencana / target) * 100) : 0,
+        wonVsRencana: rencana > 0 ? Math.round((won / rencana) * 100) : 0,
       };
     })
     // Keep the company's own branch ordering rather than sorting alphabetically.
@@ -188,6 +214,51 @@ export function buildForecast(
       if (ib === -1) return -1;
       return ia - ib;
     });
+}
+
+export interface ForecastRollupRow {
+  target: number;
+  rencana: number;
+  won: number;
+  weighted: number;
+  cabangCount: number;
+  achievement: number;
+  rencanaVsTarget: number;
+  wonVsRencana: number;
+}
+
+function rollup(rows: ForecastRow[]): ForecastRollupRow {
+  const target = rows.reduce((s, r) => s + r.target, 0);
+  const rencana = rows.reduce((s, r) => s + r.rencana, 0);
+  const won = rows.reduce((s, r) => s + r.won, 0);
+  const weighted = rows.reduce((s, r) => s + r.weighted, 0);
+  return {
+    target,
+    rencana,
+    won,
+    weighted,
+    cabangCount: rows.length,
+    achievement: target > 0 ? Math.round((won / target) * 100) : 0,
+    rencanaVsTarget: target > 0 ? Math.round((rencana / target) * 100) : 0,
+    wonVsRencana: rencana > 0 ? Math.round((won / rencana) * 100) : 0,
+  };
+}
+
+/** Rolls buildForecast's per-branch rows up to per-region — branches with no known region (regOf never populated) are grouped under `null` rather than silently dropped. */
+export function buildForecastByReg(rows: ForecastRow[]): { reg: number | null; rows: ForecastRow[]; totals: ForecastRollupRow }[] {
+  const map = new Map<number | null, ForecastRow[]>();
+  rows.forEach((r) => {
+    if (!map.has(r.reg)) map.set(r.reg, []);
+    map.get(r.reg)!.push(r);
+  });
+  return Array.from(map.entries())
+    .map(([reg, list]) => ({ reg, rows: list, totals: rollup(list) }))
+    .sort((a, b) => (a.reg ?? 999) - (b.reg ?? 999));
+}
+
+/** Company-wide total — the top of the cabang -> regional -> nasional rollup. */
+export function buildForecastNasional(rows: ForecastRow[]): ForecastRollupRow {
+  return rollup(rows);
 }
 
 export interface ForecastSeRow {

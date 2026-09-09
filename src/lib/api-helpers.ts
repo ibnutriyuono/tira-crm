@@ -46,6 +46,19 @@ export function deriveFromMaterials(materials: Material[]) {
   };
 }
 
+/** Cleans SalesPlan line items and sums their value — same shape of helper as deriveFromMaterials, simpler unit-price rule (qty*harga, no beratPc/hargaKg conversion since a sales plan is a straight value estimate, not a priced RFQ line). */
+export function deriveFromSalesPlanItems(items: { line?: unknown; uraian?: unknown; qty?: unknown; harga?: unknown }[]) {
+  const clean = (Array.isArray(items) ? items : [])
+    .map((m) => ({
+      line: String(m.line || '').trim(),
+      uraian: String(m.uraian || '').trim(),
+      qty: num(m.qty),
+      harga: num(m.harga),
+    }))
+    .filter((m) => m.uraian || m.qty || m.harga);
+  return { items: clean, value: clean.reduce((s, m) => s + m.qty * m.harga, 0) };
+}
+
 /**
  * Carries Purchasing's answer (hargaPurchasing / coo) across a Sales edit.
  *

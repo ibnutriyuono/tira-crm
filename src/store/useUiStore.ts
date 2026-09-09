@@ -27,6 +27,7 @@ export type ModalKey =
   | 'competitorLog'
   | 'forecast'
   | 'qcdRecap'
+  | 'salesPlan'
   | null;
 
 export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq' | 'vendor' | 'fupa';
@@ -48,6 +49,11 @@ export interface DeleteCtx {
 export interface FollowUpCtx {
   type: 'prospect' | 'customer';
   id: string;
+}
+export interface SalesPlanCtx {
+  se: string;
+  cabang: string;
+  periode: string;
 }
 export interface QcdCtx {
   mode: 'prospectForm' | 'kanban';
@@ -90,6 +96,7 @@ interface UiState {
   deleteCtx: DeleteCtx | null;
   cancelDocCtx: CancelDocCtx | null;
   followUpCtx: FollowUpCtx | null;
+  salesPlanCtx: SalesPlanCtx | null;
   userEditId: string | null;
   customerEditId: string | null;
   vendorEditId: string | null;
@@ -170,6 +177,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   deleteCtx: null,
   cancelDocCtx: null,
   followUpCtx: null,
+  salesPlanCtx: null,
   userEditId: null,
   customerEditId: null,
   vendorEditId: null,
