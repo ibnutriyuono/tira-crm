@@ -41,6 +41,7 @@ interface DataState {
   refetchFupas: () => Promise<void>;
   upsertBudgetTarget: (b: BudgetTarget) => void;
   upsertSalesPlan: (p: SalesPlan) => void;
+  removeSalesPlan: (id: string) => void;
   upsertNotification: (n: AppNotification) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
@@ -176,6 +177,11 @@ export const useDataStore = create<DataState>((set, get) => ({
       next[idx] = p;
       return { salesPlans: next };
     }),
+
+  // By id rather than the (se, periode) key the upsert matches on: this is
+  // used when an edit moves a plan out of the viewer's scope, and the values
+  // that would form that key are exactly the ones that may have changed.
+  removeSalesPlan: (id) => set((s) => ({ salesPlans: s.salesPlans.filter((x) => x.id !== id) })),
 
   // New notifications arrive one at a time over the socket and always
   // belong at the top (newest-first) — unlike the other upsert helpers,

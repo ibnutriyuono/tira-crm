@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { getSocket } from '@/lib/socket-client';
+import { matchesDocScope, matchesProspectScope, matchesSalesPlanScope, myRegionCabangs } from '@/lib/client-scope';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { BudgetTarget, SalesPlan, Customer, Fupa, ItemChatMessage, Prospect, PurchasingContact, Rfq, SafeUser, Vendor, AppNotification } from '@/lib/types';
@@ -23,6 +24,32 @@ function isOwnedByCurrentUser(requestedBy: string | null): boolean {
 }
 
 /**
+ * Whether a pushed record is one this user is allowed to hold.
+ *
+ * emitCrmEvent broadcasts to one shared room, so every client receives every
+ * record regardless of who it belongs to. Without this gate a Sales user in
+ * one branch accumulates another branch's prospects and documents in their
+ * store the moment anyone edits them — silently undoing the scoping bootstrap
+ * applied on load. See lib/client-scope.ts.
+ *
+ * The region lookup is rebuilt per event from the store's current prospects.
+ * That is deliberate: a long-lived closure would go stale as prospects arrive,
+ * and these lists are small enough that recomputing costs nothing next to the
+ * render the event triggers.
+ */
+function allowedInStore(kind: 'prospect' | 'doc' | 'salesPlan', record: Prospect | Rfq | Fupa | SalesPlan): boolean {
+  const state = useDataStore.getState();
+  const me = state.currentUser;
+  // Before login resolves there is no scope to check against; bootstrap will
+  // load the correct rows once it does, so dropping events here loses nothing.
+  if (!me) return false;
+  if (kind === 'prospect') return matchesProspectScope(me, record as Prospect);
+  const cabangs = myRegionCabangs(me, state.prospects);
+  if (kind === 'doc') return matchesDocScope(me, record as Rfq | Fupa, cabangs);
+  return matchesSalesPlanScope(me, record as SalesPlan, cabangs);
+}
+
+/**
  * Subscribes the shared data store to server-pushed change events so every
  * connected user's screen updates live when someone else edits data —
  * replaces the original single-file app's "everyone reads the same
@@ -33,7 +60,13 @@ export function useCrmSocket() {
     const s = getSocket();
     const store = useDataStore.getState();
 
-    const onProspectUpsert = (p: Prospect) => useDataStore.getState().upsertProspect(p);
+    const onProspectUpsert = (p: Prospect) => {
+      // A prospect can be edited out of this user's scope (reassigned to
+      // another SE or branch). Drop it from the store in that case rather than
+      // keeping the last copy they were allowed to see.
+      if (!allowedInStore('prospect', p)) return useDataStore.getState().removeProspect(p.id);
+      useDataStore.getState().upsertProspect(p);
+    };
     const onProspectDelete = ({ id }: { id: string }) => useDataStore.getState().removeProspect(id);
     const onProspectBulk = () => useDataStore.getState().refetchProspects();
 
@@ -44,6 +77,7 @@ export function useCrmSocket() {
     // Compare against the copy already in the store to spot the transitions
     // worth announcing; the update itself happens either way.
     const onRfqUpsert = (r: Rfq) => {
+      if (!allowedInStore('doc', r)) return useDataStore.getState().removeRfq(r.id);
       const prev = useDataStore.getState().rfqs.find((x) => x.id === r.id);
       useDataStore.getState().upsertRfq(r);
       if (!prev || !isOwnedByCurrentUser(r.requestedBy)) return;
@@ -57,6 +91,7 @@ export function useCrmSocket() {
     const onRfqDelete = ({ id }: { id: string }) => useDataStore.getState().removeRfq(id);
 
     const onFupaUpsert = (f: Fupa) => {
+      if (!allowedInStore('doc', f)) return useDataStore.getState().removeFupa(f.id);
       const prev = useDataStore.getState().fupas.find((x) => x.id === f.id);
       useDataStore.getState().upsertFupa(f);
       if (!prev || !isOwnedByCurrentUser(f.requestedBy)) return;
@@ -74,6 +109,7 @@ export function useCrmSocket() {
     // company-wide, which would be noise for a module they check rather than
     // live in. They still get the TopBar badge.
     const onRfqCreated = (r: Rfq) => {
+      if (!allowedInStore('doc', r)) return;
       useDataStore.getState().upsertRfq(r);
       if (useDataStore.getState().currentUser?.role !== 'purchasing') return;
       useDataStore.getState().toast(
@@ -83,6 +119,7 @@ export function useCrmSocket() {
       );
     };
     const onFupaCreated = (f: Fupa) => {
+      if (!allowedInStore('doc', f)) return;
       useDataStore.getState().upsertFupa(f);
       if (useDataStore.getState().currentUser?.role !== 'purchasing') return;
       useDataStore.getState().toast(
@@ -117,7 +154,10 @@ export function useCrmSocket() {
 
 
     const onBudgetUpsert = (b: BudgetTarget) => useDataStore.getState().upsertBudgetTarget(b);
-    const onSalesPlanUpsert = (p: SalesPlan) => useDataStore.getState().upsertSalesPlan(p);
+    const onSalesPlanUpsert = (p: SalesPlan) => {
+      if (!allowedInStore('salesPlan', p)) return useDataStore.getState().removeSalesPlan(p.id);
+      useDataStore.getState().upsertSalesPlan(p);
+    };
 
     // Notifications are already targeted to one specific user at creation
     // time (see lib/notify.ts — one row per recipient), but emitCrmEvent
