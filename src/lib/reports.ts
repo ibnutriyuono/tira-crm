@@ -1,5 +1,5 @@
 import { AGING_THRESHOLD_DAYS, STAGE_PROBABILITY } from './constants';
-import { classify, num } from './format';
+import { classify, formatDateID, formatRupiah, num } from './format';
 import type { BudgetTarget, Prospect, SalesPlan } from './types';
 
 /** The date a won prospect actually landed — PO first, then delivery, then offer. */
@@ -7,7 +7,7 @@ function recordDate(r: Prospect): string | null {
   return r.tglPO || r.tglDelivery || r.tglPenawaran || null;
 }
 
-function daysSince(iso: string): number {
+export function daysSince(iso: string): number {
   return Math.floor((Date.now() - new Date(`${iso}T00:00:00`).getTime()) / 86400000);
 }
 
@@ -321,4 +321,93 @@ export function buildAgingList(records: Prospect[]): AgingRow[] {
     .map((r) => ({ record: r, days: daysSince(String(r.statusChangedAt ?? r.updatedAt).slice(0, 10)) }))
     .filter((x) => x.days > AGING_THRESHOLD_DAYS)
     .sort((a, b) => b.days - a.days);
+}
+
+export type FollowUpTier = 'terlambat' | 'minggu-ini' | 'nanti';
+export type FollowUpSource = 'terjadwal' | 'aging' | 'reaktivasi';
+
+export interface FollowUpRow {
+  key: string;
+  source: FollowUpSource;
+  tier: FollowUpTier;
+  prospect: Prospect;
+  customer: string;
+  cabang: string;
+  reason: string;
+  detail: string;
+  value: number;
+}
+
+/**
+ * Merges three signals into one urgency-sorted follow-up worklist, rather
+ * than adding a fourth standalone list: manually scheduled follow-ups
+ * (Prospect.followUpAt/followUpNote), the existing aging-pipeline check
+ * (buildAgingList above), and the existing cold-customer signal
+ * (buildCustomerIntel). Shared by the TopBar badge count and
+ * FollowUpBoardModal's full list so they can never disagree — the count
+ * you see before opening the panel is exactly what's inside it.
+ */
+export function buildFollowUpRows(prospects: Prospect[]): FollowUpRow[] {
+  const out: FollowUpRow[] = [];
+
+  prospects.forEach((p) => {
+    if (!p.followUpAt) return;
+    const diff = daysSince(p.followUpAt); // >0 overdue, 0 today, <0 upcoming
+    const tier: FollowUpTier = diff >= 0 ? 'terlambat' : diff >= -7 ? 'minggu-ini' : 'nanti';
+    const detail =
+      diff > 0 ? `Terlambat ${diff} hari (jadwal ${formatDateID(p.followUpAt)})` : diff === 0 ? 'Jatuh tempo hari ini' : `Jatuh tempo ${formatDateID(p.followUpAt)}`;
+    out.push({
+      key: `terjadwal-${p.id}`,
+      source: 'terjadwal',
+      tier,
+      prospect: p,
+      customer: p.customer,
+      cabang: p.cabang || '-',
+      reason: p.followUpNote || 'Follow-up terjadwal',
+      detail,
+      value: p.value,
+    });
+  });
+
+  buildAgingList(prospects).forEach(({ record, days }) => {
+    out.push({
+      key: `aging-${record.id}`,
+      source: 'aging',
+      tier: 'terlambat',
+      prospect: record,
+      customer: record.customer,
+      cabang: record.cabang || '-',
+      reason: `Mangkrak ${days} hari tanpa progres`,
+      detail: record.uraian || '-',
+      value: record.value,
+    });
+  });
+
+  buildCustomerIntel(prospects).forEach((c) => {
+    if (!c.health.startsWith('Dingin') && c.health !== 'Menghangat') return;
+    const latest = c.records[0];
+    if (!latest) return;
+    out.push({
+      key: `reaktivasi-${c.name}`,
+      source: 'reaktivasi',
+      tier: c.health.startsWith('Dingin') ? 'terlambat' : 'minggu-ini',
+      prospect: latest,
+      customer: c.name,
+      cabang: c.cabang || '-',
+      reason: `Tidak order ${c.daysSinceOrder ?? '-'} hari`,
+      detail: `Total pembelian ${formatRupiah(c.wonValue)}`,
+      value: c.wonValue,
+    });
+  });
+
+  return out.sort((a, b) => {
+    const order = { terlambat: 0, 'minggu-ini': 1, nanti: 2 };
+    if (order[a.tier] !== order[b.tier]) return order[a.tier] - order[b.tier];
+    return b.value - a.value;
+  });
+}
+
+/** Count of "perlu segera" (terlambat-tier) rows — what the TopBar badge shows. */
+export function countUrgentFollowUps(prospects: Prospect[]): number {
+  return buildFollowUpRows(prospects).filter((r) => r.tier === 'terlambat').length;
 }

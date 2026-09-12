@@ -33,6 +33,9 @@ export function FollowUpModal() {
 
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
+  const [nextDate, setNextDate] = useState('');
+  const [nextNote, setNextNote] = useState('');
+  const [savingSchedule, setSavingSchedule] = useState(false);
 
   useEffect(() => {
     if (!show || !ctx) return;
@@ -47,11 +50,17 @@ export function FollowUpModal() {
       }
       setPhone(p);
       setMessage(buildProspectMessage(r, senderName));
+      // Prefills whatever's already scheduled, so reopening this modal shows
+      // (and lets you adjust) the existing plan rather than a blank slate.
+      setNextDate(r.followUpAt || '');
+      setNextNote(r.followUpNote || '');
     } else {
       const c = customers.find((x) => x.id === ctx.id);
       if (!c) return;
       setPhone(c.phone || '');
       setMessage(buildCustomerMessage(c, senderName));
+      setNextDate('');
+      setNextNote('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, ctx]);
@@ -85,6 +94,26 @@ export function FollowUpModal() {
     closeModal();
   }
 
+  // Independent of onSend — scheduling the next follow-up and sending
+  // today's WhatsApp message are two separate decisions, someone might only
+  // want one of them (e.g. schedule now, send the message later manually).
+  async function onSaveSchedule() {
+    if (!ctx || ctx.type !== 'prospect') return;
+    setSavingSchedule(true);
+    try {
+      const { prospect } = await api.patch<{ prospect: Prospect }>(`/api/prospects/${ctx.id}`, {
+        followUpAt: nextDate || null,
+        followUpNote: nextNote.trim() || null,
+      });
+      upsertProspect(prospect);
+      toast(nextDate ? `Follow-up berikutnya dijadwalkan ${nextDate}` : 'Jadwal follow-up dihapus', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal menyimpan jadwal', 'error');
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
+
   return (
     <Modal
       show={show}
@@ -111,6 +140,26 @@ export function FollowUpModal() {
           <label>Pesan</label>
           <textarea style={{ minHeight: 170 }} value={message} onChange={(e) => setMessage(e.target.value)} />
         </div>
+        {ctx.type === 'prospect' && (
+          <>
+            <div>
+              <label>Jadwalkan Follow-up Berikutnya</label>
+              <input type="date" value={nextDate} onChange={(e) => setNextDate(e.target.value)} />
+            </div>
+            <div>
+              <label>Catatan (opsional)</label>
+              <input type="text" value={nextNote} onChange={(e) => setNextNote(e.target.value)} placeholder="cth. Tanyakan kepastian PO" />
+            </div>
+            <div className="full">
+              <button type="button" className="btn btn-outline btn-sm" disabled={savingSchedule} onClick={onSaveSchedule}>
+                {nextDate ? 'Simpan Jadwal' : 'Hapus Jadwal'}
+              </button>
+              <div className="field-note" style={{ marginTop: 6 }}>
+                Terpisah dari tombol &quot;Buka WhatsApp&quot; di bawah — bisa menjadwalkan saja tanpa mengirim pesan sekarang, atau sebaliknya.
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </Modal>
   );

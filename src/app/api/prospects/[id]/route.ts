@@ -96,7 +96,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const body = await req.json().catch(() => null);
   const data: Record<string, unknown> = {};
-  const allowed = ['status', 'penawaranTerkirim', 'terfaktur', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan'];
+  const allowed = ['status', 'penawaranTerkirim', 'terfaktur', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan', 'followUpAt', 'followUpNote'];
   for (const key of allowed) {
     if (body && Object.prototype.hasOwnProperty.call(body, key)) data[key] = body[key];
   }
@@ -125,7 +125,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       ? `Memindahkan prospek "${prospect.customer}" dari "${statusLabel(movedStatus.from)}" ke "${statusLabel(movedStatus.to)}"`
       : changes?.penawaranTerkirim
         ? `Menandai penawaran prospek "${prospect.customer}" sebagai ${prospect.penawaranTerkirim ? 'Terkirim' : 'Pending'}`
-        : `Mengubah prospek "${prospect.customer}"`,
+        : changes?.followUpAt
+          ? `Menjadwalkan follow-up prospek "${prospect.customer}" pada ${prospect.followUpAt || '-'}`
+          : `Mengubah prospek "${prospect.customer}"`,
     changes,
   });
   return NextResponse.json({ prospect });

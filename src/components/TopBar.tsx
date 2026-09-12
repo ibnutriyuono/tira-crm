@@ -8,7 +8,8 @@ import { api } from '@/lib/api-client';
 import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { classify, num, todayStr } from '@/lib/format';
 import { countNewPurchasingItems } from '@/lib/purchasing-workflow';
-import { IconActivity, IconBag, IconBarChart, IconBell, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconExport, IconImport, IconPlus, IconRfq, IconSave, IconSearch, IconTemplate, IconUsers } from './icons';
+import { countUrgentFollowUps } from '@/lib/reports';
+import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconExport, IconImport, IconPlus, IconRfq, IconSave, IconSearch, IconTemplate, IconUsers } from './icons';
 
 const ROLE_LABEL: Record<string, { label: string; color: string }> = {
   admin: { label: 'Admin', color: 'amber' },
@@ -27,6 +28,10 @@ export function TopBar() {
   // RFQ/FUP A sitting in Purchasing's queue untouched — the same stage-1 count
   // the worklist shows, so the badge and the list can never disagree.
   const newPurchasingCount = countNewPurchasingItems(rfqs, fupas);
+  const prospects = useDataStore((s) => s.prospects);
+  // Same builder the Follow-up panel itself renders from (buildFollowUpRows),
+  // so this count and what's actually listed inside can never disagree.
+  const urgentFollowUpCount = countUrgentFollowUps(prospects);
   const notifications = useDataStore((s) => s.notifications);
   const unreadNotifCount = notifications.filter((n) => !n.readAt).length;
   const openModal = useUiStore((s) => s.openModal);
@@ -171,6 +176,15 @@ export function TopBar() {
           <button className="btn btn-ghost-dark" onClick={() => openModal('competitorLog')}>
             <IconBarChart />
             Log Kompetitor
+          </button>
+          <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('followUpBoard')}>
+            <IconCalendar />
+            Follow-up
+            {urgentFollowUpCount > 0 && (
+              <span className="topbar-badge" title={`${urgentFollowUpCount} follow-up perlu segera`}>
+                {urgentFollowUpCount > 9 ? '9+' : urgentFollowUpCount}
+              </span>
+            )}
           </button>
           <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('notifications')}>
             <IconBell />

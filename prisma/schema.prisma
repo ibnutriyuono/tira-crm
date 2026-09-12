@@ -92,6 +92,12 @@ model Prospect {
   qcdDelivery       String?
   qcdKompetitor     String?
   qcdCatatan        String?
+  /// Jadwal follow-up berikutnya, diisi manual oleh Sales/BM — bukan
+  /// dihitung otomatis seperti Aging (statusChangedAt). Dipakai dasbord
+  /// Follow-up untuk menyatukan "sudah dijadwalkan" dengan sinyal otomatis
+  /// (pipeline mangkrak, customer dingin) dalam satu tampilan.
+  followUpAt        String?
+  followUpNote      String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -99,6 +105,7 @@ model Prospect {
   @@index([cabang])
   @@index([se])
   @@index([reg])
+  @@index([followUpAt])
 }
 
 // `reg` is denormalized off the source Prospect at write time rather than

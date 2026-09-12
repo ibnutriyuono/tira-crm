@@ -110,6 +110,8 @@ export const PROSPECT_FIELD_LABELS: Record<string, string> = {
   qcdDelivery: 'QCD Delivery',
   qcdKompetitor: 'QCD Kompetitor',
   qcdCatatan: 'QCD Catatan',
+  followUpAt: 'Jadwal Follow-up',
+  followUpNote: 'Catatan Follow-up',
 };
 
 export const CUSTOMER_FIELD_LABELS: Record<string, string> = {
