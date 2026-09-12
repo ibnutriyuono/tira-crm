@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { notify, purchasingUserIds, requesterUserIds } from '@/lib/notify';
 
 const ENTITIES = ['prospect', 'rfq', 'fupa'] as const;
 type ItemEntity = (typeof ENTITIES)[number];
@@ -73,6 +74,31 @@ export async function POST(req: Request) {
   });
 
   emitCrmEvent('itemchat:message', message);
+
+  // Diskusi hanya relevan untuk RFQ/FUP A — thread prospek tidak melibatkan
+  // Purchasing. Penerimanya: semua staf Purchasing + pengaju dokumen,
+  // dikurangi siapapun yang justru sedang mengirim pesan ini.
+  if (entity === 'rfq' || entity === 'fupa') {
+    const parent =
+      entity === 'rfq'
+        ? await prisma.rfq.findUnique({ where: { id: entityId } })
+        : await prisma.fupa.findUnique({ where: { id: entityId } });
+    if (parent) {
+      const noDoc = (entity === 'rfq' ? (parent as { noRfq: string | null }).noRfq : (parent as { noFupa: string | null }).noFupa) || '(tanpa nomor)';
+      const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+      const recipients = new Set([...(await purchasingUserIds()), ...(await requesterUserIds(parent.requestedBy))]);
+      recipients.delete(user.id);
+      await notify({
+        userIds: Array.from(recipients),
+        type: entity === 'rfq' ? 'rfq_chat' : 'fupa_chat',
+        entity,
+        entityId,
+        title: `Pesan baru di ${entity === 'rfq' ? 'RFQ' : 'FUP A'} ${noDoc}`,
+        message: `${user.name}: ${preview}`,
+      });
+    }
+  }
+
   return NextResponse.json({ message }, { status: 201 });
 }
 

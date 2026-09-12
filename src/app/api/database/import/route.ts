@@ -24,6 +24,7 @@ export async function POST(req: Request) {
   const rfqs = Array.isArray(body.rfqs) ? (body.rfqs as Array<Record<string, unknown>>) : [];
   const users = Array.isArray(body.users) ? (body.users as Array<Record<string, unknown>>) : [];
   const salesPlans = Array.isArray(body.salesPlans) ? (body.salesPlans as Array<Record<string, unknown>>) : [];
+  const notifications = Array.isArray(body.notifications) ? (body.notifications as Array<Record<string, unknown>>) : [];
 
   await prisma.$transaction(async (tx) => {
     await tx.prospect.deleteMany({});
@@ -121,6 +122,27 @@ export async function POST(req: Request) {
         })),
       });
     }
+
+    // Unlike ActivityLog (an audit trail, deliberately untouched below),
+    // Notification is personal inbox state — mutable, disposable, meant to
+    // be marked read and eventually ignored — so it's fine to fold into the
+    // normal restore cycle rather than treated as immutable history.
+    await tx.notification.deleteMany({});
+    if (notifications.length > 0) {
+      await tx.notification.createMany({
+        data: notifications.map((n) => ({
+          id: String(n.id),
+          userId: String(n.userId),
+          type: String(n.type),
+          entity: String(n.entity),
+          entityId: String(n.entityId),
+          title: (n.title as string) ?? '',
+          message: (n.message as string) ?? '',
+          readAt: n.readAt ? new Date(n.readAt as string) : null,
+          createdAt: n.createdAt ? new Date(n.createdAt as string) : new Date(),
+        })),
+      });
+    }
   });
 
   // ActivityLog is intentionally left untouched by the restore: an audit trail
@@ -131,7 +153,7 @@ export async function POST(req: Request) {
     user,
     action: 'restore',
     entity: 'database',
-    summary: `Memulihkan database dari backup (${prospects.length} prospek, ${customers.length} customer, ${rfqs.length} RFQ, ${users.length} user, ${salesPlans.length} rencana penjualan)`,
+    summary: `Memulihkan database dari backup (${prospects.length} prospek, ${customers.length} customer, ${rfqs.length} RFQ, ${users.length} user, ${salesPlans.length} rencana penjualan, ${notifications.length} notifikasi)`,
   });
   return NextResponse.json({ ok: true });
 }

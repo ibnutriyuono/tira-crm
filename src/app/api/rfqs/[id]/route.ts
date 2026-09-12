@@ -4,6 +4,7 @@ import { isResponse, mergeRfqItemsPreservingAnswer, requireUser } from '@/lib/ap
 import { canEditPurchasing, canEditRfqAnswer } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { notify, purchasingUserIds, requesterUserIds } from '@/lib/notify';
 import type { Prisma } from '@prisma/client';
 import type { RfqItem } from '@/lib/types';
 
@@ -66,6 +67,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     summary: `Mengubah RFQ ${rfq.noRfq || '(tanpa nomor)'} untuk "${rfq.customer || '-'}"`,
     changes: diffFields(existing, rfq, RFQ_FIELD_LABELS),
   });
+  // Draft -> Terkirim lewat "Kirim ke Purchasing" — sama pentingnya bagi
+  // Purchasing dengan RFQ yang langsung dibuat dalam keadaan terkirim
+  // (ditangani di POST), jadi dicek di sini juga.
+  if (existing.status !== 'Terkirim' && rfq.status === 'Terkirim') {
+    await notify({
+      userIds: await purchasingUserIds(),
+      type: 'rfq_new',
+      entity: 'rfq',
+      entityId: rfq.id,
+      title: 'RFQ baru masuk',
+      message: `${rfq.noRfq || '(tanpa nomor)'} dari ${rfq.cabang || '-'} — ${rfq.customer || '-'}`,
+    });
+  }
   return NextResponse.json({ rfq });
 }
 
@@ -149,6 +163,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           ? `Mengirim jawaban RFQ ${rfq.noRfq || '(tanpa nomor)'} ke Sales`
           : `Mengisi jawaban Purchasing pada RFQ ${rfq.noRfq || '(tanpa nomor)'}`,
     });
+    if (body.action === 'send-jawaban') {
+      await notify({
+        userIds: await requesterUserIds(rfq.requestedBy),
+        type: 'rfq_answered',
+        entity: 'rfq',
+        entityId: rfq.id,
+        title: 'Purchasing menjawab RFQ',
+        message: `${rfq.noRfq || '(tanpa nomor)'} untuk "${rfq.customer || '-'}" sudah dijawab`,
+      });
+    }
     return NextResponse.json({ rfq });
   }
 
@@ -184,6 +208,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     summary: `Mengubah status RFQ ${rfq.noRfq || '(tanpa nomor)'} dari "${before?.status ?? '-'}" ke "${rfq.status}"`,
     changes: before ? diffFields(before, rfq, RFQ_FIELD_LABELS) : null,
   });
+  if (before?.status !== 'Selesai' && rfq.status === 'Selesai') {
+    await notify({
+      userIds: await requesterUserIds(rfq.requestedBy),
+      type: 'rfq_done',
+      entity: 'rfq',
+      entityId: rfq.id,
+      title: 'RFQ ditandai Selesai',
+      message: `${rfq.noRfq || '(tanpa nomor)'} untuk "${rfq.customer || '-'}"`,
+    });
+  }
   return NextResponse.json({ rfq });
 }
 

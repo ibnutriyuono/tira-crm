@@ -8,7 +8,7 @@ import { api } from '@/lib/api-client';
 import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { classify, num, todayStr } from '@/lib/format';
 import { countNewPurchasingItems } from '@/lib/purchasing-workflow';
-import { IconActivity, IconBag, IconBarChart, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconExport, IconImport, IconPlus, IconRfq, IconSave, IconSearch, IconTemplate, IconUsers } from './icons';
+import { IconActivity, IconBag, IconBarChart, IconBell, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconExport, IconImport, IconPlus, IconRfq, IconSave, IconSearch, IconTemplate, IconUsers } from './icons';
 
 const ROLE_LABEL: Record<string, { label: string; color: string }> = {
   admin: { label: 'Admin', color: 'amber' },
@@ -27,6 +27,8 @@ export function TopBar() {
   // RFQ/FUP A sitting in Purchasing's queue untouched — the same stage-1 count
   // the worklist shows, so the badge and the list can never disagree.
   const newPurchasingCount = countNewPurchasingItems(rfqs, fupas);
+  const notifications = useDataStore((s) => s.notifications);
+  const unreadNotifCount = notifications.filter((n) => !n.readAt).length;
   const openModal = useUiStore((s) => s.openModal);
   const [savedLabel, setSavedLabel] = useState('');
 
@@ -169,6 +171,15 @@ export function TopBar() {
           <button className="btn btn-ghost-dark" onClick={() => openModal('competitorLog')}>
             <IconBarChart />
             Log Kompetitor
+          </button>
+          <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('notifications')}>
+            <IconBell />
+            Notifikasi
+            {unreadNotifCount > 0 && (
+              <span className="topbar-badge" title={`${unreadNotifCount} notifikasi belum dibaca`}>
+                {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+              </span>
+            )}
           </button>
           <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('purchasing')}>
             <IconBag />

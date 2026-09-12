@@ -10,7 +10,7 @@ export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
 
-  const [prospects, customers, rfqs, fupas, vendors, budgetTargets, salesPlans, settingRow] = await Promise.all([
+  const [prospects, customers, rfqs, fupas, vendors, budgetTargets, salesPlans, notifications, settingRow] = await Promise.all([
     prisma.prospect.findMany({ where: prospectScopeWhere(user), orderBy: { createdAt: 'desc' } }),
     prisma.customer.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.rfq.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } }),
@@ -21,10 +21,13 @@ export async function GET() {
     // client filters by month locally (see ForecastModal), so bootstrap just
     // hands over everything this role is allowed to see across all months.
     prisma.salesPlan.findMany({ where: await salesPlanScopeWhere(user), orderBy: [{ periode: 'desc' }, { se: 'asc' }] }),
+    // Own notifications only — inherently personal, no role-based scope
+    // function needed the way prospects/rfqs/salesPlans have.
+    prisma.notification.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' }, take: 50 }),
     prisma.setting.findUnique({ where: { key: 'purchasingContact' } }),
   ]);
 
   const purchasingContact = (settingRow?.value as unknown as PurchasingContact) || { wa: '', email: '' };
 
-  return NextResponse.json({ user, prospects, customers, rfqs, fupas, vendors, budgetTargets, salesPlans, purchasingContact });
+  return NextResponse.json({ user, prospects, customers, rfqs, fupas, vendors, budgetTargets, salesPlans, notifications, purchasingContact });
 }

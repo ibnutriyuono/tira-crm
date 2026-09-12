@@ -4,13 +4,15 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PurchasingBoard } from './PurchasingBoard';
-import { IconBag } from './icons';
+import { IconBag, IconBell } from './icons';
 import { ROLE_LABELS } from '@/lib/constants';
 import { api } from '@/lib/api-client';
 import { ToastHost } from './ToastHost';
 import { CancelDocModal } from './modals/CancelDocModal';
+import { NotificationsModal } from './modals/NotificationsModal';
 import { TeamChatWidget } from './TeamChatWidget';
 import { useDataStore } from '@/store/useDataStore';
+import { useUiStore } from '@/store/useUiStore';
 import { useCrmSocket } from '@/hooks/useCrmSocket';
 
 /**
@@ -21,6 +23,9 @@ export function PurchasingPageClient() {
   const loaded = useDataStore((s) => s.loaded);
   const bootstrap = useDataStore((s) => s.bootstrap);
   const currentUser = useDataStore((s) => s.currentUser);
+  const notifications = useDataStore((s) => s.notifications);
+  const unreadNotifCount = notifications.filter((n) => !n.readAt).length;
+  const openModal = useUiStore((s) => s.openModal);
 
   const router = useRouter();
 
@@ -61,6 +66,15 @@ export function PurchasingPageClient() {
             <span className="pic-chip">
               {currentUser?.name} · <b>{ROLE_LABELS[currentUser?.role ?? ''] || currentUser?.role}</b>
             </span>
+            <button type="button" className="btn btn-ghost-dark btn-sm" style={{ position: 'relative' }} onClick={() => openModal('notifications')}>
+              <IconBell />
+              Notifikasi
+              {unreadNotifCount > 0 && (
+                <span className="topbar-badge" title={`${unreadNotifCount} notifikasi belum dibaca`}>
+                  {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                </span>
+              )}
+            </button>
             {/* Purchasing lives only in this workspace; other roles arrive from
                 the CRM and need a way back. */}
             {currentUser?.role !== 'purchasing' && (
@@ -76,6 +90,7 @@ export function PurchasingPageClient() {
         <PurchasingBoard readOnly={!canEdit} standalone />
       </div>
       <CancelDocModal />
+      <NotificationsModal />
       <ToastHost />
       <TeamChatWidget />
     </>

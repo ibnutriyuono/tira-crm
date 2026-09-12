@@ -3,6 +3,7 @@ import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { notify, requesterUserIds } from '@/lib/notify';
 
 /**
  * Membatalkan FUP A beserta alasannya. Dokumen TIDAK dihapus — statusnya
@@ -62,6 +63,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     entity: 'fupa',
     entityId: id,
     summary: `Membatalkan FUP A ${existing.noFupa || '(tanpa nomor)'} untuk "${existing.customer || '-'}" — alasan: ${reason}`,
+  });
+  await notify({
+    userIds: await requesterUserIds(fupa.requestedBy),
+    type: 'fupa_cancelled',
+    entity: 'fupa',
+    entityId: id,
+    title: 'FUP A dibatalkan',
+    message: `${fupa.noFupa || '(tanpa nomor)'} untuk "${fupa.customer || '-'}" — alasan: ${reason}`,
   });
   return NextResponse.json({ fupa });
 }

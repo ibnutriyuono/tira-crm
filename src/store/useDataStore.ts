@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { BudgetTarget, Customer, Fupa, Prospect, PurchasingContact, Rfq, SafeUser, SalesPlan, Vendor } from '@/lib/types';
+import type { AppNotification, BudgetTarget, Customer, Fupa, Prospect, PurchasingContact, Rfq, SafeUser, SalesPlan, Vendor } from '@/lib/types';
 
 interface Toast {
   id: number;
@@ -18,6 +18,7 @@ interface DataState {
   vendors: Vendor[];
   budgetTargets: BudgetTarget[];
   salesPlans: SalesPlan[];
+  notifications: AppNotification[];
   users: SafeUser[]; // only populated for admins when Kelola User modal opens
   purchasingContact: PurchasingContact;
   loaded: boolean;
@@ -40,6 +41,9 @@ interface DataState {
   refetchFupas: () => Promise<void>;
   upsertBudgetTarget: (b: BudgetTarget) => void;
   upsertSalesPlan: (p: SalesPlan) => void;
+  upsertNotification: (n: AppNotification) => void;
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
   upsertVendor: (v: Vendor) => void;
   removeVendor: (id: string) => void;
   refetchVendors: () => Promise<void>;
@@ -65,6 +69,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   vendors: [],
   budgetTargets: [],
   salesPlans: [],
+  notifications: [],
   users: [],
   purchasingContact: { wa: '', email: '' },
   loaded: false,
@@ -80,6 +85,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       vendors: [],
       budgetTargets: [],
       salesPlans: [],
+      notifications: [],
       users: [],
       purchasingContact: { wa: '', email: '' },
       loaded: false,
@@ -99,6 +105,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       vendors: data.vendors ?? [],
       budgetTargets: data.budgetTargets ?? [],
       salesPlans: data.salesPlans ?? [],
+      notifications: data.notifications ?? [],
       purchasingContact: data.purchasingContact,
       loaded: true,
     });
@@ -169,6 +176,25 @@ export const useDataStore = create<DataState>((set, get) => ({
       next[idx] = p;
       return { salesPlans: next };
     }),
+
+  // New notifications arrive one at a time over the socket and always
+  // belong at the top (newest-first) — unlike the other upsert helpers,
+  // there's no existing-row-in-place update case to handle for a brand new
+  // row, but re-delivery (a reconnect replaying an event) still shouldn't
+  // duplicate it.
+  upsertNotification: (n) =>
+    set((s) => {
+      if (s.notifications.some((x) => x.id === n.id)) return {};
+      return { notifications: [n, ...s.notifications] };
+    }),
+  markNotificationRead: (id) =>
+    set((s) => ({
+      notifications: s.notifications.map((n) => (n.id === id && !n.readAt ? { ...n, readAt: new Date().toISOString() } : n)),
+    })),
+  markAllNotificationsRead: () =>
+    set((s) => ({
+      notifications: s.notifications.map((n) => (n.readAt ? n : { ...n, readAt: new Date().toISOString() })),
+    })),
 
   upsertVendor: (v) =>
     set((s) => {

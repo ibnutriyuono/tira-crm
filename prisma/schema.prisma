@@ -16,6 +16,25 @@ enum Role {
   purchasing
 }
 
+/// Notifikasi persisten per-user — riwayat semua kejadian penting pada RFQ/FUP A
+/// yang relevan untuk penerimanya, ditampilkan di tab Notifikasi. Satu baris per
+/// penerima (bukan satu baris disiarkan), supaya "tandai terbaca" murni per-baris
+/// tanpa perlu tabel status-baca terpisah.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  entity    String // 'rfq' | 'fupa'
+  entityId  String
+  title     String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
 model User {
   id           String   @id @default(cuid())
   username     String   @unique

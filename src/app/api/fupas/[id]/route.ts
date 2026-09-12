@@ -4,6 +4,7 @@ import { isResponse, requireUser } from '@/lib/api-helpers';
 import { canEditPurchasing } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { notify, purchasingUserIds, requesterUserIds } from '@/lib/notify';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -38,6 +39,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     summary: `Mengubah FUP A ${fupa.noFupa || '(tanpa nomor)'} untuk "${fupa.customer || '-'}"`,
     changes: diffFields(existing, fupa, FUPA_FIELD_LABELS),
   });
+  if (existing.status !== 'Terkirim' && fupa.status === 'Terkirim') {
+    await notify({
+      userIds: await purchasingUserIds(),
+      type: 'fupa_new',
+      entity: 'fupa',
+      entityId: fupa.id,
+      title: 'FUP A baru masuk',
+      message: `${fupa.noFupa || '(tanpa nomor)'} dari ${fupa.cabang || '-'} — ${fupa.customer || '-'}`,
+    });
+  }
   return NextResponse.json({ fupa });
 }
 
@@ -119,6 +130,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       entityId: id,
       summary: `Mengisi catatan/jawaban Purchasing pada FUP A ${fupa.noFupa || '(tanpa nomor)'}`,
     });
+    if (answering) {
+      await notify({
+        userIds: await requesterUserIds(fupa.requestedBy),
+        type: 'fupa_answered',
+        entity: 'fupa',
+        entityId: fupa.id,
+        title: 'Purchasing menjawab FUP A',
+        message: `${fupa.noFupa || '(tanpa nomor)'} untuk "${fupa.customer || '-'}" sudah dijawab`,
+      });
+    }
     return NextResponse.json({ fupa });
   }
 
@@ -132,6 +153,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       entityId: id,
       summary: `Mengubah status FUP A ${fupa.noFupa || '(tanpa nomor)'} dari "${existing.status}" ke "${fupa.status}"`,
     });
+    if (existing.status !== 'Selesai' && fupa.status === 'Selesai') {
+      await notify({
+        userIds: await requesterUserIds(fupa.requestedBy),
+        type: 'fupa_done',
+        entity: 'fupa',
+        entityId: fupa.id,
+        title: 'FUP A ditandai Selesai',
+        message: `${fupa.noFupa || '(tanpa nomor)'} untuk "${fupa.customer || '-'}"`,
+      });
+    }
     return NextResponse.json({ fupa });
   }
 

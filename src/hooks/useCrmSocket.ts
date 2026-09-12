@@ -4,14 +4,14 @@ import { useEffect } from 'react';
 import { getSocket } from '@/lib/socket-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
-import type { BudgetTarget, SalesPlan, Customer, Fupa, ItemChatMessage, Prospect, PurchasingContact, Rfq, SafeUser, Vendor } from '@/lib/types';
+import type { BudgetTarget, SalesPlan, Customer, Fupa, ItemChatMessage, Prospect, PurchasingContact, Rfq, SafeUser, Vendor, AppNotification } from '@/lib/types';
 
 /**
  * Notification toasts open the document they are about. Purchasing works from
  * the standalone /purchasing page (no modals mounted), everyone else from the
  * monitor modal — setting both covers each without knowing which is rendered.
  */
-function openPurchDoc(jenis: 'RFQ' | 'FUPA', id: string) {
+export function openPurchDoc(jenis: 'RFQ' | 'FUPA', id: string) {
   useUiStore.setState({ purchDetailCtx: { jenis, id } });
   if (useDataStore.getState().currentUser?.role !== 'purchasing') useUiStore.getState().openModal('purchasing');
 }
@@ -119,6 +119,18 @@ export function useCrmSocket() {
     const onBudgetUpsert = (b: BudgetTarget) => useDataStore.getState().upsertBudgetTarget(b);
     const onSalesPlanUpsert = (p: SalesPlan) => useDataStore.getState().upsertSalesPlan(p);
 
+    // Notifications are already targeted to one specific user at creation
+    // time (see lib/notify.ts — one row per recipient), but emitCrmEvent
+    // broadcasts to the single shared 'crm' room regardless, so every
+    // connected client receives every notification event. The exact userId
+    // match here is what actually keeps someone else's notification off
+    // your screen.
+    const onNotificationNew = (n: AppNotification) => {
+      const me = useDataStore.getState().currentUser;
+      if (!me || n.userId !== me.id) return;
+      useDataStore.getState().upsertNotification(n);
+    };
+
     const onVendorUpsert = (v: Vendor) => useDataStore.getState().upsertVendor(v);
     const onVendorDelete = ({ id }: { id: string }) => useDataStore.getState().removeVendor(id);
     const onVendorBulk = () => useDataStore.getState().refetchVendors();
@@ -154,6 +166,7 @@ export function useCrmSocket() {
 
     s.on('budget:updated', onBudgetUpsert);
     s.on('salesPlan:updated', onSalesPlanUpsert);
+    s.on('notification:new', onNotificationNew);
 
     s.on('vendor:created', onVendorUpsert);
     s.on('vendor:updated', onVendorUpsert);
@@ -181,6 +194,7 @@ export function useCrmSocket() {
       s.off('fupa:deleted', onFupaDelete);
       s.off('budget:updated', onBudgetUpsert);
       s.off('salesPlan:updated', onSalesPlanUpsert);
+      s.off('notification:new', onNotificationNew);
       s.off('vendor:created', onVendorUpsert);
       s.off('vendor:updated', onVendorUpsert);
       s.off('vendor:deleted', onVendorDelete);

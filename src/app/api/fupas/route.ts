@@ -4,6 +4,7 @@ import { isResponse, requireUser } from '@/lib/api-helpers';
 import { cabangRegMap, docScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { notify, purchasingUserIds } from '@/lib/notify';
 
 export async function GET() {
   const user = await requireUser();
@@ -63,5 +64,15 @@ export async function POST(req: Request) {
     entityId: fupa.id,
     summary: `Membuat FUP A ${fupa.noFupa || '(tanpa nomor)'} untuk "${fupa.customer || '-'}" (${fupa.status})`,
   });
+  if (fupa.status === 'Terkirim') {
+    await notify({
+      userIds: await purchasingUserIds(),
+      type: 'fupa_new',
+      entity: 'fupa',
+      entityId: fupa.id,
+      title: 'FUP A baru masuk',
+      message: `${fupa.noFupa || '(tanpa nomor)'} dari ${fupa.cabang || '-'} — ${fupa.customer || '-'}`,
+    });
+  }
   return NextResponse.json({ fupa }, { status: 201 });
 }

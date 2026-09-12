@@ -3,6 +3,7 @@ import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { notify, requesterUserIds } from '@/lib/notify';
 
 /**
  * Membatalkan RFQ beserta alasannya. Dokumen TIDAK dihapus — statusnya
@@ -62,6 +63,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     entity: 'rfq',
     entityId: id,
     summary: `Membatalkan RFQ ${existing.noRfq || '(tanpa nomor)'} untuk "${existing.customer || '-'}" — alasan: ${reason}`,
+  });
+  await notify({
+    userIds: await requesterUserIds(rfq.requestedBy),
+    type: 'rfq_cancelled',
+    entity: 'rfq',
+    entityId: id,
+    title: 'RFQ dibatalkan',
+    message: `${rfq.noRfq || '(tanpa nomor)'} untuk "${rfq.customer || '-'}" — alasan: ${reason}`,
   });
   return NextResponse.json({ rfq });
 }

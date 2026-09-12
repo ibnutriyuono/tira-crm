@@ -28,6 +28,7 @@ export type ModalKey =
   | 'forecast'
   | 'qcdRecap'
   | 'salesPlan'
+  | 'notifications'
   | null;
 
 export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq' | 'vendor' | 'fupa';

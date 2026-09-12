@@ -4,6 +4,7 @@ import { isResponse, requireUser } from '@/lib/api-helpers';
 import { cabangRegMap, docScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { notify, purchasingUserIds } from '@/lib/notify';
 
 export async function GET() {
   const user = await requireUser();
@@ -114,5 +115,15 @@ export async function POST(req: Request) {
     entityId: rfq.id,
     summary: `Membuat RFQ ${rfq.noRfq || '(tanpa nomor)'} untuk "${rfq.customer || '-'}" (${rfq.status})`,
   });
+  if (rfq.status === 'Terkirim') {
+    await notify({
+      userIds: await purchasingUserIds(),
+      type: 'rfq_new',
+      entity: 'rfq',
+      entityId: rfq.id,
+      title: 'RFQ baru masuk',
+      message: `${rfq.noRfq || '(tanpa nomor)'} dari ${rfq.cabang || '-'} — ${rfq.customer || '-'}`,
+    });
+  }
   return NextResponse.json({ rfq }, { status: 201 });
 }

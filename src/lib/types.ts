@@ -245,6 +245,30 @@ export interface BudgetTarget {
   amount: number;
 }
 
+export type NotificationType =
+  | 'rfq_new'
+  | 'fupa_new'
+  | 'rfq_answered'
+  | 'fupa_answered'
+  | 'rfq_done'
+  | 'fupa_done'
+  | 'rfq_chat'
+  | 'fupa_chat'
+  | 'rfq_cancelled'
+  | 'fupa_cancelled';
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  entity: 'rfq' | 'fupa';
+  entityId: string;
+  title: string;
+  message: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
 export interface SalesPlanItem {
   line: string;
   uraian: string;
