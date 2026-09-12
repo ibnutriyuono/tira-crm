@@ -398,6 +398,7 @@ enum ActivityEntity {
   fupa
   quotation
   budget
+  salesPlan
   chat
 }
 
