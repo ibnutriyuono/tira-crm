@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import type PptxGenJS from 'pptxgenjs';
 import { Modal } from '../Modal';
 import { IconDownload } from '../icons';
 import { CABANG_LIST, STATUS_META } from '@/lib/constants';
@@ -17,6 +18,17 @@ const RUST = 'B94A3D';
 const CHART_COLORS = [STEEL, AMBER, GREEN, RUST, '6B7684'];
 
 const SOURCE_LABEL: Record<string, string> = { terjadwal: 'Terjadwal', aging: 'Pipeline Mangkrak', reaktivasi: 'Customer Dingin' };
+
+/**
+ * Header rows are styled cells, body rows are plain strings. pptxgenjs accepts
+ * both at runtime (it normalizes strings itself), but its v4 typings declare a
+ * row as TableCell[] only, so the two shapes have no common type. Wrapping the
+ * strings here lets the tables below stay readable while still matching the
+ * shape the library documents.
+ */
+function tableRows(rows: (string | PptxGenJS.TableCell)[][]): PptxGenJS.TableCell[][] {
+  return rows.map((row) => row.map((cell) => (typeof cell === 'string' ? { text: cell } : cell)));
+}
 
 /** "2026-09" -> "September 2026" — a raw YYYY-MM reads fine in a form input, not on a title slide. */
 function formatPeriodeLong(periode: string): string {
@@ -118,15 +130,10 @@ export function GmAnalysisModal() {
   async function onGeneratePpt() {
     setBusy(true);
     try {
-      // Dynamic import + CJS/ESM interop for this package's default export
-      // isn't something this sandbox can verify against Next.js's actual
-      // bundler output (see xlsx's own `const XLSX = await import('xlsx')`
-      // elsewhere in this codebase, used directly with no `.default`) —
-      // `any` here is a deliberate, narrow escape hatch for that one
-      // uncertain line, not a general type-safety shortcut.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pptxgenModule: any = await import('pptxgenjs');
-      const PptxGen = pptxgenModule.default ?? pptxgenModule;
+      // Loaded on demand, like the xlsx exports elsewhere in this codebase:
+      // the deck is built in the browser, so the library stays out of the
+      // main bundle until a GM actually asks for one.
+      const { default: PptxGen } = await import('pptxgenjs');
       const pres = new PptxGen();
       pres.layout = 'LAYOUT_WIDE';
       const chartOpts = { chartColors: CHART_COLORS };
@@ -152,7 +159,7 @@ export function GmAnalysisModal() {
         ['Realisasi vs Rencana', `${nasional.wonVsRencana}%`],
         ['Weighted Pipeline Aktif', formatRupiah(nasional.weighted)],
       ];
-      s2.addTable(kpiRows, { x: 0.5, y: 1.3, w: 8, fontSize: 13, border: { type: 'solid', color: 'DDDDDD', pt: 0.5 }, autoPage: false });
+      s2.addTable(tableRows(kpiRows), { x: 0.5, y: 1.3, w: 8, fontSize: 13, border: { type: 'solid', color: 'DDDDDD', pt: 0.5 }, autoPage: false });
 
       // 3. Performa per Regional
       const s3 = pres.addSlide();
@@ -178,7 +185,7 @@ export function GmAnalysisModal() {
       s4.addText('Performa per Cabang', { x: 0.5, y: 0.4, w: 11, h: 0.6, fontSize: 24, bold: true, color: GRAPHITE, fontFace: 'Cambria' });
       const branchHeader = ['Cabang', 'Target', 'Rencana', 'Realisasi', 'Achievement'].map((t) => ({ text: t, options: { bold: true, fill: { color: GRAPHITE }, color: 'FFFFFF' } }));
       const branchBody = rows.map((r) => [r.cabang, formatRupiah(r.target), formatRupiah(r.rencana), formatRupiah(r.won), `${r.achievement}%`]);
-      s4.addTable([branchHeader, ...branchBody], { x: 0.4, y: 1.15, w: 12.5, fontSize: 10.5, border: { type: 'solid', color: 'DDDDDD', pt: 0.5 }, autoPage: true, autoPageCharWeight: -1 });
+      s4.addTable(tableRows([branchHeader, ...branchBody]), { x: 0.4, y: 1.15, w: 12.5, fontSize: 10.5, border: { type: 'solid', color: 'DDDDDD', pt: 0.5 }, autoPage: true, autoPageCharWeight: -1 });
 
       // 5. Pipeline funnel + aging
       const s5 = pres.addSlide();
@@ -199,7 +206,7 @@ export function GmAnalysisModal() {
       s6.addText('5 Customer Dingin Bernilai Terbesar', { x: 6.7, y: 1.1, w: 6.1, h: 0.4, fontSize: 14, bold: true, color: RUST });
       const dinginHeader = ['Customer', 'Cabang', 'Tidak Order', 'Nilai Historis'].map((t) => ({ text: t, options: { bold: true, fill: { color: GRAPHITE }, color: 'FFFFFF', fontSize: 10 } }));
       const dinginBody = topDingin.map((c) => [c.name, c.cabang, `${c.daysSinceOrder ?? '-'} hari`, formatRupiah(c.wonValue)]);
-      s6.addTable([dinginHeader, ...(dinginBody.length > 0 ? dinginBody : [['Tidak ada customer dingin bernilai besar', '', '', '']])], {
+      s6.addTable(tableRows([dinginHeader, ...(dinginBody.length > 0 ? dinginBody : [['Tidak ada customer dingin bernilai besar', '', '', '']])]), {
         x: 6.7, y: 1.55, w: 6.1, fontSize: 9.5, border: { type: 'solid', color: 'DDDDDD', pt: 0.5 },
       });
 
@@ -208,7 +215,7 @@ export function GmAnalysisModal() {
       s7.addText('Follow-up Perlu Segera', { x: 0.5, y: 0.4, w: 11, h: 0.6, fontSize: 24, bold: true, color: GRAPHITE, fontFace: 'Cambria' });
       const fuHeader = ['Customer', 'Cabang', 'Sumber', 'Alasan'].map((t) => ({ text: t, options: { bold: true, fill: { color: GRAPHITE }, color: 'FFFFFF' } }));
       const fuBody = urgentFollowUps.slice(0, 15).map((r) => [r.customer, r.cabang, SOURCE_LABEL[r.source] ?? r.source, r.reason]);
-      s7.addTable([fuHeader, ...(fuBody.length > 0 ? fuBody : [['Tidak ada follow-up yang terlambat', '', '', '']])], {
+      s7.addTable(tableRows([fuHeader, ...(fuBody.length > 0 ? fuBody : [['Tidak ada follow-up yang terlambat', '', '', '']])]), {
         x: 0.4, y: 1.15, w: 12.5, fontSize: 11, border: { type: 'solid', color: 'DDDDDD', pt: 0.5 }, autoPage: true,
       });
 
