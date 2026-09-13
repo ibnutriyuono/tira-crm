@@ -9,7 +9,7 @@ import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { classify, num, todayStr } from '@/lib/format';
 import { countNewPurchasingItems } from '@/lib/purchasing-workflow';
 import { countUrgentFollowUps } from '@/lib/reports';
-import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconExport, IconImport, IconPlus, IconRfq, IconSave, IconSearch, IconTemplate, IconUsers } from './icons';
+import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconExport, IconImport, IconPlus, IconPresentation, IconRfq, IconSave, IconSearch, IconTemplate, IconUsers } from './icons';
 
 const ROLE_LABEL: Record<string, { label: string; color: string }> = {
   admin: { label: 'Admin', color: 'amber' },
@@ -133,6 +133,12 @@ export function TopBar() {
             <button className="btn btn-ghost-dark" onClick={() => openModal('users')}>
               <IconUsers />
               Kelola User
+            </button>
+          )}
+          {currentUser.role === 'gm' && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('gmAnalysis')}>
+              <IconPresentation />
+              Analisa Eksekutif
             </button>
           )}
           <button className="btn btn-ghost-dark" onClick={() => openModal('customers')}>
