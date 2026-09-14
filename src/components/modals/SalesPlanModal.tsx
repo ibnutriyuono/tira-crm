@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { IconPlus, IconTrash } from '../icons';
-import { formatRupiah, num } from '@/lib/format';
-import { CABANG_LIST } from '@/lib/constants';
+import { classify, formatRupiah, getProspectMaterials, materialUnitPrice, num } from '@/lib/format';
+import { CABANG_LIST, STATUS_META } from '@/lib/constants';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -36,6 +36,7 @@ export function SalesPlanModal() {
 
   const currentUser = useDataStore((s) => s.currentUser);
   const salesPlans = useDataStore((s) => s.salesPlans);
+  const prospects = useDataStore((s) => s.prospects);
   const upsertSalesPlan = useDataStore((s) => s.upsertSalesPlan);
   const toast = useDataStore((s) => s.toast);
 
@@ -49,6 +50,7 @@ export function SalesPlanModal() {
   const [cabang, setCabang] = useState('');
   const [items, setItems] = useState<SalesPlanItem[]>([emptyItem()]);
   const [busy, setBusy] = useState(false);
+  const [pickedProspectId, setPickedProspectId] = useState('');
 
   useEffect(() => {
     if (!show) return;
@@ -60,8 +62,47 @@ export function SalesPlanModal() {
     setCabang(c);
     const existing = salesPlans.find((pl) => pl.se.toLowerCase() === s.toLowerCase() && pl.periode === p);
     setItems(existing && existing.items.length > 0 ? existing.items.map((it) => ({ ...it })) : [emptyItem()]);
+    setPickedProspectId('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, ctx]);
+
+  // Open pipeline AND already-Won deals (PO/Kontrak, DO) belonging to this
+  // plan's SE — the pool "Ambil dari Prospek" picks from. A signed PO or a
+  // DO already in progress is still material Sales wants visible in the
+  // plan (e.g. a deal that closed late in the month, feeding next month's
+  // delivery) — Rencana isn't only "not yet won", so this stays broader
+  // than Realisasi rather than trying to mirror it. Only Lost and mere
+  // Activity logs (status 0/6) are excluded — neither is sellable material.
+  // Re-filters whenever `se` itself changes (not just on open) since
+  // admin/gm can retarget the plan to a different SE without closing and
+  // reopening the modal.
+  const sePipeline = useMemo(() => {
+    const target = se.trim().toLowerCase();
+    if (!target) return [];
+    return prospects
+      .filter((p) => (p.se || '').trim().toLowerCase() === target && (classify(p) === 'Aktif' || classify(p) === 'Won'))
+      .sort((a, b) => b.value - a.value);
+  }, [prospects, se]);
+
+  function onAddFromProspect() {
+    const prospect = sePipeline.find((p) => p.id === pickedProspectId);
+    if (!prospect) return;
+    const pulled: SalesPlanItem[] = getProspectMaterials(prospect).map((m) => ({
+      line: m.line,
+      uraian: m.uraian,
+      qty: m.qty,
+      harga: materialUnitPrice(m),
+    }));
+    setItems((prev) => {
+      // An untouched blank starting row would otherwise sit there empty
+      // above whatever gets pulled in — replace it instead of leaving Sales
+      // to notice and delete it manually.
+      const isUntouchedBlank = prev.length === 1 && !prev[0].line.trim() && !prev[0].uraian.trim() && !prev[0].harga;
+      return isUntouchedBlank ? pulled : [...prev, ...pulled];
+    });
+    toast(`${pulled.length} material dari "${prospect.customer}" ditambahkan`, 'success');
+    setPickedProspectId('');
+  }
 
   const total = useMemo(() => items.reduce((sum, it) => sum + num(it.qty) * num(it.harga), 0), [items]);
 
@@ -140,6 +181,31 @@ export function SalesPlanModal() {
           <label>Total Rencana</label>
           <input type="text" readOnly value={formatRupiah(total)} style={{ background: 'var(--steel-100)', fontWeight: 700 }} />
         </div>
+      </div>
+
+      <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>Ambil dari Prospek (opsional)</div>
+      {!se.trim() ? (
+        <div className="field-note">Isi Sales Engineer (SE) dulu untuk melihat daftar prospeknya.</div>
+      ) : sePipeline.length === 0 ? (
+        <div className="field-note">Tidak ada prospek yang bisa ditarik untuk SE ini — isi material secara manual di bawah.</div>
+      ) : (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select value={pickedProspectId} onChange={(e) => setPickedProspectId(e.target.value)} style={{ maxWidth: 420 }}>
+            <option value="">Pilih prospek milik {se}…</option>
+            {sePipeline.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.customer} — {formatRupiah(p.value)} ({p.cabang || '-'}) · {STATUS_META[p.status]?.label ?? '-'}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="btn btn-outline btn-sm" disabled={!pickedProspectId} onClick={onAddFromProspect}>
+            <IconPlus /> Tambahkan Material
+          </button>
+        </div>
+      )}
+      <div className="field-note" style={{ marginTop: 4 }}>
+        Menarik baris material dari prospek yang dipilih (harga per unit dihitung dari Berat/pc × Harga/Kg bila terisi,
+        kalau tidak dari Harga langsung) — baris hasil tarikan tetap bisa diedit atau dihapus seperti biasa.
       </div>
 
       <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>Material yang Direncanakan</div>
