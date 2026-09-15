@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
+import { customerScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
-  const customers = await prisma.customer.findMany({ orderBy: { createdAt: 'desc' } });
+  const customers = await prisma.customer.findMany({ where: await customerScopeWhere(user), orderBy: { createdAt: 'desc' } });
   return NextResponse.json({ customers });
 }
 

@@ -80,6 +80,33 @@ export function prospectScopeWhere(user: SafeUser) {
 }
 
 /**
+ * Customer and BudgetTarget share this exact shape: both key on `cabang`
+ * only (neither has an `se` field), so sales is scoped the same as bm here
+ * — a customer or a branch target belongs to the branch, not to one SE
+ * within it. rm resolves its own region's branches via cabangRegMap since
+ * neither table carries `reg` directly.
+ */
+async function cabangOnlyScopeWhere(user: SafeUser, cabangField: string) {
+  if (user.role === 'sales' || user.role === 'bm') {
+    return { [cabangField]: { equals: user.cabang || '', mode: 'insensitive' as const } };
+  }
+  if (user.role === 'rm') {
+    const map = await cabangRegMap();
+    const myCabangs = Object.keys(map).filter((c) => map[c] === (user.reg ?? -1));
+    return { [cabangField]: { in: myCabangs, mode: 'insensitive' as const } };
+  }
+  return {}; // gm, admin, purchasing see everything
+}
+
+export async function customerScopeWhere(user: SafeUser) {
+  return cabangOnlyScopeWhere(user, 'cabang');
+}
+
+export async function budgetTargetScopeWhere(user: SafeUser) {
+  return cabangOnlyScopeWhere(user, 'cabang');
+}
+
+/**
  * Branch -> region lookup, rebuilt from the prospect table. A branch has no
  * standalone row, so its region is only knowable from the prospects filed
  * against it — this mirrors the single-file app's cabangRegMap().

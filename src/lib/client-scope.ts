@@ -1,4 +1,4 @@
-import type { Fupa, Prospect, Rfq, SafeUser, SalesPlan } from './types';
+import type { BudgetTarget, Customer, Fupa, Prospect, Rfq, SafeUser, SalesPlan } from './types';
 
 /**
  * Client-side mirrors of the server scope rules in lib/auth.ts.
@@ -9,10 +9,11 @@ import type { Fupa, Prospect, Rfq, SafeUser, SalesPlan } from './types';
  *
  * Live updates had no such guard. emitCrmEvent broadcasts to the single shared
  * 'crm' room (lib/socket.ts) — there is no per-user room — so every connected
- * browser receives every prospect, RFQ, FUP A and sales plan the moment it is
- * created or edited, anywhere in the company. The socket handlers wrote all of
- * it straight into the store, which meant the careful server-side scoping held
- * only until the next edit landed and then quietly stopped holding.
+ * browser receives every prospect, RFQ, FUP A, sales plan, customer and
+ * branch target the moment it is created or edited, anywhere in the company.
+ * The socket handlers wrote all of it straight into the store, which meant
+ * the careful server-side scoping held only until the next edit landed and
+ * then quietly stopped holding.
  *
  * These predicates re-apply the same rules before anything enters the store.
  *
@@ -115,4 +116,37 @@ export function matchesSalesPlanScope(user: SafeUser, plan: SalesPlan, regionCab
     default:
       return false;
   }
+}
+
+/**
+ * Mirrors cabangOnlyScopeWhere() (used by both customerScopeWhere and
+ * budgetTargetScopeWhere) — Customer and BudgetTarget share the same shape,
+ * keyed on `cabang` alone: sales is scoped the same as bm here (a customer
+ * or a branch target belongs to the branch, not one SE within it), rm
+ * resolves its region's branches the same way as everywhere else on this
+ * page, gm/admin/purchasing see everything. Unlike matchesDocScope/
+ * matchesSalesPlanScope there's no NULL-reg fallback to worry about —
+ * neither table carries a `reg` column at all, only `cabang`.
+ */
+function matchesCabangOnlyScope(user: SafeUser, cabang: string | null, regionCabangs?: Set<string>): boolean {
+  switch (user.role) {
+    case 'sales':
+    case 'bm':
+      return eq(cabang, user.cabang || '');
+    case 'rm':
+      return !!cabang && (regionCabangs ?? new Set<string>()).has(cabang.trim().toLowerCase());
+    // gm, admin, purchasing see everything.
+    default:
+      return true;
+  }
+}
+
+/** Mirrors customerScopeWhere(). */
+export function matchesCustomerScope(user: SafeUser, customer: Customer, regionCabangs?: Set<string>): boolean {
+  return matchesCabangOnlyScope(user, customer.cabang, regionCabangs);
+}
+
+/** Mirrors budgetTargetScopeWhere(). */
+export function matchesBudgetTargetScope(user: SafeUser, target: BudgetTarget, regionCabangs?: Set<string>): boolean {
+  return matchesCabangOnlyScope(user, target.cabang, regionCabangs);
 }

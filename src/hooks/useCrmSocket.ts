@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { getSocket } from '@/lib/socket-client';
-import { matchesDocScope, matchesProspectScope, matchesSalesPlanScope, myRegionCabangs } from '@/lib/client-scope';
+import { matchesBudgetTargetScope, matchesCustomerScope, matchesDocScope, matchesProspectScope, matchesSalesPlanScope, myRegionCabangs } from '@/lib/client-scope';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { BudgetTarget, SalesPlan, Customer, Fupa, ItemChatMessage, Prospect, PurchasingContact, Rfq, SafeUser, Vendor, AppNotification } from '@/lib/types';
@@ -37,7 +37,7 @@ function isOwnedByCurrentUser(requestedBy: string | null): boolean {
  * and these lists are small enough that recomputing costs nothing next to the
  * render the event triggers.
  */
-function allowedInStore(kind: 'prospect' | 'doc' | 'salesPlan', record: Prospect | Rfq | Fupa | SalesPlan): boolean {
+function allowedInStore(kind: 'prospect' | 'doc' | 'salesPlan' | 'customer' | 'budgetTarget', record: Prospect | Rfq | Fupa | SalesPlan | Customer | BudgetTarget): boolean {
   const state = useDataStore.getState();
   const me = state.currentUser;
   // Before login resolves there is no scope to check against; bootstrap will
@@ -46,7 +46,9 @@ function allowedInStore(kind: 'prospect' | 'doc' | 'salesPlan', record: Prospect
   if (kind === 'prospect') return matchesProspectScope(me, record as Prospect);
   const cabangs = myRegionCabangs(me, state.prospects);
   if (kind === 'doc') return matchesDocScope(me, record as Rfq | Fupa, cabangs);
-  return matchesSalesPlanScope(me, record as SalesPlan, cabangs);
+  if (kind === 'salesPlan') return matchesSalesPlanScope(me, record as SalesPlan, cabangs);
+  if (kind === 'customer') return matchesCustomerScope(me, record as Customer, cabangs);
+  return matchesBudgetTargetScope(me, record as BudgetTarget, cabangs);
 }
 
 /**
@@ -70,7 +72,13 @@ export function useCrmSocket() {
     const onProspectDelete = ({ id }: { id: string }) => useDataStore.getState().removeProspect(id);
     const onProspectBulk = () => useDataStore.getState().refetchProspects();
 
-    const onCustomerUpsert = (c: Customer) => useDataStore.getState().upsertCustomer(c);
+    const onCustomerUpsert = (c: Customer) => {
+      // A customer's cabang can be reassigned after creation — same rule as
+      // prospects: drop it from the store if the edit moved it out of scope,
+      // rather than keeping the last copy this user was allowed to see.
+      if (!allowedInStore('customer', c)) return useDataStore.getState().removeCustomer(c.id);
+      useDataStore.getState().upsertCustomer(c);
+    };
     const onCustomerDelete = ({ id }: { id: string }) => useDataStore.getState().removeCustomer(id);
     const onCustomerBulk = () => useDataStore.getState().refetchCustomers();
 
@@ -153,7 +161,14 @@ export function useCrmSocket() {
     };
 
 
-    const onBudgetUpsert = (b: BudgetTarget) => useDataStore.getState().upsertBudgetTarget(b);
+    const onBudgetUpsert = (b: BudgetTarget) => {
+      // Unlike Prospect/Customer, a target's (cabang, periode) pair is its
+      // identity — the upsert never changes which branch it belongs to, so
+      // there's no "edited out of scope" case here to remove for, only
+      // "was this ever in scope" on arrival.
+      if (!allowedInStore('budgetTarget', b)) return;
+      useDataStore.getState().upsertBudgetTarget(b);
+    };
     const onSalesPlanUpsert = (p: SalesPlan) => {
       if (!allowedInStore('salesPlan', p)) return useDataStore.getState().removeSalesPlan(p.id);
       useDataStore.getState().upsertSalesPlan(p);

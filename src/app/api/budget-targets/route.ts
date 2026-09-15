@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, num, requireUser } from '@/lib/api-helpers';
-import { canEditBudgetTarget } from '@/lib/auth';
+import { budgetTargetScopeWhere, canEditBudgetTarget } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
-  const budgetTargets = await prisma.budgetTarget.findMany({ orderBy: [{ periode: 'desc' }, { cabang: 'asc' }] });
+  const budgetTargets = await prisma.budgetTarget.findMany({ where: await budgetTargetScopeWhere(user), orderBy: [{ periode: 'desc' }, { cabang: 'asc' }] });
   return NextResponse.json({ budgetTargets });
 }
 
