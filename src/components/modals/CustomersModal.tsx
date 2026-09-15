@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { IconEdit, IconTrash, IconWa } from '../icons';
 import { todayStr } from '@/lib/format';
+import { appendSheet, buildCustomerSheet } from '@/lib/exports';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
@@ -29,13 +30,8 @@ export function CustomersModal() {
   async function exportExcel() {
     if (customers.length === 0) return toast('Tidak ada data customer untuk diexport', 'error');
     const XLSX = await import('xlsx');
-    const header = ['NAMA CUSTOMER', 'CABANG', 'PIC', 'NO TELP', 'EMAIL', 'ALAMAT', 'CATATAN'];
-    const aoa: unknown[][] = [header];
-    customers.forEach((c) => aoa.push([c.name || '', c.cabang || '', c.pic || '', c.phone || '', c.email || '', c.address || '', c.catatan || '']));
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 28 }, { wch: 8 }, { wch: 18 }, { wch: 16 }, { wch: 24 }, { wch: 36 }, { wch: 26 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Customer');
+    appendSheet(XLSX, wb, buildCustomerSheet(customers));
     XLSX.writeFile(wb, `CRM_Customer_Export_${todayStr()}.xlsx`);
     toast(`Export berhasil: ${customers.length} data customer`, 'success');
   }

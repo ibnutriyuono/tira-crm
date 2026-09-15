@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { IconEdit, IconTrash, IconWa } from '../icons';
 import { normalizePhone, todayStr } from '@/lib/format';
+import { appendSheet, buildVendorSheet } from '@/lib/exports';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
@@ -37,12 +38,8 @@ export function VendorsModal() {
   async function exportExcel() {
     if (vendors.length === 0) return toast('Tidak ada data vendor untuk diexport', 'error');
     const XLSX = await import('xlsx');
-    const aoa: unknown[][] = [HEADER];
-    vendors.forEach((v) => aoa.push([v.nama || '', v.pic || '', v.wa || '', v.email || '', v.kategori || '', v.alamat || '', v.catatan || '']));
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = COLS;
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Vendor');
+    appendSheet(XLSX, wb, buildVendorSheet(vendors));
     XLSX.writeFile(wb, `CRM_Vendor_Export_${todayStr()}.xlsx`);
     toast(`Export berhasil: ${vendors.length} data vendor`, 'success');
   }

@@ -6,10 +6,11 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { api } from '@/lib/api-client';
 import { getFilteredProspects, sortProspects } from '@/lib/filter';
-import { classify, num, todayStr } from '@/lib/format';
+import { todayStr } from '@/lib/format';
 import { countNewPurchasingItems } from '@/lib/purchasing-workflow';
 import { countUrgentFollowUps } from '@/lib/reports';
-import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconExport, IconImport, IconPlus, IconPresentation, IconRfq, IconSave, IconSearch, IconTemplate, IconUsers } from './icons';
+import { appendSheet, buildBudgetTargetSheet, buildCustomerSheet, buildFupaSheet, buildProspectSheet, buildRfqSheet, buildSalesPlanSheet, buildVendorSheet, STATUS_LEGEND } from '@/lib/exports';
+import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconDownload, IconExport, IconImport, IconPlus, IconPresentation, IconRfq, IconSave, IconSearch, IconTemplate, IconUsers } from './icons';
 
 const ROLE_LABEL: Record<string, { label: string; color: string }> = {
   admin: { label: 'Admin', color: 'amber' },
@@ -60,21 +61,38 @@ export function TopBar() {
     const list = sortProspects(getFilteredProspects(useDataStore.getState().prospects, ui), ui.sortKey, ui.sortDir);
     if (list.length === 0) return toast('Tidak ada data untuk diexport pada filter saat ini', 'error');
     const XLSX = await import('xlsx');
-    const header = ['REG', 'CABANG', 'SE', 'CUSTOMER', 'NO. WHATSAPP', 'TGL. PENAWARAN', 'TGL. PO', 'TGL. DELIVERY', 'LINE', 'URAIAN PRODUCT', 'QTY (Pcs)', 'VALUE (Rp)', 'KONDISI STOCK', 'KETERANGAN', 'STATUS', 'KLASIFIKASI', 'STATUS PENAWARAN'];
-    const aoa: unknown[][] = [header];
-    list.forEach((r) => {
-      aoa.push([r.reg || '', r.cabang || '', r.se || '', r.customer || '', r.phone || '', r.tglPenawaran || '', r.tglPO || '', r.tglDelivery || '', r.line || '', r.uraian || '', num(r.qty), num(r.value), r.kondisiStock || '', r.keterangan || '', num(r.status), classify(r), r.penawaranTerkirim ? 'Terkirim' : 'Pending']);
-    });
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 5 }, { wch: 8 }, { wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 13 }, { wch: 12 }, { wch: 13 }, { wch: 6 }, { wch: 32 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 24 }, { wch: 8 }, { wch: 10 }, { wch: 14 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'PROSPECT LIST');
-    const legend = [['STATUS', 'KETERANGAN'], [0, 'Sales Activity'], [1, 'Permintaan'], [2, 'Penawaran Harga'], [3, 'Negosiasi'], [4, 'PO / Kontrak'], [5, 'DO'], [6, 'Lose Order / Batal']];
-    const wsLegend = XLSX.utils.aoa_to_sheet(legend);
-    wsLegend['!cols'] = [{ wch: 10 }, { wch: 24 }];
-    XLSX.utils.book_append_sheet(wb, wsLegend, 'Legend Status');
+    appendSheet(XLSX, wb, buildProspectSheet(list));
+    appendSheet(XLSX, wb, STATUS_LEGEND);
     XLSX.writeFile(wb, `CRM_Prospect_Export_${todayStr()}.xlsx`);
     toast(`Export berhasil: ${list.length} data prospek`, 'success');
+  }
+
+  // One workbook, one sheet per entity — everything the CURRENT user's
+  // store already holds, which is exactly what they're each individually
+  // scoped to see (prospects/rfqs/fupas/salesPlans server-scoped by role;
+  // customers/vendors/budgetTargets are company-wide for everyone already).
+  // Reuses the exact same builders as every per-module export button above,
+  // so a sheet in here never drifts from what "Export Excel" on that
+  // module's own screen produces.
+  async function exportAllExcel() {
+    const s = useDataStore.getState();
+    const specs = [
+      s.prospects.length && buildProspectSheet(s.prospects),
+      s.rfqs.length && buildRfqSheet(s.rfqs),
+      s.fupas.length && buildFupaSheet(s.fupas),
+      s.customers.length && buildCustomerSheet(s.customers),
+      s.vendors.length && buildVendorSheet(s.vendors),
+      s.salesPlans.length && buildSalesPlanSheet(s.salesPlans),
+      s.budgetTargets.length && buildBudgetTargetSheet(s.budgetTargets),
+    ].filter(Boolean) as ReturnType<typeof buildProspectSheet>[];
+    if (specs.length === 0) return toast('Tidak ada data untuk diexport', 'error');
+    const XLSX = await import('xlsx');
+    const wb = XLSX.utils.book_new();
+    specs.forEach((spec) => appendSheet(XLSX, wb, spec));
+    appendSheet(XLSX, wb, STATUS_LEGEND);
+    XLSX.writeFile(wb, `CRM_Export_Semua_${todayStr()}.xlsx`);
+    toast(`Export semua data berhasil (${specs.length} sheet)`, 'success');
   }
 
   async function downloadTemplate() {
@@ -229,6 +247,10 @@ export function TopBar() {
           <button className="btn btn-ghost-dark" onClick={exportExcel}>
             <IconExport />
             Export Excel
+          </button>
+          <button className="btn btn-ghost-dark" onClick={exportAllExcel} title="Satu file Excel berisi semua data (Prospek, RFQ, FUP A, Customer, Vendor, Rencana Penjualan, Target), tiap jenis di sheet terpisah">
+            <IconDownload />
+            Export Semua
           </button>
           {/* Not in the single-file app's toolbar — this build's own addition,
               kept last so the shared buttons match it 1:1. */}

@@ -7,6 +7,7 @@ import { ItemChatBadge, useItemChatCounts } from '../ItemChatBadge';
 import { IconCheck, IconEdit, IconTrash } from '../icons';
 import { formatDateID, formatDateTimeID, formatRupiah, todayStr } from '@/lib/format';
 import { WORKFLOW_META, rfqAsWorkflowDoc, workflowStage } from '@/lib/purchasing-workflow';
+import { appendSheet, buildRfqSheet } from '@/lib/exports';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -52,31 +53,8 @@ export function RfqManageModal() {
   async function exportExcel() {
     if (list.length === 0) return toast('Tidak ada data RFQ untuk diexport.', 'error');
     const XLSX = await import('xlsx');
-    const header = ['NO', 'NO RFQ', 'TANGGAL', 'CABANG', 'CUSTOMER', 'LINE', 'GRADE', 'MATERIAL', 'DIA (mm)', 'THICK (mm)', 'WIDTH (mm)', 'LENGTH (mm)', 'PCS', 'BERAT (KGS)', 'LOKAL/IMPORT', 'ESTIMASI KEBUTUHAN', 'HARGA (PURCHASING)', 'CURRENCY', 'UOM', 'DELIVERY TIME', 'ORIGIN', 'NOTE', 'NO QUOTE', 'STATUS', 'STATUS PURCHASING', 'TERKIRIM KE PURCHASING', 'JAWABAN RFQ', 'DIBUAT OLEH'];
-    const aoa: unknown[][] = [header];
-    let no = 1;
-    list.forEach((r) => {
-      const items = r.items?.length ? r.items : ([{}] as RfqItem[]);
-      items.forEach((it, idx) => {
-        aoa.push([
-          idx === 0 ? no : '', idx === 0 ? r.noRfq || '' : '', idx === 0 ? formatDateID(r.tglRfq) : '',
-          idx === 0 ? r.cabang || '' : '', idx === 0 ? r.customer || '' : '',
-          it.line || '', it.grade || '', it.material || '', it.dia || '', it.thick || '', it.width || '', it.length || '',
-          it.pcs || '', it.berat || '', it.lokal || '', it.estimasi || '',
-          it.hargaPurchasing || '', it.currency || '', it.uom || '', it.deliveryTime || '', it.coo || '', it.note || '', it.noQuote ? 'Ya' : '',
-          idx === 0 ? r.status || 'Draft' : '',
-          idx === 0 ? WORKFLOW_META[workflowStage(rfqAsWorkflowDoc(r))].label : '',
-          idx === 0 ? (r.sentToPurchasingAt ? formatDateID(r.sentToPurchasingAt) : 'Belum') : '',
-          idx === 0 ? (r.jawabanRfqDikirim ? formatDateID(r.jawabanRfqAt) : 'Belum') : '',
-          idx === 0 ? r.requestedBy || '' : '',
-        ]);
-      });
-      no++;
-    });
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 4 }, { wch: 10 }, { wch: 11 }, { wch: 8 }, { wch: 22 }, { wch: 6 }, { wch: 10 }, { wch: 24 }, { wch: 9 }, { wch: 9 }, { wch: 9 }, { wch: 9 }, { wch: 6 }, { wch: 11 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 9 }, { wch: 9 }, { wch: 14 }, { wch: 12 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'RFQ');
+    appendSheet(XLSX, wb, buildRfqSheet(list));
     XLSX.writeFile(wb, `Kelola_RFQ_${todayStr()}.xlsx`);
     toast(`Export berhasil: ${list.length} RFQ`, 'success');
   }

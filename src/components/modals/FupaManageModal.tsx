@@ -7,6 +7,7 @@ import { ItemChatBadge, useItemChatCounts } from '../ItemChatBadge';
 import { IconCheck, IconEdit, IconTrash } from '../icons';
 import { formatDateID, formatDateTimeID, todayStr } from '@/lib/format';
 import { WORKFLOW_META, fupaAsWorkflowDoc, workflowStage } from '@/lib/purchasing-workflow';
+import { appendSheet, buildFupaSheet } from '@/lib/exports';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -49,26 +50,8 @@ export function FupaManageModal() {
   async function exportExcel() {
     if (list.length === 0) return toast('Tidak ada data FUP A untuk diexport.', 'error');
     const XLSX = await import('xlsx');
-    const header = ['NO', 'NO FUP A', 'TANGGAL', 'REF. RFQ', 'CABANG', 'CUSTOMER', 'LINE', 'GRADE', 'MATERIAL', 'PCS', 'BERAT (KGS)', 'LOKAL/IMPORT', 'ESTIMASI KEBUTUHAN', 'STATUS', 'STATUS PURCHASING', 'DIMINTA OLEH', 'CATATAN'];
-    const aoa: unknown[][] = [header];
-    let no = 1;
-    list.forEach((f) => {
-      const items = f.items?.length ? f.items : ([{}] as typeof f.items);
-      items.forEach((it, idx) => {
-        aoa.push([
-          idx === 0 ? no : '', idx === 0 ? f.noFupa || '' : '', idx === 0 ? formatDateID(f.tglFupa) : '',
-          idx === 0 ? f.sourceNoRfq || '' : '', idx === 0 ? f.cabang || '' : '', idx === 0 ? f.customer || '' : '',
-          it.line || '', it.grade || '', it.material || '', it.pcs || '', it.berat || '', it.lokal || '', it.estimasi || '',
-          idx === 0 ? f.status : '', idx === 0 ? WORKFLOW_META[workflowStage(fupaAsWorkflowDoc(f))].label : '',
-          idx === 0 ? f.requestedBy || '' : '', idx === 0 ? f.catatan || '' : '',
-        ]);
-      });
-      no++;
-    });
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 4 }, { wch: 12 }, { wch: 11 }, { wch: 12 }, { wch: 8 }, { wch: 22 }, { wch: 6 }, { wch: 10 }, { wch: 24 }, { wch: 6 }, { wch: 11 }, { wch: 14 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 24 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'FUP A');
+    appendSheet(XLSX, wb, buildFupaSheet(list));
     XLSX.writeFile(wb, `Kelola_FUPA_${todayStr()}.xlsx`);
     toast(`Export berhasil: ${list.length} FUP A`, 'success');
   }
