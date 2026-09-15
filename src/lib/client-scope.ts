@@ -119,22 +119,52 @@ export function matchesSalesPlanScope(user: SafeUser, plan: SalesPlan, regionCab
 }
 
 /**
+ * The branches this user is scoped to for the cabang-only tables, mirroring
+ * cabangOnlyScopeWhere()'s own resolution.
+ *
+ * A sales account is not required to carry a `cabang` — Kelola User asks for
+ * Kode SE on sales and Cabang on bm, and the API enforces neither — so for
+ * sales this falls back to the branches read off their own prospects, the way
+ * the server falls back to seCabangs(). The store's prospects are already
+ * scoped to this user, so for a sales account they are exactly their own.
+ *
+ * An empty set means "no branch affiliation resolved", which matches nothing.
+ */
+export function myCabangScope(user: SafeUser, prospects: Prospect[]): Set<string> {
+  const mine = new Set<string>();
+  if (user.role === 'bm' || (user.role === 'sales' && user.cabang)) {
+    if (user.cabang) mine.add(user.cabang.trim().toLowerCase());
+    return mine;
+  }
+  if (user.role === 'sales') {
+    if (!user.se) return mine;
+    prospects.forEach((p) => {
+      if (p.cabang && eq(p.se, user.se)) mine.add(p.cabang.trim().toLowerCase());
+    });
+    return mine;
+  }
+  if (user.role === 'rm') return myRegionCabangs(user, prospects);
+  return mine; // gm, admin, purchasing see everything — the set is unused
+}
+
+/**
  * Mirrors cabangOnlyScopeWhere() (used by both customerScopeWhere and
  * budgetTargetScopeWhere) — Customer and BudgetTarget share the same shape,
- * keyed on `cabang` alone: sales is scoped the same as bm here (a customer
- * or a branch target belongs to the branch, not one SE within it), rm
- * resolves its region's branches the same way as everywhere else on this
- * page, gm/admin/purchasing see everything. Unlike matchesDocScope/
- * matchesSalesPlanScope there's no NULL-reg fallback to worry about —
- * neither table carries a `reg` column at all, only `cabang`.
+ * keyed on `cabang` alone: sales is scoped by branch rather than by SE (a
+ * customer or a branch target belongs to the branch, not one SE within it),
+ * rm resolves its region's branches, gm/admin/purchasing see everything.
+ * Unlike matchesDocScope/matchesSalesPlanScope there's no NULL-reg fallback
+ * to worry about — neither table carries a `reg` column at all, only `cabang`.
+ *
+ * `scopeCabangs` comes from myCabangScope() above, which is what resolves the
+ * sales-without-a-cabang case rather than matching on an empty string.
  */
-function matchesCabangOnlyScope(user: SafeUser, cabang: string | null, regionCabangs?: Set<string>): boolean {
+function matchesCabangOnlyScope(user: SafeUser, cabang: string | null, scopeCabangs?: Set<string>): boolean {
   switch (user.role) {
     case 'sales':
     case 'bm':
-      return eq(cabang, user.cabang || '');
     case 'rm':
-      return !!cabang && (regionCabangs ?? new Set<string>()).has(cabang.trim().toLowerCase());
+      return !!cabang && (scopeCabangs ?? new Set<string>()).has(cabang.trim().toLowerCase());
     // gm, admin, purchasing see everything.
     default:
       return true;
@@ -142,11 +172,11 @@ function matchesCabangOnlyScope(user: SafeUser, cabang: string | null, regionCab
 }
 
 /** Mirrors customerScopeWhere(). */
-export function matchesCustomerScope(user: SafeUser, customer: Customer, regionCabangs?: Set<string>): boolean {
-  return matchesCabangOnlyScope(user, customer.cabang, regionCabangs);
+export function matchesCustomerScope(user: SafeUser, customer: Customer, scopeCabangs?: Set<string>): boolean {
+  return matchesCabangOnlyScope(user, customer.cabang, scopeCabangs);
 }
 
 /** Mirrors budgetTargetScopeWhere(). */
-export function matchesBudgetTargetScope(user: SafeUser, target: BudgetTarget, regionCabangs?: Set<string>): boolean {
-  return matchesCabangOnlyScope(user, target.cabang, regionCabangs);
+export function matchesBudgetTargetScope(user: SafeUser, target: BudgetTarget, scopeCabangs?: Set<string>): boolean {
+  return matchesCabangOnlyScope(user, target.cabang, scopeCabangs);
 }

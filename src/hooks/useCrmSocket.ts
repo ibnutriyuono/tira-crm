@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { getSocket } from '@/lib/socket-client';
-import { matchesBudgetTargetScope, matchesCustomerScope, matchesDocScope, matchesProspectScope, matchesSalesPlanScope, myRegionCabangs } from '@/lib/client-scope';
+import { matchesBudgetTargetScope, matchesCustomerScope, matchesDocScope, matchesProspectScope, matchesSalesPlanScope, myCabangScope, myRegionCabangs } from '@/lib/client-scope';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { BudgetTarget, SalesPlan, Customer, Fupa, ItemChatMessage, Prospect, PurchasingContact, Rfq, SafeUser, Vendor, AppNotification } from '@/lib/types';
@@ -47,8 +47,12 @@ function allowedInStore(kind: 'prospect' | 'doc' | 'salesPlan' | 'customer' | 'b
   const cabangs = myRegionCabangs(me, state.prospects);
   if (kind === 'doc') return matchesDocScope(me, record as Rfq | Fupa, cabangs);
   if (kind === 'salesPlan') return matchesSalesPlanScope(me, record as SalesPlan, cabangs);
-  if (kind === 'customer') return matchesCustomerScope(me, record as Customer, cabangs);
-  return matchesBudgetTargetScope(me, record as BudgetTarget, cabangs);
+  // Customer and BudgetTarget key on cabang alone, so they resolve their own
+  // branch set — which for a sales account without a cabang comes from their
+  // prospects rather than from the region.
+  const scope = myCabangScope(me, state.prospects);
+  if (kind === 'customer') return matchesCustomerScope(me, record as Customer, scope);
+  return matchesBudgetTargetScope(me, record as BudgetTarget, scope);
 }
 
 /**

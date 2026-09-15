@@ -80,15 +80,51 @@ export function prospectScopeWhere(user: SafeUser) {
 }
 
 /**
+ * The branches a sales account works in, read off its own prospects.
+ *
+ * Needed because `cabang` is not something a sales account is required to
+ * have: Kelola User asks for Kode SE on a sales user and Cabang on a bm one
+ * (see the guidance text in UserFormModal), and POST /api/users validates
+ * neither — so a sales account created exactly as instructed stores
+ * `cabang: ''`. Scoping such a user by that empty string would match no
+ * branch at all and blank out their Customer list and Target Bulanan.
+ *
+ * Derived the same way cabangRegMap derives region -> branch: from the
+ * prospect table, the only place the association is actually recorded.
+ */
+async function seCabangs(user: SafeUser): Promise<string[]> {
+  const rows = await prisma.prospect.findMany({
+    where: { se: { equals: user.se || '', mode: 'insensitive' }, cabang: { not: null } },
+    select: { cabang: true },
+    distinct: ['cabang'],
+  });
+  return rows.map((r) => r.cabang).filter((c): c is string => !!c);
+}
+
+/**
  * Customer and BudgetTarget share this exact shape: both key on `cabang`
- * only (neither has an `se` field), so sales is scoped the same as bm here
- * — a customer or a branch target belongs to the branch, not to one SE
+ * only (neither has an `se` field), so sales is scoped by branch rather than
+ * by SE — a customer or a branch target belongs to the branch, not to one SE
  * within it. rm resolves its own region's branches via cabangRegMap since
  * neither table carries `reg` directly.
+ *
+ * An account with no branch affiliation to resolve — no cabang, no se, or an
+ * se with no prospects yet — matches nothing rather than everything. That is
+ * the safe direction for a scope rule, but it does mean a brand-new sales
+ * account sees an empty Customer list until its first prospect exists.
  */
 async function cabangOnlyScopeWhere(user: SafeUser, cabangField: string) {
-  if (user.role === 'sales' || user.role === 'bm') {
-    return { [cabangField]: { equals: user.cabang || '', mode: 'insensitive' as const } };
+  if (user.role === 'bm') {
+    // No branch on the account means nothing to scope to. Matching on '' would
+    // otherwise quietly return any row stored with a blank cabang, which the
+    // client mirror (myCabangScope) treats as no affiliation at all.
+    if (!user.cabang) return { [cabangField]: { in: [] as string[], mode: 'insensitive' as const } };
+    return { [cabangField]: { equals: user.cabang, mode: 'insensitive' as const } };
+  }
+  if (user.role === 'sales') {
+    if (user.cabang) return { [cabangField]: { equals: user.cabang, mode: 'insensitive' as const } };
+    if (!user.se) return { [cabangField]: { in: [] as string[], mode: 'insensitive' as const } };
+    return { [cabangField]: { in: await seCabangs(user), mode: 'insensitive' as const } };
   }
   if (user.role === 'rm') {
     const map = await cabangRegMap();
