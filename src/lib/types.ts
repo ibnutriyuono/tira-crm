@@ -245,6 +245,8 @@ export interface BudgetTarget {
   cabang: string;
   periode: string;
   amount: number;
+  grossMarginTarget: number | null;
+  grossMarginResult: number | null;
 }
 
 export type NotificationType =
@@ -276,6 +278,11 @@ export interface SalesPlanItem {
   uraian: string;
   qty: number | string;
   harga: number | string;
+  /** Set only when this row was pulled in via "Ambil dari Prospek" — the
+   * source Prospect.id, kept so a prospect can be traced across every
+   * period it was planned for (see buildProspectStarCounts in reports.ts).
+   * Manually-typed rows never have this. */
+  sourceProspectId?: string | null;
 }
 
 export interface SalesPlan {

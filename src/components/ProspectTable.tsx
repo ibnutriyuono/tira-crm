@@ -1,7 +1,10 @@
 'use client';
 
+import { useMemo } from 'react';
 import { classify, formatDateID, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
 import { STATUS_META } from '@/lib/constants';
+import { buildProspectStarCounts } from '@/lib/reports';
+import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
 import { IconDoc, IconEdit, IconRfq, IconTrash, IconWa } from './icons';
@@ -29,6 +32,8 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
   const openModal = useUiStore((s) => s.openModal);
   // Above the empty-list early return — hooks cannot run conditionally.
   const purchCounts = useProspectPurchasingCounts(true);
+  const salesPlans = useDataStore((s) => s.salesPlans);
+  const starCounts = useMemo(() => buildProspectStarCounts(salesPlans), [salesPlans]);
 
   if (filtered.length === 0) {
     return (
@@ -90,7 +95,18 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                   <td className="center">{r.reg || '-'}</td>
                   <td>{r.cabang || '-'}</td>
                   <td>{r.se || '-'}</td>
-                  <td className="customer">{r.customer || '-'}<ProspectPurchasingBubble count={purchCounts[r.id]} /></td>
+                  <td className="customer">
+                    {r.customer || '-'}
+                    <ProspectPurchasingBubble count={purchCounts[r.id]} />
+                    {!!starCounts.get(r.id) && (
+                      <span
+                        className="prospect-star-badge"
+                        title={`Masuk Rencana Penjualan pada ${starCounts.get(r.id)} periode berbeda`}
+                      >
+                        ★ {starCounts.get(r.id)}
+                      </span>
+                    )}
+                  </td>
                   <td className="produk">{r.uraian || '-'}</td>
                   <td className="num">{num(r.qty).toLocaleString('id-ID')}</td>
                   <td className="num">{formatRupiah(r.value)}</td>

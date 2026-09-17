@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { KANBAN_STATUSES, STATUS_META } from '@/lib/constants';
 import { classify, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
+import { buildProspectStarCounts } from '@/lib/reports';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -12,7 +13,7 @@ import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './Prospec
 
 const CAP = 40;
 
-function KanbanCard({ r, purchCount }: { r: Prospect; purchCount?: number }) {
+function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: number; starCount?: number }) {
   const openModal = useUiStore((s) => s.openModal);
   const currentUser = useDataStore((s) => s.currentUser);
   const klas = classify(r);
@@ -32,7 +33,15 @@ function KanbanCard({ r, purchCount }: { r: Prospect; purchCount?: number }) {
       onDragEnd={() => setDragging(false)}
     >
       <div className="kc-top">
-        <span className="kc-customer">{r.customer}<ProspectPurchasingBubble count={purchCount} /></span>
+        <span className="kc-customer">
+          {r.customer}
+          <ProspectPurchasingBubble count={purchCount} />
+          {!!starCount && (
+            <span className="prospect-star-badge" title={`Masuk Rencana Penjualan pada ${starCount} periode berbeda`}>
+              ★ {starCount}
+            </span>
+          )}
+        </span>
         <span className={`badge ${klasBadgeColor(klas)}`}>{klas}</span>
       </div>
       <div className="kc-produk">{r.uraian || '-'}</div>
@@ -135,6 +144,8 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
   // dibuat bulan ini dan sekarang ada di Negosiasi.
   const [bulanPerKolom, setBulanPerKolom] = useState<Record<number, string>>({});
   const purchCounts = useProspectPurchasingCounts(true);
+  const salesPlans = useDataStore((s) => s.salesPlans);
+  const starCounts = useMemo(() => buildProspectStarCounts(salesPlans), [salesPlans]);
   const upsertProspect = useDataStore((s) => s.upsertProspect);
   const toast = useDataStore((s) => s.toast);
   const [dragOverStatus, setDragOverStatus] = useState<number | null>(null);
@@ -212,7 +223,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                 {shown.length === 0 ? (
                   <div className="kanban-empty">{bulanAktif ? 'Tidak ada perubahan status di bulan ini' : 'Tidak ada data'}</div>
                 ) : (
-                  shown.map((r) => <KanbanCard key={r.id} r={r} purchCount={purchCounts[r.id]} />)
+                  shown.map((r) => <KanbanCard key={r.id} r={r} purchCount={purchCounts[r.id]} starCount={starCounts.get(r.id)} />)
                 )}
                 {items.length > CAP && <div className="kanban-more">+{items.length - CAP} lainnya — persempit dengan filter</div>}
               </div>

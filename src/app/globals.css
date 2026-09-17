@@ -606,6 +606,17 @@ tr.hl-yellow:hover td{ background:rgba(201,130,46,.18); }
    red discussion bubble when a prospect has both. */
 .item-chat-bubble.purch{background:var(--steel-500);}
 
+/* Prospek list — how many distinct periods this prospect's material has been
+   pulled into a Rencana Penjualan (see buildProspectStarCounts). Amber, to
+   read as "worth noticing" rather than "needs action" (rust/red) or "just a
+   count" (steel) — this is informational, not a to-do. */
+.prospect-star-badge{
+  display:inline-flex; align-items:center; gap:2px;
+  padding:1px 6px; border-radius:9px; margin-left:6px; vertical-align:middle;
+  background:var(--amber-100); color:var(--amber-600);
+  font-size:10.5px; font-weight:700; white-space:nowrap;
+}
+
 /* Omzet / GIT KPI accents (match the single-file app) */
 /* The accent is drawn by the ::before bar, driven by --bar-color — setting
    border-left-color here did nothing. */

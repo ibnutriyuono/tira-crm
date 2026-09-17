@@ -10,7 +10,7 @@ import { todayStr } from '@/lib/format';
 import { countNewPurchasingItems } from '@/lib/purchasing-workflow';
 import { countUrgentFollowUps } from '@/lib/reports';
 import { appendSheet, buildBudgetTargetSheet, buildCustomerSheet, buildFupaSheet, buildProspectSheet, buildRfqSheet, buildSalesPlanSheet, buildVendorSheet, STATUS_LEGEND } from '@/lib/exports';
-import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconDownload, IconExport, IconImport, IconPlus, IconPresentation, IconRfq, IconSave, IconSearch, IconTemplate, IconUsers } from './icons';
+import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconDownload, IconExport, IconImport, IconPlus, IconPresentation, IconRfq, IconSave, IconSearch, IconTarget, IconTemplate, IconUsers } from './icons';
 
 const ROLE_LABEL: Record<string, { label: string; color: string }> = {
   admin: { label: 'Admin', color: 'amber' },
@@ -178,6 +178,10 @@ export function TopBar() {
           <button className="btn btn-ghost-dark" onClick={() => openModal('forecast')}>
             <IconChartLine />
             Forecast
+          </button>
+          <button className="btn btn-ghost-dark" onClick={() => openModal('kpi')}>
+            <IconTarget />
+            KPI
           </button>
           <button
             className="btn btn-ghost-dark"

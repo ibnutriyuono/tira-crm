@@ -92,6 +92,9 @@ export function SalesPlanModal() {
       uraian: m.uraian,
       qty: m.qty,
       harga: materialUnitPrice(m),
+      // Traced so this prospect's star count in the Prospek list picks up
+      // this period — see buildProspectStarCounts in lib/reports.ts.
+      sourceProspectId: prospect.id,
     }));
     setItems((prev) => {
       // An untouched blank starting row would otherwise sit there empty

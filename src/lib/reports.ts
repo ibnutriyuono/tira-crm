@@ -411,3 +411,32 @@ export function buildFollowUpRows(prospects: Prospect[]): FollowUpRow[] {
 export function countUrgentFollowUps(prospects: Prospect[]): number {
   return buildFollowUpRows(prospects).filter((r) => r.tier === 'terlambat').length;
 }
+
+/**
+ * Star count per prospect for the Prospek list: how many DISTINCT periods
+ * that prospect's material was pulled into a Rencana Penjualan (via "Ambil
+ * dari Prospek" in SalesPlanModal — manually-typed rows carry no
+ * sourceProspectId and never contribute). A prospect planned in September
+ * and again in October reads 2 stars; pulled twice within the same period
+ * (e.g. by mistake) still reads 1 — the count is periods, not row
+ * occurrences, since the signal is "kept resurfacing across months," not
+ * "how many lines came from it."
+ *
+ * Reads whatever SalesPlan[] the caller already has in scope (bootstrap
+ * already scopes this per role — sales sees only their own plans, bm their
+ * branch's, etc.), so a star count naturally reflects only what its viewer
+ * is allowed to see, with no separate scoping needed here.
+ */
+export function buildProspectStarCounts(salesPlans: SalesPlan[]): Map<string, number> {
+  const periodsByProspect = new Map<string, Set<string>>();
+  salesPlans.forEach((plan) => {
+    plan.items.forEach((item) => {
+      if (!item.sourceProspectId) return;
+      if (!periodsByProspect.has(item.sourceProspectId)) periodsByProspect.set(item.sourceProspectId, new Set());
+      periodsByProspect.get(item.sourceProspectId)!.add(plan.periode);
+    });
+  });
+  const counts = new Map<string, number>();
+  periodsByProspect.forEach((periods, prospectId) => counts.set(prospectId, periods.size));
+  return counts;
+}

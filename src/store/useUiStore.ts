@@ -31,6 +31,7 @@ export type ModalKey =
   | 'notifications'
   | 'followUpBoard'
   | 'gmAnalysis'
+  | 'kpi'
   | null;
 
 export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq' | 'vendor' | 'fupa';
