@@ -143,6 +143,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
   // berarti yang bergerak ke Negosiasi bulan ini, bukan yang kebetulan
   // dibuat bulan ini dan sekarang ada di Negosiasi.
   const [bulanPerKolom, setBulanPerKolom] = useState<Record<number, string>>({});
+  const [hariPerKolom, setHariPerKolom] = useState<Record<number, string>>({});
   const purchCounts = useProspectPurchasingCounts(true);
   const salesPlans = useDataStore((s) => s.salesPlans);
   const starCounts = useMemo(() => buildProspectStarCounts(salesPlans), [salesPlans]);
@@ -182,7 +183,13 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
           // pilihan bulan yang hasilnya pasti kosong.
           const bulanOptions = Array.from(new Set(semua.map((r) => (r.statusChangedAt || '').slice(0, 7)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
           const bulanAktif = bulanPerKolom[s] || '';
-          const items = bulanAktif ? semua.filter((r) => (r.statusChangedAt || '').slice(0, 7) === bulanAktif) : semua;
+          const dalamBulan = bulanAktif ? semua.filter((r) => (r.statusChangedAt || '').slice(0, 7) === bulanAktif) : semua;
+          // Penajaman opsional dari filter bulan: opsi hari dibangun dari isi
+          // dalamBulan (bukan seluruh kolom), supaya kalau bulan dipilih,
+          // pilihan harinya cuma hari-hari yang benar-benar ada di bulan itu.
+          const hariOptions = Array.from(new Set(dalamBulan.map((r) => (r.statusChangedAt || '').slice(0, 10)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+          const hariAktif = hariPerKolom[s] || '';
+          const items = hariAktif ? dalamBulan.filter((r) => (r.statusChangedAt || '').slice(0, 10) === hariAktif) : dalamBulan;
           const totalVal = items.reduce((sum, r) => sum + num(r.value), 0);
           const shown = items.slice(0, CAP);
           return (
@@ -193,19 +200,42 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                 </div>
                 <div className="kc-meta">
                   {items.length} prospek · {formatRupiah(totalVal)}
-                  {bulanAktif && semua.length !== items.length && <span> (dari {semua.length})</span>}
+                  {(bulanAktif || hariAktif) && semua.length !== items.length && <span> (dari {semua.length})</span>}
                 </div>
                 {bulanOptions.length > 0 && (
                   <select
                     className="kc-month"
                     value={bulanAktif}
-                    onChange={(e) => setBulanPerKolom((prev) => ({ ...prev, [s]: e.target.value }))}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setBulanPerKolom((prev) => ({ ...prev, [s]: v }));
+                      // Opsi hari akan dibangun ulang dari bulan yang baru —
+                      // hari yang tadinya dipilih bisa saja tidak ada di
+                      // bulan itu sama sekali, jadi direset bukan dibiarkan
+                      // menyaring ke hasil yang diam-diam kosong.
+                      setHariPerKolom((prev) => ({ ...prev, [s]: '' }));
+                    }}
                     title="Saring berdasar bulan perubahan status ke tahap ini"
                   >
                     <option value="">Semua bulan</option>
                     {bulanOptions.map((m) => (
                       <option key={m} value={m}>
                         {new Date(`${m}-01T00:00:00`).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {hariOptions.length > 0 && (
+                  <select
+                    className="kc-month"
+                    value={hariAktif}
+                    onChange={(e) => setHariPerKolom((prev) => ({ ...prev, [s]: e.target.value }))}
+                    title="Persempit lagi ke hari tertentu perubahan status ke tahap ini"
+                  >
+                    <option value="">Semua hari{bulanAktif ? ' di bulan ini' : ''}</option>
+                    {hariOptions.map((d) => (
+                      <option key={d} value={d}>
+                        {new Date(`${d}T00:00:00`).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: bulanAktif ? undefined : 'numeric' })}
                       </option>
                     ))}
                   </select>
@@ -221,7 +251,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                 onDrop={(e) => handleDrop(s, e)}
               >
                 {shown.length === 0 ? (
-                  <div className="kanban-empty">{bulanAktif ? 'Tidak ada perubahan status di bulan ini' : 'Tidak ada data'}</div>
+                  <div className="kanban-empty">{hariAktif ? 'Tidak ada perubahan status di hari ini' : bulanAktif ? 'Tidak ada perubahan status di bulan ini' : 'Tidak ada data'}</div>
                 ) : (
                   shown.map((r) => <KanbanCard key={r.id} r={r} purchCount={purchCounts[r.id]} starCount={starCounts.get(r.id)} />)
                 )}
