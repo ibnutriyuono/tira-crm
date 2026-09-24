@@ -40,16 +40,30 @@ export function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function classify(r: Pick<Prospect, 'status' | 'keterangan'>): Klasifikasi {
+/**
+ * `status` alone decides this — deliberately. An earlier version also
+ * pattern-matched `keterangan` (free-text notes) for words like "po", "do",
+ * "cancel", "batal" and classified on that regardless of the actual status
+ * field, meant to catch legacy records whose Won/Lost outcome was only ever
+ * written as a note. In practice it did the opposite: short, everyday words
+ * like "PO" or "DO" show up constantly in ordinary notes on deals that are
+ * nowhere near won ("menunggu PO customer", "estimasi DO minggu depan"),
+ * so a prospect still sitting at Penawaran Harga (status 2) could get
+ * badged Won just because someone wrote a note mentioning PO — reported
+ * via a screenshot showing several Penawaran Harga cards all marked Won.
+ * Removed rather than narrowed, since the status field (with its own
+ * dedicated PO/Kontrak and DO stages) is the actual source of truth Sales
+ * and Purchasing already update deliberately — a text-search fallback
+ * duplicating that, imperfectly, buys nothing this app doesn't already
+ * have a real field for.
+ */
+export function classify(r: Pick<Prospect, 'status'>): Klasifikasi {
   const status = num(r.status);
-  const k = (r.keterangan || '').toLowerCase();
   // Status 0 is a logged sales activity, not a live pipeline deal — counting it
   // as 'Aktif' inflated Aktif Pipeline against the single-file app.
   if (status === 0) return 'Activity';
   if (status === 6) return 'Lost';
-  if (/kalah|lose|lost|batal|cancel|loss/.test(k)) return 'Lost';
   if (status === 4 || status === 5) return 'Won';
-  if (/tersupply|terssupply|closed|\bclose\b|terkirim|invoice|\bdo\b|full ?supply|diambil|dikirim|faktur|\bpo\b/.test(k)) return 'Won';
   return 'Aktif';
 }
 
