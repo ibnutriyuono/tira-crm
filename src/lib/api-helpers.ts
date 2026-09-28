@@ -101,6 +101,32 @@ export function mergeRfqItemsPreservingAnswer(existing: RfqItem[] | null | undef
 }
 
 /**
+ * No. PO is mandatory the moment a prospect's status actually MOVES into
+ * PO/Kontrak (4) or DO (5) — not on every subsequent edit of a record that
+ * already sits there. Same "only a real move, not an edit" boundary the
+ * aging clock (statusChangedAt) already draws: an old record created before
+ * this field existed can still be edited (phone, follow-up, notes, even with
+ * status held at 4/5) without being forced to backfill a number nobody asked
+ * it to have retroactively. DO is included because it always presumes a PO
+ * already happened, even when status is jumped there directly, skipping 4 —
+ * so the gate covers a 3→5 jump exactly like a 3→4 one.
+ *
+ * `prevStatus` is `null` for a brand-new prospect — nothing to compare
+ * against, so any status other than 4/5 trivially "differs"; a create
+ * straight into PO/Kontrak or DO is itself the move being gated.
+ */
+export function requireNoPoOnMoveToPo(prevStatus: number | null, nextStatus: number, noPo: unknown): NextResponse | null {
+  const movingIn = (nextStatus === 4 || nextStatus === 5) && prevStatus !== nextStatus;
+  if (movingIn && !String(noPo ?? '').trim()) {
+    return NextResponse.json(
+      { error: 'No. PO wajib diisi saat memindahkan status prospek ke PO/Kontrak atau DO.' },
+      { status: 400 },
+    );
+  }
+  return null;
+}
+
+/**
  * Which of a prospect's scope fields a role is allowed to choose. Sales and BM
  * are pinned to their own branch so a typo can't file a prospect into someone
  * else's cabang, where it would vanish from their own reports. RM covers several

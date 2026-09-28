@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { diffFields, logActivity, PROSPECT_FIELD_LABELS } from '@/lib/activity';
-import { deriveFromMaterials, isResponse, requireUser, resolveProspectScope } from '@/lib/api-helpers';
+import { deriveFromMaterials, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
 import { STATUS_META } from '@/lib/constants';
 import { canDeleteProspect } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -42,6 +42,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
   const derived = deriveFromMaterials(materials);
 
+  const status = Number(body?.status) || 0;
+  const noPo = String(body?.noPo || '').trim();
+  const poErr = requireNoPoOnMoveToPo(Number(scoped.existing.status), status, noPo);
+  if (poErr) return poErr;
+
   // Locked scope fields come from the account, not the request — see
   // api-helpers.ts#prospectScopeLocks.
   const { reg, cabang, se } = await resolveProspectScope(user, body);
@@ -55,12 +60,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       customer,
       phone: String(body?.phone || '').trim(),
       tglPenawaran: body?.tglPenawaran || null,
+      noPo: noPo || null,
       tglPO: body?.tglPO || null,
       tglDelivery: body?.tglDelivery || null,
       ...derived,
       kondisiStock: String(body?.kondisiStock || '').trim(),
       keterangan: String(body?.keterangan || '').trim(),
-      status: Number(body?.status) || 0,
+      status,
       penawaranTerkirim: !!body?.penawaranTerkirim,
       terfaktur: !!body?.terfaktur,
       qcdQuality: body?.qcdQuality ?? undefined,
@@ -96,7 +102,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const body = await req.json().catch(() => null);
   const data: Record<string, unknown> = {};
-  const allowed = ['status', 'penawaranTerkirim', 'terfaktur', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan', 'followUpAt', 'followUpNote'];
+  const allowed = ['status', 'noPo', 'penawaranTerkirim', 'terfaktur', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan', 'followUpAt', 'followUpNote'];
   for (const key of allowed) {
     if (body && Object.prototype.hasOwnProperty.call(body, key)) data[key] = body[key];
   }
@@ -107,6 +113,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if ('status' in data && Number(data.status) !== Number(scoped.existing?.status)) {
     data.statusChangedAt = new Date();
   }
+
+  // Same PO gate as the full form (POST/PUT), applied here too since this is
+  // exactly the endpoint the Kanban drag and the inline status dropdown use
+  // to move status without going through the form at all — a partial PATCH
+  // is the one path a "wajib" rule at the form level alone wouldn't cover.
+  // Only checked when `status` is actually part of THIS request and is
+  // really changing (mirrors the aging-clock check just above), so editing
+  // an unrelated field on an old record already sitting at 4/5 without a
+  // noPo on file is never blocked by this.
+  if ('status' in data) {
+    const nextNoPo = 'noPo' in data ? data.noPo : scoped.existing?.noPo;
+    const poErr = requireNoPoOnMoveToPo(Number(scoped.existing?.status), Number(data.status), nextNoPo);
+    if (poErr) return poErr;
+  }
+  if (typeof data.noPo === 'string') data.noPo = data.noPo.trim() || null;
 
   const prospect = await prisma.prospect.update({ where: { id }, data });
   emitCrmEvent('prospect:updated', prospect);

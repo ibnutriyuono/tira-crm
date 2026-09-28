@@ -30,6 +30,8 @@ export interface Prospect {
   customer: string;
   phone: string | null;
   tglPenawaran: string | null;
+  /** Nomor PO/kontrak dari customer — wajib begitu status masuk 4 (PO/Kontrak) atau 5 (DO). */
+  noPo: string | null;
   tglPO: string | null;
   tglDelivery: string | null;
   line: string | null;

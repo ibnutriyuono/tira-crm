@@ -98,6 +98,7 @@ export const PROSPECT_FIELD_LABELS: Record<string, string> = {
   customer: 'Customer',
   phone: 'No. WhatsApp',
   tglPenawaran: 'Tgl. Penawaran',
+  noPo: 'No. PO',
   tglPO: 'Tgl. PO',
   tglDelivery: 'Tgl. Delivery',
   materials: 'Material',

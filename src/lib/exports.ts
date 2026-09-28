@@ -11,10 +11,10 @@ export interface SheetSpec {
 }
 
 export function buildProspectSheet(list: Prospect[]): SheetSpec {
-  const header = ['REG', 'CABANG', 'SE', 'CUSTOMER', 'NO. WHATSAPP', 'TGL. PENAWARAN', 'TGL. PO', 'TGL. DELIVERY', 'LINE', 'URAIAN PRODUCT', 'QTY (Pcs)', 'VALUE (Rp)', 'KONDISI STOCK', 'KETERANGAN', 'STATUS', 'KLASIFIKASI', 'STATUS PENAWARAN', 'STATUS FAKTUR'];
+  const header = ['REG', 'CABANG', 'SE', 'CUSTOMER', 'NO. WHATSAPP', 'TGL. PENAWARAN', 'NO. PO', 'TGL. PO', 'TGL. DELIVERY', 'LINE', 'URAIAN PRODUCT', 'QTY (Pcs)', 'VALUE (Rp)', 'KONDISI STOCK', 'KETERANGAN', 'STATUS', 'KLASIFIKASI', 'STATUS PENAWARAN', 'STATUS FAKTUR'];
   const rows = list.map((r) => [
     r.reg || '', r.cabang || '', r.se || '', r.customer || '', r.phone || '',
-    r.tglPenawaran || '', r.tglPO || '', r.tglDelivery || '',
+    r.tglPenawaran || '', r.noPo || '', r.tglPO || '', r.tglDelivery || '',
     r.line || '', r.uraian || '', num(r.qty), num(r.value),
     r.kondisiStock || '', r.keterangan || '', num(r.status), classify(r),
     r.penawaranTerkirim ? 'Terkirim' : 'Pending',
@@ -23,7 +23,7 @@ export function buildProspectSheet(list: Prospect[]): SheetSpec {
     // "GIT" for a deal that was never billed because it isn't Won yet.
     classify(r) === 'Won' ? (r.terfaktur ? 'Omzet (Terfaktur)' : 'GIT (Belum Terfaktur)') : '',
   ]);
-  const colWidths = [{ wch: 5 }, { wch: 8 }, { wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 13 }, { wch: 12 }, { wch: 13 }, { wch: 6 }, { wch: 32 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 24 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 20 }];
+  const colWidths = [{ wch: 5 }, { wch: 8 }, { wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 13 }, { wch: 16 }, { wch: 12 }, { wch: 13 }, { wch: 6 }, { wch: 32 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 24 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 20 }];
   return { sheetName: 'Prospek', header, rows, colWidths };
 }
 

@@ -72,6 +72,12 @@ model Prospect {
   customer          String
   phone             String?
   tglPenawaran      String?
+  /// Nomor PO/kontrak dari customer. Wajib diisi (ditegakkan di layer
+  /// API, lihat POST/PUT/PATCH /api/prospects) begitu `status` dipindahkan
+  /// ke 4 (PO/Kontrak) atau 5 (DO) -- DO tetap mensyaratkan PO karena
+  /// secara alur selalu didahului PO, termasuk saat status dilompat
+  /// langsung dari tahap sebelumnya tanpa pernah "mampir" di status 4.
+  noPo              String?
   tglPO             String?
   tglDelivery       String?
   line              String?

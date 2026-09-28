@@ -21,7 +21,18 @@ export function QcdModal() {
   const [delivery, setDelivery] = useState('');
   const [kompetitor, setKompetitor] = useState('');
   const [catatan, setCatatan] = useState('');
+  const [noPo, setNoPo] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const kanbanRecord = qcdCtx?.mode === 'kanban' ? records.find((x) => x.id === qcdCtx.recordId) : null;
+  // Kanban's handleDrop only opens this modal WITHOUT having moved the
+  // status yet when it's gating a move into PO/Kontrak or DO on a prospect
+  // that has no No. PO on file — see the comment there. In that case this
+  // modal is the one place status actually gets committed, together with
+  // the now-mandatory No. PO. Any other kanban open (status already moved
+  // by handleDrop, or a status-6 Lose Order) keeps the old, purely-optional
+  // QCD flow untouched.
+  const poRequired = !!kanbanRecord && (Number(qcdCtx?.statusVal) === 4 || Number(qcdCtx?.statusVal) === 5) && !(kanbanRecord.noPo || '').trim();
 
   useEffect(() => {
     if (!show || !qcdCtx) return;
@@ -39,12 +50,13 @@ export function QcdModal() {
       setDelivery(r?.qcdDelivery || '');
       setKompetitor(r?.qcdKompetitor || '');
       setCatatan(r?.qcdCatatan || '');
+      setNoPo(r?.noPo || '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, qcdCtx]);
 
   if (!qcdCtx) return null;
-  const label = Number(qcdCtx.statusVal) === 4 ? 'PO / Kontrak' : 'Lose Order / Batal';
+  const label = Number(qcdCtx.statusVal) === 4 ? 'PO / Kontrak' : Number(qcdCtx.statusVal) === 5 ? 'DO' : 'Lose Order / Batal';
 
   async function onSubmit() {
     const data = { quality: quality.trim(), cost: cost.trim(), delivery: delivery.trim(), kompetitor: kompetitor.trim(), catatan: catatan.trim() };
@@ -55,20 +67,31 @@ export function QcdModal() {
       return;
     }
     if (qcdCtx!.mode === 'kanban' && qcdCtx!.recordId) {
+      if (poRequired && !noPo.trim()) {
+        toast('No. PO wajib diisi sebelum status dipindahkan ke PO/Kontrak atau DO', 'error');
+        return;
+      }
       setBusy(true);
       try {
-        const { prospect } = await api.patch<{ prospect: Prospect }>(`/api/prospects/${qcdCtx!.recordId}`, {
+        const patchBody: Record<string, unknown> = {
           qcdQuality: data.quality,
           qcdCost: data.cost,
           qcdDelivery: data.delivery,
           qcdKompetitor: data.kompetitor,
           qcdCatatan: data.catatan,
-        });
+        };
+        // Status was deliberately held back by handleDrop until now — commit
+        // it together with the No. PO that gated it, in the same request.
+        if (poRequired) {
+          patchBody.status = qcdCtx!.statusVal;
+          patchBody.noPo = noPo.trim();
+        }
+        const { prospect } = await api.patch<{ prospect: Prospect }>(`/api/prospects/${qcdCtx!.recordId}`, patchBody);
         upsertProspect(prospect);
         closeModal();
-        toast('Data QCD tersimpan', 'success');
+        toast(poRequired ? 'Status & No. PO tersimpan' : 'Data QCD tersimpan', 'success');
       } catch (err) {
-        toast(err instanceof Error ? err.message : 'Gagal menyimpan QCD', 'error');
+        toast(err instanceof Error ? err.message : 'Gagal menyimpan', 'error');
       } finally {
         setBusy(false);
       }
@@ -85,18 +108,29 @@ export function QcdModal() {
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Lewati
+            {poRequired ? 'Batal' : 'Lewati'}
           </button>
           <button type="submit" className="btn btn-primary" disabled={busy}>
-            Simpan QCD
+            {poRequired ? 'Simpan & Pindahkan' : 'Simpan QCD'}
           </button>
         </>
       }
     >
       <p style={{ marginTop: 0, marginBottom: 14, color: 'var(--text-soft)', fontSize: 12.5 }}>
-        Status pipeline berubah menjadi <b>{qcdCtx.statusVal} · {label}</b>. Mohon lengkapi detail berikut untuk arsip evaluasi:
+        {poRequired ? (
+          <>Status pipeline akan pindah ke <b>{qcdCtx.statusVal} · {label}</b> setelah No. PO diisi — kartu tetap di kolom semula sampai itu terisi. Detail QCD di bawah ini opsional.</>
+        ) : (
+          <>Status pipeline berubah menjadi <b>{qcdCtx.statusVal} · {label}</b>. Mohon lengkapi detail berikut untuk arsip evaluasi:</>
+        )}
       </p>
       <div className="form-grid">
+        {poRequired && (
+          <div className="full">
+            <label>No. PO / Kontrak <span style={{ color: 'var(--rust-500)' }}>*</span></label>
+            <input type="text" autoFocus value={noPo} onChange={(e) => setNoPo(e.target.value)} placeholder="cth. PO-2026-00123" />
+            <div className="field-note">Wajib diisi sebelum status pindah ke {label}</div>
+          </div>
+        )}
         <div>
           <label>Quality</label>
           <input type="text" value={quality} onChange={(e) => setQuality(e.target.value)} placeholder="cth. Sesuai spesifikasi / ada revisi" />

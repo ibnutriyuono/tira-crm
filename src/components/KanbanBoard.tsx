@@ -158,6 +158,20 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
     const rec = filtered.find((x) => x.id === id) || useDataStore.getState().prospects.find((x) => x.id === id);
     if (!rec || num(rec.status) === newStatus) return;
 
+    // No. PO wajib diisi begitu masuk ke PO/Kontrak atau DO — beda dari QCD
+    // (opsional, tombol "Lewati"), jadi kalau prospek ini belum punya No. PO
+    // sama sekali, status BELUM dipindahkan sekarang: kartu tetap di kolom
+    // asalnya (tidak ada upsert optimis, tidak ada PATCH) sampai No. PO
+    // diisi lewat modal yang sama yang biasanya menampung QCD — modal itu
+    // yang lalu mengirim status+No. PO sekaligus begitu disimpan. Kalau
+    // No. PO sudah ada dari sebelumnya (misal pernah masuk PO, mundur ke
+    // Negosiasi, lalu ditarik lagi ke PO), lanjut jalur biasa di bawah.
+    if ((newStatus === 4 || newStatus === 5) && !(rec.noPo || '').trim()) {
+      useUiStore.setState({ qcdCtx: { mode: 'kanban', statusVal: newStatus, recordId: id } });
+      openModal('qcd');
+      return;
+    }
+
     const optimistic = { ...rec, status: newStatus };
     upsertProspect(optimistic);
     toast('Status prospek diperbarui', 'success');

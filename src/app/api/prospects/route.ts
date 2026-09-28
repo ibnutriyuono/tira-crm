@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prospectScopeWhere } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
-import { deriveFromMaterials, isResponse, requireUser, resolveProspectScope } from '@/lib/api-helpers';
+import { deriveFromMaterials, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Material } from '@/lib/types';
@@ -31,6 +31,11 @@ export async function POST(req: Request) {
   }
   const derived = deriveFromMaterials(materials);
 
+  const status = Number(body?.status) || 0;
+  const noPo = String(body?.noPo || '').trim();
+  const poErr = requireNoPoOnMoveToPo(null, status, noPo);
+  if (poErr) return poErr;
+
   // Locked scope fields come from the account, not the request — see
   // api-helpers.ts#prospectScopeLocks.
   const { reg, cabang, se } = await resolveProspectScope(user, body);
@@ -43,12 +48,13 @@ export async function POST(req: Request) {
       customer,
       phone: String(body?.phone || '').trim(),
       tglPenawaran: body?.tglPenawaran || null,
+      noPo: noPo || null,
       tglPO: body?.tglPO || null,
       tglDelivery: body?.tglDelivery || null,
       ...derived,
       kondisiStock: String(body?.kondisiStock || '').trim(),
       keterangan: String(body?.keterangan || '').trim(),
-      status: Number(body?.status) || 0,
+      status,
       penawaranTerkirim: !!body?.penawaranTerkirim,
       terfaktur: !!body?.terfaktur,
       qcdQuality: body?.qcdQuality || '',

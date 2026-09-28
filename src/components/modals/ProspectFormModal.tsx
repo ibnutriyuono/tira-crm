@@ -63,6 +63,7 @@ export function ProspectFormModal() {
   const [materials, setMaterials] = useState<Material[]>([emptyMaterial()]);
   const [kondisiStock, setKondisiStock] = useState('');
   const [tglPenawaran, setTglPenawaran] = useState('');
+  const [noPo, setNoPo] = useState('');
   const [tglPO, setTglPO] = useState('');
   const [tglDelivery, setTglDelivery] = useState('');
   const [keterangan, setKeterangan] = useState('');
@@ -82,6 +83,7 @@ export function ProspectFormModal() {
       setMaterials(getProspectMaterials(editing));
       setKondisiStock(editing.kondisiStock || '');
       setTglPenawaran(editing.tglPenawaran || '');
+      setNoPo(editing.noPo || '');
       setTglPO(editing.tglPO || '');
       setTglDelivery(editing.tglDelivery || '');
       setKeterangan(editing.keterangan || '');
@@ -106,6 +108,7 @@ export function ProspectFormModal() {
       setMaterials([emptyMaterial()]);
       setKondisiStock('');
       setTglPenawaran('');
+      setNoPo('');
       setTglPO('');
       setTglDelivery('');
       setKeterangan('');
@@ -157,6 +160,18 @@ export function ProspectFormModal() {
       toast('Isi minimal satu uraian material', 'error');
       return;
     }
+    const statusNum = Number(status);
+    // Wajib begitu status benar-benar BERPINDAH ke PO/Kontrak atau DO — bukan
+    // setiap kali menyimpan prospek lama yang sudah lama duduk di status itu
+    // tanpa No. PO tercatat (field ini baru ada sekarang, jadi data lama wajar
+    // belum punya). DO ikut disyaratkan karena selalu didahului PO, termasuk
+    // saat status dilompat langsung tanpa pernah "mampir" di status 4.
+    const prevStatus = editing ? num(editing.status) : null;
+    const isMovingToPo = (statusNum === 4 || statusNum === 5) && prevStatus !== statusNum;
+    if (isMovingToPo && !noPo.trim()) {
+      toast('No. PO wajib diisi saat memindahkan status ke PO/Kontrak atau DO', 'error');
+      return;
+    }
     setBusy(true);
     const payload = {
       reg: Number(reg),
@@ -165,6 +180,7 @@ export function ProspectFormModal() {
       customer: trimmedCustomer,
       phone,
       tglPenawaran: tglPenawaran || '',
+      noPo: noPo.trim(),
       tglPO: tglPO || '',
       tglDelivery: tglDelivery || '',
       materials,
@@ -321,6 +337,15 @@ export function ProspectFormModal() {
         <div>
           <label>Tgl. Penawaran</label>
           <input type="date" value={tglPenawaran} onChange={(e) => setTglPenawaran(e.target.value)} />
+        </div>
+        <div>
+          <label>
+            No. PO{(Number(status) === 4 || Number(status) === 5) && <span style={{ color: 'var(--rust-500)' }}> *</span>}
+          </label>
+          <input type="text" value={noPo} onChange={(e) => setNoPo(e.target.value)} placeholder="cth. PO-2026-00123" />
+          {(Number(status) === 4 || Number(status) === 5) && !noPo.trim() && (
+            <div className="field-note">Wajib diisi untuk status PO/Kontrak atau DO</div>
+          )}
         </div>
         <div>
           <label>Tgl. PO</label>
