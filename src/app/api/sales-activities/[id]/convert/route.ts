@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
-import { deriveFromMaterials, isResponse, num, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
+import { cleanFaktor, cleanLevel } from '@/lib/qcd';
+import { deriveFromMaterials, isResponse, num, requireNoPoOnMoveToPo, requireQcdOnClose, requireUser, resolveProspectScope } from '@/lib/api-helpers';
 import { canWriteSalesActivity } from '@/lib/auth';
 import { activityOwner, formatActivityPics } from '@/lib/sales-activity';
 import { ACTIVITY_CONVERT_STATUSES } from '@/lib/constants';
@@ -41,6 +42,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const noPo = String(body?.noPo || '').trim();
   const poErr = requireNoPoOnMoveToPo(null, status, noPo);
   if (poErr) return poErr;
+  // Entering PO closes the deal: QCD is mandatory, same as the prospect form and Kanban.
+  const qcdErr = requireQcdOnClose(null, status, body || {});
+  if (qcdErr) return qcdErr;
 
   const qty = Math.max(num(body?.qty), 0) || 1;
   const total = Math.max(num(body?.value), 0);
@@ -65,6 +69,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // PIC yang ditemui ikut terbawa ke prospek supaya tidak hilang di pipeline.
         keterangan: [activity.keterangan || '', picNote].filter(Boolean).join(' | '),
         status,
+        ...(status === 4
+          ? {
+              qcdQualityLevel: cleanLevel(body?.qcdQualityLevel),
+              qcdCostLevel: cleanLevel(body?.qcdCostLevel),
+              qcdDeliveryLevel: cleanLevel(body?.qcdDeliveryLevel),
+              qcdFaktor: cleanFaktor(body?.qcdFaktor),
+              qcdQuality: String(body?.qcdQuality || '').trim(),
+              qcdCost: String(body?.qcdCost || '').trim(),
+              qcdDelivery: String(body?.qcdDelivery || '').trim(),
+              qcdKompetitor: String(body?.qcdKompetitor || '').trim(),
+              qcdCatatan: String(body?.qcdCatatan || '').trim(),
+            }
+          : {}),
       },
     });
     await tx.salesActivity.update({ where: { id }, data: { prospectId: created.id } });

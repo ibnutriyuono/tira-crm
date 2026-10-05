@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prospectScopeWhere } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
-import { deriveFromMaterials, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
+import { cleanFaktor, cleanLevel } from '@/lib/qcd';
+import { deriveFromMaterials, requireQcdOnClose, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Material } from '@/lib/types';
@@ -35,6 +36,8 @@ export async function POST(req: Request) {
   const noPo = String(body?.noPo || '').trim();
   const poErr = requireNoPoOnMoveToPo(null, status, noPo);
   if (poErr) return poErr;
+  const qcdErr = requireQcdOnClose(null, status, body || {});
+  if (qcdErr) return qcdErr;
 
   // Locked scope fields come from the account, not the request — see
   // api-helpers.ts#prospectScopeLocks.
@@ -62,6 +65,10 @@ export async function POST(req: Request) {
       qcdDelivery: body?.qcdDelivery || '',
       qcdKompetitor: body?.qcdKompetitor || '',
       qcdCatatan: body?.qcdCatatan || '',
+      qcdQualityLevel: cleanLevel(body?.qcdQualityLevel),
+      qcdCostLevel: cleanLevel(body?.qcdCostLevel),
+      qcdDeliveryLevel: cleanLevel(body?.qcdDeliveryLevel),
+      qcdFaktor: cleanFaktor(body?.qcdFaktor),
     },
   });
 

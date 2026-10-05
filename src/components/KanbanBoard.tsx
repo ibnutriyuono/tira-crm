@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { KANBAN_STATUSES, STATUS_META } from '@/lib/constants';
 import { classify, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
 import { buildProspectStarCounts } from '@/lib/reports';
+import { qcdRequiredOnMove } from '@/lib/qcd';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -160,16 +161,15 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
     const rec = filtered.find((x) => x.id === id) || useDataStore.getState().prospects.find((x) => x.id === id);
     if (!rec || num(rec.status) === newStatus) return;
 
-    // No. PO wajib diisi begitu masuk ke PO/Kontrak atau DO — beda dari QCD
-    // (opsional, tombol "Lewati"), jadi kalau prospek ini belum punya No. PO
-    // sama sekali, status BELUM dipindahkan sekarang: kartu tetap di kolom
-    // asalnya (tidak ada upsert optimis, tidak ada PATCH) sampai No. PO
-    // diisi lewat modal yang sama yang biasanya menampung QCD — modal itu
-    // yang lalu mengirim status+No. PO sekaligus begitu disimpan. Kalau
-    // No. PO sudah ada dari sebelumnya (misal pernah masuk PO, mundur ke
-    // Negosiasi, lalu ditarik lagi ke PO), lanjut jalur biasa di bawah.
-    if ((newStatus === 4 || newStatus === 5) && !(rec.noPo || '').trim()) {
-      useUiStore.setState({ qcdCtx: { mode: 'kanban', statusVal: newStatus, recordId: id } });
+    // Deal ditutup (masuk PO/Kontrak/DO dari tahap terbuka, atau Lose) wajib
+    // QCD; masuk PO/DO tanpa No. PO wajib No. PO. Dalam dua kasus itu status
+    // BELUM dipindahkan sekarang: kartu tetap di kolom asalnya (tanpa upsert
+    // optimis, tanpa PATCH) sampai modal QCD disimpan -- modal itulah yang
+    // mengirim status + QCD (+ No. PO) sekaligus. "Batal" = kartu tidak pindah.
+    const prev = num(rec.status);
+    const needsNoPo = (newStatus === 4 || newStatus === 5) && !(rec.noPo || '').trim();
+    if (qcdRequiredOnMove(prev, newStatus) || needsNoPo) {
+      useUiStore.setState({ qcdCtx: { mode: 'kanban', statusVal: newStatus, recordId: id, commit: true } });
       openModal('qcd');
       return;
     }
@@ -177,10 +177,6 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
     const optimistic = { ...rec, status: newStatus };
     upsertProspect(optimistic);
     toast('Status prospek diperbarui', 'success');
-    if (newStatus === 4 || newStatus === 6) {
-      useUiStore.setState({ qcdCtx: { mode: 'kanban', statusVal: newStatus, recordId: id } });
-      openModal('qcd');
-    }
     try {
       const { prospect } = await api.patch<{ prospect: Prospect }>(`/api/prospects/${id}`, { status: newStatus });
       upsertProspect(prospect);

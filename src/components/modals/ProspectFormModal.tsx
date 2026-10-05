@@ -8,7 +8,9 @@ import { CABANG_LIST } from '@/lib/constants';
 import { formatRupiah, getProspectMaterials, materialUnitPrice, num } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
-import { useUiStore } from '@/store/useUiStore';
+import { EMPTY_QCD, useUiStore } from '@/store/useUiStore';
+import { qcdMissing, qcdRequiredOnMove } from '@/lib/qcd';
+import { QcdFields } from '../QcdFields';
 import type { Material, Prospect } from '@/lib/types';
 
 const emptyMaterial = (): Material => ({ line: '', uraian: '', qty: 1, beratPc: 0, hargaKg: 0, harga: 0 });
@@ -94,6 +96,10 @@ export function ProspectFormModal() {
           delivery: editing.qcdDelivery || '',
           kompetitor: editing.qcdKompetitor || '',
           catatan: editing.qcdCatatan || '',
+          qualityLevel: editing.qcdQualityLevel || '',
+          costLevel: editing.qcdCostLevel || '',
+          deliveryLevel: editing.qcdDeliveryLevel || '',
+          faktor: editing.qcdFaktor || '',
         },
       });
     } else {
@@ -112,7 +118,7 @@ export function ProspectFormModal() {
       setTglPO('');
       setTglDelivery('');
       setKeterangan('');
-      useUiStore.setState({ pendingProspectQCD: { quality: '', cost: '', delivery: '', kompetitor: '', catatan: '' } });
+      useUiStore.setState({ pendingProspectQCD: { ...EMPTY_QCD } });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, editId]);
@@ -141,14 +147,15 @@ export function ProspectFormModal() {
     }
   }
 
+  const qcdNeeded = qcdRequiredOnMove(editing ? num(editing.status) : null, Number(status));
+
+  // QCD fields appear inline below for a closed status (PO/DO/Lose).
+  // Previously a separate modal replaced this form and its unsaved edits were
+  // lost when that modal closed. Mandatory on a closing move (lib/qcd.ts).
   function onStatusChange(val: string) {
     setStatus(val);
-    const n = Number(val);
-    if (n === 4 || n === 6) {
-      useUiStore.setState({ qcdCtx: { mode: 'prospectForm', statusVal: n, recordId: editId } });
-      openModal('qcd');
-    }
   }
+
 
   async function onSubmit() {
     const trimmedCustomer = customer.trim();
@@ -172,6 +179,19 @@ export function ProspectFormModal() {
       toast('No. PO wajib diisi saat memindahkan status ke PO/Kontrak atau DO', 'error');
       return;
     }
+    if (qcdRequiredOnMove(prevStatus, statusNum)) {
+      const miss = qcdMissing(statusNum, {
+        qcdQualityLevel: pendingQCD.qualityLevel,
+        qcdCostLevel: pendingQCD.costLevel,
+        qcdDeliveryLevel: pendingQCD.deliveryLevel,
+        qcdFaktor: pendingQCD.faktor,
+        qcdKompetitor: pendingQCD.kompetitor,
+      });
+      if (miss) {
+        toast(`${miss} Lengkapi di bagian QCD pada form ini.`, 'error');
+        return;
+      }
+    }
     setBusy(true);
     const payload = {
       reg: Number(reg),
@@ -194,6 +214,10 @@ export function ProspectFormModal() {
       qcdDelivery: pendingQCD.delivery,
       qcdKompetitor: pendingQCD.kompetitor,
       qcdCatatan: pendingQCD.catatan,
+      qcdQualityLevel: pendingQCD.qualityLevel,
+      qcdCostLevel: pendingQCD.costLevel,
+      qcdDeliveryLevel: pendingQCD.deliveryLevel,
+      qcdFaktor: pendingQCD.faktor,
     };
     try {
       const { prospect } = editId
@@ -359,6 +383,14 @@ export function ProspectFormModal() {
           <label>Keterangan</label>
           <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="Catatan / progres terbaru" />
         </div>
+        {[4, 5, 6].includes(Number(status)) && (
+          <div className="full rfq-item-card" style={{ borderColor: qcdNeeded ? 'var(--amber-600)' : undefined }}>
+            <div className="rfq-item-head">
+              <span>Quality · Cost · Delivery {qcdNeeded ? '(wajib — deal ditutup)' : ''}</span>
+            </div>
+            <QcdFields value={pendingQCD} onChange={(v) => useUiStore.setState({ pendingProspectQCD: v })} statusVal={Number(status)} required={qcdNeeded} />
+          </div>
+        )}
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>Diskusi</label>

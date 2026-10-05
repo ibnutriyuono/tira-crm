@@ -213,6 +213,13 @@ model Prospect {
   qcdDelivery       String?
   qcdKompetitor     String?
   qcdCatatan        String?
+  /// QCD terstruktur (dropdown) saat deal ditutup: unggul | setara | kalah
+  /// dibanding kompetitor. Lihat src/lib/qcd.ts.
+  qcdQualityLevel   String?
+  qcdCostLevel      String?
+  qcdDeliveryLevel  String?
+  /// Faktor penentu utama menang/kalah (harga, kualitas, delivery, ...).
+  qcdFaktor         String?
   /// Jadwal follow-up berikutnya, diisi manual oleh Sales/BM — bukan
   /// dihitung otomatis seperti Aging (statusChangedAt). Dipakai dasbord
   /// Follow-up untuk menyatukan "sudah dijadwalkan" dengan sinyal otomatis

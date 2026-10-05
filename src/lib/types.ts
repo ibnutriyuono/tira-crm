@@ -51,6 +51,10 @@ export interface Prospect {
   qcdDelivery: string | null;
   qcdKompetitor: string | null;
   qcdCatatan: string | null;
+  qcdQualityLevel?: string | null;
+  qcdCostLevel?: string | null;
+  qcdDeliveryLevel?: string | null;
+  qcdFaktor?: string | null;
   followUpAt: string | null;
   followUpNote: string | null;
   createdAt: string;

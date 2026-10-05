@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
 import { diffFields, logActivity, PROSPECT_FIELD_LABELS } from '@/lib/activity';
-import { deriveFromMaterials, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
+import { cleanFaktor, cleanLevel, type QcdInput } from '@/lib/qcd';
+import { deriveFromMaterials, requireQcdOnClose, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
 import { STATUS_META } from '@/lib/constants';
 import { canDeleteProspect } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Material, SafeUser } from '@/lib/types';
+
+/** The record's QCD as it will be after this request: request values win, existing ones fill the gaps. */
+function mergeQcd(existing: Record<string, unknown> | null | undefined, body: Record<string, unknown> | null): QcdInput {
+  const pick = (k: string) => (body && Object.prototype.hasOwnProperty.call(body, k) ? body[k] : existing?.[k]);
+  return { qcdQualityLevel: pick('qcdQualityLevel'), qcdCostLevel: pick('qcdCostLevel'), qcdDeliveryLevel: pick('qcdDeliveryLevel'), qcdFaktor: pick('qcdFaktor'), qcdKompetitor: pick('qcdKompetitor') };
+}
 
 const statusLabel = (v: unknown) => STATUS_META[Number(v)]?.label ?? String(v);
 
@@ -46,6 +53,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const noPo = String(body?.noPo || '').trim();
   const poErr = requireNoPoOnMoveToPo(Number(scoped.existing.status), status, noPo);
   if (poErr) return poErr;
+  const qcdErr = requireQcdOnClose(Number(scoped.existing.status), status, mergeQcd(scoped.existing, body));
+  if (qcdErr) return qcdErr;
 
   // Locked scope fields come from the account, not the request — see
   // api-helpers.ts#prospectScopeLocks.
@@ -74,6 +83,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       qcdDelivery: body?.qcdDelivery ?? undefined,
       qcdKompetitor: body?.qcdKompetitor ?? undefined,
       qcdCatatan: body?.qcdCatatan ?? undefined,
+      qcdQualityLevel: body?.qcdQualityLevel !== undefined ? cleanLevel(body.qcdQualityLevel) : undefined,
+      qcdCostLevel: body?.qcdCostLevel !== undefined ? cleanLevel(body.qcdCostLevel) : undefined,
+      qcdDeliveryLevel: body?.qcdDeliveryLevel !== undefined ? cleanLevel(body.qcdDeliveryLevel) : undefined,
+      qcdFaktor: body?.qcdFaktor !== undefined ? cleanFaktor(body.qcdFaktor) : undefined,
     },
   });
 
@@ -102,7 +115,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const body = await req.json().catch(() => null);
   const data: Record<string, unknown> = {};
-  const allowed = ['status', 'noPo', 'penawaranTerkirim', 'terfaktur', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan', 'followUpAt', 'followUpNote'];
+  const allowed = ['status', 'noPo', 'penawaranTerkirim', 'terfaktur', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan', 'qcdQualityLevel', 'qcdCostLevel', 'qcdDeliveryLevel', 'qcdFaktor', 'followUpAt', 'followUpNote'];
   for (const key of allowed) {
     if (body && Object.prototype.hasOwnProperty.call(body, key)) data[key] = body[key];
   }
@@ -126,7 +139,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const nextNoPo = 'noPo' in data ? data.noPo : scoped.existing?.noPo;
     const poErr = requireNoPoOnMoveToPo(Number(scoped.existing?.status), Number(data.status), nextNoPo);
     if (poErr) return poErr;
+    const qcdErr = requireQcdOnClose(Number(scoped.existing?.status), Number(data.status), mergeQcd(scoped.existing, data));
+    if (qcdErr) return qcdErr;
   }
+  for (const k of ['qcdQualityLevel', 'qcdCostLevel', 'qcdDeliveryLevel'] as const) if (k in data) data[k] = cleanLevel(data[k]);
+  if ('qcdFaktor' in data) data.qcdFaktor = cleanFaktor(data.qcdFaktor);
   if (typeof data.noPo === 'string') data.noPo = data.noPo.trim() || null;
 
   const prospect = await prisma.prospect.update({ where: { id }, data });

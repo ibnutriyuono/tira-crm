@@ -8,7 +8,9 @@ import { formatDateID, formatRupiah } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { activityOwner, localToday } from '@/lib/sales-activity';
 import { useDataStore } from '@/store/useDataStore';
-import { useUiStore } from '@/store/useUiStore';
+import { EMPTY_QCD, useUiStore, type PendingQcd } from '@/store/useUiStore';
+import { qcdMissing } from '@/lib/qcd';
+import { QcdFields, qcdPayload } from '../QcdFields';
 import type { ActivityPic, Prospect, SalesActivity } from '@/lib/types';
 
 const TIPE_LABEL: Record<string, string> = Object.fromEntries(ACTIVITY_TYPES.map((t) => [t.key, t.label]));
@@ -57,6 +59,7 @@ export function SalesActivityModal() {
   const [qty, setQty] = useState('1');
   const [nilai, setNilai] = useState('');
   const [noPo, setNoPo] = useState('');
+  const [qcd, setQcd] = useState<PendingQcd>({ ...EMPTY_QCD });
 
   const periode = tanggal.slice(0, 7);
 
@@ -183,12 +186,17 @@ export function SalesActivityModal() {
     setQty('1');
     setNilai('');
     setNoPo('');
+    setQcd({ ...EMPTY_QCD });
   }
 
   async function onConvert() {
     if (!convert) return;
     if (!uraian.trim()) return toast('Isi uraian material/kebutuhan customer', 'error');
     if (convert.status === 4 && !noPo.trim()) return toast('No. PO wajib diisi untuk status PO/Kontrak', 'error');
+    if (convert.status === 4) {
+      const miss = qcdMissing(4, qcdPayload(qcd));
+      if (miss) return toast(miss, 'error');
+    }
     setBusy(true);
     try {
       const res = await api.post<{ prospect: Prospect; activity: SalesActivity }>(`/api/sales-activities/${convert.activity.id}/convert`, {
@@ -197,6 +205,7 @@ export function SalesActivityModal() {
         qty: Number(qty) || 1,
         value: Number(nilai) || 0,
         noPo: noPo.trim(),
+        ...(convert.status === 4 ? qcdPayload(qcd) : {}),
       });
       upsertProspect(res.prospect);
       setActivities((list) => list.map((a) => (a.id === res.activity.id ? { ...a, prospectId: res.prospect.id } : a)));
@@ -351,8 +360,14 @@ export function SalesActivityModal() {
               </div>
             )}
           </div>
+          {convert.status === 4 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 6 }}>Quality · Cost · Delivery (wajib — deal ditutup)</div>
+              <QcdFields value={qcd} onChange={setQcd} statusVal={4} required />
+            </div>
+          )}
           <div className="field-note" style={{ marginTop: 6 }}>
-            Prospek dibuat dengan status {STATUS_META[convert.status]?.label}. Detail lain (material tambahan, harga, QCD) dapat dilengkapi dari Pipeline.
+            Prospek dibuat dengan status {STATUS_META[convert.status]?.label}. Detail lain (material tambahan, harga) dapat dilengkapi dari Pipeline.
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setConvert(null)}>

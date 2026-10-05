@@ -66,7 +66,24 @@ export interface QcdCtx {
   mode: 'prospectForm' | 'kanban';
   statusVal: number;
   recordId: string | null;
+  /** Kanban only: the status has NOT been moved yet -- the QCD modal commits it together with the QCD (and No. PO when needed). */
+  commit?: boolean;
+  /** Modal to return to after save/cancel (e.g. the KPI QCD dashboard). */
+  returnTo?: ModalKey;
 }
+
+export interface PendingQcd {
+  quality: string;
+  cost: string;
+  delivery: string;
+  kompetitor: string;
+  catatan: string;
+  qualityLevel: string;
+  costLevel: string;
+  deliveryLevel: string;
+  faktor: string;
+}
+export const EMPTY_QCD: PendingQcd = { quality: '', cost: '', delivery: '', kompetitor: '', catatan: '', qualityLevel: '', costLevel: '', deliveryLevel: '', faktor: '' };
 export interface RfqCtx {
   prospectId: string | null;
   rfqId: string | null;
@@ -120,7 +137,7 @@ interface UiState {
   qcdCtx: QcdCtx | null;
   importTarget: 'prospect' | 'customer' | 'vendor';
   /** Staged QCD answers for a prospect still being created/edited in the form modal — committed together on Save. */
-  pendingProspectQCD: { quality: string; cost: string; delivery: string; kompetitor: string; catatan: string };
+  pendingProspectQCD: PendingQcd;
 
   openModal: (m: ModalKey) => void;
   closeModal: () => void;
@@ -197,7 +214,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   visitTripOpenId: null,
   qcdCtx: null,
   importTarget: 'prospect',
-  pendingProspectQCD: { quality: '', cost: '', delivery: '', kompetitor: '', catatan: '' },
+  pendingProspectQCD: { ...EMPTY_QCD },
 
   openModal: (m) => set({ modal: m }),
   closeModal: () => set({ modal: null }),

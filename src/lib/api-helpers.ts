@@ -1,3 +1,4 @@
+import { qcdMissing, qcdRequiredOnMove, type QcdInput } from './qcd';
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { cabangRegMap, getCurrentUser } from './auth';
@@ -146,6 +147,19 @@ export function normalizeCustomerPics(input: unknown): CustomerPic[] {
  * against, so any status other than 4/5 trivially "differs"; a create
  * straight into PO/Kontrak or DO is itself the move being gated.
  */
+/**
+ * QCD is mandatory when a deal closes (enters Won from an open stage, or
+ * enters Lost): the three Quality/Cost/Delivery levels and the deciding
+ * factor, plus the competitor when lost. `q` is the record as it WILL be
+ * (existing values merged with this request), so a QCD filled earlier still
+ * counts. See lib/qcd.ts.
+ */
+export function requireQcdOnClose(prevStatus: number | null, nextStatus: number, q: QcdInput): NextResponse | null {
+  if (!qcdRequiredOnMove(prevStatus, nextStatus)) return null;
+  const msg = qcdMissing(nextStatus, q);
+  return msg ? NextResponse.json({ error: msg }, { status: 400 }) : null;
+}
+
 export function requireNoPoOnMoveToPo(prevStatus: number | null, nextStatus: number, noPo: unknown): NextResponse | null {
   const movingIn = (nextStatus === 4 || nextStatus === 5) && prevStatus !== nextStatus;
   if (movingIn && !String(noPo ?? '').trim()) {
