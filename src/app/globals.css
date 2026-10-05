@@ -172,7 +172,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .filters{display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:14px 18px;}
 .field{display:flex; flex-direction:column; gap:4px;}
 .field label{font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-soft); font-weight:600;}
-select, input[type=text], input[type=search], input[type=date], input[type=number], input[type=password], textarea{
+select, input[type=text], input[type=search], input[type=date], input[type=month], input[type=number], input[type=password], textarea{
   font-family:inherit; font-size:13px; padding:8px 10px; border:1px solid var(--border); border-radius:5px;
   background:var(--surface); color:var(--text);
 }

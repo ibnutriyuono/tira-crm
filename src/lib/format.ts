@@ -1,4 +1,4 @@
-import type { Klasifikasi, Material, Prospect } from './types';
+import type { Customer, CustomerPic, Klasifikasi, Material, Prospect } from './types';
 
 export function num(v: unknown): number {
   const n = Number(v);
@@ -88,6 +88,22 @@ export function getProspectMaterials(r: Pick<Prospect, 'materials' | 'qty' | 'va
   const qty = num(r.qty) || 1;
   const harga = qty > 0 ? Math.round(num(r.value) / qty) : num(r.value);
   return [{ line: r.line || '', uraian: r.uraian || '', qty, beratPc: 0, hargaKg: 0, harga }];
+}
+
+// Legacy fallback for customers saved before multi-PIC support: when `pics`
+// is empty, synthesize one entry from the old single pic/phone/email fields
+// so every call site (quotation addressee, follow-up greeting, customer
+// table) can read through this one function instead of re-deriving the
+// fallback itself. Mirrors getProspectMaterials()'s role for `materials`.
+export function getPrimaryPic(c: Pick<Customer, 'pics' | 'pic' | 'phone' | 'email'> | null | undefined): CustomerPic | null {
+  if (!c) return null;
+  if (Array.isArray(c.pics) && c.pics.length > 0) {
+    return c.pics.find((p) => p.isPrimary) || c.pics[0];
+  }
+  if (c.pic || c.phone || c.email) {
+    return { id: 'legacy', nama: c.pic || '', jabatan: null, phone: c.phone || null, email: c.email || null, isPrimary: true };
+  }
+  return null;
 }
 
 export function uid(): string {

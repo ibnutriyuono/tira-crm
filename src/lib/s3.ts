@@ -40,7 +40,7 @@ function s3() {
  * together in the console, and prefixed with a UUID so two uploads of the same
  * filename never collide.
  */
-export function buildKey(entity: 'rfq' | 'fupa', entityId: string, filename: string) {
+export function buildKey(entity: 'rfq' | 'fupa' | 'trip', entityId: string, filename: string) {
   const safe = filename.replace(/[^\w.\- ]+/g, '_').slice(-120);
   return `${prefix}/${entity}/${entityId}/${randomUUID()}-${safe}`;
 }
@@ -56,11 +56,11 @@ export async function putObject(key: string, body: Buffer, contentType: string) 
  * Short-lived download URL. The bucket stays private — the API route redirects
  * to one of these rather than proxying bytes through the Node process.
  */
-export async function presignGet(key: string, filename?: string, expiresIn = 300) {
+export async function presignGet(key: string, filename?: string, expiresIn = 300, inline = false) {
   const command = new GetObjectCommand({
     Bucket: bucket,
     Key: key,
-    ...(filename ? { ResponseContentDisposition: `attachment; filename="${filename.replace(/"/g, '')}"` } : {}),
+    ...(filename ? { ResponseContentDisposition: `${inline ? 'inline' : 'attachment'}; filename="${filename.replace(/"/g, '')}"` } : {}),
   });
   return getSignedUrl(s3(), command, { expiresIn });
 }

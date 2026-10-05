@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
-import { IconBag, IconChat, IconCheck, IconRfq, IconTrash } from '../icons';
+import { IconBag, IconCalendar, IconChat, IconCheck, IconRfq, IconTrash } from '../icons';
 import { api } from '@/lib/api-client';
 import { openPurchDoc } from '@/hooks/useCrmSocket';
 import { useDataStore } from '@/store/useDataStore';
@@ -20,6 +20,11 @@ const NOTIF_META: Record<NotificationType, { icon: () => React.JSX.Element; colo
   fupa_chat: { icon: IconChat, color: 'amber' },
   rfq_cancelled: { icon: IconTrash, color: 'rust' },
   fupa_cancelled: { icon: IconTrash, color: 'rust' },
+  trip_submitted: { icon: IconCalendar, color: 'amber' },
+  trip_approved: { icon: IconCheck, color: 'green' },
+  trip_rejected: { icon: IconTrash, color: 'rust' },
+  trip_scheduled: { icon: IconCalendar, color: 'steel' },
+  trip_cancelled: { icon: IconTrash, color: 'rust' },
 };
 
 function timeAgo(iso: string): string {
@@ -65,6 +70,11 @@ export function NotificationsModal() {
       api.patch(`/api/notifications/${n.id}`, {}).catch(() => {});
     }
     closeModal();
+    if (n.entity === 'visitTrip') {
+      useUiStore.setState({ visitTripOpenId: n.entityId });
+      useUiStore.getState().openModal('visitTrip');
+      return;
+    }
     // openPurchDoc already branches per role: purchasing goes straight to
     // their dedicated page's inline detail, everyone else gets the
     // Purchasing modal opened for them — same helper the toast onClick
@@ -114,7 +124,7 @@ export function NotificationsModal() {
       {list.length === 0 ? (
         <div className="empty-state">
           <h3>{filter === 'belum' ? 'Tidak ada notifikasi belum dibaca' : 'Belum ada notifikasi'}</h3>
-          <p>Notifikasi RFQ/FUP A baru, jawaban Purchasing, diskusi, dan pembatalan akan muncul di sini.</p>
+          <p>Notifikasi RFQ/FUP A baru, jawaban Purchasing, diskusi, pembatalan, dan Perjalanan Dinas akan muncul di sini.</p>
         </div>
       ) : (
         <div className="notif-list">

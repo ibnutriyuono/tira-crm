@@ -2,6 +2,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import { prisma } from './prisma';
+import { activityOwner } from './sales-activity';
 import type { SafeUser } from './types';
 
 export const SESSION_COOKIE = 'crm_session';
@@ -281,4 +282,41 @@ export async function canEditBudgetTarget(user: SafeUser, cabang: string): Promi
   }
   if (user.role === 'bm') return (user.cabang || '').toUpperCase() === target;
   return false;
+}
+
+/**
+ * Read scope for SalesActivity / ActivityTarget. Both carry the same se /
+ * cabang / reg columns as SalesPlan, so the hierarchy is identical: sales sees
+ * their own SE, bm their branch, rm their region, gm/admin everything, and
+ * every other role (purchasing) nothing.
+ */
+export const salesActivityScopeWhere = salesPlanScopeWhere;
+
+/**
+ * Sales accounts (with a Kode SE) and branch managers (BM, who also hold their
+ * own customers) log activities, always under their own identity (see
+ * activityOwner). RM / GM / admin read and set targets but do not log on
+ * anyone's behalf -- an entry typed in for an SE would count toward that SE's
+ * KPI without the SE having done it.
+ */
+export function canWriteSalesActivity(user: SafeUser): boolean {
+  return activityOwner(user) !== null;
+}
+
+/**
+ * Perjalanan dinas: GM/admin see every trip; an RM sees their own plus the
+ * trips of BMs in their region and any trip into a branch of their region;
+ * a BM sees their own plus trips into their branch (e.g. the RM visiting).
+ * Sales/purchasing see none.
+ */
+export function visitTripScopeWhere(user: SafeUser) {
+  if (user.role === 'admin' || user.role === 'gm') return {};
+  if (user.role === 'rm') {
+    const reg = user.reg ?? -1;
+    return { OR: [{ ownerId: user.id }, { ownerReg: reg }, { reg }] };
+  }
+  if (user.role === 'bm') {
+    return { OR: [{ ownerId: user.id }, { cabang: { equals: user.cabang || '__none__', mode: 'insensitive' as const } }] };
+  }
+  return { id: '__none__' };
 }

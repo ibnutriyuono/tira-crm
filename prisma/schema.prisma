@@ -52,13 +52,128 @@ model Customer {
   id        String   @id @default(cuid())
   name      String
   cabang    String?
+  // Legacy single-PIC fields. Kept (not dropped) so old rows/exports/imports
+  // keep working, but no longer edited directly from the form once `pics`
+  // is in use — the API mirrors them from the primary entry in `pics` on
+  // every save, so they always reflect "the" contact for call sites that
+  // haven't been updated to read `pics` yet.
   pic       String?
   phone     String?
   email     String?
   address   String?
   catatan   String?
+  // One or more contact persons at this company: [{id, nama, jabatan, phone,
+  // email, isPrimary}], see CustomerPic in lib/types.ts. Nullable/empty for
+  // customers that only ever had the legacy single pic/phone/email filled in.
+  pics      Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// Foto kunjungan pada sebuah perjalanan dinas (lihat VisitTrip). File-nya di
+/// object storage (seperti Attachment); `visitId` menunjuk TripVisit.id di
+/// dalam VisitTrip.visits (JSON), jadi bukan foreign key.
+model TripPhoto {
+  id         String   @id @default(cuid())
+  tripId     String
+  visitId    String
+  name       String
+  type       String?
+  size       Int      @default(0)
+  key        String   @unique
+  uploadedBy String?
+  createdAt  DateTime @default(now())
+
+  @@index([tripId])
+}
+
+/// Perjalanan dinas GM / RM / BM ke customer di sebuah cabang: satu header
+/// (siapa, ke cabang mana, kapan) dengan daftar kunjungan customer di
+/// `visits` (JSON, seperti Rfq.items) -- masing-masing punya tujuan
+/// (rencana) dan realisasi. Alur: draft -> diajukan -> disetujui/ditolak ->
+/// selesai, atau batal. BM disetujui RM regionalnya, RM disetujui GM, GM
+/// langsung disetujui saat diajukan.
+model VisitTrip {
+  id               String    @id @default(cuid())
+  ownerId          String
+  ownerName        String
+  ownerRole        String
+  ownerCabang      String?
+  ownerReg         Int?
+  /// Cabang tujuan perjalanan.
+  cabang           String
+  reg              Int?
+  tglBerangkat     String
+  tglPulang        String
+  /// Maksud perjalanan secara umum.
+  keperluan        String?
+  visits           Json      @default("[]")
+  status           String    @default("draft")
+  submittedAt      DateTime?
+  approverName     String?
+  approvedAt       DateTime?
+  approvalNote     String?
+  catatanRealisasi String?
+  finishedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([ownerId])
+  @@index([cabang])
+  @@index([status])
+  @@index([tglBerangkat])
+}
+
+/// Aktivitas harian Sales (kunjungan, telepon, meeting, kirim dokumen).
+/// Terpisah dari Prospect: satu customer bisa dikunjungi berkali-kali dan
+/// sebagian besar aktivitas tidak pernah menjadi peluang. Bila menghasilkan
+/// Permintaan/Penawaran/PO, tombol "Masukkan ke Pipeline" membuat Prospect dan
+/// mengisi `prospectId` di sini (satu aktivitas -> paling banyak satu prospek).
+model SalesActivity {
+  id         String   @id @default(cuid())
+  /// Hari aktivitas, "YYYY-MM-DD" (waktu lokal, sama seperti tglPenawaran).
+  tanggal    String
+  se         String
+  /// Didenormalisasi dari akun saat disimpan (seperti SalesPlan) agar rollup
+  /// per cabang/regional tidak perlu join ke tabel user.
+  cabang     String?
+  reg        Int?
+  /// kunjungan | telepon | meeting | dokumen -- lihat ACTIVITY_TYPES.
+  tipe       String
+  customer   String
+  /// Hasil/ringkasan singkat; juga dipakai sebagai uraian awal saat dikonversi.
+  keterangan String?
+  /// PIC customer yang ditemui/dihubungi: [{ nama, jabatan }], minimal satu.
+  /// JSON seperti Customer.pics; baris lama (sebelum phase27) berisi [].
+  pics       Json     @default("[]")
+  prospectId String?
+  createdBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([tanggal])
+  @@index([se])
+  @@index([cabang])
+  @@index([reg])
+  @@index([prospectId])
+}
+
+/// Target aktivitas per SE per bulan, diisi atasan (BM/RM/GM/Admin). `targets`
+/// = { kunjungan: n, telepon: n, meeting: n, dokumen: n }; tipe yang tidak
+/// ada memakai DEFAULT_ACTIVITY_TARGETS.
+model ActivityTarget {
+  id        String   @id @default(cuid())
+  se        String
+  periode   String // "YYYY-MM"
+  cabang    String?
+  reg       Int?
+  targets   Json     @default("{}")
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([se, periode])
+  @@index([periode])
 }
 
 // A single material line item inside Prospect.materials / Rfq.items is stored
@@ -438,6 +553,9 @@ enum ActivityEntity {
   quotation
   budget
   salesPlan
+  salesActivity
+  activityTarget
+  visitTrip
   chat
 }
 

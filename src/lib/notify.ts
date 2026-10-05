@@ -16,12 +16,17 @@ export type NotifType =
   | 'rfq_chat'
   | 'fupa_chat'
   | 'rfq_cancelled'
-  | 'fupa_cancelled';
+  | 'fupa_cancelled'
+  | 'trip_submitted'
+  | 'trip_approved'
+  | 'trip_rejected'
+  | 'trip_scheduled'
+  | 'trip_cancelled';
 
 interface NotifyInput {
   userIds: string[];
   type: NotifType;
-  entity: 'rfq' | 'fupa';
+  entity: 'rfq' | 'fupa' | 'visitTrip';
   entityId: string;
   title: string;
   message: string;
@@ -70,5 +75,36 @@ export async function requesterUserIds(requestedBy: string | null): Promise<stri
     where: { OR: [{ name: { equals: name, mode: 'insensitive' } }, { username: { equals: name, mode: 'insensitive' } }] },
     select: { id: true },
   });
+  return rows.map((r) => r.id);
+}
+
+/**
+ * Who is notified when a trip is submitted: for a BM's trip the RM(s) of the
+ * BM's region AND the GM(s) -- either may approve (canApproveTrip), and the
+ * GM wants sight of every BM trip. For an RM's trip, the GM(s).
+ */
+export async function tripApproverIds(ownerRole: string, ownerReg: number | null): Promise<string[]> {
+  const or: Record<string, unknown>[] = [];
+  if (ownerRole === 'bm') {
+    or.push({ role: 'gm' });
+    if (ownerReg != null) or.push({ role: 'rm', reg: ownerReg });
+  } else if (ownerRole === 'rm') {
+    or.push({ role: 'gm' });
+  } else {
+    return [];
+  }
+  const rows = await prisma.user.findMany({ where: { OR: or }, select: { id: true } });
+  return rows.map((r) => r.id);
+}
+
+/**
+ * Who should know a manager is coming to a branch: the BM(s) of the
+ * destination branch and the RM(s) of its region. The traveller is excluded
+ * by the caller.
+ */
+export async function tripHostIds(cabang: string, reg: number | null): Promise<string[]> {
+  const or: Record<string, unknown>[] = [{ role: 'bm', cabang: { equals: cabang, mode: 'insensitive' } }];
+  if (reg != null) or.push({ role: 'rm', reg });
+  const rows = await prisma.user.findMany({ where: { OR: or }, select: { id: true } });
   return rows.map((r) => r.id);
 }

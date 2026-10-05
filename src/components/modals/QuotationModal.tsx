@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { IconDownload, IconMail, IconPlus, IconTrash } from '../icons';
-import { escapeForFilename, formatDateLongID, formatRupiah, getProspectMaterials, materialUnitPrice, num, todayStr } from '@/lib/format';
+import { escapeForFilename, formatDateLongID, formatRupiah, getPrimaryPic, getProspectMaterials, materialUnitPrice, num, todayStr } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -55,10 +55,11 @@ export function QuotationModal() {
   useEffect(() => {
     if (!show || !record) return;
     const cust = customers.find((c) => (c.name || '').trim().toLowerCase() === (record.customer || '').trim().toLowerCase());
+    const custPic = getPrimaryPic(cust);
     setNomor(generateDefaultNomor(record));
     setTanggal(todayStr());
     setKepada(record.customer || '');
-    setPic(cust?.pic || '');
+    setPic(custPic?.nama || '');
     setAlamat(cust?.address || '');
     setPerihal(`Penawaran Harga ${record.uraian || ''}`.slice(0, 120));
     setItems(getProspectMaterials(record).map((m) => ({ ...m })));
@@ -67,7 +68,7 @@ export function QuotationModal() {
     setPengiriman('2-4 minggu setelah PO diterima / sesuai kondisi stock');
     setBerlaku('14 hari kerja sejak tanggal penawaran');
     setCatatan('');
-    setEmail(cust?.email || '');
+    setEmail(custPic?.email || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, prospectId]);
 

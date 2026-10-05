@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { IconEdit, IconTrash, IconWa } from '../icons';
-import { todayStr } from '@/lib/format';
+import { getPrimaryPic, todayStr } from '@/lib/format';
 import { appendSheet, buildCustomerSheet } from '@/lib/exports';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -24,7 +24,13 @@ export function CustomersModal() {
   const list = useMemo(() => {
     if (!search) return customers;
     const q = search.toLowerCase();
-    return customers.filter((c) => (c.name || '').toLowerCase().includes(q) || (c.pic || '').toLowerCase().includes(q) || (c.cabang || '').toLowerCase().includes(q));
+    return customers.filter(
+      (c) =>
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.cabang || '').toLowerCase().includes(q) ||
+        (c.pics || []).some((p) => (p.nama || '').toLowerCase().includes(q) || (p.jabatan || '').toLowerCase().includes(q)) ||
+        (getPrimaryPic(c)?.nama || '').toLowerCase().includes(q),
+    );
   }, [customers, search]);
 
   async function exportExcel() {
@@ -101,13 +107,19 @@ export function CustomersModal() {
             <tbody>
               {list.map((c) => {
                 const cnt = records.filter((r) => (r.customer || '').trim().toLowerCase() === (c.name || '').trim().toLowerCase()).length;
+                const primary = getPrimaryPic(c);
+                const extra = (c.pics?.length || 0) - 1;
                 return (
                   <tr key={c.id}>
                     <td style={{ fontWeight: 600, color: 'var(--graphite-900)' }}>{c.name}</td>
                     <td>{c.cabang || '-'}</td>
-                    <td>{c.pic || '-'}</td>
-                    <td className="mono">{c.phone || '-'}</td>
-                    <td>{c.email || '-'}</td>
+                    <td>
+                      {primary?.nama || '-'}
+                      {primary?.jabatan ? <span style={{ color: 'var(--muted)' }}> · {primary.jabatan}</span> : null}
+                      {extra > 0 && <span className="badge steel" style={{ marginLeft: 6 }}>+{extra}</span>}
+                    </td>
+                    <td className="mono">{primary?.phone || '-'}</td>
+                    <td>{primary?.email || '-'}</td>
                     <td className="center">{cnt}</td>
                     <td>
                       <div className="row-actions">

@@ -144,6 +144,8 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
   // dibuat bulan ini dan sekarang ada di Negosiasi.
   const [bulanPerKolom, setBulanPerKolom] = useState<Record<number, string>>({});
   const [hariPerKolom, setHariPerKolom] = useState<Record<number, string>>({});
+  // Khusus kolom DO: pisahkan yang sudah terfaktur (Omzet) dari yang belum (GIT).
+  const [fakturDo, setFakturDo] = useState<'' | 'omzet' | 'git'>('');
   const purchCounts = useProspectPurchasingCounts(true);
   const salesPlans = useDataStore((s) => s.salesPlans);
   const starCounts = useMemo(() => buildProspectStarCounts(salesPlans), [salesPlans]);
@@ -203,7 +205,12 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
           // pilihan harinya cuma hari-hari yang benar-benar ada di bulan itu.
           const hariOptions = Array.from(new Set(dalamBulan.map((r) => (r.statusChangedAt || '').slice(0, 10)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
           const hariAktif = hariPerKolom[s] || '';
-          const items = hariAktif ? dalamBulan.filter((r) => (r.statusChangedAt || '').slice(0, 10) === hariAktif) : dalamBulan;
+          const dalamHari = hariAktif ? dalamBulan.filter((r) => (r.statusChangedAt || '').slice(0, 10) === hariAktif) : dalamBulan;
+          // Filter faktur hanya berlaku di kolom DO; hitungan di opsinya
+          // mengikuti filter bulan/hari yang sedang aktif.
+          const fakturAktif = s === 5 ? fakturDo : '';
+          const nOmzet = s === 5 ? dalamHari.filter((r) => r.terfaktur).length : 0;
+          const items = fakturAktif ? dalamHari.filter((r) => (fakturAktif === 'omzet' ? r.terfaktur : !r.terfaktur)) : dalamHari;
           const totalVal = items.reduce((sum, r) => sum + num(r.value), 0);
           const shown = items.slice(0, CAP);
           return (
@@ -214,7 +221,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                 </div>
                 <div className="kc-meta">
                   {items.length} prospek · {formatRupiah(totalVal)}
-                  {(bulanAktif || hariAktif) && semua.length !== items.length && <span> (dari {semua.length})</span>}
+                  {(bulanAktif || hariAktif || fakturAktif) && semua.length !== items.length && <span> (dari {semua.length})</span>}
                 </div>
                 {bulanOptions.length > 0 && (
                   <select
@@ -254,6 +261,18 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                     ))}
                   </select>
                 )}
+                {s === 5 && semua.length > 0 && (
+                  <select
+                    className="kc-month"
+                    value={fakturDo}
+                    onChange={(e) => setFakturDo(e.target.value as '' | 'omzet' | 'git')}
+                    title="Saring DO berdasar status faktur: Omzet (sudah terfaktur) atau GIT (belum terfaktur)"
+                  >
+                    <option value="">Semua (Omzet + GIT)</option>
+                    <option value="omzet">Omzet (Terfaktur) · {nOmzet}</option>
+                    <option value="git">GIT (Belum Terfaktur) · {dalamHari.length - nOmzet}</option>
+                  </select>
+                )}
               </div>
               <div
                 className={`kanban-col-body${dragOverStatus === s ? ' drag-over' : ''}`}
@@ -265,7 +284,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                 onDrop={(e) => handleDrop(s, e)}
               >
                 {shown.length === 0 ? (
-                  <div className="kanban-empty">{hariAktif ? 'Tidak ada perubahan status di hari ini' : bulanAktif ? 'Tidak ada perubahan status di bulan ini' : 'Tidak ada data'}</div>
+                  <div className="kanban-empty">{fakturAktif ? (fakturAktif === 'omzet' ? 'Tidak ada DO terfaktur' : 'Tidak ada DO berstatus GIT') + (bulanAktif || hariAktif ? ' pada periode ini' : '') : hariAktif ? 'Tidak ada perubahan status di hari ini' : bulanAktif ? 'Tidak ada perubahan status di bulan ini' : 'Tidak ada data'}</div>
                 ) : (
                   shown.map((r) => <KanbanCard key={r.id} r={r} purchCount={purchCounts[r.id]} starCount={starCounts.get(r.id)} />)
                 )}

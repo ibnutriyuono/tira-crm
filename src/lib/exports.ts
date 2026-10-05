@@ -75,9 +75,16 @@ export function buildFupaSheet(list: Fupa[]): SheetSpec {
 }
 
 export function buildCustomerSheet(list: Customer[]): SheetSpec {
-  const header = ['NAMA CUSTOMER', 'CABANG', 'PIC', 'NO TELP', 'EMAIL', 'ALAMAT', 'CATATAN'];
-  const rows = list.map((c) => [c.name || '', c.cabang || '', c.pic || '', c.phone || '', c.email || '', c.address || '', c.catatan || '']);
-  const colWidths = [{ wch: 28 }, { wch: 8 }, { wch: 18 }, { wch: 16 }, { wch: 24 }, { wch: 36 }, { wch: 26 }];
+  // One row per PIC (a customer with three PICs becomes three rows, the
+  // company columns repeated) so every contact survives the export; a
+  // customer with no PIC at all still gets a single row.
+  const header = ['NAMA CUSTOMER', 'CABANG', 'PIC', 'JABATAN', 'NO TELP', 'EMAIL', 'ALAMAT', 'CATATAN'];
+  const rows: unknown[][] = [];
+  list.forEach((c) => {
+    const pics = Array.isArray(c.pics) && c.pics.length > 0 ? c.pics : [{ nama: c.pic || '', jabatan: null, phone: c.phone, email: c.email }];
+    pics.forEach((p) => rows.push([c.name || '', c.cabang || '', p.nama || '', p.jabatan || '', p.phone || '', p.email || '', c.address || '', c.catatan || '']));
+  });
+  const colWidths = [{ wch: 28 }, { wch: 8 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 24 }, { wch: 36 }, { wch: 26 }];
   return { sheetName: 'Customer', header, rows, colWidths };
 }
 

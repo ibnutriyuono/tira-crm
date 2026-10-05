@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Modal } from '../Modal';
 import { IconWa } from '../icons';
 import { STATUS_META } from '@/lib/constants';
-import { normalizePhone, num } from '@/lib/format';
+import { getPrimaryPic, normalizePhone, num } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -15,7 +15,8 @@ function buildProspectMessage(r: Prospect, senderName: string): string {
   return `Selamat siang Bapak/Ibu ${r.customer},\n\nKami dari PT Tira Austenite (Steel Division) ingin follow up terkait penawaran berikut:\n- Produk: ${r.uraian || '-'}\n- Qty: ${num(r.qty)} pcs\n- Status saat ini: ${stMeta.label}\n\nMohon info perkembangan / kepastian order dari Bapak/Ibu. Terima kasih.\n\nSalam,\n${senderName}`;
 }
 function buildCustomerMessage(c: Customer, senderName: string): string {
-  return `Selamat siang Bapak/Ibu ${c.pic || c.name},\n\nKami dari PT Tira Austenite (Steel Division) ingin menyapa dan menginformasikan ketersediaan produk baja terbaru kami untuk kebutuhan ${c.name}.\n\nMohon informasi apabila ada kebutuhan yang dapat kami bantu. Terima kasih.\n\nSalam,\n${senderName}`;
+  const picName = getPrimaryPic(c)?.nama || c.name;
+  return `Selamat siang Bapak/Ibu ${picName},\n\nKami dari PT Tira Austenite (Steel Division) ingin menyapa dan menginformasikan ketersediaan produk baja terbaru kami untuk kebutuhan ${c.name}.\n\nMohon informasi apabila ada kebutuhan yang dapat kami bantu. Terima kasih.\n\nSalam,\n${senderName}`;
 }
 
 export function FollowUpModal() {

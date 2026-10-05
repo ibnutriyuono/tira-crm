@@ -57,15 +57,34 @@ export interface Prospect {
   updatedAt: string;
 }
 
+/**
+ * One contact person at a Customer's company. A company can have several —
+ * e.g. a purchasing PIC and a finance PIC with different numbers — unlike
+ * the old single pic/phone/email fields on Customer, which this list
+ * replaces going forward (see Customer.pics and Customer.pic's comment).
+ */
+export interface CustomerPic {
+  id: string;
+  nama: string;
+  jabatan: string | null;
+  phone: string | null;
+  email: string | null;
+  isPrimary: boolean;
+}
+
 export interface Customer {
   id: string;
   name: string;
   cabang: string | null;
+  // Legacy single-PIC fields, mirrored from the primary entry of `pics` on
+  // every save. Still read as a fallback by getPrimaryPic() for customers
+  // saved before multi-PIC existed.
   pic: string | null;
   phone: string | null;
   email: string | null;
   address: string | null;
   catatan: string | null;
+  pics: CustomerPic[] | null;
 }
 
 export interface RfqItem {
@@ -261,18 +280,112 @@ export type NotificationType =
   | 'rfq_chat'
   | 'fupa_chat'
   | 'rfq_cancelled'
-  | 'fupa_cancelled';
+  | 'fupa_cancelled'
+  | 'trip_submitted'
+  | 'trip_approved'
+  | 'trip_rejected'
+  | 'trip_scheduled'
+  | 'trip_cancelled';
 
 export interface AppNotification {
   id: string;
   userId: string;
   type: NotificationType;
-  entity: 'rfq' | 'fupa';
+  entity: 'rfq' | 'fupa' | 'visitTrip';
   entityId: string;
   title: string;
   message: string;
   readAt: string | null;
   createdAt: string;
+}
+
+export interface SalesActivity {
+  id: string;
+  tanggal: string;
+  se: string;
+  cabang: string | null;
+  reg: number | null;
+  tipe: 'kunjungan' | 'telepon' | 'meeting' | 'dokumen';
+  customer: string;
+  keterangan: string | null;
+  /** PIC customer yang ditemui/dihubungi. Bisa kosong ([]) untuk data sebelum kolom ini ada. */
+  pics: ActivityPic[];
+  prospectId: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActivityPic {
+  nama: string;
+  jabatan: string;
+}
+
+export interface ActivityTarget {
+  id: string;
+  se: string;
+  periode: string;
+  cabang: string | null;
+  reg: number | null;
+  targets: Partial<Record<'kunjungan' | 'telepon' | 'meeting' | 'dokumen', number>>;
+  updatedBy: string | null;
+}
+
+export type TripStatus = 'draft' | 'diajukan' | 'disetujui' | 'ditolak' | 'selesai' | 'batal';
+export type TripHasil = '' | 'tercapai' | 'sebagian' | 'tidak' | 'batal';
+
+/** One customer visit inside a VisitTrip. */
+export interface TripVisit {
+  id: string;
+  customer: string;
+  /** PIC yang akan/telah ditemui (teks bebas, opsional). */
+  pic: string;
+  /** Tanggal rencana kunjungan (YYYY-MM-DD, opsional, di dalam rentang perjalanan). */
+  tanggal: string;
+  /** Tujuan kunjungan -- bagian rencana. */
+  tujuan: string;
+  /** Apa yang benar-benar terjadi -- ringkasan singkat, diisi setelah perjalanan disetujui. */
+  realisasi: string;
+  /** Uraian realisasi: cerita rinci suasana & isi kunjungan. Tercetak di lampiran laporan. */
+  uraian?: string;
+  hasil: TripHasil;
+  /** true = kunjungan di luar rencana, ditambahkan saat realisasi. */
+  tambahan: boolean;
+}
+
+export interface TripPhoto {
+  id: string;
+  tripId: string;
+  visitId: string;
+  name: string;
+  type: string | null;
+  size: number;
+  uploadedBy: string | null;
+  createdAt: string;
+}
+
+export interface VisitTrip {
+  id: string;
+  ownerId: string;
+  ownerName: string;
+  ownerRole: Role;
+  ownerCabang: string | null;
+  ownerReg: number | null;
+  cabang: string;
+  reg: number | null;
+  tglBerangkat: string;
+  tglPulang: string;
+  keperluan: string | null;
+  visits: TripVisit[];
+  status: TripStatus;
+  submittedAt: string | null;
+  approverName: string | null;
+  approvedAt: string | null;
+  approvalNote: string | null;
+  catatanRealisasi: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SalesPlanItem {
@@ -332,6 +445,9 @@ export type ActivityEntity =
   | 'quotation'
   | 'budget'
   | 'salesPlan'
+  | 'salesActivity'
+  | 'activityTarget'
+  | 'visitTrip'
   | 'chat';
 
 export type ActivityChanges = Record<string, { label: string; from: unknown; to: unknown }>;

@@ -1,6 +1,7 @@
+import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { cabangRegMap, getCurrentUser } from './auth';
-import type { SafeUser, Material, RfqItem } from './types';
+import type { CustomerPic, SafeUser, Material, RfqItem } from './types';
 
 export async function requireUser(): Promise<SafeUser | NextResponse> {
   const user = await getCurrentUser();
@@ -98,6 +99,36 @@ export function mergeRfqItemsPreservingAnswer(existing: RfqItem[] | null | undef
       noQuote: item.noQuote ?? match?.noQuote,
     };
   });
+}
+
+/**
+ * Cleans up the PIC list a customer form posts: trims every field, drops
+ * rows with no name (a blank row left over from "+ Tambah PIC"), assigns a
+ * stable id to any row that doesn't have one yet (a brand new row from the
+ * form), and makes sure exactly one entry is primary — the first one
+ * explicitly marked, or the first row of all when nobody marked one. An
+ * empty/missing input yields `[]`, never null, so callers can always rely
+ * on an array.
+ */
+export function normalizeCustomerPics(input: unknown): CustomerPic[] {
+  const rows = Array.isArray(input) ? input : [];
+  const cleaned = rows
+    .map((r) => {
+      const row = (r ?? {}) as Record<string, unknown>;
+      return {
+        id: typeof row.id === 'string' && row.id.trim() ? row.id.trim() : randomUUID(),
+        nama: String(row.nama ?? '').trim(),
+        jabatan: String(row.jabatan ?? '').trim() || null,
+        phone: String(row.phone ?? '').trim() || null,
+        email: String(row.email ?? '').trim() || null,
+        isPrimary: !!row.isPrimary,
+      };
+    })
+    .filter((r) => r.nama);
+
+  if (cleaned.length === 0) return [];
+  const firstPrimaryIdx = cleaned.findIndex((r) => r.isPrimary);
+  return cleaned.map((r, i) => ({ ...r, isPrimary: firstPrimaryIdx === -1 ? i === 0 : i === firstPrimaryIdx }));
 }
 
 /**

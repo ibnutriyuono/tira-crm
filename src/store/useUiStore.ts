@@ -32,6 +32,9 @@ export type ModalKey =
   | 'followUpBoard'
   | 'gmAnalysis'
   | 'kpi'
+  | 'salesActivity'
+  | 'activityKpi'
+  | 'visitTrip'
   | null;
 
 export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq' | 'vendor' | 'fupa';
@@ -112,6 +115,8 @@ interface UiState {
   /** Ask the purchasing board to open one document's detail. Set from outside
       the board (a notification toast); the board consumes and clears it. */
   purchDetailCtx: { jenis: 'RFQ' | 'FUPA'; id: string } | null;
+  /** Set before opening 'visitTrip' to land directly on one trip's detail (e.g. from a notification). */
+  visitTripOpenId: string | null;
   qcdCtx: QcdCtx | null;
   importTarget: 'prospect' | 'customer' | 'vendor';
   /** Staged QCD answers for a prospect still being created/edited in the form modal — committed together on Save. */
@@ -189,6 +194,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   quotationProspectId: null,
   rfqCtx: null,
   purchDetailCtx: null,
+  visitTripOpenId: null,
   qcdCtx: null,
   importTarget: 'prospect',
   pendingProspectQCD: { quality: '', cost: '', delivery: '', kompetitor: '', catatan: '' },

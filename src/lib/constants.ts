@@ -47,6 +47,10 @@ export const ACTIVITY_ENTITY_LABEL: Record<string, string> = {
   quotation: 'Penawaran Vendor',
   budget: 'Target Budget',
   chat: 'Chat',
+  salesPlan: 'Rencana Penjualan',
+  salesActivity: 'Aktivitas Sales',
+  activityTarget: 'Target Aktivitas',
+  visitTrip: 'Perjalanan Dinas',
 };
 
 // Purchasing-side status ladder for RFQ / FUP A, ported from the single-file
@@ -113,3 +117,29 @@ export const RFQ_LOKAL_OPTIONS = [
  * and enforce it server-side rather than only stating it in a label.
  */
 export const ATTACHMENT_MAX_BYTES = 15 * 1024 * 1024;
+
+// --- Aktivitas harian Sales ---------------------------------------------
+export type ActivityTipe = 'kunjungan' | 'telepon' | 'meeting' | 'dokumen';
+
+/** `short` is for table headers and one-line summaries. */
+export const ACTIVITY_TYPES: { key: ActivityTipe; label: string; short: string; unit: string }[] = [
+  { key: 'kunjungan', label: 'Kunjungan customer', short: 'Kunjungan', unit: 'kunjungan' },
+  { key: 'telepon', label: 'Telepon / WhatsApp', short: 'Telepon/WA', unit: 'kontak' },
+  { key: 'meeting', label: 'Meeting / presentasi', short: 'Meeting', unit: 'meeting' },
+  { key: 'dokumen', label: 'Kirim penawaran / dokumen', short: 'Dokumen', unit: 'dokumen' },
+];
+
+/**
+ * Target bulanan per jenis aktivitas bila atasan belum menetapkannya untuk SE
+ * itu. Angka awal ini hanya titik mulai (BELUM ditetapkan oleh manajemen) --
+ * UI menandainya "default" dan atasan menggantinya per SE per bulan.
+ */
+export const DEFAULT_ACTIVITY_TARGETS: Record<ActivityTipe, number> = {
+  kunjungan: 20,
+  telepon: 40,
+  meeting: 8,
+  dokumen: 10,
+};
+
+/** Status pipeline yang bisa dituju tombol "Masukkan ke Pipeline". */
+export const ACTIVITY_CONVERT_STATUSES = [1, 2, 4] as const;

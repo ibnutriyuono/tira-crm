@@ -70,6 +70,8 @@ export async function POST(req: Request) {
           email: (c.email as string) ?? '',
           address: (c.address as string) ?? '',
           catatan: (c.catatan as string) ?? '',
+          // Multi-PIC list; backups taken before it existed have none.
+          pics: (Array.isArray(c.pics) ? c.pics : []) as unknown as Prisma.InputJsonValue,
         })),
       });
     }

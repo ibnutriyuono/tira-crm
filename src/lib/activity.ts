@@ -123,6 +123,7 @@ export const CUSTOMER_FIELD_LABELS: Record<string, string> = {
   email: 'Email',
   address: 'Alamat',
   catatan: 'Catatan',
+  pics: 'Daftar PIC',
 };
 
 export const FUPA_FIELD_LABELS: Record<string, string> = {

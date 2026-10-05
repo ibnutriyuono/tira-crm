@@ -41,6 +41,9 @@ import { ImportModal } from './modals/ImportModal';
 import { DatabaseModal } from './modals/DatabaseModal';
 import { DbImportConfirmModal } from './modals/DbImportConfirmModal';
 import { ActivityLogModal } from './modals/ActivityLogModal';
+import { SalesActivityModal } from './modals/SalesActivityModal';
+import { ActivityKpiModal } from './modals/ActivityKpiModal';
+import { VisitTripModal } from './modals/VisitTripModal';
 import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -134,6 +137,9 @@ export function CrmApp() {
       <FollowUpBoardModal />
       <GmAnalysisModal />
       <KpiModal />
+      <SalesActivityModal />
+      <ActivityKpiModal />
+      <VisitTripModal />
       <CompetitorLogModal />
       <ForecastModal />
       <QcdRecapModal />

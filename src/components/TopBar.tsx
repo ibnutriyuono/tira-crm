@@ -183,6 +183,20 @@ export function TopBar() {
             <IconTarget />
             KPI
           </button>
+          <button className="btn btn-ghost-dark" onClick={() => openModal('salesActivity')}>
+            <IconTarget />
+            Aktivitas Harian
+          </button>
+          <button className="btn btn-ghost-dark" onClick={() => openModal('activityKpi')}>
+            <IconTarget />
+            KPI Aktivitas
+          </button>
+          {['admin', 'gm', 'rm', 'bm'].includes(currentUser.role) && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('visitTrip')}>
+              <IconCalendar />
+              Perjalanan Dinas
+            </button>
+          )}
           <button
             className="btn btn-ghost-dark"
             onClick={() => {
