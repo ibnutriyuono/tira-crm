@@ -153,7 +153,7 @@ export function TopBar() {
               Kelola User
             </button>
           )}
-          {currentUser.role === 'gm' && (
+          {currentUser.role !== 'purchasing' && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('gmAnalysis')}>
               <IconPresentation />
               Analisa Eksekutif

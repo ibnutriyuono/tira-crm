@@ -44,6 +44,7 @@ import { ActivityLogModal } from './modals/ActivityLogModal';
 import { SalesActivityModal } from './modals/SalesActivityModal';
 import { ActivityKpiModal } from './modals/ActivityKpiModal';
 import { VisitTripModal } from './modals/VisitTripModal';
+import { RunningText } from './RunningText';
 import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -91,6 +92,7 @@ export function CrmApp() {
   return (
     <>
       <TopBar />
+      <RunningText />
       <div className="wrap">
         <KpiGrid list={filtered} />
         <FunnelPanel list={filtered} />

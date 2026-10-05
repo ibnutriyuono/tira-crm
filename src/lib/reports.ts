@@ -11,6 +11,20 @@ export function daysSince(iso: string): number {
   return Math.floor((Date.now() - new Date(`${iso}T00:00:00`).getTime()) / 86400000);
 }
 
+/**
+ * Grouping key for a customer name: case, spacing and punctuation don't make
+ * a different company. "PT. Sinar  Baja" and "pt sinar baja" are one account;
+ * before this they were counted as two, splitting order history and making
+ * both look colder than the company really is.
+ */
+export function customerKey(name: string): string {
+  return (name || '')
+    .toLowerCase()
+    .replace(/[.,]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export interface CustomerIntelRow {
   records: Prospect[];
   name: string;
@@ -33,7 +47,7 @@ export function buildCustomerIntel(records: Prospect[]): CustomerIntelRow[] {
   records.forEach((r) => {
     const nameRaw = (r.customer || '').trim();
     if (!nameRaw) return;
-    const key = nameRaw.toLowerCase();
+    const key = customerKey(nameRaw);
     if (!map.has(key)) map.set(key, { name: nameRaw, cabang: r.cabang || '', records: [] });
     const entry = map.get(key)!;
     entry.records.push(r);
@@ -185,9 +199,9 @@ export function buildForecast(
       // Weighted forecast covers the whole live pipeline; only Won and Target
       // are scoped to the selected month.
       const open = cList.filter((r) => classify(r) === 'Aktif');
-      const weighted = open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[r.status] ?? 0), 0);
+      const weighted = open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[num(r.status)] ?? 0), 0);
       const won = cList.filter((r) => classify(r) === 'Won' && inPeriod(r)).reduce((s, r) => s + num(r.value), 0);
-      const target = targets.find((t) => t.cabang === cabang && t.periode === periode)?.amount ?? 0;
+      const target = targets.find((t) => (t.cabang || '').trim().toUpperCase() === cabang && t.periode === periode)?.amount ?? 0;
       const rencana = plansInPeriode.filter((p) => (p.cabang || '').toUpperCase() === cabang).reduce((s, p) => s + num(p.value), 0);
       const agingCount = open.filter((r) => daysSince(String(r.statusChangedAt ?? r.updatedAt).slice(0, 10)) > AGING_THRESHOLD_DAYS).length;
 
@@ -288,7 +302,7 @@ export function buildForecastBySe(records: Prospect[], periode: string): Forecas
       se,
       cabang: list.find((r) => r.cabang)?.cabang || '-',
       won: won.reduce((s, r) => s + num(r.value), 0),
-      weighted: open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[r.status] ?? 0), 0),
+      weighted: open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[num(r.status)] ?? 0), 0),
       openCount: open.length,
       wonCount: won.length,
     });

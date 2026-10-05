@@ -39,6 +39,23 @@ export async function PUT(req: Request) {
   const { items, value } = deriveFromSalesPlanItems(Array.isArray(body?.items) ? body.items : []);
   const reg = cabang ? ((await cabangRegMap())[cabang] ?? user.reg ?? null) : (user.reg ?? null);
 
+  // A prospect already invoiced (DO, terfaktur) is finished revenue, not
+  // something to plan -- it can't be newly pulled into a plan. Rows that were
+  // already in this plan before the prospect got invoiced are left as they
+  // are, so re-saving an older plan doesn't fail.
+  const pulledIds = Array.from(new Set(items.map((it) => (it as { sourceProspectId?: string | null }).sourceProspectId).filter(Boolean) as string[]));
+  if (pulledIds.length) {
+    const existing = await prisma.salesPlan.findUnique({ where: { se_periode: { se, periode } }, select: { items: true } });
+    const already = new Set(((existing?.items as unknown as { sourceProspectId?: string | null }[]) || []).map((it) => it.sourceProspectId).filter(Boolean));
+    const fresh = pulledIds.filter((id) => !already.has(id));
+    if (fresh.length) {
+      const invoiced = await prisma.prospect.findMany({ where: { id: { in: fresh }, status: 5, terfaktur: true }, select: { customer: true } });
+      if (invoiced.length) {
+        return NextResponse.json({ error: `Prospek yang sudah terfaktur tidak bisa dimasukkan ke rencana penjualan: ${invoiced.map((p) => p.customer).join(', ')}` }, { status: 400 });
+      }
+    }
+  }
+
   const salesPlan = await prisma.salesPlan.upsert({
     where: { se_periode: { se, periode } },
     create: { se, periode, cabang, reg, items: items as never, value, requestedBy: user.name || user.username },

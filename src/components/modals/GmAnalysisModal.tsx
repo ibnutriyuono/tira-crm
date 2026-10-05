@@ -4,9 +4,9 @@ import { useMemo, useState } from 'react';
 import type PptxGenJS from 'pptxgenjs';
 import { Modal } from '../Modal';
 import { IconDownload } from '../icons';
-import { CABANG_LIST, STATUS_META } from '@/lib/constants';
-import { classify, formatDateID, formatRupiah, todayStr } from '@/lib/format';
-import { buildAgingList, buildCustomerIntel, buildFollowUpRows, buildForecast, buildForecastByReg, buildForecastNasional } from '@/lib/reports';
+import { STATUS_META } from '@/lib/constants';
+import { formatDateID, formatRupiah, todayStr } from '@/lib/format';
+import { buildExecAnalysis, execScopeFor, localPeriode, type ExecAnalysis } from '@/lib/exec-analysis';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
@@ -17,44 +17,36 @@ const GREEN = '2F8F5B';
 const RUST = 'B94A3D';
 const CHART_COLORS = [STEEL, AMBER, GREEN, RUST, '6B7684'];
 
-const SOURCE_LABEL: Record<string, string> = { terjadwal: 'Terjadwal', aging: 'Pipeline Mangkrak', reaktivasi: 'Customer Dingin' };
-
 /**
  * Header rows are styled cells, body rows are plain strings. pptxgenjs accepts
- * both at runtime (it normalizes strings itself), but its v4 typings declare a
- * row as TableCell[] only, so the two shapes have no common type. Wrapping the
- * strings here lets the tables below stay readable while still matching the
- * shape the library documents.
+ * both at runtime, but its v4 typings declare a row as TableCell[] only.
  */
 function tableRows(rows: (string | PptxGenJS.TableCell)[][]): PptxGenJS.TableCell[][] {
   return rows.map((row) => row.map((cell) => (typeof cell === 'string' ? { text: cell } : cell)));
 }
 
-/** "2026-09" -> "September 2026" — a raw YYYY-MM reads fine in a form input, not on a title slide. */
+/** "2026-09" -> "September 2026". */
 function formatPeriodeLong(periode: string): string {
   const d = new Date(`${periode}-01T00:00:00`);
   if (Number.isNaN(d.getTime())) return periode;
   return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 }
 
-function currentPeriode(): string {
-  return new Date().toISOString().slice(0, 7);
+/** Compact Rupiah for KPI tiles ("Rp 3,00 M", "Rp 820 jt") -- the full figure sits in the tile's tooltip. */
+function rpShort(n: number): string {
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return `Rp ${(n / 1e9).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} M`;
+  if (abs >= 1e6) return `Rp ${(n / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 })} jt`;
+  return formatRupiah(n);
 }
 
+const achColor = (a: number) => (a >= 100 ? 'green' : a >= 90 ? 'amber' : a > 0 ? 'rust' : 'slate');
+
 /**
- * GM-only. Synthesizes signals already computed elsewhere in the app
- * (Forecast's target/rencana/realisasi, Customer Intelligence's health
- * tiers, Aging pipeline, Follow-up backlog) into one executive view, plus a
- * "Buat PPT" button that turns the same numbers into a downloadable deck —
- * generated client-side with pptxgenjs (already the pattern this app uses
- * for Excel exports via the `xlsx` package: dynamic import, build in the
- * browser, trigger a download, no server round-trip).
- *
- * Deliberately reuses buildForecast/buildCustomerIntel/buildAgingList/
- * buildFollowUpRows rather than recomputing any of this — those are the
- * exact functions Forecast, Marketing's Reaktivasi tab, and the Follow-up
- * dashboard already render from, so this can't silently drift from what
- * those screens show.
+ * Analisa Eksekutif -- open to GM, RM, BM, Sales (and admin), each scoped to
+ * what they are responsible for (see execScopeFor): Nasional / Regional /
+ * Cabang / own SE. All figures come from buildExecAnalysis so the screen and
+ * the PPT can never disagree.
  */
 export function GmAnalysisModal() {
   const show = useUiStore((s) => s.modal === 'gmAnalysis');
@@ -66,169 +58,124 @@ export function GmAnalysisModal() {
   const salesPlans = useDataStore((s) => s.salesPlans);
   const toast = useDataStore((s) => s.toast);
 
-  const [periode, setPeriode] = useState(currentPeriode());
+  const [periode, setPeriode] = useState(localPeriode());
   const [busy, setBusy] = useState(false);
 
-  // Defense in depth: the TopBar button is already hidden for non-GM (see
-  // TopBar.tsx), but a modal key is just client state, not a real access
-  // boundary — a stale UI after a role change, or the key being opened
-  // directly, must not render GM-only figures for anyone else.
-  const allowed = currentUser?.role === 'gm';
-
-  const rows = useMemo(() => buildForecast(prospects, budgetTargets, periode, CABANG_LIST, salesPlans), [prospects, budgetTargets, periode, salesPlans]);
-  const regRows = useMemo(() => buildForecastByReg(rows), [rows]);
-  const nasional = useMemo(() => buildForecastNasional(rows), [rows]);
-  const intel = useMemo(() => buildCustomerIntel(prospects), [prospects]);
-  const aging = useMemo(() => buildAgingList(prospects), [prospects]);
-  const followUps = useMemo(() => buildFollowUpRows(prospects), [prospects]);
-  const urgentFollowUps = useMemo(() => followUps.filter((r) => r.tier === 'terlambat'), [followUps]);
-
-  const healthCounts = useMemo(() => {
-    const c: Record<string, number> = { Aktif: 0, Menghangat: 0, 'Dingin (Follow-up)': 0, 'Belum Pernah Order': 0 };
-    intel.forEach((x) => {
-      c[x.health] = (c[x.health] || 0) + 1;
-    });
-    return c;
-  }, [intel]);
-
-  const funnelCounts = useMemo(
-    () =>
-      [1, 2, 3, 4].map((stage) => {
-        const inStage = prospects.filter((p) => p.status === stage && classify(p) === 'Aktif');
-        return { stage, label: STATUS_META[stage]?.label ?? String(stage), count: inStage.length, value: inStage.reduce((s, p) => s + p.value, 0) };
-      }),
-    [prospects],
+  // The modal key is only client state; the scope check here is what keeps a
+  // role with no sales data (purchasing) from rendering anything.
+  const scope = useMemo(() => (currentUser ? execScopeFor(currentUser, prospects) : null), [currentUser, prospects]);
+  const a = useMemo<ExecAnalysis | null>(
+    () => (scope && show ? buildExecAnalysis(prospects, budgetTargets, salesPlans, scope, periode, formatRupiah) : null),
+    [scope, show, prospects, budgetTargets, salesPlans, periode],
   );
 
-  const topDingin = useMemo(() => intel.filter((c) => c.health.startsWith('Dingin')).sort((a, b) => b.wonValue - a.wonValue).slice(0, 5), [intel]);
-  const topAging = useMemo(() => aging.slice(0, 5), [aging]);
-
-  const insights = useMemo(() => {
-    const out: string[] = [];
-    const weakRegions = regRows.filter((r) => r.totals.target > 0 && r.totals.achievement < 50);
-    if (nasional.target > 0) {
-      out.push(
-        `Realisasi nasional ${nasional.achievement}% dari target (${formatRupiah(nasional.won)} dari ${formatRupiah(nasional.target)}); Rencana yang diisi Sales baru mencakup ${nasional.rencanaVsTarget}% dari target.`,
-      );
-    }
-    if (weakRegions.length > 0) {
-      out.push(`${weakRegions.length} dari ${regRows.length} regional pencapaiannya masih di bawah 50% target bulan ini.`);
-    }
-    if (aging.length > 0) {
-      out.push(`${aging.length} deal aktif mangkrak tanpa progres, senilai ${formatRupiah(aging.reduce((s, a) => s + a.record.value, 0))} tertahan di pipeline.`);
-    }
-    const dinginCount = intel.filter((c) => c.health.startsWith('Dingin')).length;
-    if (dinginCount > 0) {
-      out.push(`${dinginCount} customer sudah lama tidak order, dengan riwayat pembelian ${formatRupiah(topDingin.reduce((s, c) => s + c.wonValue, 0))} pada 5 terbesar saja.`);
-    }
-    if (urgentFollowUps.length > 0) {
-      out.push(`${urgentFollowUps.length} follow-up sudah lewat jadwal dan belum ditindaklanjuti.`);
-    }
-    return out;
-  }, [nasional, regRows, aging, intel, topDingin, urgentFollowUps]);
-
   async function onGeneratePpt() {
+    if (!a) return;
     setBusy(true);
     try {
-      // Loaded on demand, like the xlsx exports elsewhere in this codebase:
-      // the deck is built in the browser, so the library stays out of the
-      // main bundle until a GM actually asks for one.
       const { default: PptxGen } = await import('pptxgenjs');
       const pres = new PptxGen();
       pres.layout = 'LAYOUT_WIDE';
       const chartOpts = { chartColors: CHART_COLORS };
+      const H = (t: string) => ({ text: t, options: { bold: true, fill: { color: GRAPHITE }, color: 'FFFFFF' } });
+      const title = (s: PptxGenJS.Slide, t: string) => s.addText(t, { x: 0.5, y: 0.4, w: 12, h: 0.6, fontSize: 24, bold: true, color: GRAPHITE, fontFace: 'Cambria' });
+      const tbl = { border: { type: 'solid' as const, color: 'DDDDDD', pt: 0.5 } };
 
       // 1. Sampul
       const s1 = pres.addSlide();
       s1.background = { color: GRAPHITE };
-      s1.addText('Laporan Analisa Eksekutif', { x: 0.8, y: 2.3, w: 11, h: 1, fontSize: 36, bold: true, color: 'FFFFFF', fontFace: 'Cambria' });
-      s1.addText(`Periode ${formatPeriodeLong(periode)}`, { x: 0.8, y: 3.25, w: 8, h: 0.5, fontSize: 16, color: 'D7E3EC' });
-      s1.addText('PT Tira Austenite — Steel Division', { x: 0.8, y: 4.0, w: 8, h: 0.4, fontSize: 12, bold: true, color: 'FFFFFF' });
-      s1.addText(`Dibuat otomatis ${formatDateID(todayStr())} — hanya untuk kalangan GM`, { x: 0.8, y: 6.9, w: 10, h: 0.3, fontSize: 10, color: 'A9B8C6' });
+      s1.addText('Laporan Analisa Eksekutif', { x: 0.8, y: 2.1, w: 11, h: 1, fontSize: 36, bold: true, color: 'FFFFFF', fontFace: 'Cambria' });
+      s1.addText(`${a.scope.label} · Periode ${formatPeriodeLong(a.periode)}`, { x: 0.8, y: 3.1, w: 11, h: 0.5, fontSize: 18, color: 'D7E3EC' });
+      s1.addText('PT Tira Austenite — Steel Division', { x: 0.8, y: 3.9, w: 8, h: 0.4, fontSize: 12, bold: true, color: 'FFFFFF' });
+      s1.addText(`Dibuat otomatis ${formatDateID(todayStr())} oleh ${currentUser?.name || '-'} — internal & rahasia`, { x: 0.8, y: 6.9, w: 11, h: 0.3, fontSize: 10, color: 'A9B8C6' });
 
-      // 2. Ringkasan eksekutif
+      // 2. Ringkasan
       const s2 = pres.addSlide();
-      s2.addText('Ringkasan Eksekutif', { x: 0.5, y: 0.4, w: 11, h: 0.6, fontSize: 26, bold: true, color: GRAPHITE, fontFace: 'Cambria' });
-      const kpiRows = [
-        [{ text: 'Indikator', options: { bold: true, fill: { color: GRAPHITE }, color: 'FFFFFF' } }, { text: 'Nilai', options: { bold: true, fill: { color: GRAPHITE }, color: 'FFFFFF' } }],
-        ['Target Nasional', formatRupiah(nasional.target)],
-        ['Rencana Penjualan (Sales)', formatRupiah(nasional.rencana)],
-        ['Realisasi (Won)', formatRupiah(nasional.won)],
-        ['Achievement vs Target', `${nasional.achievement}%`],
-        ['Rencana vs Target', `${nasional.rencanaVsTarget}%`],
-        ['Realisasi vs Rencana', `${nasional.wonVsRencana}%`],
-        ['Weighted Pipeline Aktif', formatRupiah(nasional.weighted)],
+      title(s2, 'Ringkasan Eksekutif');
+      const kpi = [
+        [H('Indikator'), H('Nilai')],
+        [a.scope.kind === 'se' ? 'Target Cabang (acuan)' : 'Target', formatRupiah(a.target)],
+        ['Rencana Penjualan', formatRupiah(a.rencana)],
+        ['Realisasi (Won)', `${formatRupiah(a.won)} · ${a.wonCount} deal`],
+        ['  PO/Kontrak · DO GIT · DO Omzet', `${formatRupiah(a.wonPo)} · ${formatRupiah(a.wonDoGit)} · ${formatRupiah(a.wonDoOmzet)}`],
+        ['Achievement vs Target', `${a.achievement}%`],
+        ['vs Bulan Lalu', a.momPct == null ? '-' : `${a.momPct >= 0 ? '+' : ''}${a.momPct}% (${formatRupiah(a.prevWon)})`],
+        ['Sisa Gap', formatRupiah(a.gap) + (a.requiredPerDay ? ` · perlu ${formatRupiah(a.requiredPerDay)}/hari kerja` : '')],
+        ['Weighted Pipeline · Coverage', `${formatRupiah(a.weighted)} · ${a.coverage == null ? '-' : `${Math.round(a.coverage * 100)}%`}`],
+        ['Win Rate', a.winRate == null ? '-' : `${a.winRate}% (${a.wonCount} menang / ${a.lostCount} kalah)`],
+        ['Rata-rata Nilai Deal', formatRupiah(a.avgDeal)],
       ];
-      s2.addTable(tableRows(kpiRows), { x: 0.5, y: 1.3, w: 8, fontSize: 13, border: { type: 'solid', color: 'DDDDDD', pt: 0.5 }, autoPage: false });
+      s2.addTable(tableRows(kpi), { x: 0.5, y: 1.2, w: 12, fontSize: 12.5, ...tbl, autoPage: false });
 
-      // 3. Performa per Regional
-      const s3 = pres.addSlide();
-      s3.addText('Performa per Regional', { x: 0.5, y: 0.4, w: 11, h: 0.6, fontSize: 24, bold: true, color: GRAPHITE, fontFace: 'Cambria' });
-      if (regRows.length > 0) {
-        // Values scaled to millions for the chart axis — a raw "2500000000"
-        // tick label is unreadable at a glance; the full-precision figure
-        // is already on the Ringkasan Eksekutif table (slide 2) for anyone
-        // who needs it exact.
+      // 3. Per regional / cabang
+      if (a.scope.kind === 'nasional' && a.regRows.length > 0) {
+        const s3 = pres.addSlide();
+        title(s3, 'Performa per Regional (Rp juta)');
+        const labels = a.regRows.map((r) => (r.reg != null ? `Regional ${r.reg}` : 'Belum Diketahui'));
         s3.addChart(
           pres.ChartType.bar,
           [
-            { name: 'Target', labels: regRows.map((r) => (r.reg != null ? `Regional ${r.reg}` : 'Belum Diketahui')), values: regRows.map((r) => Math.round(r.totals.target / 1e6)) },
-            { name: 'Rencana', labels: regRows.map((r) => (r.reg != null ? `Regional ${r.reg}` : 'Belum Diketahui')), values: regRows.map((r) => Math.round(r.totals.rencana / 1e6)) },
-            { name: 'Realisasi', labels: regRows.map((r) => (r.reg != null ? `Regional ${r.reg}` : 'Belum Diketahui')), values: regRows.map((r) => Math.round(r.totals.won / 1e6)) },
+            { name: 'Target', labels, values: a.regRows.map((r) => Math.round(r.totals.target / 1e6)) },
+            { name: 'Rencana', labels, values: a.regRows.map((r) => Math.round(r.totals.rencana / 1e6)) },
+            { name: 'Realisasi', labels, values: a.regRows.map((r) => Math.round(r.totals.won / 1e6)) },
           ],
           { x: 0.5, y: 1.2, w: 12, h: 5.6, barGrouping: 'clustered', showLegend: true, valAxisTitle: 'Rp Juta', showValAxisTitle: true, ...chartOpts },
         );
       }
+      if (a.scope.kind !== 'se' && a.rows.length > 0) {
+        const s4 = pres.addSlide();
+        title(s4, 'Performa per Cabang');
+        const body = a.rows.filter((r) => r.target > 0 || r.won > 0 || r.openCount > 0 || r.rencana > 0).map((r) => [r.cabang, formatRupiah(r.target), formatRupiah(r.rencana), formatRupiah(r.won), `${r.achievement}%`, formatRupiah(r.weighted), String(r.agingCount)]);
+        s4.addTable(tableRows([['Cabang', 'Target', 'Rencana', 'Realisasi', 'Ach.', 'Weighted Pipeline', 'Mangkrak'].map(H), ...body]), { x: 0.4, y: 1.15, w: 12.5, fontSize: 10.5, ...tbl, autoPage: true, autoPageCharWeight: -1 });
+      }
 
-      // 4. Performa per Cabang
-      const s4 = pres.addSlide();
-      s4.addText('Performa per Cabang', { x: 0.5, y: 0.4, w: 11, h: 0.6, fontSize: 24, bold: true, color: GRAPHITE, fontFace: 'Cambria' });
-      const branchHeader = ['Cabang', 'Target', 'Rencana', 'Realisasi', 'Achievement'].map((t) => ({ text: t, options: { bold: true, fill: { color: GRAPHITE }, color: 'FFFFFF' } }));
-      const branchBody = rows.map((r) => [r.cabang, formatRupiah(r.target), formatRupiah(r.rencana), formatRupiah(r.won), `${r.achievement}%`]);
-      s4.addTable(tableRows([branchHeader, ...branchBody]), { x: 0.4, y: 1.15, w: 12.5, fontSize: 10.5, border: { type: 'solid', color: 'DDDDDD', pt: 0.5 }, autoPage: true, autoPageCharWeight: -1 });
-
-      // 5. Pipeline funnel + aging
+      // 4. SE & customer
       const s5 = pres.addSlide();
-      s5.addText('Kesehatan Pipeline', { x: 0.5, y: 0.4, w: 11, h: 0.6, fontSize: 24, bold: true, color: GRAPHITE, fontFace: 'Cambria' });
-      s5.addChart(pres.ChartType.bar, [{ name: 'Jumlah Deal', labels: funnelCounts.map((f) => f.label), values: funnelCounts.map((f) => f.count) }], {
-        x: 0.5, y: 1.1, w: 6.2, h: 4.3, showLegend: false, ...chartOpts,
+      title(s5, a.scope.kind === 'se' ? 'Customer Terbesar Periode Ini' : 'Peringkat SE & Customer Terbesar');
+      if (a.scope.kind !== 'se') {
+        const seBody = a.seRows.slice(0, 12).map((r) => [r.se, r.cabang, formatRupiah(r.won), String(r.wonCount), formatRupiah(r.weighted)]);
+        s5.addTable(tableRows([['SE', 'Cabang', 'Realisasi', 'Deal', 'Weighted'].map(H), ...(seBody.length ? seBody : [['Belum ada data', '', '', '', '']])]), { x: 0.4, y: 1.15, w: 6.3, fontSize: 9.5, ...tbl });
+      }
+      const cBody = a.topCustomers.map((c) => [c.name, c.cabang, formatRupiah(c.value), String(c.count)]);
+      s5.addTable(tableRows([['Customer', 'Cabang', 'Realisasi', 'Deal'].map(H), ...(cBody.length ? cBody : [['Belum ada realisasi', '', '', '']])]), {
+        x: a.scope.kind === 'se' ? 0.4 : 6.9, y: 1.15, w: a.scope.kind === 'se' ? 12.5 : 6.0, fontSize: 9.5, ...tbl,
       });
-      s5.addText(`${aging.length} Deal Mangkrak (Aging)`, { x: 7.0, y: 1.1, w: 5.8, h: 0.4, fontSize: 14, bold: true, color: RUST });
-      const agingLines = topAging.map((a) => `${a.record.customer} (${a.record.cabang || '-'}) — ${a.days} hari, ${formatRupiah(a.record.value)}`);
-      s5.addText(agingLines.length > 0 ? agingLines.join('\n') : 'Tidak ada deal yang mangkrak.', { x: 7.0, y: 1.55, w: 5.8, h: 3.8, fontSize: 11, color: GRAPHITE, valign: 'top', lineSpacingMultiple: 1.3 });
 
-      // 6. Kesehatan customer
+      // 5. Pipeline
       const s6 = pres.addSlide();
-      s6.addText('Kesehatan Customer', { x: 0.5, y: 0.4, w: 11, h: 0.6, fontSize: 24, bold: true, color: GRAPHITE, fontFace: 'Cambria' });
-      s6.addChart(pres.ChartType.pie, [{ name: 'Customer', labels: Object.keys(healthCounts), values: Object.values(healthCounts) }], {
-        x: 0.5, y: 1.1, w: 5.8, h: 4.6, showLegend: true, showPercent: true, ...chartOpts,
+      title(s6, 'Kesehatan Pipeline');
+      s6.addChart(pres.ChartType.bar, [{ name: 'Nilai (Rp juta)', labels: a.funnel.map((f) => STATUS_META[f.stage]?.label ?? String(f.stage)), values: a.funnel.map((f) => Math.round(f.value / 1e6)) }], {
+        x: 0.5, y: 1.1, w: 6.2, h: 4.3, showLegend: false, valAxisTitle: 'Rp Juta', showValAxisTitle: true, ...chartOpts,
       });
-      s6.addText('5 Customer Dingin Bernilai Terbesar', { x: 6.7, y: 1.1, w: 6.1, h: 0.4, fontSize: 14, bold: true, color: RUST });
-      const dinginHeader = ['Customer', 'Cabang', 'Tidak Order', 'Nilai Historis'].map((t) => ({ text: t, options: { bold: true, fill: { color: GRAPHITE }, color: 'FFFFFF', fontSize: 10 } }));
-      const dinginBody = topDingin.map((c) => [c.name, c.cabang, `${c.daysSinceOrder ?? '-'} hari`, formatRupiah(c.wonValue)]);
-      s6.addTable(tableRows([dinginHeader, ...(dinginBody.length > 0 ? dinginBody : [['Tidak ada customer dingin bernilai besar', '', '', '']])]), {
-        x: 6.7, y: 1.55, w: 6.1, fontSize: 9.5, border: { type: 'solid', color: 'DDDDDD', pt: 0.5 },
-      });
+      s6.addText(`${a.aging.length} deal mangkrak · ${formatRupiah(a.agingValue)}`, { x: 7.0, y: 1.1, w: 5.8, h: 0.4, fontSize: 14, bold: true, color: RUST });
+      const agingLines = a.aging.slice(0, 8).map((x) => `${x.record.customer} (${x.record.cabang || '-'}) — ${x.days} hari, ${formatRupiah(x.record.value)}`);
+      s6.addText(agingLines.length ? agingLines.join('\n') : 'Tidak ada deal yang mangkrak.', { x: 7.0, y: 1.55, w: 5.8, h: 2.6, fontSize: 10.5, color: GRAPHITE, valign: 'top' });
+      s6.addText(`${a.gitOld.length} DO belum terfaktur >30 hari`, { x: 7.0, y: 4.3, w: 5.8, h: 0.4, fontSize: 14, bold: true, color: AMBER });
+      s6.addText(a.gitOld.slice(0, 5).map((g) => `${g.customer} (${g.cabang}) — ${g.days} hari, ${formatRupiah(g.value)}`).join('\n') || '-', { x: 7.0, y: 4.75, w: 5.8, h: 2, fontSize: 10.5, color: GRAPHITE, valign: 'top' });
 
-      // 7. Follow-up
+      // 6. Customer
       const s7 = pres.addSlide();
-      s7.addText('Follow-up Perlu Segera', { x: 0.5, y: 0.4, w: 11, h: 0.6, fontSize: 24, bold: true, color: GRAPHITE, fontFace: 'Cambria' });
-      const fuHeader = ['Customer', 'Cabang', 'Sumber', 'Alasan'].map((t) => ({ text: t, options: { bold: true, fill: { color: GRAPHITE }, color: 'FFFFFF' } }));
-      const fuBody = urgentFollowUps.slice(0, 15).map((r) => [r.customer, r.cabang, SOURCE_LABEL[r.source] ?? r.source, r.reason]);
-      s7.addTable(tableRows([fuHeader, ...(fuBody.length > 0 ? fuBody : [['Tidak ada follow-up yang terlambat', '', '', '']])]), {
-        x: 0.4, y: 1.15, w: 12.5, fontSize: 11, border: { type: 'solid', color: 'DDDDDD', pt: 0.5 }, autoPage: true,
-      });
+      title(s7, 'Kesehatan Customer');
+      s7.addChart(pres.ChartType.pie, [{ name: 'Customer', labels: Object.keys(a.health), values: Object.values(a.health) }], { x: 0.5, y: 1.1, w: 5.8, h: 4.6, showLegend: true, showPercent: true, ...chartOpts });
+      const dBody = a.topDingin.map((c) => [c.name, c.cabang, `${c.daysSinceOrder ?? '-'} hari`, formatRupiah(c.wonValue)]);
+      s7.addText('Customer Dingin Bernilai Terbesar', { x: 6.7, y: 1.1, w: 6.1, h: 0.4, fontSize: 14, bold: true, color: RUST });
+      s7.addTable(tableRows([['Customer', 'Cabang', 'Tidak Order', 'Nilai Historis'].map(H), ...(dBody.length ? dBody : [['Tidak ada', '', '', '']])]), { x: 6.7, y: 1.55, w: 6.1, fontSize: 9.5, ...tbl });
 
-      // 8. Catatan & rekomendasi
+      // 7. Kualitas data
       const s8 = pres.addSlide();
-      s8.background = { color: GRAPHITE };
-      s8.addText('Catatan & Rekomendasi', { x: 0.8, y: 0.6, w: 11, h: 0.7, fontSize: 26, bold: true, color: 'FFFFFF', fontFace: 'Cambria' });
-      const insightText = insights.length > 0 ? insights : ['Tidak ada catatan khusus periode ini.'];
-      insightText.forEach((t, i) => {
-        s8.addText(`•  ${t}`, { x: 0.8, y: 1.6 + i * 0.85, w: 11.5, h: 0.8, fontSize: 14, color: 'D7E3EC', valign: 'top' });
+      title(s8, 'Kualitas Data');
+      const qBody = a.dataIssues.map((d) => [d.label, String(d.count), d.hint]);
+      s8.addTable(tableRows([['Masalah', 'Jumlah', 'Dampak'].map(H), ...(qBody.length ? qBody : [['Tidak ada masalah data terdeteksi', '', '']])]), { x: 0.4, y: 1.15, w: 12.5, fontSize: 11, ...tbl });
+
+      // 8. Catatan
+      const s9 = pres.addSlide();
+      s9.background = { color: GRAPHITE };
+      s9.addText('Catatan & Rekomendasi', { x: 0.8, y: 0.5, w: 11, h: 0.7, fontSize: 26, bold: true, color: 'FFFFFF', fontFace: 'Cambria' });
+      s9.addText((a.insights.length ? a.insights : ['Tidak ada catatan khusus periode ini.']).map((t) => ({ text: t, options: { bullet: true, breakLine: true } })), {
+        x: 0.8, y: 1.4, w: 11.8, h: 5.6, fontSize: 13, color: 'D7E3EC', valign: 'top', paraSpaceAfter: 6,
       });
 
-      await pres.writeFile({ fileName: `Analisa-Eksekutif-${periode}.pptx` });
+      await pres.writeFile({ fileName: `Analisa-Eksekutif-${a.scope.label.replace(/[^\w-]+/g, '_')}-${a.periode}.pptx` });
       toast('PPT analisa berhasil dibuat', 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal membuat PPT', 'error');
@@ -237,72 +184,186 @@ export function GmAnalysisModal() {
     }
   }
 
-  if (!allowed) return null;
+  if (!scope) return null;
+
+  const cabangRows = a ? a.rows.filter((r) => r.target > 0 || r.won > 0 || r.openCount > 0 || r.rencana > 0) : [];
+  const hiddenCabang = a ? a.rows.length - cabangRows.length : 0;
+  const regionRows = a ? a.regRows.filter((r) => r.totals.target > 0 || r.totals.won > 0 || r.totals.weighted > 0 || r.totals.rencana > 0) : [];
+  const pctBadge = (v: number) => <span className={`badge ${achColor(v)}`}>{v}%</span>;
 
   return (
     <Modal
       show={show}
       onClose={closeModal}
-      title="Analisa Eksekutif (GM)"
-      wide
+      title={`Analisa Eksekutif — ${scope.label}`}
+      xwide
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
             Tutup
           </button>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={onGeneratePpt}>
+          <button type="button" className="btn btn-primary" disabled={busy || !a} onClick={onGeneratePpt}>
             <IconDownload /> {busy ? 'Membuat PPT…' : 'Buat PPT'}
           </button>
         </>
       }
     >
-      <div className="import-summary" style={{ marginBottom: 14 }}>
-        Menyatukan Forecast, Customer Intelligence, Aging Pipeline, dan Follow-up jadi satu ringkasan — plus tombol{' '}
-        <b>Buat PPT</b> untuk mengunduh versi lengkapnya sebagai file presentasi. Halaman ini hanya terlihat untuk role GM.
-      </div>
+      {a && (
+        <>
+          <div className="toolbar-row" style={{ alignItems: 'center', marginBottom: 12 }}>
+            <label style={{ margin: 0 }}>Periode</label>
+            <input type="month" value={periode} onChange={(e) => e.target.value && setPeriode(e.target.value)} style={{ maxWidth: 180 }} />
+            <span className="field-note" style={{ margin: 0 }}>
+              Cakupan: <b>{scope.label}</b>
+              {scope.kind === 'se' && ' — target yang ditampilkan adalah target cabang sebagai acuan kontribusi Anda'}
+            </span>
+          </div>
 
-      <div style={{ marginBottom: 14 }}>
-        <label>Periode</label>
-        <input type="month" value={periode} onChange={(e) => setPeriode(e.target.value)} style={{ maxWidth: 180 }} />
-      </div>
+          <div className="kpi-grid">
+            <div className="kpi">
+              <div className="label">{scope.kind === 'se' ? 'Target Cabang' : 'Target'}</div>
+              <div className="value" title={formatRupiah(a.target)}>{rpShort(a.target)}</div>
+              <div className="foot">Rencana {formatRupiah(a.rencana)} ({a.rencanaVsTarget}%)</div>
+            </div>
+            <div className="kpi won">
+              <div className="label">Realisasi</div>
+              <div className="value" title={formatRupiah(a.won)}>{rpShort(a.won)}</div>
+              <div className="foot">
+                {a.wonCount} deal · {a.momPct == null ? 'bln lalu -' : `${a.momPct >= 0 ? '▲' : '▼'} ${Math.abs(a.momPct)}% vs bln lalu`}
+              </div>
+            </div>
+            <div className="kpi">
+              <div className="label">Achievement</div>
+              <div className="value">{a.achievement}%</div>
+              <div className="foot">Realisasi vs rencana {a.wonVsRencana}%</div>
+            </div>
+            <div className="kpi lost">
+              <div className="label">Sisa Gap</div>
+              <div className="value" title={formatRupiah(a.gap)}>{rpShort(a.gap)}</div>
+              <div className="foot">{a.requiredPerDay ? `Perlu ${formatRupiah(a.requiredPerDay)}/hari kerja (${a.daysLeft} hari)` : a.daysLeft == null ? 'Bukan periode berjalan' : 'Target tercapai'}</div>
+            </div>
+            <div className="kpi aktif">
+              <div className="label">Weighted Pipeline</div>
+              <div className="value" title={formatRupiah(a.weighted)}>{rpShort(a.weighted)}</div>
+              <div className="foot">Coverage gap {a.coverage == null ? '-' : `${Math.round(a.coverage * 100)}%`}</div>
+            </div>
+            <div className="kpi">
+              <div className="label">Win Rate</div>
+              <div className="value">{a.winRate == null ? '-' : `${a.winRate}%`}</div>
+              <div className="foot">
+                {a.lostCount} kalah · {formatRupiah(a.lostValue)}
+              </div>
+            </div>
+          </div>
 
-      <div className="kpi-grid" style={{ marginBottom: 18 }}>
-        <div className="kpi">
-          <div className="label">Target Nasional</div>
-          <div className="value">{formatRupiah(nasional.target)}</div>
-        </div>
-        <div className="kpi">
-          <div className="label">Rencana</div>
-          <div className="value">{formatRupiah(nasional.rencana)}</div>
-        </div>
-        <div className="kpi won">
-          <div className="label">Realisasi</div>
-          <div className="value">{formatRupiah(nasional.won)}</div>
-        </div>
-        <div className="kpi rate">
-          <div className="label">Achievement</div>
-          <div className="value">{nasional.achievement}%</div>
-        </div>
-        <div className="kpi lost">
-          <div className="label">Deal Mangkrak</div>
-          <div className="value">{aging.length}</div>
-        </div>
-        <div className="kpi lost">
-          <div className="label">Follow-up Terlambat</div>
-          <div className="value">{urgentFollowUps.length}</div>
-        </div>
-      </div>
+          <div className="import-summary" style={{ marginTop: 0, marginBottom: 14 }}>
+            <b>Komposisi realisasi:</b> PO/Kontrak {formatRupiah(a.wonPo)} · DO GIT (belum faktur) {formatRupiah(a.wonDoGit)} · DO Omzet (terfaktur) {formatRupiah(a.wonDoOmzet)} · rata-rata per deal {formatRupiah(a.avgDeal)}
+          </div>
 
-      <div style={{ fontWeight: 600, fontSize: 12.5, margin: '4px 0 8px' }}>Catatan &amp; Rekomendasi</div>
-      {insights.length === 0 ? (
-        <div className="field-note">Tidak ada catatan khusus untuk periode ini.</div>
-      ) : (
-        <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: 'var(--text-soft)', lineHeight: 1.7 }}>
-          {insights.map((t, i) => (
-            <li key={i}>{t}</li>
-          ))}
-        </ul>
+          <Section title="Catatan & Rekomendasi">
+            {a.insights.length === 0 ? (
+              <div className="field-note">Tidak ada catatan khusus untuk periode ini.</div>
+            ) : (
+              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, lineHeight: 1.7 }}>
+                {a.insights.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            )}
+          </Section>
+
+          {scope.kind === 'nasional' && regionRows.length > 0 && (
+            <Section title="Per Regional">
+              <Table
+                head={['Regional', 'Target', 'Rencana', 'Realisasi', 'Ach.', 'Weighted']}
+                rows={regionRows.map((r) => [r.reg != null ? `Regional ${r.reg}` : 'Belum diketahui', formatRupiah(r.totals.target), formatRupiah(r.totals.rencana), formatRupiah(r.totals.won), pctBadge(r.totals.achievement), formatRupiah(r.totals.weighted)])}
+              />
+            </Section>
+          )}
+
+          {scope.kind !== 'se' && (
+            <Section title="Per Cabang">
+              <Table
+                head={['Cabang', 'Target', 'Rencana', 'Realisasi', 'Ach.', 'Weighted', 'Deal aktif', 'Mangkrak']}
+                rows={cabangRows.map((r) => [r.cabang, formatRupiah(r.target), formatRupiah(r.rencana), formatRupiah(r.won), pctBadge(r.achievement), formatRupiah(r.weighted), r.openCount, r.agingCount])}
+              />
+              {hiddenCabang > 0 && <div className="field-note">{hiddenCabang} cabang tanpa target, rencana, maupun aktivitas pada periode ini tidak ditampilkan.</div>}
+            </Section>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+            {scope.kind !== 'se' && (
+              <Section title="Peringkat SE (realisasi periode)">
+                <Table head={['SE', 'Cabang', 'Realisasi', 'Deal', 'Weighted']} rows={a.seRows.slice(0, 15).map((r) => [r.se, r.cabang, formatRupiah(r.won), r.wonCount, formatRupiah(r.weighted)])} />
+              </Section>
+            )}
+            <Section title="Customer terbesar (realisasi periode)">
+              <Table head={['Customer', 'Cabang', 'Realisasi', 'Deal']} rows={a.topCustomers.map((c) => [c.name, c.cabang, formatRupiah(c.value), c.count])} />
+            </Section>
+            <Section title="Pipeline aktif per tahap">
+              <Table head={['Tahap', 'Deal', 'Nilai']} rows={a.funnel.map((f) => [STATUS_META[f.stage]?.label ?? f.stage, f.count, formatRupiah(f.value)])} />
+            </Section>
+            <Section title={`Kalah periode ini — kompetitor (${a.lostCount} deal)`}>
+              <Table head={['Kompetitor', 'Kali menang atas kita']} rows={a.topCompetitors.map((c) => [c.name, c.count])} empty="Belum ada data kompetitor pada deal kalah" />
+            </Section>
+            <Section title={`Deal mangkrak (${a.aging.length})`}>
+              <Table head={['Customer', 'Cabang', 'Tahap', 'Hari', 'Nilai']} rows={a.aging.slice(0, 10).map((x) => [x.record.customer, x.record.cabang || '-', STATUS_META[Number(x.record.status)]?.label ?? '-', x.days, formatRupiah(x.record.value)])} />
+            </Section>
+            <Section title={`DO belum terfaktur > 30 hari (${a.gitOld.length})`}>
+              <Table head={['Customer', 'Cabang', 'Hari', 'Nilai']} rows={a.gitOld.slice(0, 10).map((g) => [g.customer, g.cabang, g.days, formatRupiah(g.value)])} />
+            </Section>
+            <Section title="Customer dingin bernilai terbesar">
+              <Table head={['Customer', 'Cabang', 'Tidak order', 'Nilai historis']} rows={a.topDingin.map((c) => [c.name, c.cabang, `${c.daysSinceOrder ?? '-'} hari`, formatRupiah(c.wonValue)])} />
+            </Section>
+          </div>
+
+          <Section title="Kualitas Data — perlu dirapikan agar angka akurat">
+            {a.dataIssues.length === 0 ? (
+              <div className="field-note">Tidak ada masalah data terdeteksi. 👍</div>
+            ) : (
+              <Table
+                head={['Masalah', 'Jumlah', 'Dampak', 'Contoh']}
+                rows={a.dataIssues.map((d) => [<b key="l">{d.label}</b>, <span key="c" className="badge amber">{d.count}</span>, d.hint, <span key="e" style={{ fontSize: 12 }}>{d.examples.join('; ')}</span>])}
+              />
+            )}
+          </Section>
+        </>
       )}
     </Modal>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontWeight: 700, fontSize: 13, margin: '4px 0 6px' }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function Table({ head, rows, empty = 'Tidak ada data' }: { head: string[]; rows: React.ReactNode[][]; empty?: string }) {
+  if (rows.length === 0) return <div className="field-note">{empty}</div>;
+  return (
+    <div className="table-wrap" style={{ borderTop: 'none' }}>
+      <table className="simple-table" style={{ minWidth: 0 }}>
+        <thead>
+          <tr>
+            {head.map((h) => (
+              <th key={h}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i}>
+              {r.map((c, j) => (
+                <td key={j}>{c}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

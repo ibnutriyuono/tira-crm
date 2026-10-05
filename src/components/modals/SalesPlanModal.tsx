@@ -71,8 +71,9 @@ export function SalesPlanModal() {
   // DO already in progress is still material Sales wants visible in the
   // plan (e.g. a deal that closed late in the month, feeding next month's
   // delivery) — Rencana isn't only "not yet won", so this stays broader
-  // than Realisasi rather than trying to mirror it. Only Lost and mere
-  // Activity logs (status 0/6) are excluded — neither is sellable material.
+  // than Realisasi rather than trying to mirror it. Lost and mere
+  // Activity logs (status 0/6) are excluded — neither is sellable material —
+  // and so is a DO that is already invoiced (terfaktur).
   // Re-filters whenever `se` itself changes (not just on open) since
   // admin/gm can retarget the plan to a different SE without closing and
   // reopening the modal.
@@ -81,12 +82,39 @@ export function SalesPlanModal() {
     if (!target) return [];
     return prospects
       .filter((p) => (p.se || '').trim().toLowerCase() === target && (classify(p) === 'Aktif' || classify(p) === 'Won'))
+      // Already invoiced (DO terfaktur) = finished revenue, not something to
+      // plan: hidden from the picker (the API rejects it too).
+      .filter((p) => !(num(p.status) === 5 && p.terfaktur))
       .sort((a, b) => b.value - a.value);
   }, [prospects, se]);
+
+  // ★ marker per prospect: how many different periods it has been planned in,
+  // counting this form's unsaved rows as the current period (the saved copy
+  // of this same SE+periode plan is replaced by what's on screen). Same rule
+  // as the ★ badge on the Prospek list (buildProspectStarCounts).
+  const planMarks = useMemo(() => {
+    const others = salesPlans.filter((pl) => !(pl.se.toLowerCase() === se.trim().toLowerCase() && pl.periode === periode));
+    const periodsById = new Map<string, Set<string>>();
+    const add = (id: string | null | undefined, per: string) => {
+      if (!id) return;
+      if (!periodsById.has(id)) periodsById.set(id, new Set());
+      periodsById.get(id)!.add(per);
+    };
+    others.forEach((pl) => pl.items.forEach((it) => add(it.sourceProspectId, pl.periode)));
+    const inThisPlan = new Set<string>();
+    items.forEach((it) => {
+      if (it.sourceProspectId) {
+        add(it.sourceProspectId, periode);
+        inThisPlan.add(it.sourceProspectId);
+      }
+    });
+    return { stars: new Map(Array.from(periodsById.entries()).map(([id, set]) => [id, set.size])), inThisPlan };
+  }, [salesPlans, se, periode, items]);
 
   function onAddFromProspect() {
     const prospect = sePipeline.find((p) => p.id === pickedProspectId);
     if (!prospect) return;
+    if (planMarks.inThisPlan.has(prospect.id) && !window.confirm(`"${prospect.customer}" sudah ada di rencana periode ini. Tambahkan materialnya lagi?`)) return;
     const pulled: SalesPlanItem[] = getProspectMaterials(prospect).map((m) => ({
       line: m.line,
       uraian: m.uraian,
@@ -197,7 +225,9 @@ export function SalesPlanModal() {
             <option value="">Pilih prospek milik {se}…</option>
             {sePipeline.map((p) => (
               <option key={p.id} value={p.id}>
+                {planMarks.stars.get(p.id) ? `${'★'.repeat(Math.min(planMarks.stars.get(p.id) as number, 5))} ` : ''}
                 {p.customer} — {formatRupiah(p.value)} ({p.cabang || '-'}) · {STATUS_META[p.status]?.label ?? '-'}
+                {planMarks.inThisPlan.has(p.id) ? ' · sudah di rencana ini' : planMarks.stars.get(p.id) ? ` · sudah di ${planMarks.stars.get(p.id)} rencana` : ''}
               </option>
             ))}
           </select>
@@ -208,7 +238,9 @@ export function SalesPlanModal() {
       )}
       <div className="field-note" style={{ marginTop: 4 }}>
         Menarik baris material dari prospek yang dipilih (harga per unit dihitung dari Berat/pc × Harga/Kg bila terisi,
-        kalau tidak dari Harga langsung) — baris hasil tarikan tetap bisa diedit atau dihapus seperti biasa.
+        kalau tidak dari Harga langsung) — baris hasil tarikan tetap bisa diedit atau dihapus seperti biasa. Prospek DO yang
+        sudah terfaktur tidak ditampilkan. Tanda ★ = prospek sudah pernah masuk rencana penjualan (jumlah bintang = jumlah
+        periode rencana).
       </div>
 
       <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>Material yang Direncanakan</div>
