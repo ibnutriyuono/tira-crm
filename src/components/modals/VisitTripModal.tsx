@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
+import { CustomerNameInput } from '../CustomerNameInput';
 import { IconPlus, IconTrash } from '../icons';
 import { CABANG_LIST } from '@/lib/constants';
 import { formatDateID } from '@/lib/format';
@@ -152,13 +153,6 @@ export function VisitTripModal() {
       .catch((err) => toast(err instanceof Error ? err.message : 'Perjalanan tidak ditemukan', 'error'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show]);
-
-  const customerOptions = useMemo(() => {
-    const names = new Set<string>();
-    customers.forEach((c) => c.name && names.add(c.name));
-    prospects.forEach((p) => p.customer && names.add(p.customer));
-    return Array.from(names).sort((a, b) => a.localeCompare(b));
-  }, [customers, prospects]);
 
   const picOptions = useMemo(() => {
     const out: string[] = [];
@@ -331,11 +325,6 @@ export function VisitTripModal() {
 
   const lists = (
     <>
-      <datalist id="tripCustomers">
-        {customerOptions.map((c) => (
-          <option key={c} value={c} />
-        ))}
-      </datalist>
       <datalist id="tripPics">
         {picOptions.map((c) => (
           <option key={c} value={c} />
@@ -481,7 +470,7 @@ export function VisitTripModal() {
           <div className="form-grid">
             <div>
               <label>Customer *</label>
-              <input type="text" list="tripCustomers" value={v.customer} onChange={(e) => setPlan(i, 'customer', e.target.value)} placeholder="Pilih / ketik nama customer" />
+              <CustomerNameInput value={v.customer} onChange={(val) => setPlan(i, 'customer', val)} />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <div style={{ flex: 2 }}>
@@ -567,7 +556,7 @@ export function VisitTripModal() {
                   <td>{i + 1}</td>
                   <td style={{ minWidth: 140 }}>
                     {editReal && v.tambahan ? (
-                      <input type="text" list="tripCustomers" value={v.customer} onChange={(e) => setReal(i, 'customer', e.target.value)} placeholder="Customer" style={{ width: '100%' }} />
+                      <CustomerNameInput value={v.customer} onChange={(val) => setReal(i, 'customer', val)} placeholder="Customer" />
                     ) : (
                       <b>{v.customer}</b>
                     )}

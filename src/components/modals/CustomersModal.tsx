@@ -77,6 +77,11 @@ export function CustomersModal() {
             Import Excel
           </button>
         )}
+        {(currentUser?.role === 'gm' || currentUser?.role === 'admin') && (
+          <button className="btn btn-outline btn-sm" onClick={() => openModal('customerUnify')}>
+            Satukan Nama Customer
+          </button>
+        )}
         <button className="btn btn-outline btn-sm" onClick={exportExcel}>
           Export Excel
         </button>

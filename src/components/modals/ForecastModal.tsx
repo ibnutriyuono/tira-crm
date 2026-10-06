@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { formatDateID, formatRupiah, num } from '@/lib/format';
 import { AGING_THRESHOLD_DAYS, CABANG_LIST, STATUS_META } from '@/lib/constants';
@@ -8,7 +8,49 @@ import { buildAgingList, buildForecast, buildForecastByReg, buildForecastBySe, b
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
-import type { BudgetTarget } from '@/lib/types';
+import { buildSalesPlanDetail, canEditSalesPlanFor } from '@/lib/sales-plan-view';
+import { IconTrash } from '../icons';
+import type { BudgetTarget, SalesPlan } from '@/lib/types';
+
+const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const labelPeriode = (p: string) => `${BULAN[Number(p.slice(5, 7)) - 1] || ''} ${p.slice(0, 4)}`;
+/** 1165999999 -> "1.165.999.999" */
+const dots = (n: number) => (n ? Math.round(n).toLocaleString('id-ID') : '');
+
+/**
+ * Target input with thousand dots. A carried-forward target (no entry for
+ * this month yet) is shown as the value with a "dari <bulan>" note; typing a
+ * different amount saves it for this month only.
+ */
+function TargetInput({ value, from, onSave }: { value: number; from: string | null; onSave: (v: number) => void }) {
+  const [text, setText] = useState(dots(value));
+  const [synced, setSynced] = useState(value);
+  if (synced !== value) {
+    // Periode switched or the target changed elsewhere: show the new value.
+    setSynced(value);
+    setText(dots(value));
+  }
+  return (
+    <div>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={text}
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, '');
+          setText(digits ? Number(digits).toLocaleString('id-ID') : '');
+        }}
+        onBlur={() => {
+          const v = Number(text.replace(/\D/g, '')) || 0;
+          if (v !== value) onSave(v);
+        }}
+        placeholder="0"
+        style={{ maxWidth: 170, textAlign: 'right', fontFamily: 'var(--font-ibm-plex-mono), monospace', color: from ? 'var(--text-soft)' : undefined }}
+      />
+      {from && <div className="field-note" style={{ marginTop: 2 }}>dari {labelPeriode(from)}</div>}
+    </div>
+  );
+}
 
 function currentPeriode(): string {
   return new Date().toISOString().slice(0, 7);
@@ -24,10 +66,14 @@ export function ForecastModal() {
   const budgetTargets = useDataStore((s) => s.budgetTargets);
   const salesPlans = useDataStore((s) => s.salesPlans);
   const upsertBudgetTarget = useDataStore((s) => s.upsertBudgetTarget);
+  const upsertSalesPlan = useDataStore((s) => s.upsertSalesPlan);
+  const removeSalesPlan = useDataStore((s) => s.removeSalesPlan);
   const currentUser = useDataStore((s) => s.currentUser);
   const toast = useDataStore((s) => s.toast);
 
   const [periode, setPeriode] = useState(currentPeriode());
+  const [planCabang, setPlanCabang] = useState('');
+  const [deleting, setDeleting] = useState('');
 
   // rm may only set targets for branches inside their own region; the region of
   // a branch is only knowable from the prospect rows.
@@ -71,6 +117,24 @@ export function ForecastModal() {
   const regRows = useMemo(() => buildForecastByReg(rows), [rows]);
   const nasional = useMemo(() => buildForecastNasional(rows), [rows]);
   const agingRows = useMemo(() => buildAgingList(records), [records]);
+  const planDetail = useMemo(() => buildSalesPlanDetail(salesPlans, records, periode), [salesPlans, records, periode]);
+  const planDetailShown = planCabang ? planDetail.filter((g) => g.cabang === planCabang) : planDetail;
+
+  async function deletePlanItem(planSe: string, index: number, uraian: string, nominal: number) {
+    if (!window.confirm(`Hapus "${uraian || '(tanpa uraian)'}" (${formatRupiah(nominal)}) dari rencana ${planSe} periode ${periode}?`)) return;
+    const key = `${planSe}|${index}`;
+    setDeleting(key);
+    try {
+      const res = await api.del<{ salesPlan?: SalesPlan; deleted?: boolean; id?: string }>('/api/sales-plans', { se: planSe, periode, index, uraian });
+      if (res.salesPlan) upsertSalesPlan(res.salesPlan);
+      else if (res.id) removeSalesPlan(res.id);
+      toast(res.deleted ? `Material dihapus — rencana ${planSe} kini kosong dan ikut dihapus` : 'Material dihapus dari rencana', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal menghapus material', 'error');
+    } finally {
+      setDeleting('');
+    }
+  }
 
   async function saveTarget(cabang: string, amount: number) {
     try {
@@ -95,7 +159,9 @@ export function ForecastModal() {
 
       <div className="import-summary" style={{ marginTop: 0 }}>
         Forecast dihitung dari pipeline aktif (status Permintaan/Penawaran Harga/Negosiasi) dikalikan probabilitas tiap
-        tahap: Permintaan 10%, Penawaran Harga 30%, Negosiasi 60%. Data mengikuti cakupan role Anda yang login.
+        tahap: Permintaan 10%, Penawaran Harga 30%, Negosiasi 60%. Data mengikuti cakupan role Anda yang login. Target
+        cabang berlaku untuk bulan-bulan berikutnya sampai diubah: bulan yang belum diisi otomatis memakai target bulan
+        sebelumnya (ditandai &quot;dari …&quot;).
       </div>
 
       <div className="kpi-grid" style={{ marginTop: 12 }}>
@@ -164,17 +230,12 @@ export function ForecastModal() {
                   <td style={{ fontWeight: 600 }}>{r.cabang}</td>
                   <td>
                     {canEdit(r.cabang) ? (
-                      <input
-                        type="number"
-                        defaultValue={r.target || ''}
-                        onBlur={(e) => {
-                          const v = num(e.target.value);
-                          if (v !== r.target) saveTarget(r.cabang, v);
-                        }}
-                        style={{ maxWidth: 150 }}
-                      />
+                      <TargetInput key={`${r.cabang}-${periode}`} value={r.target} from={r.targetFrom} onSave={(v) => saveTarget(r.cabang, v)} />
                     ) : (
-                      <span className="mono">{formatRupiah(r.target)}</span>
+                      <span className="mono">
+                        {formatRupiah(r.target)}
+                        {r.targetFrom && <span className="field-note" style={{ display: 'block' }}>dari {labelPeriode(r.targetFrom)}</span>}
+                      </span>
                     )}
                   </td>
                   <td className="mono">{formatRupiah(r.rencana)}</td>
@@ -262,7 +323,7 @@ export function ForecastModal() {
               {seList.map((r) => {
                 const rencana = seRencana.get(r.se) || 0;
                 const rasio = rencana > 0 ? Math.round((r.won / rencana) * 100) : null;
-                const bolehEdit = !currentUser ? false : ['admin', 'gm'].includes(currentUser.role) || (currentUser.role === 'sales' && (currentUser.se || '').toUpperCase() === r.se) || (currentUser.role === 'bm' && (currentUser.cabang || '').toUpperCase() === r.cabang.toUpperCase());
+                const bolehEdit = canEditSalesPlanFor(currentUser, r.se, r.cabang);
                 return (
                   <tr key={r.se}>
                     <td style={{ fontWeight: 600 }}>{r.se}</td>
@@ -292,6 +353,102 @@ export function ForecastModal() {
             </tbody>
           </table>
         </div>
+      )}
+
+      <h4 style={{ marginTop: 18, marginBottom: 6 }}>Rincian Rencana Penjualan — per Cabang &amp; Sales</h4>
+      {planDetail.length === 0 ? (
+        <div className="import-summary" style={{ marginTop: 0 }}>Belum ada rencana penjualan pada periode ini.</div>
+      ) : (
+        <>
+          {planDetail.length > 1 && (
+            <div className="toolbar-row">
+              <label style={{ fontSize: 12, textTransform: 'none' }}>Cabang</label>
+              <select className="btn-sm" value={planCabang} onChange={(e) => setPlanCabang(e.target.value)} style={{ maxWidth: 200 }}>
+                <option value="">Semua cabang ({planDetail.length})</option>
+                {planDetail.map((g) => (
+                  <option key={g.cabang} value={g.cabang}>
+                    {g.cabang} — {formatRupiah(g.total)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="table-wrap" style={{ borderTop: 'none' }}>
+            <table className="simple-table" style={{ minWidth: 980 }}>
+              <thead>
+                <tr>
+                  <th>SE</th>
+                  <th>Customer</th>
+                  <th>Line</th>
+                  <th>Uraian Material</th>
+                  <th style={{ textAlign: 'right' }}>Qty</th>
+                  <th style={{ textAlign: 'right' }}>Harga</th>
+                  <th style={{ textAlign: 'right' }}>Nominal</th>
+                  <th>Status Pipeline</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {planDetailShown.map((g) => (
+                  <Fragment key={g.cabang}>
+                    <tr style={{ background: 'var(--steel-100)', fontWeight: 700 }}>
+                      <td colSpan={6}>Cabang {g.cabang} · {g.ses.length} SE</td>
+                      <td className="mono" style={{ textAlign: 'right' }}>{formatRupiah(g.total)}</td>
+                      <td colSpan={2}></td>
+                    </tr>
+                    {g.ses.map((x) => {
+                      const bolehHapus = canEditSalesPlanFor(currentUser, x.se, x.cabang);
+                      return (
+                        <Fragment key={x.planId}>
+                          {x.items.map((it, i) => (
+                            <tr key={`${x.planId}-${it.index}`}>
+                              <td style={{ fontWeight: 600 }}>{i === 0 ? x.se : ''}</td>
+                              <td>{it.status.customer || <span style={{ color: 'var(--text-soft)' }}>-</span>}</td>
+                              <td>{it.line || '-'}</td>
+                              <td>{it.uraian || '-'}</td>
+                              <td className="mono" style={{ textAlign: 'right' }}>{num(it.qty).toLocaleString('id-ID')}</td>
+                              <td className="mono" style={{ textAlign: 'right' }}>{formatRupiah(num(it.harga))}</td>
+                              <td className="mono" style={{ textAlign: 'right' }}>{formatRupiah(it.nominal)}</td>
+                              <td><span className={`badge ${it.status.color}`}>{it.status.label}</span></td>
+                              <td>
+                                {bolehHapus && (
+                                  <button
+                                    type="button"
+                                    className="icon-btn danger"
+                                    title="Hapus material dari rencana"
+                                    disabled={deleting === `${x.se}|${it.index}`}
+                                    onClick={() => deletePlanItem(x.se, it.index, it.uraian, it.nominal)}
+                                  >
+                                    <IconTrash />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr style={{ fontWeight: 600 }}>
+                            <td colSpan={6} style={{ textAlign: 'right', color: 'var(--text-soft)' }}>Subtotal {x.se} ({x.items.length} material)</td>
+                            <td className="mono" style={{ textAlign: 'right' }}>{formatRupiah(x.total)}</td>
+                            <td colSpan={2}></td>
+                          </tr>
+                        </Fragment>
+                      );
+                    })}
+                  </Fragment>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ fontWeight: 700, background: 'var(--steel-100)' }}>
+                  <td colSpan={6}>TOTAL {planCabang ? `CABANG ${planCabang}` : 'RENCANA'}</td>
+                  <td className="mono" style={{ textAlign: 'right' }}>{formatRupiah(planDetailShown.reduce((t, g) => t + g.total, 0))}</td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="field-note" style={{ marginTop: 6 }}>
+            Status pipeline diambil dari prospek asal material (baris yang ditarik lewat &quot;Ambil dari Prospek&quot;); baris yang diketik manual ditandai &quot;Manual&quot;. Tombol hapus muncul untuk pemilik rencana, BM cabangnya, GM dan Admin. Rencana yang semua materialnya dihapus ikut terhapus.
+          </div>
+        </>
       )}
 
       <h4 style={{ marginTop: 18, marginBottom: 6 }}>Aging Alert — Pipeline Macet</h4>

@@ -1,3 +1,4 @@
+import { normalizeItemLines, normalizeLine } from './format';
 import { qcdMissing, qcdRequiredOnMove, type QcdInput } from './qcd';
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
@@ -28,7 +29,7 @@ export function num(v: unknown): number {
 export function deriveFromMaterials(materials: Material[]) {
   const clean = materials
     .map((m) => ({
-      line: (m.line || '').trim(),
+      line: normalizeLine(m.line),
       uraian: (m.uraian || '').trim(),
       qty: num(m.qty),
       beratPc: num(m.beratPc),
@@ -52,7 +53,7 @@ export function deriveFromMaterials(materials: Material[]) {
 export function deriveFromSalesPlanItems(items: { line?: unknown; uraian?: unknown; qty?: unknown; harga?: unknown; sourceProspectId?: unknown }[]) {
   const clean = (Array.isArray(items) ? items : [])
     .map((m) => ({
-      line: String(m.line || '').trim(),
+      line: normalizeLine(m.line),
       uraian: String(m.uraian || '').trim(),
       qty: num(m.qty),
       harga: num(m.harga),
@@ -79,7 +80,7 @@ export function deriveFromSalesPlanItems(items: { line?: unknown; uraian?: unkno
  */
 export function mergeRfqItemsPreservingAnswer(existing: RfqItem[] | null | undefined, incoming: RfqItem[]): RfqItem[] {
   const prev = Array.isArray(existing) ? existing : [];
-  const keyOf = (it: RfqItem) => `${(it.line || '').trim().toLowerCase()}|${(it.material || '').trim().toLowerCase()}`;
+  const keyOf = (it: RfqItem) => `${normalizeLine(it.line).toLowerCase()}|${(it.material || '').trim().toLowerCase()}`;
 
   const byKey = new Map<string, RfqItem>();
   prev.forEach((it) => {

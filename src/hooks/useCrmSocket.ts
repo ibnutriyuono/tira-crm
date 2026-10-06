@@ -173,6 +173,9 @@ export function useCrmSocket() {
       if (!allowedInStore('budgetTarget', b)) return;
       useDataStore.getState().upsertBudgetTarget(b);
     };
+    // Bulk server-side change (e.g. customer names unified): reload everything.
+    const onDataRefresh = () => void useDataStore.getState().bootstrap();
+    const onSalesPlanDelete = ({ id }: { id: string }) => useDataStore.getState().removeSalesPlan(id);
     const onSalesPlanUpsert = (p: SalesPlan) => {
       if (!allowedInStore('salesPlan', p)) return useDataStore.getState().removeSalesPlan(p.id);
       useDataStore.getState().upsertSalesPlan(p);
@@ -225,11 +228,13 @@ export function useCrmSocket() {
 
     s.on('budget:updated', onBudgetUpsert);
     s.on('salesPlan:updated', onSalesPlanUpsert);
+    s.on('salesPlan:deleted', onSalesPlanDelete);
     s.on('notification:new', onNotificationNew);
 
     s.on('vendor:created', onVendorUpsert);
     s.on('vendor:updated', onVendorUpsert);
     s.on('vendor:deleted', onVendorDelete);
+    s.on('data:refresh', onDataRefresh);
     s.on('vendor:bulk-imported', onVendorBulk);
 
     s.on('user:created', onUserUpsert);
@@ -253,10 +258,12 @@ export function useCrmSocket() {
       s.off('fupa:deleted', onFupaDelete);
       s.off('budget:updated', onBudgetUpsert);
       s.off('salesPlan:updated', onSalesPlanUpsert);
+      s.off('salesPlan:deleted', onSalesPlanDelete);
       s.off('notification:new', onNotificationNew);
       s.off('vendor:created', onVendorUpsert);
       s.off('vendor:updated', onVendorUpsert);
       s.off('vendor:deleted', onVendorDelete);
+      s.off('data:refresh', onDataRefresh);
       s.off('vendor:bulk-imported', onVendorBulk);
       s.off('rfq:created', onRfqCreated);
       s.off('rfq:updated', onRfqUpsert);

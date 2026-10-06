@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
+import { CustomerNameInput } from '../CustomerNameInput';
 import { AttachmentList } from '../AttachmentList';
 import { ItemChat } from '../ItemChat';
 import { IconDownload, IconMail, IconPlus, IconSave, IconTrash, IconWa } from '../icons';
 import { ATTACHMENT_MAX_BYTES, RFQ_LOKAL_OPTIONS } from '@/lib/constants';
-import { formatDateID, formatFileSize, formatRupiah, getProspectMaterials, normalizePhone, num, todayStr } from '@/lib/format';
+import { formatDateID, formatFileSize, formatRupiah, getProspectMaterials, normalizeLine, normalizePhone, num, todayStr } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -290,7 +291,7 @@ export function RfqModal() {
         </div>
         <div>
           <label>Customer (CUST)</label>
-          <input type="text" value={cust} onChange={(e) => setCust(e.target.value)} />
+          <CustomerNameInput value={cust} onChange={setCust} />
         </div>
       </div>
       <div className="full" style={{ marginTop: 14 }}>
@@ -322,7 +323,7 @@ export function RfqModal() {
             <div className="form-grid">
               <div>
                 <label>Line</label>
-                <input type="text" value={it.line} onChange={(e) => updateItem(idx, { line: e.target.value })} />
+                <input type="text" value={it.line} onChange={(e) => updateItem(idx, { line: e.target.value })} onBlur={(e) => updateItem(idx, { line: normalizeLine(e.target.value) })} />
               </div>
               <div>
                 <label>Grade</label>

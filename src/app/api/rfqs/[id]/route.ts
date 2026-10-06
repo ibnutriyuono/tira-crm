@@ -1,3 +1,4 @@
+import { normalizeItemLines } from '@/lib/format';
 import { NextResponse } from 'next/server';
 import { diffFields, logActivity, RFQ_FIELD_LABELS } from '@/lib/activity';
 import { isResponse, mergeRfqItemsPreservingAnswer, requireUser } from '@/lib/api-helpers';
@@ -49,7 +50,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       requestedBy: body?.requestedBy ?? existing.requestedBy,
       prospectId,
       items: Array.isArray(body?.items)
-        ? (mergeRfqItemsPreservingAnswer(existing.items as unknown as RfqItem[], body.items) as unknown as Prisma.InputJsonValue)
+        ? (mergeRfqItemsPreservingAnswer(existing.items as unknown as RfqItem[], normalizeItemLines(body.items)) as unknown as Prisma.InputJsonValue)
         : existing.items ?? undefined,
       catatan: body?.catatan ?? existing.catatan,
       status: body?.markSent ? 'Terkirim' : body?.status ?? existing.status,
@@ -128,7 +129,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const prev = await prisma.rfq.findUnique({ where: { id } });
     if (!prev) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
 
-    const items = Array.isArray(body?.items) ? body.items : ((prev.items as unknown as RfqItem[]) ?? []);
+    const items = Array.isArray(body?.items) ? normalizeItemLines(body.items as RfqItem[]) : ((prev.items as unknown as RfqItem[]) ?? []);
 
     if (body.action === 'send-jawaban') {
       // An answer counts as given once a material is resolved either way —
@@ -146,7 +147,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const rfq = await prisma.rfq.update({
       where: { id },
       data: {
-        items,
+        items: items as unknown as Prisma.InputJsonValue,
         ...(typeof body.purchNotes === 'string' ? { purchNotes: body.purchNotes } : {}),
         ...(typeof body.purchJawaban === 'string' ? { purchJawaban: body.purchJawaban } : {}),
         ...(body.action === 'send-jawaban' ? { jawabanRfqDikirim: true, jawabanRfqAt: new Date() } : {}),

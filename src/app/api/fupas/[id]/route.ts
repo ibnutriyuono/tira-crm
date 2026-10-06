@@ -1,3 +1,5 @@
+import { normalizeItemLines } from '@/lib/format';
+import type { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { diffFields, FUPA_FIELD_LABELS, logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
@@ -23,7 +25,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       cabang: body?.cabang ?? existing.cabang,
       customer: body?.customer ?? existing.customer,
       catatan: body?.catatan ?? existing.catatan,
-      items: Array.isArray(body?.items) ? body.items : existing.items ?? undefined,
+      items: Array.isArray(body?.items) ? (normalizeItemLines(body.items) as unknown as Prisma.InputJsonValue) : existing.items ?? undefined,
       status: body?.markSent ? 'Terkirim' : body?.status ?? existing.status,
       // First hand-off only, so re-sending doesn't reset the original stamp.
       ...(body?.markSent && !existing.sentToPurchasingAt ? { sentToPurchasingAt: new Date() } : {}),

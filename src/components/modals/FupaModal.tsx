@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { Modal } from '../Modal';
+import { CustomerNameInput } from '../CustomerNameInput';
 import { AttachmentList } from '../AttachmentList';
 import { ItemChat } from '../ItemChat';
 import { IconDownload, IconMail, IconPlus, IconSave, IconTrash, IconWa } from '../icons';
 import { ATTACHMENT_MAX_BYTES, RFQ_LOKAL_OPTIONS } from '@/lib/constants';
-import { formatFileSize, getProspectMaterials, normalizePhone, num, todayStr } from '@/lib/format';
+import { formatFileSize, getProspectMaterials, normalizeLine, normalizePhone, num, todayStr } from '@/lib/format';
 import { buildPurchaseRequestMessage, downloadPurchaseRequestExcel } from '@/lib/purchase-request';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
@@ -229,7 +230,7 @@ export function FupaModal() {
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <label>Customer (Cust)</label>
-          <input type="text" value={customer} onChange={(e) => setCustomer(e.target.value)} />
+          <CustomerNameInput value={customer} onChange={setCustomer} />
         </div>
       </div>
 
@@ -255,7 +256,7 @@ export function FupaModal() {
               </button>
             </div>
             <div className="form-grid">
-              <div><label>Line</label><input type="text" value={it.line} onChange={(e) => setItem(idx, { line: e.target.value })} /></div>
+              <div><label>Line</label><input type="text" value={it.line} onChange={(e) => setItem(idx, { line: e.target.value })} onBlur={(e) => setItem(idx, { line: normalizeLine(e.target.value) })} /></div>
               <div><label>Grade</label><input type="text" value={it.grade} onChange={(e) => setItem(idx, { grade: e.target.value })} /></div>
               <div className="full">
                 <label>Material / Spesifikasi</label>

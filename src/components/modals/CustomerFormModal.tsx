@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
+import { CustomerNameInput } from '../CustomerNameInput';
 import { IconPlus, IconTrash } from '../icons';
 import { CABANG_LIST } from '@/lib/constants';
 import { uid } from '@/lib/format';
@@ -136,7 +137,7 @@ export function CustomerFormModal() {
       <div className="form-grid">
         <div className="full">
           <label>Nama Customer *</label>
-          <input type="text" required value={name} onChange={(e) => setName(e.target.value)} />
+          <CustomerNameInput required mode="warn" ignore={editing?.name} value={name} onChange={setName} placeholder="Nama customer" />
         </div>
         <div>
           <label>Cabang</label>

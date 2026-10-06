@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from 'jose';
+import { canEditSalesPlanFor } from './sales-plan-view';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import { prisma } from './prisma';
@@ -241,10 +242,7 @@ export async function salesPlanScopeWhere(user: SafeUser) {
  * they aggregate across several branches they don't individually run.
  */
 export function canEditSalesPlan(user: SafeUser, targetSe: string, targetCabang: string | null) {
-  if (user.role === 'admin' || user.role === 'gm') return true;
-  if (user.role === 'sales') return (user.se || '').trim().toLowerCase() === targetSe.trim().toLowerCase();
-  if (user.role === 'bm') return (user.cabang || '').trim().toLowerCase() === (targetCabang || '').trim().toLowerCase();
-  return false;
+  return canEditSalesPlanFor(user, targetSe, targetCabang);
 }
 
 /**

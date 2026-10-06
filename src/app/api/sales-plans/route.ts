@@ -3,6 +3,7 @@ import { logActivity } from '@/lib/activity';
 import { deriveFromSalesPlanItems, isResponse, requireUser } from '@/lib/api-helpers';
 import { cabangRegMap, canEditSalesPlan, salesPlanScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { removePlanItem } from '@/lib/sales-plan-view';
 import { emitCrmEvent } from '@/lib/socket';
 
 export async function GET(req: Request) {
@@ -70,5 +71,51 @@ export async function PUT(req: Request) {
     entityId: salesPlan.id,
     summary: `Menyimpan rencana penjualan ${se} periode ${periode} (${items.length} material, senilai Rp ${Math.round(value).toLocaleString('id-ID')})`,
   });
+  return NextResponse.json({ salesPlan });
+}
+
+/**
+ * Delete one material row from an SE's plan ({ se, periode, index, uraian }),
+ * or the whole plan when no index is given. `uraian` must still match the row
+ * at `index` -- if the plan changed underneath, the request is refused rather
+ * than deleting a different material. A plan left with no rows is removed.
+ */
+export async function DELETE(req: Request) {
+  const user = await requireUser();
+  if (isResponse(user)) return user;
+
+  const body = await req.json().catch(() => null);
+  const se = String(body?.se || '').trim();
+  const periode = String(body?.periode || '').trim();
+  if (!se || !/^\d{4}-\d{2}$/.test(periode)) {
+    return NextResponse.json({ error: 'Sales Engineer dan periode (YYYY-MM) wajib diisi' }, { status: 400 });
+  }
+  const plan = await prisma.salesPlan.findUnique({ where: { se_periode: { se, periode } } });
+  if (!plan) return NextResponse.json({ error: 'Rencana tidak ditemukan' }, { status: 404 });
+  if (!canEditSalesPlan(user, plan.se, plan.cabang)) {
+    return NextResponse.json({ error: 'Anda tidak berhak menghapus rencana SE ini.' }, { status: 403 });
+  }
+
+  const current = (Array.isArray(plan.items) ? plan.items : []) as unknown as { uraian?: string }[];
+  let remaining: typeof current = [];
+  let removedLabel = 'seluruh rencana';
+  if (body?.index != null) {
+    const next = removePlanItem(current, Number(body.index), String(body?.uraian || ''));
+    if (!next) return NextResponse.json({ error: 'Rencana sudah berubah, muat ulang lalu coba lagi.' }, { status: 409 });
+    removedLabel = `material "${String(current[Number(body.index)].uraian || '').trim()}"`;
+    remaining = next;
+  }
+
+  if (remaining.length === 0) {
+    await prisma.salesPlan.delete({ where: { id: plan.id } });
+    emitCrmEvent('salesPlan:deleted', { id: plan.id });
+    await logActivity({ user, action: 'delete', entity: 'salesPlan', entityId: plan.id, summary: `Menghapus ${removedLabel} ${plan.se} periode ${periode} (rencana kosong, dihapus)` });
+    return NextResponse.json({ deleted: true, id: plan.id });
+  }
+
+  const { items, value } = deriveFromSalesPlanItems(remaining as never);
+  const salesPlan = await prisma.salesPlan.update({ where: { id: plan.id }, data: { items: items as never, value } });
+  emitCrmEvent('salesPlan:updated', salesPlan);
+  await logActivity({ user, action: 'update', entity: 'salesPlan', entityId: plan.id, summary: `Menghapus ${removedLabel} dari rencana ${plan.se} periode ${periode}` });
   return NextResponse.json({ salesPlan });
 }

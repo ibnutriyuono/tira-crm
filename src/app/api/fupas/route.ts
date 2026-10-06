@@ -1,3 +1,5 @@
+import { normalizeItemLines } from '@/lib/format';
+import type { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
@@ -43,7 +45,7 @@ export async function POST(req: Request) {
       customer: String(body?.customer || sourceRfq?.customer || ''),
       requestedBy: String(body?.requestedBy || user.name),
       prospectId,
-      items: Array.isArray(body?.items) ? body.items : [],
+      items: Array.isArray(body?.items) ? (normalizeItemLines(body.items) as unknown as Prisma.InputJsonValue) : [],
       catatan: String(body?.catatan || ''),
       status: body?.markSent ? 'Terkirim' : 'Draft',
       sentToPurchasingAt: body?.markSent ? new Date() : null,

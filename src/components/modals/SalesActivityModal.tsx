@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
+import { CustomerNameInput } from '../CustomerNameInput';
 import { IconEdit, IconPlus, IconTrash } from '../icons';
 import { ACTIVITY_CONVERT_STATUSES, ACTIVITY_TYPES, STATUS_META, type ActivityTipe } from '@/lib/constants';
 import { formatDateID, formatRupiah } from '@/lib/format';
@@ -93,13 +94,6 @@ export function SalesActivityModal() {
     setKeterangan('');
     setPics([{ nama: '', jabatan: '' }]);
   }
-
-  const customerOptions = useMemo(() => {
-    const names = new Set<string>();
-    customers.forEach((c) => c.name && names.add(c.name));
-    prospects.forEach((p) => p.customer && names.add(p.customer));
-    return Array.from(names).sort((a, b) => a.localeCompare(b));
-  }, [customers, prospects]);
 
   const mine = useMemo(() => activities.filter((a) => (owner ? a.se.toLowerCase() === owner.toLowerCase() : true)), [activities, owner]);
   const dayList = useMemo(() => mine.filter((a) => a.tanggal === tanggal), [mine, tanggal]);
@@ -282,12 +276,7 @@ export function SalesActivityModal() {
             </div>
             <div>
               <label>Customer *</label>
-              <input type="text" list="salesActCustomers" value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Pilih / ketik nama customer" />
-              <datalist id="salesActCustomers">
-                {customerOptions.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
+              <CustomerNameInput value={customer} onChange={setCustomer} />
             </div>
             <div className="full">
               <label>

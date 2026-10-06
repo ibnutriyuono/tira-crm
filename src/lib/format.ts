@@ -81,13 +81,35 @@ export function normalizePhone(p?: string | null): string {
 
 // Legacy fallback for records created before multi-material support so a
 // missing/empty `materials` array still renders something sensible.
+/**
+ * Product line codes are two digits: "4" -> "04", "12" stays "12". A list
+ * ("4, 7") is normalized per entry; anything that isn't a plain number
+ * ("PL-4") is kept as typed.
+ */
+export function normalizeLine(v: unknown): string {
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  return s
+    .split(/\s*,\s*/)
+    .filter(Boolean)
+    .map((t) => (/^\d$/.test(t) ? `0${t}` : t))
+    .join(', ');
+}
+
+/** Same as normalizeLine for every row of an item list (RFQ/FUP A/plan). */
+export function normalizeItemLines<T>(items: T[]): T[] {
+  return (Array.isArray(items) ? items : []).map((it) =>
+    it && typeof it === 'object' && 'line' in (it as object) ? { ...it, line: normalizeLine((it as { line?: unknown }).line) } : it,
+  );
+}
+
 export function getProspectMaterials(r: Pick<Prospect, 'materials' | 'qty' | 'value' | 'line' | 'uraian'>): Material[] {
   if (Array.isArray(r.materials) && r.materials.length > 0) {
-    return r.materials.map((m) => ({ line: m.line || '', uraian: m.uraian || '', qty: num(m.qty) || 0, beratPc: num(m.beratPc) || 0, hargaKg: num(m.hargaKg) || 0, harga: num(m.harga) || 0 }));
+    return r.materials.map((m) => ({ line: normalizeLine(m.line), uraian: m.uraian || '', qty: num(m.qty) || 0, beratPc: num(m.beratPc) || 0, hargaKg: num(m.hargaKg) || 0, harga: num(m.harga) || 0 }));
   }
   const qty = num(r.qty) || 1;
   const harga = qty > 0 ? Math.round(num(r.value) / qty) : num(r.value);
-  return [{ line: r.line || '', uraian: r.uraian || '', qty, beratPc: 0, hargaKg: 0, harga }];
+  return [{ line: normalizeLine(r.line), uraian: r.uraian || '', qty, beratPc: 0, hargaKg: 0, harga }];
 }
 
 // Legacy fallback for customers saved before multi-PIC support: when `pics`

@@ -183,10 +183,6 @@ export function TopBar() {
             <IconTarget />
             KPI
           </button>
-          <button className="btn btn-ghost-dark" onClick={() => openModal('salesActivity')}>
-            <IconTarget />
-            Aktivitas Harian
-          </button>
           <button className="btn btn-ghost-dark" onClick={() => openModal('activityKpi')}>
             <IconTarget />
             KPI Aktivitas
@@ -279,6 +275,10 @@ export function TopBar() {
           <button className="btn btn-outline" onClick={saveAllNow}>
             <IconSave />
             Simpan Perubahan
+          </button>
+          <button className="btn btn-activity" onClick={() => openModal('salesActivity')}>
+            <IconCalendar />
+            Aktivitas Harian
           </button>
           <button
             className="btn btn-primary"

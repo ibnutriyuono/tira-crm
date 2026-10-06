@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { IconPlus, IconTrash } from '../icons';
-import { classify, formatRupiah, getProspectMaterials, materialUnitPrice, num } from '@/lib/format';
+import { classify, formatRupiah, getProspectMaterials, normalizeLine, materialUnitPrice, num } from '@/lib/format';
 import { CABANG_LIST, STATUS_META } from '@/lib/constants';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
+import { planItemStatus } from '@/lib/sales-plan-view';
 import type { SalesPlan, SalesPlanItem } from '@/lib/types';
+
+const CELL_INPUT = { width: '100%', minWidth: 0, boxSizing: 'border-box' as const };
 
 const emptyItem = (): SalesPlanItem => ({ line: '', uraian: '', qty: 1, harga: '' });
 
@@ -38,6 +41,7 @@ export function SalesPlanModal() {
   const salesPlans = useDataStore((s) => s.salesPlans);
   const prospects = useDataStore((s) => s.prospects);
   const upsertSalesPlan = useDataStore((s) => s.upsertSalesPlan);
+  const removeSalesPlan = useDataStore((s) => s.removeSalesPlan);
   const toast = useDataStore((s) => s.toast);
 
   const locks =
@@ -51,6 +55,14 @@ export function SalesPlanModal() {
   const [items, setItems] = useState<SalesPlanItem[]>([emptyItem()]);
   const [busy, setBusy] = useState(false);
   const [pickedProspectId, setPickedProspectId] = useState('');
+  // Which saved plan (se|periode) the rows on screen came from. Changing SE or
+  // periode loads that plan's saved materials; rows typed for a key that has
+  // no saved plan yet are kept rather than wiped.
+  const [loadedKey, setLoadedKey] = useState('');
+
+  const planKey = (s: string, p: string) => `${s.trim().toLowerCase()}|${p}`;
+  const findPlan = (s: string, p: string) => salesPlans.find((pl) => pl.se.toLowerCase() === s.trim().toLowerCase() && pl.periode === p) || null;
+  const savedPlan = se.trim() ? findPlan(se, periode) : null;
 
   useEffect(() => {
     if (!show) return;
@@ -60,11 +72,45 @@ export function SalesPlanModal() {
     setPeriode(p);
     setSe(s);
     setCabang(c);
-    const existing = salesPlans.find((pl) => pl.se.toLowerCase() === s.toLowerCase() && pl.periode === p);
+    const existing = s ? findPlan(s, p) : null;
     setItems(existing && existing.items.length > 0 ? existing.items.map((it) => ({ ...it })) : [emptyItem()]);
+    setLoadedKey(existing ? planKey(s, p) : '');
     setPickedProspectId('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, ctx]);
+
+  // SE / periode changed inside the open form: show what is already planned
+  // for that SE in that month.
+  useEffect(() => {
+    if (!show) return;
+    const key = planKey(se, periode);
+    if (key === loadedKey) return;
+    const existing = se.trim() ? findPlan(se, periode) : null;
+    if (existing) {
+      setItems(existing.items.length > 0 ? existing.items.map((it) => ({ ...it })) : [emptyItem()]);
+      setLoadedKey(key);
+    } else if (loadedKey) {
+      // Rows on screen belong to another SE/month's saved plan: don't carry
+      // them over as if they were this one's.
+      setItems([emptyItem()]);
+      setLoadedKey('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [se, periode, salesPlans]);
+
+  // Saved plans this user can see for the chosen month (role-scoped by the
+  // API): quick way for BM/RM/GM to open an SE's plan.
+  const savedThisPeriode = useMemo(
+    () => salesPlans.filter((pl) => pl.periode === periode && (pl.items || []).length > 0).sort((a, b) => num(b.value) - num(a.value)),
+    [salesPlans, periode],
+  );
+  const prospectById = useMemo(() => new Map(prospects.map((p) => [p.id, p])), [prospects]);
+  const seSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    prospects.forEach((p) => p.se && set.add(p.se.trim().toUpperCase()));
+    salesPlans.forEach((p) => set.add(p.se.trim().toUpperCase()));
+    return Array.from(set).sort();
+  }, [prospects, salesPlans]);
 
   // Open pipeline AND already-Won deals (PO/Kontrak, DO) belonging to this
   // plan's SE — the pool "Ambil dari Prospek" picks from. A signed PO or a
@@ -141,15 +187,44 @@ export function SalesPlanModal() {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   }
 
+  function removeRow(idx: number) {
+    setItems((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      return next.length ? next : [emptyItem()];
+    });
+  }
+
+  async function onDeletePlan() {
+    if (!savedPlan) return;
+    if (!window.confirm(`Hapus seluruh rencana ${savedPlan.se} periode ${periode} (${savedPlan.items.length} material, ${formatRupiah(num(savedPlan.value))})?`)) return;
+    setBusy(true);
+    try {
+      await api.del('/api/sales-plans', { se: savedPlan.se, periode });
+      removeSalesPlan(savedPlan.id);
+      setItems([emptyItem()]);
+      setLoadedKey('');
+      toast(`Rencana ${savedPlan.se} periode ${periode} dihapus`, 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal menghapus rencana', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onSave() {
     if (!se.trim()) return toast('Sales Engineer (SE) wajib diisi', 'error');
     if (!cabang.trim()) return toast('Cabang wajib diisi', 'error');
-    if (!items.some((it) => (it.uraian || '').trim())) return toast('Isi minimal satu material rencana', 'error');
+    if (!items.some((it) => (it.uraian || '').trim())) {
+      // Every row deleted from a saved plan = remove the plan.
+      if (savedPlan) return onDeletePlan();
+      return toast('Isi minimal satu material rencana', 'error');
+    }
 
     setBusy(true);
     try {
-      const { salesPlan } = await api.put<{ salesPlan: SalesPlan }>('/api/sales-plans', { se: se.trim(), cabang, periode, items });
+      const { salesPlan } = await api.put<{ salesPlan: SalesPlan }>('/api/sales-plans', { se: savedPlan?.se ?? se.trim(), cabang, periode, items });
       upsertSalesPlan(salesPlan);
+      setLoadedKey(planKey(salesPlan.se, salesPlan.periode));
       toast(`Rencana ${se} periode ${periode} tersimpan`, 'success');
       closeModal();
     } catch (err) {
@@ -167,6 +242,11 @@ export function SalesPlanModal() {
       wide
       footer={
         <>
+          {savedPlan && (
+            <button type="button" className="btn btn-outline" style={{ marginRight: 'auto', color: 'var(--rust-500)' }} onClick={onDeletePlan} disabled={busy}>
+              <IconTrash /> Hapus Rencana
+            </button>
+          )}
           <button type="button" className="btn btn-outline" onClick={closeModal}>
             Tutup
           </button>
@@ -189,7 +269,14 @@ export function SalesPlanModal() {
         </div>
         <div>
           <label>Sales Engineer (SE)</label>
-          <input type="text" value={se} readOnly={locks.se} onChange={(e) => setSe(e.target.value)} placeholder="Inisial SE" />
+          <input type="text" list="salesPlanSeList" value={se} readOnly={locks.se} onChange={(e) => setSe(e.target.value)} placeholder="Inisial SE" />
+          {!locks.se && (
+            <datalist id="salesPlanSeList">
+              {seSuggestions.map((x) => (
+                <option key={x} value={x} />
+              ))}
+            </datalist>
+          )}
           {locks.se && <div className="field-note">Terkunci sesuai akun Anda</div>}
         </div>
         <div>
@@ -213,6 +300,31 @@ export function SalesPlanModal() {
           <input type="text" readOnly value={formatRupiah(total)} style={{ background: 'var(--steel-100)', fontWeight: 700 }} />
         </div>
       </div>
+
+      {!locks.se && savedThisPeriode.length > 0 && (
+        <>
+          <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>Rencana tersimpan periode ini</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {savedThisPeriode.map((pl) => {
+              const active = pl.se.toLowerCase() === se.trim().toLowerCase();
+              return (
+                <button
+                  key={pl.id}
+                  type="button"
+                  className={`btn btn-sm ${active ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => {
+                    setSe(pl.se);
+                    if (!locks.cabang && pl.cabang) setCabang(pl.cabang);
+                  }}
+                >
+                  {pl.se} · {pl.cabang || '-'} · {pl.items.length} material · {formatRupiah(num(pl.value))}
+                </button>
+              );
+            })}
+          </div>
+          <div className="field-note" style={{ marginTop: 4 }}>Klik untuk membuka rencana SE tersebut.</div>
+        </>
+      )}
 
       <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>Ambil dari Prospek (opsional)</div>
       {!se.trim() ? (
@@ -243,16 +355,25 @@ export function SalesPlanModal() {
         periode rencana).
       </div>
 
-      <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>Material yang Direncanakan</div>
+      <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>
+        Material yang Direncanakan
+        {savedPlan ? (
+          <span className="badge green" style={{ marginLeft: 8 }}>
+            Tersimpan · {savedPlan.items.length} material · {formatRupiah(num(savedPlan.value))}
+          </span>
+        ) : se.trim() ? (
+          <span className="badge slate" style={{ marginLeft: 8 }}>Belum ada rencana tersimpan</span>
+        ) : null}
+      </div>
       <div className="table-wrap" style={{ borderTop: 'none' }}>
-        <table className="simple-table">
+        <table className="simple-table" style={{ minWidth: 0, tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th style={{ width: '10%' }}>Line</th>
+              <th style={{ width: 60 }}>Line</th>
               <th>Uraian Material</th>
-              <th style={{ width: '12%' }}>Qty</th>
-              <th style={{ width: '18%' }}>Estimasi Harga</th>
-              <th style={{ width: '18%' }}>Value</th>
+              <th style={{ width: 70 }}>Qty</th>
+              <th style={{ width: 120 }}>Estimasi Harga</th>
+              <th style={{ width: 140, textAlign: 'right' }}>Value</th>
               <th style={{ width: 40 }}></th>
             </tr>
           </thead>
@@ -260,24 +381,32 @@ export function SalesPlanModal() {
             {items.map((it, idx) => (
               <tr key={idx}>
                 <td>
-                  <input type="text" value={it.line} onChange={(e) => updateItem(idx, { line: e.target.value })} placeholder="cth. 02" />
+                  <input type="text" value={it.line} onChange={(e) => updateItem(idx, { line: e.target.value })} onBlur={(e) => updateItem(idx, { line: normalizeLine(e.target.value) })} placeholder="cth. 02" style={CELL_INPUT} />
                 </td>
                 <td>
-                  <input type="text" value={it.uraian} onChange={(e) => updateItem(idx, { uraian: e.target.value })} placeholder="cth. Plate ASTM A36 Tbl 12mm" />
+                  <input type="text" value={it.uraian} onChange={(e) => updateItem(idx, { uraian: e.target.value })} placeholder="cth. Plate ASTM A36 Tbl 12mm" style={CELL_INPUT} />
+                  {it.sourceProspectId &&
+                    (() => {
+                      const st = planItemStatus(it, prospectById);
+                      return (
+                        <div className="field-note" style={{ marginTop: 3 }}>
+                          {st.customer ? `${st.customer} · ` : ''}
+                          <span className={`badge ${st.color}`}>{st.label}</span>
+                        </div>
+                      );
+                    })()}
                 </td>
                 <td>
-                  <input type="number" min={0} value={it.qty} onChange={(e) => updateItem(idx, { qty: e.target.value })} />
+                  <input type="number" min={0} value={it.qty} onChange={(e) => updateItem(idx, { qty: e.target.value })} style={CELL_INPUT} />
                 </td>
                 <td>
-                  <input type="number" min={0} value={it.harga} onChange={(e) => updateItem(idx, { harga: e.target.value })} placeholder="per unit" />
+                  <input type="number" min={0} value={it.harga} onChange={(e) => updateItem(idx, { harga: e.target.value })} placeholder="per unit" style={CELL_INPUT} />
                 </td>
-                <td className="mono">{formatRupiah(num(it.qty) * num(it.harga))}</td>
+                <td className="mono" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatRupiah(num(it.qty) * num(it.harga))}</td>
                 <td>
-                  {items.length > 1 && (
-                    <button type="button" className="icon-btn danger" onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}>
-                      <IconTrash />
-                    </button>
-                  )}
+                  <button type="button" className="icon-btn danger" title="Hapus material" onClick={() => removeRow(idx)}>
+                    <IconTrash />
+                  </button>
                 </td>
               </tr>
             ))}
@@ -287,6 +416,11 @@ export function SalesPlanModal() {
       <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 8 }} onClick={() => setItems((prev) => [...prev, emptyItem()])}>
         <IconPlus /> Tambah Material
       </button>
+      {savedPlan && (
+        <div className="field-note" style={{ marginTop: 6 }}>
+          Hapus baris lalu klik <b>Simpan Rencana</b> untuk menyimpan perubahan. Bila semua baris dihapus, rencana periode ini ikut dihapus.
+        </div>
+      )}
     </Modal>
   );
 }

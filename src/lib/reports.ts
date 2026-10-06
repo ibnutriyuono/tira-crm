@@ -1,5 +1,5 @@
 import { AGING_THRESHOLD_DAYS, STAGE_PROBABILITY } from './constants';
-import { classify, formatDateID, formatRupiah, num } from './format';
+import { classify, formatDateID, formatRupiah, normalizeLine, num } from './format';
 import type { BudgetTarget, Prospect, SalesPlan } from './types';
 
 /** The date a won prospect actually landed — PO first, then delivery, then offer. */
@@ -17,6 +17,23 @@ export function daysSince(iso: string): number {
  * before this they were counted as two, splitting order history and making
  * both look colder than the company really is.
  */
+/**
+ * A branch's monthly target for `periode`. A month with its own entry uses it;
+ * a month without one carries the most recent earlier month's target forward,
+ * so a target set once applies to every following month until changed.
+ * `fromPeriode` names the month it was carried from (null = set for this month).
+ */
+export function effectiveTarget(targets: BudgetTarget[], cabang: string, periode: string): { amount: number; fromPeriode: string | null } {
+  const cb = (cabang || '').trim().toUpperCase();
+  let best: BudgetTarget | null = null;
+  for (const t of targets) {
+    if ((t.cabang || '').trim().toUpperCase() !== cb || !t.periode || t.periode > periode) continue;
+    if (t.periode === periode) return { amount: num(t.amount), fromPeriode: null };
+    if (!best || t.periode > best.periode) best = t;
+  }
+  return best ? { amount: num(best.amount), fromPeriode: best.periode } : { amount: 0, fromPeriode: null };
+}
+
 export function customerKey(name: string): string {
   return (name || '')
     .toLowerCase()
@@ -126,7 +143,7 @@ export function buildCompetitorLog(records: Prospect[]): CompetitorRow[] {
     entry.records.forEach((r) => {
       const cb = r.cabang || '-';
       cabangCount[cb] = (cabangCount[cb] || 0) + 1;
-      const ln = r.line || '-';
+      const ln = normalizeLine(r.line) || '-';
       lineCount[ln] = (lineCount[ln] || 0) + 1;
     });
     out.push({
@@ -148,6 +165,8 @@ export interface ForecastRow {
   /** Region the branch belongs to, derived from whichever prospect rows carry it. Null when no record in scope names this branch's region yet. */
   reg: number | null;
   target: number;
+  /** Month the target was carried forward from, or null when set for this month. */
+  targetFrom: string | null;
   /** Sum of SalesPlan.value for every SE in this branch this month — what Sales itself committed to sell, distinct from the company-set target. */
   rencana: number;
   won: number;
@@ -201,7 +220,9 @@ export function buildForecast(
       const open = cList.filter((r) => classify(r) === 'Aktif');
       const weighted = open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[num(r.status)] ?? 0), 0);
       const won = cList.filter((r) => classify(r) === 'Won' && inPeriod(r)).reduce((s, r) => s + num(r.value), 0);
-      const target = targets.find((t) => (t.cabang || '').trim().toUpperCase() === cabang && t.periode === periode)?.amount ?? 0;
+      const eff = effectiveTarget(targets, cabang, periode);
+      const target = eff.amount;
+      const targetFrom = eff.fromPeriode;
       const rencana = plansInPeriode.filter((p) => (p.cabang || '').toUpperCase() === cabang).reduce((s, p) => s + num(p.value), 0);
       const agingCount = open.filter((r) => daysSince(String(r.statusChangedAt ?? r.updatedAt).slice(0, 10)) > AGING_THRESHOLD_DAYS).length;
 
@@ -209,6 +230,7 @@ export function buildForecast(
         cabang,
         reg: regOf.get(cabang) ?? null,
         target,
+        targetFrom,
         rencana,
         won,
         weighted,

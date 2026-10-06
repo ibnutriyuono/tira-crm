@@ -109,6 +109,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .btn-outline:hover{border-color:var(--steel-500); color:var(--steel-600);}
 .btn-danger{background:var(--rust-500); color:#fff;}
 .btn-danger:hover{background:var(--rust-600);}
+.btn-activity{background:var(--teal-500); color:#fff; border-color:var(--teal-600);}
+.btn-activity:hover{background:var(--teal-600);}
 .btn-wa{background:var(--wa-500); color:#fff;}
 .btn-wa:hover{background:var(--wa-600);}
 .btn-sm{padding:6px 10px; font-size:12px;}

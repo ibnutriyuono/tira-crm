@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
+import { CustomerNameInput } from '../CustomerNameInput';
 import { ItemChat } from '../ItemChat';
 import { IconPlus, IconTrash } from '../icons';
 import { CABANG_LIST } from '@/lib/constants';
-import { formatRupiah, getProspectMaterials, materialUnitPrice, num } from '@/lib/format';
+import { formatRupiah, getProspectMaterials, normalizeLine, materialUnitPrice, num } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { EMPTY_QCD, useUiStore } from '@/store/useUiStore';
@@ -289,12 +290,7 @@ export function ProspectFormModal() {
         </div>
         <div className="full">
           <label>Customer *</label>
-          <input list="customerNameList" type="text" required value={customer} onChange={(e) => onCustomerChange(e.target.value)} placeholder="Nama customer" />
-          <datalist id="customerNameList">
-            {customers.map((c) => (
-              <option key={c.id} value={c.name} />
-            ))}
-          </datalist>
+          <CustomerNameInput required value={customer} onChange={onCustomerChange} placeholder="Nama customer" />
         </div>
         <div className="full">
           <label>No. WhatsApp / HP Customer</label>
@@ -327,7 +323,7 @@ export function ProspectFormModal() {
           </div>
           {materials.map((it, idx) => (
             <div className="qitem-row" key={idx}>
-              <input type="text" placeholder="Line" value={it.line} onChange={(e) => updateMaterial(idx, { line: e.target.value })} />
+              <input type="text" placeholder="cth. 04" value={it.line} onChange={(e) => updateMaterial(idx, { line: e.target.value })} onBlur={(e) => updateMaterial(idx, { line: normalizeLine(e.target.value) })} />
               <input type="text" placeholder="Uraian material" value={it.uraian} onChange={(e) => updateMaterial(idx, { uraian: e.target.value })} />
               <input type="number" min={0} step="any" value={it.qty} onChange={(e) => updateMaterial(idx, { qty: num(e.target.value) })} />
               <input type="number" min={0} step="any" placeholder="Kg/pc" value={it.beratPc || ''} onChange={(e) => updateMaterial(idx, { beratPc: num(e.target.value) })} />

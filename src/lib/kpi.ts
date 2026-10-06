@@ -1,4 +1,5 @@
 import { classify } from './format';
+import { effectiveTarget } from './reports';
 import type { BudgetTarget, Prospect } from './types';
 
 export type KpiSignal = 'blue' | 'green' | 'yellow' | 'red' | null;
@@ -77,11 +78,14 @@ function signalFor(achieve: number | null): KpiSignal {
 
 /** Cumulative YTD sum of BudgetTarget.amount across every branch in `cabangList`, Jan through `throughMonth` of `year`. Reused as the Budget basis for both Sales Order and Invoice (see buildKpiScorecard's own note on why) and, doubled, for Prospect/Opportunity. */
 function cumulativeAmountTarget(budgetTargets: BudgetTarget[], cabangList: string[], year: string, throughMonth: number): number {
+  // A month without its own target uses the latest earlier one (same rule
+  // as the Forecast tab, see effectiveTarget).
+  const cabangs = Array.from(new Set(budgetTargets.filter((bt) => inCabangList(bt.cabang, cabangList)).map((bt) => (bt.cabang || '').trim().toUpperCase())));
   let sum = 0;
   for (let m = 1; m <= throughMonth; m++) {
     const p = periodeOf(year, m);
-    budgetTargets.forEach((bt) => {
-      if (bt.periode === p && inCabangList(bt.cabang, cabangList)) sum += bt.amount || 0;
+    cabangs.forEach((cb) => {
+      sum += effectiveTarget(budgetTargets, cb, p).amount;
     });
   }
   return sum;

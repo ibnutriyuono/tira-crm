@@ -9,6 +9,7 @@ export type ModalKey =
   | 'users'
   | 'userForm'
   | 'customers'
+  | 'customerUnify'
   | 'customerForm'
   | 'database'
   | 'dbImportConfirm'

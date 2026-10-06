@@ -20,6 +20,7 @@ import { RfqManageModal } from './modals/RfqManageModal';
 import { UsersModal } from './modals/UsersModal';
 import { UserFormModal } from './modals/UserFormModal';
 import { CustomersModal } from './modals/CustomersModal';
+import { CustomerUnifyModal } from './modals/CustomerUnifyModal';
 import { VendorsModal } from './modals/VendorsModal';
 import { VendorFormModal } from './modals/VendorFormModal';
 import { FupaModal } from './modals/FupaModal';
@@ -125,6 +126,7 @@ export function CrmApp() {
       <UsersModal />
       <UserFormModal />
       <CustomersModal />
+      <CustomerUnifyModal />
       <CustomerFormModal />
       <VendorsModal />
       <VendorFormModal />

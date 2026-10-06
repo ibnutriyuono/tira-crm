@@ -1,3 +1,4 @@
+import { normalizeLine } from '@/lib/format';
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
@@ -49,11 +50,11 @@ export async function POST(req: Request) {
           tglPenawaran: r.tglPenawaran || null,
           tglPO: r.tglPO || null,
           tglDelivery: r.tglDelivery || null,
-          line: r.line || '',
+          line: normalizeLine(r.line),
           uraian: r.uraian || '',
           qty,
           value,
-          materials: [{ line: r.line || '', uraian: r.uraian || '', qty, harga: qty > 0 ? Math.round(value / qty) : value }],
+          materials: [{ line: normalizeLine(r.line), uraian: r.uraian || '', qty, harga: qty > 0 ? Math.round(value / qty) : value }],
           kondisiStock: r.kondisiStock || '',
           keterangan: r.keterangan || '',
           status: Number(r.status) || 0,
