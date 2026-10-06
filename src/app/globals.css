@@ -612,6 +612,14 @@ tr.hl-yellow:hover td{ background:rgba(201,130,46,.18); }
    pulled into a Rencana Penjualan (see buildProspectStarCounts). Amber, to
    read as "worth noticing" rather than "needs action" (rust/red) or "just a
    count" (steel) — this is informational, not a to-do. */
+.new-badge{
+  display:inline-flex; align-items:center;
+  padding:1px 6px; border-radius:9px; margin-left:6px; vertical-align:middle;
+  background:var(--teal-500); color:#fff;
+  font-size:10px; font-weight:800; letter-spacing:.06em; white-space:nowrap;
+}
+.filter-chip-new{border-color:var(--teal-500); color:var(--teal-600);}
+.filter-chip-new.active{background:var(--teal-500); color:#fff;}
 .prospect-star-badge{
   display:inline-flex; align-items:center; gap:2px;
   padding:1px 6px; border-radius:9px; margin-left:6px; vertical-align:middle;

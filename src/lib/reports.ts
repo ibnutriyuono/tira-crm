@@ -34,6 +34,26 @@ export function effectiveTarget(targets: BudgetTarget[], cabang: string, periode
   return best ? { amount: num(best.amount), fromPeriode: best.periode } : { amount: 0, fromPeriode: null };
 }
 
+/** Every "YYYY-MM" from `from` to `to` inclusive (swapped if reversed, max 60). */
+export function periodeList(from: string, to: string = from): string[] {
+  let [a, b] = from <= to ? [from, to] : [to, from];
+  if (!/^\d{4}-\d{2}$/.test(a)) return [];
+  if (!/^\d{4}-\d{2}$/.test(b)) b = a;
+  const out: string[] = [];
+  let [y, m] = a.split('-').map(Number);
+  while (out.length < 60) {
+    const p = `${y}-${String(m).padStart(2, '0')}`;
+    out.push(p);
+    if (p >= b) break;
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+  }
+  return out;
+}
+
 export function customerKey(name: string): string {
   return (name || '')
     .toLowerCase()
@@ -193,15 +213,19 @@ export function buildForecast(
   periode: string,
   cabangList: string[] = [],
   salesPlans: SalesPlan[] = [],
+  /** Last month of a range ("YYYY-MM"); omitted = the single month `periode`. */
+  periodeTo?: string,
 ): ForecastRow[] {
+  const months = periodeList(periode, periodeTo || periode);
+  const monthSet = new Set(months);
   // Every branch in scope appears, not just those with activity this period —
   // otherwise a branch with a target but no deals silently vanishes and the
   // table stops reconciling with the KPI cards above it.
   const dataCabangs = records.map((r) => (r.cabang || '').trim().toUpperCase()).filter(Boolean);
   const cabangs = Array.from(new Set([...cabangList.map((c) => c.toUpperCase()), ...dataCabangs]));
 
-  const inPeriod = (r: Prospect) => (recordDate(r) || '').slice(0, 7) === periode;
-  const plansInPeriode = salesPlans.filter((p) => p.periode === periode);
+  const inPeriod = (r: Prospect) => monthSet.has((recordDate(r) || '').slice(0, 7));
+  const plansInPeriode = salesPlans.filter((p) => monthSet.has(p.periode));
 
   // Region per branch, read off whichever prospect happens to carry it —
   // there's no first-class Cabang entity, so this is the only source. Used
@@ -220,9 +244,10 @@ export function buildForecast(
       const open = cList.filter((r) => classify(r) === 'Aktif');
       const weighted = open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[num(r.status)] ?? 0), 0);
       const won = cList.filter((r) => classify(r) === 'Won' && inPeriod(r)).reduce((s, r) => s + num(r.value), 0);
-      const eff = effectiveTarget(targets, cabang, periode);
-      const target = eff.amount;
-      const targetFrom = eff.fromPeriode;
+      // A range sums each month's target (carry-forward applies per month).
+      const effs = months.map((p) => effectiveTarget(targets, cabang, p));
+      const target = effs.reduce((s, e) => s + e.amount, 0);
+      const targetFrom = months.length === 1 ? effs[0].fromPeriode : null;
       const rencana = plansInPeriode.filter((p) => (p.cabang || '').toUpperCase() === cabang).reduce((s, p) => s + num(p.value), 0);
       const agingCount = open.filter((r) => daysSince(String(r.statusChangedAt ?? r.updatedAt).slice(0, 10)) > AGING_THRESHOLD_DAYS).length;
 
@@ -307,8 +332,9 @@ export interface ForecastSeRow {
 }
 
 /** Per sales-engineer breakdown for `periode`, mirroring forecastSeTable. */
-export function buildForecastBySe(records: Prospect[], periode: string): ForecastSeRow[] {
-  const inPeriod = (r: Prospect) => (recordDate(r) || '').slice(0, 7) === periode;
+export function buildForecastBySe(records: Prospect[], periode: string, periodeTo?: string): ForecastSeRow[] {
+  const monthSet = new Set(periodeList(periode, periodeTo || periode));
+  const inPeriod = (r: Prospect) => monthSet.has((recordDate(r) || '').slice(0, 7));
   const map = new Map<string, Prospect[]>();
   records.filter(inPeriod).forEach((r) => {
     const se = (r.se || '-').toUpperCase();

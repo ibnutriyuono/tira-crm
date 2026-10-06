@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { BULAN_LIST, STATUS_META } from '@/lib/constants';
+import { createdInRange } from '@/lib/new-records';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
@@ -20,8 +21,38 @@ export function Filters() {
     [records],
   );
 
+  // Counts for the "Dibuat" filter, over everything this role can see.
+  const now = new Date();
+  const todayKey = now.toDateString();
+  const createdCounts = useMemo(() => {
+    const d = new Date();
+    return { today: records.filter((r) => createdInRange(r, 'today', d)).length, week: records.filter((r) => createdInRange(r, 'week', d)).length };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [records, todayKey]);
+
   return (
     <div className="filters">
+      <div className="field">
+        <label>Dibuat</label>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            type="button"
+            className={`btn btn-outline btn-sm filter-chip-new${ui.fDibuat === 'today' ? ' active' : ''}`}
+            onClick={() => ui.setFilter({ fDibuat: ui.fDibuat === 'today' ? '' : 'today' })}
+            title="Tampilkan hanya prospek yang dibuat hari ini"
+          >
+            Hari ini ({createdCounts.today})
+          </button>
+          <button
+            type="button"
+            className={`btn btn-outline btn-sm filter-chip-new${ui.fDibuat === 'week' ? ' active' : ''}`}
+            onClick={() => ui.setFilter({ fDibuat: ui.fDibuat === 'week' ? '' : 'week' })}
+            title="Tampilkan prospek yang dibuat sejak Senin minggu ini"
+          >
+            Minggu ini ({createdCounts.week})
+          </button>
+        </div>
+      </div>
       <div className="field">
         <label>Bulan</label>
         <select value={ui.fBulan} onChange={(e) => ui.setFilter({ fBulan: e.target.value })}>

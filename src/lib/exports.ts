@@ -1,4 +1,4 @@
-import { classify, formatDateID, formatRupiah, num } from './format';
+import { classify, formatDateID, formatRupiah, materialUnitPrice, num } from './format';
 import { WORKFLOW_META, fupaAsWorkflowDoc, rfqAsWorkflowDoc, workflowStage } from './purchasing-workflow';
 import type { BudgetTarget, Customer, Fupa, Prospect, Rfq, RfqItem, SalesPlan, Vendor } from './types';
 
@@ -8,23 +8,69 @@ export interface SheetSpec {
   header: string[];
   rows: unknown[][];
   colWidths: { wch: number }[];
+  /** Optional Excel number format per column index, e.g. '#,##0' for Rupiah. */
+  numFormats?: Record<number, string>;
 }
 
+/**
+ * Prospects, one row per MATERIAL line: a quotation with three materials
+ * becomes three rows, so every material's unit price is visible. The
+ * prospect's own columns (customer, dates, total value, status, ...) are
+ * filled on its first row only and left blank on the rows below it -- the
+ * same layout as the RFQ sheet -- which keeps SUM(VALUE) correct and keeps
+ * the file re-importable through Import Excel (rows without CUSTOMER are
+ * skipped there, and URAIAN PRODUCT still carries the full description).
+ *
+ * Material columns: HARGA SATUAN is the unit price per pc -- berat/pc x
+ * harga/kg when both are filled, otherwise the flat price (materialUnitPrice);
+ * SUBTOTAL = qty x harga satuan. A legacy prospect saved before materials
+ * existed gets one material row derived from its own uraian/qty/value.
+ */
+/** Strips float noise (19.6 x 95000 = 1862000.0000000002). */
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 export function buildProspectSheet(list: Prospect[]): SheetSpec {
-  const header = ['REG', 'CABANG', 'SE', 'CUSTOMER', 'NO. WHATSAPP', 'TGL. PENAWARAN', 'NO. PO', 'TGL. PO', 'TGL. DELIVERY', 'LINE', 'URAIAN PRODUCT', 'QTY (Pcs)', 'VALUE (Rp)', 'KONDISI STOCK', 'KETERANGAN', 'STATUS', 'KLASIFIKASI', 'STATUS PENAWARAN', 'STATUS FAKTUR'];
-  const rows = list.map((r) => [
-    r.reg || '', r.cabang || '', r.se || '', r.customer || '', r.phone || '',
-    r.tglPenawaran || '', r.noPo || '', r.tglPO || '', r.tglDelivery || '',
-    r.line || '', r.uraian || '', num(r.qty), num(r.value),
-    r.kondisiStock || '', r.keterangan || '', num(r.status), classify(r),
-    r.penawaranTerkirim ? 'Terkirim' : 'Pending',
-    // Only meaningful once a deal is Won (DO/PO) — terfaktur otherwise sits
-    // at its default false, so this reads as blank rather than a misleading
-    // "GIT" for a deal that was never billed because it isn't Won yet.
-    classify(r) === 'Won' ? (r.terfaktur ? 'Omzet (Terfaktur)' : 'GIT (Belum Terfaktur)') : '',
-  ]);
-  const colWidths = [{ wch: 5 }, { wch: 8 }, { wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 13 }, { wch: 16 }, { wch: 12 }, { wch: 13 }, { wch: 6 }, { wch: 32 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 24 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 20 }];
-  return { sheetName: 'Prospek', header, rows, colWidths };
+  const header = [
+    'REG', 'CABANG', 'SE', 'CUSTOMER', 'NO. WHATSAPP', 'TGL. PENAWARAN', 'NO. PO', 'TGL. PO', 'TGL. DELIVERY', 'LINE', 'URAIAN PRODUCT', 'QTY (Pcs)', 'VALUE (Rp)',
+    'NO. MATERIAL', 'LINE MATERIAL', 'URAIAN MATERIAL', 'QTY MATERIAL (Pcs)', 'BERAT/PC (Kg)', 'HARGA/KG (Rp)', 'HARGA SATUAN (Rp)', 'SUBTOTAL MATERIAL (Rp)',
+    'KONDISI STOCK', 'KETERANGAN', 'STATUS', 'KLASIFIKASI', 'STATUS PENAWARAN', 'STATUS FAKTUR',
+  ];
+  const rows: unknown[][] = [];
+  list.forEach((r) => {
+    const klas = classify(r);
+    const head = [
+      r.reg || '', r.cabang || '', r.se || '', r.customer || '', r.phone || '',
+      r.tglPenawaran || '', r.noPo || '', r.tglPO || '', r.tglDelivery || '',
+      r.line || '', r.uraian || '', num(r.qty), num(r.value),
+    ];
+    const tail = [
+      r.kondisiStock || '', r.keterangan || '', num(r.status), klas,
+      r.penawaranTerkirim ? 'Terkirim' : 'Pending',
+      // Only meaningful once a deal is Won (DO/PO) — terfaktur otherwise sits
+      // at its default false, so this reads as blank rather than a misleading
+      // "GIT" for a deal that was never billed because it isn't Won yet.
+      klas === 'Won' ? (r.terfaktur ? 'Omzet (Terfaktur)' : 'GIT (Belum Terfaktur)') : '',
+    ];
+    const mats = (Array.isArray(r.materials) ? r.materials : []).filter((m) => (m.uraian || '').trim() || num(m.qty) || materialUnitPrice(m));
+    const lines = mats.length
+      ? mats.map((m) => {
+          const unit = round2(materialUnitPrice(m));
+          return [m.line || '', m.uraian || '', num(m.qty), num(m.beratPc) || '', num(m.hargaKg) || '', unit, round2(num(m.qty) * unit)];
+        })
+      : [[r.line || '', r.uraian || '', num(r.qty), '', '', num(r.qty) > 0 ? round2(num(r.value) / num(r.qty)) : num(r.value), num(r.value)]];
+    lines.forEach((mat, idx) => {
+      const first = idx === 0;
+      rows.push([...(first ? head : head.map(() => '')), idx + 1, ...mat, ...(first ? tail : tail.map(() => ''))]);
+    });
+  });
+  const colWidths = [
+    { wch: 5 }, { wch: 8 }, { wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 13 }, { wch: 16 }, { wch: 12 }, { wch: 13 }, { wch: 6 }, { wch: 32 }, { wch: 8 }, { wch: 16 },
+    { wch: 6 }, { wch: 8 }, { wch: 34 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 17 },
+    { wch: 14 }, { wch: 24 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 20 },
+  ];
+  const rp = '#,##0';
+  const numFormats: Record<number, string> = { 11: rp, 12: rp, 16: '#,##0.##', 17: '#,##0.###', 18: rp, 19: rp, 20: rp };
+  return { sheetName: 'Prospek', header, rows, colWidths, numFormats };
 }
 
 export function buildRfqSheet(list: Rfq[]): SheetSpec {
@@ -130,5 +176,14 @@ export const STATUS_LEGEND: SheetSpec = {
 export function appendSheet(XLSX: typeof import('xlsx'), wb: import('xlsx').WorkBook, spec: SheetSpec): void {
   const ws = XLSX.utils.aoa_to_sheet([spec.header, ...spec.rows]);
   ws['!cols'] = spec.colWidths;
+  if (spec.numFormats) {
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    for (let r = 1; r <= range.e.r; r++) {
+      for (const [c, z] of Object.entries(spec.numFormats)) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c: Number(c) })];
+        if (cell && cell.t === 'n') cell.z = z;
+      }
+    }
+  }
   XLSX.utils.book_append_sheet(wb, ws, spec.sheetName);
 }

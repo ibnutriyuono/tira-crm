@@ -80,7 +80,7 @@ export function CrmApp() {
   // as a whole — `ui` also carries page/viewMode/modal state that shouldn't
   // invalidate this list.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const filtered = useMemo(() => sortProspects(getFilteredProspects(records, ui), ui.sortKey, ui.sortDir), [records, ui.search, ui.fReg, ui.fCabang, ui.fSe, ui.fKlas, ui.fStatus, ui.fPenawaran, ui.fBulan, ui.fTahun, ui.sortKey, ui.sortDir]);
+  const filtered = useMemo(() => sortProspects(getFilteredProspects(records, ui), ui.sortKey, ui.sortDir), [records, ui.search, ui.fReg, ui.fCabang, ui.fSe, ui.fKlas, ui.fStatus, ui.fPenawaran, ui.fBulan, ui.fTahun, ui.fDibuat, ui.sortKey, ui.sortDir]);
 
   if (!loaded) {
     return (

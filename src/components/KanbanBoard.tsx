@@ -10,6 +10,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
 import { IconCart, IconDoc, IconEdit, IconRfq, IconTrash, IconWa } from './icons';
+import { NewBadge } from './NewBadge';
 import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './ProspectPurchasingBubble';
 
 const CAP = 40;
@@ -36,6 +37,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
       <div className="kc-top">
         <span className="kc-customer">
           {r.customer}
+          <NewBadge createdAt={r.createdAt} />
           <ProspectPurchasingBubble count={purchCount} />
           {!!starCount && (
             <span className="prospect-star-badge" title={`Masuk Rencana Penjualan pada ${starCount} periode berbeda`}>

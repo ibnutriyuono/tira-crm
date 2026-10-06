@@ -105,6 +105,8 @@ interface UiState {
   fPenawaran: string;
   fBulan: string;
   fTahun: string;
+  /** '' | 'today' | 'week' -- not persisted: "today" means a different day tomorrow. */
+  fDibuat: string;
   sortKey: string;
   sortDir: 'asc' | 'desc';
   page: number;
@@ -157,6 +159,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   fPenawaran: '',
   fBulan: '',
   fTahun: '',
+  fDibuat: '',
   sortKey: 'tglPenawaran',
   sortDir: 'desc',
   page: 1,
@@ -167,7 +170,7 @@ export const useUiStore = create<UiState>((set, get) => ({
     get().persistViewState();
   },
   resetFilters: () => {
-    set({ fReg: '', fCabang: '', fSe: '', fKlas: '', fStatus: '', fPenawaran: '', fBulan: '', fTahun: '', search: '', page: 1 });
+    set({ fReg: '', fCabang: '', fSe: '', fKlas: '', fStatus: '', fPenawaran: '', fBulan: '', fTahun: '', fDibuat: '', search: '', page: 1 });
     get().persistViewState();
   },
   hydrateViewState: () => {

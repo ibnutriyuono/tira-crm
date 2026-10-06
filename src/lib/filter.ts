@@ -1,4 +1,5 @@
 import { classify, num } from './format';
+import { createdInRange, type CreatedRange } from './new-records';
 import type { Prospect } from './types';
 
 interface FilterState {
@@ -11,6 +12,8 @@ interface FilterState {
   fPenawaran: string;
   fBulan: string;
   fTahun: string;
+  /** Dibuat hari ini / minggu ini (by createdAt). */
+  fDibuat?: string;
 }
 
 // Role-based scoping already happened server-side (prospectScopeWhere) —
@@ -26,6 +29,10 @@ export function getFilteredProspects(records: Prospect[], f: FilterState): Prosp
   else if (f.fPenawaran === 'pending') list = list.filter((r) => !r.penawaranTerkirim);
   if (f.fBulan) list = list.filter((r) => r.tglPenawaran && r.tglPenawaran.slice(5, 7) === f.fBulan);
   if (f.fTahun) list = list.filter((r) => r.tglPenawaran && r.tglPenawaran.slice(0, 4) === f.fTahun);
+  if (f.fDibuat) {
+    const now = new Date();
+    list = list.filter((r) => createdInRange(r, f.fDibuat as CreatedRange, now));
+  }
   if (f.search) {
     const q = f.search.toLowerCase();
     list = list.filter(

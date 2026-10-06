@@ -25,13 +25,6 @@ function tableRows(rows: (string | PptxGenJS.TableCell)[][]): PptxGenJS.TableCel
   return rows.map((row) => row.map((cell) => (typeof cell === 'string' ? { text: cell } : cell)));
 }
 
-/** "2026-09" -> "September 2026". */
-function formatPeriodeLong(periode: string): string {
-  const d = new Date(`${periode}-01T00:00:00`);
-  if (Number.isNaN(d.getTime())) return periode;
-  return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-}
-
 /** Compact Rupiah for KPI tiles ("Rp 3,00 M", "Rp 820 jt") -- the full figure sits in the tile's tooltip. */
 function rpShort(n: number): string {
   const abs = Math.abs(n);
@@ -58,15 +51,31 @@ export function GmAnalysisModal() {
   const salesPlans = useDataStore((s) => s.salesPlans);
   const toast = useDataStore((s) => s.toast);
 
+  // Period = month range "Dari ... s/d ..."; one month when both are equal.
   const [periode, setPeriode] = useState(localPeriode());
+  const [periodeTo, setPeriodeTo] = useState(localPeriode());
+  const thisMonth = localPeriode();
+  const setRange = (from: string, to: string) => {
+    if (!from || !to) return;
+    // Keep "dari" <= "s/d" whichever end was moved.
+    if (from > to) [from, to] = [to, from];
+    setPeriode(from);
+    setPeriodeTo(to);
+  };
+  const quick = [
+    { label: 'Bulan ini', from: thisMonth, to: thisMonth },
+    { label: 'YTD', from: `${thisMonth.slice(0, 4)}-01`, to: thisMonth },
+    { label: 'Kuartal ini', from: `${thisMonth.slice(0, 4)}-${String(Math.floor((Number(thisMonth.slice(5)) - 1) / 3) * 3 + 1).padStart(2, '0')}`, to: thisMonth },
+    { label: 'Tahun lalu', from: `${Number(thisMonth.slice(0, 4)) - 1}-01`, to: `${Number(thisMonth.slice(0, 4)) - 1}-12` },
+  ];
   const [busy, setBusy] = useState(false);
 
   // The modal key is only client state; the scope check here is what keeps a
   // role with no sales data (purchasing) from rendering anything.
   const scope = useMemo(() => (currentUser ? execScopeFor(currentUser, prospects) : null), [currentUser, prospects]);
   const a = useMemo<ExecAnalysis | null>(
-    () => (scope && show ? buildExecAnalysis(prospects, budgetTargets, salesPlans, scope, periode, formatRupiah) : null),
-    [scope, show, prospects, budgetTargets, salesPlans, periode],
+    () => (scope && show ? buildExecAnalysis(prospects, budgetTargets, salesPlans, scope, periode, formatRupiah, new Date(), periodeTo) : null),
+    [scope, show, prospects, budgetTargets, salesPlans, periode, periodeTo],
   );
 
   async function onGeneratePpt() {
@@ -85,7 +94,7 @@ export function GmAnalysisModal() {
       const s1 = pres.addSlide();
       s1.background = { color: GRAPHITE };
       s1.addText('Laporan Analisa Eksekutif', { x: 0.8, y: 2.1, w: 11, h: 1, fontSize: 36, bold: true, color: 'FFFFFF', fontFace: 'Cambria' });
-      s1.addText(`${a.scope.label} · Periode ${formatPeriodeLong(a.periode)}`, { x: 0.8, y: 3.1, w: 11, h: 0.5, fontSize: 18, color: 'D7E3EC' });
+      s1.addText(`${a.scope.label} · Periode ${a.periodLabel}`, { x: 0.8, y: 3.1, w: 11, h: 0.5, fontSize: 18, color: 'D7E3EC' });
       s1.addText('PT Tira Austenite — Steel Division', { x: 0.8, y: 3.9, w: 8, h: 0.4, fontSize: 12, bold: true, color: 'FFFFFF' });
       s1.addText(`Dibuat otomatis ${formatDateID(todayStr())} oleh ${currentUser?.name || '-'} — internal & rahasia`, { x: 0.8, y: 6.9, w: 11, h: 0.3, fontSize: 10, color: 'A9B8C6' });
 
@@ -99,7 +108,7 @@ export function GmAnalysisModal() {
         ['Realisasi (Won)', `${formatRupiah(a.won)} · ${a.wonCount} deal`],
         ['  PO/Kontrak · DO GIT · DO Omzet', `${formatRupiah(a.wonPo)} · ${formatRupiah(a.wonDoGit)} · ${formatRupiah(a.wonDoOmzet)}`],
         ['Achievement vs Target', `${a.achievement}%`],
-        ['vs Bulan Lalu', a.momPct == null ? '-' : `${a.momPct >= 0 ? '+' : ''}${a.momPct}% (${formatRupiah(a.prevWon)})`],
+        [`vs ${a.compareLabel.replace(/^./, (c) => c.toUpperCase())}`, a.momPct == null ? '-' : `${a.momPct >= 0 ? '+' : ''}${a.momPct}% (${formatRupiah(a.prevWon)})`],
         ['Sisa Gap', formatRupiah(a.gap) + (a.requiredPerDay ? ` · perlu ${formatRupiah(a.requiredPerDay)}/hari kerja` : '')],
         ['Weighted Pipeline · Coverage', `${formatRupiah(a.weighted)} · ${a.coverage == null ? '-' : `${Math.round(a.coverage * 100)}%`}`],
         ['Win Rate', a.winRate == null ? '-' : `${a.winRate}% (${a.wonCount} menang / ${a.lostCount} kalah)`],
@@ -175,7 +184,7 @@ export function GmAnalysisModal() {
         x: 0.8, y: 1.4, w: 11.8, h: 5.6, fontSize: 13, color: 'D7E3EC', valign: 'top', paraSpaceAfter: 6,
       });
 
-      await pres.writeFile({ fileName: `Analisa-Eksekutif-${a.scope.label.replace(/[^\w-]+/g, '_')}-${a.periode}.pptx` });
+      await pres.writeFile({ fileName: `Analisa-Eksekutif-${a.scope.label.replace(/[^\w-]+/g, '_')}-${a.periode}${a.periodeTo !== a.periode ? `_sd_${a.periodeTo}` : ''}.pptx` });
       toast('PPT analisa berhasil dibuat', 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal membuat PPT', 'error');
@@ -212,9 +221,21 @@ export function GmAnalysisModal() {
         <>
           <div className="toolbar-row" style={{ alignItems: 'center', marginBottom: 12 }}>
             <label style={{ margin: 0 }}>Periode</label>
-            <input type="month" value={periode} onChange={(e) => e.target.value && setPeriode(e.target.value)} style={{ maxWidth: 180 }} />
+            <input type="month" value={periode} onChange={(e) => setRange(e.target.value, periodeTo)} style={{ maxWidth: 170 }} title="Dari bulan" />
+            <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>s/d</span>
+            <input type="month" value={periodeTo} onChange={(e) => setRange(periode, e.target.value)} style={{ maxWidth: 170 }} title="Sampai bulan" />
+            {quick.map((q) => (
+              <button
+                key={q.label}
+                type="button"
+                className={`btn btn-sm ${periode === q.from && periodeTo === q.to ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setRange(q.from, q.to)}
+              >
+                {q.label}
+              </button>
+            ))}
             <span className="field-note" style={{ margin: 0 }}>
-              Cakupan: <b>{scope.label}</b>
+              <b>{a.periodLabel}</b>{a.monthCount > 1 ? ` (${a.monthCount} bulan)` : ''} · Cakupan: <b>{scope.label}</b>
               {scope.kind === 'se' && ' — target yang ditampilkan adalah target cabang sebagai acuan kontribusi Anda'}
             </span>
           </div>
@@ -229,7 +250,7 @@ export function GmAnalysisModal() {
               <div className="label">Realisasi</div>
               <div className="value" title={formatRupiah(a.won)}>{rpShort(a.won)}</div>
               <div className="foot">
-                {a.wonCount} deal · {a.momPct == null ? 'bln lalu -' : `${a.momPct >= 0 ? '▲' : '▼'} ${Math.abs(a.momPct)}% vs bln lalu`}
+                {a.wonCount} deal · {a.momPct == null ? `${a.compareLabel} -` : `${a.momPct >= 0 ? '▲' : '▼'} ${Math.abs(a.momPct)}% vs ${a.compareLabel}`}
               </div>
             </div>
             <div className="kpi">

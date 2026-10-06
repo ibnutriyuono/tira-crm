@@ -9,6 +9,7 @@ import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
 import { IconDoc, IconEdit, IconRfq, IconTrash, IconWa } from './icons';
 import { Pagination } from './Pagination';
+import { NewBadge } from './NewBadge';
 import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './ProspectPurchasingBubble';
 
 const COLS: { key: string; label: string; sortable?: boolean }[] = [
@@ -97,6 +98,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                   <td>{r.se || '-'}</td>
                   <td className="customer">
                     {r.customer || '-'}
+                    <NewBadge createdAt={r.createdAt} />
                     <ProspectPurchasingBubble count={purchCounts[r.id]} />
                     {!!starCounts.get(r.id) && (
                       <span

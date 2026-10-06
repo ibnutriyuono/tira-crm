@@ -1,6 +1,6 @@
 import { CABANG_LIST, STAGE_PROBABILITY } from './constants';
 import { classify, num } from './format';
-import { buildAgingList, buildCustomerIntel, buildForecast, buildForecastBySe, buildForecastByReg, buildForecastNasional, customerKey, daysSince } from './reports';
+import { buildAgingList, buildCustomerIntel, buildForecast, buildForecastBySe, buildForecastByReg, buildForecastNasional, customerKey, daysSince, periodeList } from './reports';
 import type { BudgetTarget, Prospect, SafeUser, SalesPlan } from './types';
 
 /**
@@ -53,6 +53,18 @@ export function prevPeriode(periode: string): string {
   return localPeriode(d);
 }
 
+/** Same month one year earlier. */
+const yearBefore = (p: string) => `${Number(p.slice(0, 4)) - 1}${p.slice(4)}`;
+
+const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+/** "Oktober 2026" or "Januari – Agustus 2026" / "November 2025 – Februari 2026". */
+export function periodeLabel(from: string, to: string = from): string {
+  const [a, b] = from <= to ? [from, to] : [to, from];
+  const name = (p: string) => BULAN[Number(p.slice(5, 7)) - 1] || p;
+  if (a === b) return `${name(a)} ${a.slice(0, 4)}`;
+  return a.slice(0, 4) === b.slice(0, 4) ? `${name(a)} – ${name(b)} ${b.slice(0, 4)}` : `${name(a)} ${a.slice(0, 4)} – ${name(b)} ${b.slice(0, 4)}`;
+}
+
 /** The date a deal was won -- PO, then delivery, then offer (same rule as reports.ts). */
 function wonDate(r: Prospect): string {
   return r.tglPO || r.tglDelivery || r.tglPenawaran || '';
@@ -75,7 +87,16 @@ export interface DataIssue {
 
 export interface ExecAnalysis {
   scope: ExecScope;
+  /** First month of the period ("YYYY-MM"). */
   periode: string;
+  /** Last month of the period; equals `periode` for a single month. */
+  periodeTo: string;
+  /** Number of months in the period. */
+  monthCount: number;
+  /** "Oktober 2026" / "Januari – Agustus 2026". */
+  periodLabel: string;
+  /** What prevWon/momPct compare against: last month (single month) or the same months a year earlier (range). */
+  compareLabel: string;
   // money
   target: number;
   rencana: number;
@@ -118,6 +139,7 @@ export interface ExecAnalysis {
 }
 
 function workingDaysLeft(periode: string, today = new Date()): number | null {
+  // Only meaningful while the period's last month is still running.
   if (periode !== localPeriode(today)) return null;
   const [y, m] = periode.split('-').map(Number);
   const last = new Date(y, m, 0).getDate();
@@ -133,36 +155,46 @@ export function buildExecAnalysis(
   budgetTargets: BudgetTarget[],
   salesPlans: SalesPlan[],
   scope: ExecScope,
-  periode: string,
+  periodeFrom: string,
   formatRp: (n: number) => string,
   today = new Date(),
+  /** Last month of a range; omitted = single month. */
+  periodeToArg?: string,
 ): ExecAnalysis {
+  const months = periodeList(periodeFrom, periodeToArg || periodeFrom);
+  const periode = months[0] || periodeFrom;
+  const periodeTo = months[months.length - 1] || periode;
+  const monthSet = new Set(months);
+  const inMonths = (d: string) => monthSet.has(d.slice(0, 7));
   const prospects = allProspects.filter(inScope(scope));
   const plans = salesPlans.filter((p) => scope.kind === 'se' || scope.cabangs.includes((p.cabang || '').toUpperCase()));
-  const rows = buildForecast(prospects, budgetTargets, periode, scope.cabangs, plans).filter((r) => scope.cabangs.includes(r.cabang) || r.won > 0 || r.openCount > 0);
+  const rows = buildForecast(prospects, budgetTargets, periode, scope.cabangs, plans, periodeTo).filter((r) => scope.cabangs.includes(r.cabang) || r.won > 0 || r.openCount > 0);
   const regRows = buildForecastByReg(rows);
   const nas = buildForecastNasional(rows);
 
-  const wonInPeriod = prospects.filter((r) => classify(r) === 'Won' && wonDate(r).slice(0, 7) === periode);
+  const wonInPeriod = prospects.filter((r) => classify(r) === 'Won' && inMonths(wonDate(r)));
   const sum = (list: Prospect[]) => list.reduce((s, r) => s + num(r.value), 0);
   const wonPo = sum(wonInPeriod.filter((r) => num(r.status) === 4));
   const wonDoGit = sum(wonInPeriod.filter((r) => num(r.status) === 5 && !r.terfaktur));
   const wonDoOmzet = sum(wonInPeriod.filter((r) => num(r.status) === 5 && r.terfaktur));
   const won = nas.won;
 
-  const prev = prevPeriode(periode);
-  const prevWon = sum(prospects.filter((r) => classify(r) === 'Won' && wonDate(r).slice(0, 7) === prev));
+  // One month: compare with last month. A range: with the same months a year
+  // earlier (Jan-Aug 2026 vs Jan-Aug 2025), the comparison management uses.
+  const prevMonths = new Set(months.length === 1 ? [prevPeriode(periode)] : months.map(yearBefore));
+  const compareLabel = months.length === 1 ? 'bulan lalu' : 'periode sama tahun lalu';
+  const prevWon = sum(prospects.filter((r) => classify(r) === 'Won' && prevMonths.has(wonDate(r).slice(0, 7))));
   const momPct = prevWon > 0 ? Math.round(((won - prevWon) / prevWon) * 100) : null;
 
   const gap = Math.max(0, nas.target - won);
-  const daysLeft = workingDaysLeft(periode, today);
+  const daysLeft = workingDaysLeft(periodeTo, today);
   const requiredPerDay = daysLeft && gap > 0 ? gap / daysLeft : null;
   const open = prospects.filter((r) => classify(r) === 'Aktif');
   const weighted = open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[num(r.status)] ?? 0), 0);
   const coverage = gap > 0 ? Math.round((weighted / gap) * 100) / 100 : null;
 
   // Lost in period: dated by when the deal moved to Lose (statusChangedAt).
-  const lostInPeriod = prospects.filter((r) => classify(r) === 'Lost' && (r.statusChangedAt || '').slice(0, 7) === periode);
+  const lostInPeriod = prospects.filter((r) => classify(r) === 'Lost' && inMonths(String(r.statusChangedAt || '')));
   const decided = wonInPeriod.length + lostInPeriod.length;
   const compCount = new Map<string, { name: string; count: number }>();
   lostInPeriod.forEach((r) => {
@@ -209,6 +241,10 @@ export function buildExecAnalysis(
   const a: ExecAnalysis = {
     scope,
     periode,
+    periodeTo,
+    monthCount: months.length,
+    periodLabel: periodeLabel(periode, periodeTo),
+    compareLabel,
     target: nas.target,
     rencana: nas.rencana,
     won,
@@ -234,7 +270,7 @@ export function buildExecAnalysis(
     funnel,
     rows,
     regRows,
-    seRows: buildForecastBySe(prospects, periode),
+    seRows: buildForecastBySe(prospects, periode, periodeTo),
     topCustomers,
     aging,
     agingValue,
@@ -288,15 +324,16 @@ function buildInsights(a: ExecAnalysis, rp: (n: number) => string): string[] {
   if (a.target > 0) {
     out.push(
       `${a.scope.kind === 'se' ? 'Kontribusi Anda' : `Realisasi ${who}`} ${a.achievement}% dari target${a.scope.kind === 'se' ? ' cabang' : ''} (${rp(a.won)} dari ${rp(a.target)}).` +
-        (a.momPct != null ? ` ${a.momPct >= 0 ? 'Naik' : 'Turun'} ${Math.abs(a.momPct)}% dibanding bulan lalu.` : ''),
+        (a.momPct != null ? ` ${a.momPct >= 0 ? 'Naik' : 'Turun'} ${Math.abs(a.momPct)}% dibanding ${a.compareLabel}.` : ''),
     );
   } else if (a.won > 0) {
     out.push(`Realisasi ${rp(a.won)} dari ${a.wonCount} deal; target periode ini belum diisi.`);
   }
   if (a.won > 0 && a.wonDoGit > 0) out.push(`${rp(a.wonDoGit)} (${pct(a.wonDoGit, a.won)}%) dari realisasi masih GIT — sudah DO tapi belum terfaktur.`);
   if (a.requiredPerDay != null && a.daysLeft) {
-    out.push(`Sisa gap ${rp(a.gap)}: perlu rata-rata ${rp(a.requiredPerDay)} per hari kerja selama ${a.daysLeft} hari kerja tersisa.`);
+    out.push(`Sisa gap ${rp(a.gap)}: perlu rata-rata ${rp(a.requiredPerDay)} per hari kerja selama ${a.daysLeft} hari kerja tersisa${a.monthCount > 1 ? ' di bulan terakhir periode' : ''}.`);
   }
+  if (a.monthCount > 1 && a.wonCount) out.push(`Rata-rata realisasi ${rp(a.won / a.monthCount)} per bulan selama ${a.monthCount} bulan.`);
   if (a.coverage != null) {
     out.push(
       a.coverage >= 1
