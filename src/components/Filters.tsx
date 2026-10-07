@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { BULAN_LIST, STATUS_META } from '@/lib/constants';
+import { changeDate } from '@/lib/filter';
 import { createdInRange } from '@/lib/new-records';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -17,7 +18,7 @@ export function Filters() {
   const seSet = useMemo(() => Array.from(new Set(records.map((r) => r.se).filter(Boolean))).sort() as string[], [records]);
   const tahunSet = useMemo(
     () =>
-      (Array.from(new Set(records.map((r) => (r.tglPenawaran ? r.tglPenawaran.slice(0, 4) : null)).filter(Boolean))) as string[]).sort((a, b) => b.localeCompare(a)),
+      (Array.from(new Set(records.map((r) => changeDate(r).slice(0, 4)).filter(Boolean))) as string[]).sort((a, b) => b.localeCompare(a)),
     [records],
   );
 
@@ -54,7 +55,7 @@ export function Filters() {
         </div>
       </div>
       <div className="field">
-        <label>Bulan</label>
+        <label title="Berdasarkan tanggal perubahan status terakhir prospek">Bulan Perubahan</label>
         <select value={ui.fBulan} onChange={(e) => ui.setFilter({ fBulan: e.target.value })}>
           <option value="">Semua</option>
           {BULAN_LIST.map((b) => (
@@ -65,7 +66,7 @@ export function Filters() {
         </select>
       </div>
       <div className="field">
-        <label>Tahun</label>
+        <label title="Berdasarkan tanggal perubahan status terakhir prospek">Tahun Perubahan</label>
         <select value={ui.fTahun} onChange={(e) => ui.setFilter({ fTahun: e.target.value })}>
           <option value="">Semua</option>
           {tahunSet.map((t) => (

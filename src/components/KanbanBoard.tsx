@@ -10,6 +10,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
 import { IconCart, IconDoc, IconEdit, IconRfq, IconTrash, IconWa } from './icons';
+import { changeDate } from '@/lib/filter';
 import { NewBadge } from './NewBadge';
 import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './ProspectPurchasingBubble';
 
@@ -195,15 +196,15 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
           const semua = filtered.filter((r) => num(r.status) === s);
           // Opsi bulan dibangun dari isi kolom itu sendiri, supaya tidak ada
           // pilihan bulan yang hasilnya pasti kosong.
-          const bulanOptions = Array.from(new Set(semua.map((r) => (r.statusChangedAt || '').slice(0, 7)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+          const bulanOptions = Array.from(new Set(semua.map((r) => changeDate(r).slice(0, 7)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
           const bulanAktif = bulanPerKolom[s] || '';
-          const dalamBulan = bulanAktif ? semua.filter((r) => (r.statusChangedAt || '').slice(0, 7) === bulanAktif) : semua;
+          const dalamBulan = bulanAktif ? semua.filter((r) => changeDate(r).slice(0, 7) === bulanAktif) : semua;
           // Penajaman opsional dari filter bulan: opsi hari dibangun dari isi
           // dalamBulan (bukan seluruh kolom), supaya kalau bulan dipilih,
           // pilihan harinya cuma hari-hari yang benar-benar ada di bulan itu.
-          const hariOptions = Array.from(new Set(dalamBulan.map((r) => (r.statusChangedAt || '').slice(0, 10)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+          const hariOptions = Array.from(new Set(dalamBulan.map((r) => changeDate(r).slice(0, 10)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
           const hariAktif = hariPerKolom[s] || '';
-          const dalamHari = hariAktif ? dalamBulan.filter((r) => (r.statusChangedAt || '').slice(0, 10) === hariAktif) : dalamBulan;
+          const dalamHari = hariAktif ? dalamBulan.filter((r) => changeDate(r).slice(0, 10) === hariAktif) : dalamBulan;
           // Filter faktur hanya berlaku di kolom DO; hitungan di opsinya
           // mengikuti filter bulan/hari yang sedang aktif.
           const fakturAktif = s === 5 ? fakturDo : '';

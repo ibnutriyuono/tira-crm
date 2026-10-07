@@ -1,5 +1,5 @@
 import { classify, num } from './format';
-import { createdInRange, type CreatedRange } from './new-records';
+import { createdInRange, localDateOf, type CreatedRange } from './new-records';
 import type { Prospect } from './types';
 
 interface FilterState {
@@ -16,6 +16,11 @@ interface FilterState {
   fDibuat?: string;
 }
 
+/** Local YYYY-MM-DD of the last status change; offer date for old rows without one. */
+export function changeDate(r: Pick<Prospect, 'statusChangedAt' | 'tglPenawaran'>): string {
+  return localDateOf(r.statusChangedAt as string | null | undefined) || r.tglPenawaran || '';
+}
+
 // Role-based scoping already happened server-side (prospectScopeWhere) —
 // this only re-implements the original's client-side filter/search/sort.
 export function getFilteredProspects(records: Prospect[], f: FilterState): Prospect[] {
@@ -27,8 +32,10 @@ export function getFilteredProspects(records: Prospect[], f: FilterState): Prosp
   if (f.fKlas) list = list.filter((r) => classify(r) === f.fKlas);
   if (f.fPenawaran === 'sent') list = list.filter((r) => !!r.penawaranTerkirim);
   else if (f.fPenawaran === 'pending') list = list.filter((r) => !r.penawaranTerkirim);
-  if (f.fBulan) list = list.filter((r) => r.tglPenawaran && r.tglPenawaran.slice(5, 7) === f.fBulan);
-  if (f.fTahun) list = list.filter((r) => r.tglPenawaran && r.tglPenawaran.slice(0, 4) === f.fTahun);
+  // Bulan/Tahun = when the prospect last changed status (local date), the
+  // same date the Kanban column filters and Aging use -- not the offer date.
+  if (f.fBulan) list = list.filter((r) => changeDate(r).slice(5, 7) === f.fBulan);
+  if (f.fTahun) list = list.filter((r) => changeDate(r).slice(0, 4) === f.fTahun);
   if (f.fDibuat) {
     const now = new Date();
     list = list.filter((r) => createdInRange(r, f.fDibuat as CreatedRange, now));
