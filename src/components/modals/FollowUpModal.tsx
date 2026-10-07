@@ -74,6 +74,10 @@ export function FollowUpModal() {
       toast('Nomor WhatsApp tidak valid. Isi nomor yang benar (cth. 08123456789).', 'error');
       return;
     }
+    // Open WhatsApp first, inside the click, so the browser doesn't treat it
+    // as a pop-up; the bookkeeping below happens after.
+    window.open(`https://wa.me/${normalized}?text=${encodeURIComponent(message)}`, '_blank');
+    closeModal();
     try {
       if (ctx!.type === 'prospect') {
         const r = records.find((x) => x.id === ctx!.id);
@@ -89,10 +93,19 @@ export function FollowUpModal() {
         }
       }
     } catch {
-      // non-blocking — still open WhatsApp even if the phone-number save failed
+      // non-blocking — WhatsApp is already open even if the phone-number save failed
     }
-    window.open(`https://wa.me/${normalized}?text=${encodeURIComponent(message)}`, '_blank');
-    closeModal();
+    // Realisasi follow-up -> Aktivitas Harian (and a due schedule is marked done).
+    try {
+      const res = await api.post<{ logged: boolean; scheduleCleared: boolean; prospect?: Prospect | null }>(
+        '/api/follow-ups/done',
+        ctx!.type === 'prospect' ? { prospectId: ctx!.id } : { customerId: ctx!.id },
+      );
+      if (res.prospect) upsertProspect(res.prospect);
+      if (res.logged) toast(`Follow-up tercatat di Aktivitas Harian${res.scheduleCleared ? ' · jadwal follow-up ditandai selesai' : ''}`, 'success');
+    } catch {
+      // logging is best-effort; the message itself went out
+    }
   }
 
   // Independent of onSend — scheduling the next follow-up and sending
@@ -107,7 +120,7 @@ export function FollowUpModal() {
         followUpNote: nextNote.trim() || null,
       });
       upsertProspect(prospect);
-      toast(nextDate ? `Follow-up berikutnya dijadwalkan ${nextDate}` : 'Jadwal follow-up dihapus', 'success');
+      toast(nextDate ? `Follow-up dijadwalkan ${nextDate} · masuk Aktivitas Harian sebagai rencana` : 'Jadwal follow-up dihapus', 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal menyimpan jadwal', 'error');
     } finally {
@@ -157,6 +170,7 @@ export function FollowUpModal() {
               </button>
               <div className="field-note" style={{ marginTop: 6 }}>
                 Terpisah dari tombol &quot;Buka WhatsApp&quot; di bawah — bisa menjadwalkan saja tanpa mengirim pesan sekarang, atau sebaliknya.
+                Jadwal otomatis masuk Aktivitas Harian sebagai <b>rencana</b>; saat &quot;Buka WhatsApp&quot; diklik, follow-up tercatat sebagai aktivitas Telepon/WA hari ini.
               </div>
             </div>
           </>

@@ -23,6 +23,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const { id } = await params;
   const own = await loadOwn(activityOwner(user) || '', id);
   if (own.error) return own.error;
+  if (own.existing.status === 'rencana') {
+    return NextResponse.json({ error: 'Rencana follow-up diatur dari jadwal follow-up prospek; tandai "Selesai" bila sudah dilakukan.' }, { status: 400 });
+  }
 
   const body = await req.json().catch(() => null);
   const tanggal = validTanggal(body?.tanggal);

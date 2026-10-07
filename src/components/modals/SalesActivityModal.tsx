@@ -99,7 +99,7 @@ export function SalesActivityModal() {
   const dayList = useMemo(() => mine.filter((a) => a.tanggal === tanggal), [mine, tanggal]);
   const monthCount = useMemo(() => {
     const m: Record<string, number> = {};
-    mine.forEach((a) => (m[a.tipe] = (m[a.tipe] || 0) + 1));
+    mine.filter((a) => a.status !== 'rencana').forEach((a) => (m[a.tipe] = (m[a.tipe] || 0) + 1));
     return m;
   }, [mine]);
 
@@ -159,6 +159,20 @@ export function SalesActivityModal() {
     setCustomer(a.customer);
     setKeterangan(a.keterangan || '');
     setPics(a.pics?.length ? a.pics.map((p) => ({ ...p })) : [{ nama: '', jabatan: '' }]);
+  }
+
+  // A planned follow-up done (possibly earlier than its date): it becomes
+  // today's Telepon/WA activity and the prospect's schedule is cleared.
+  async function onDonePlan(a: SalesActivity) {
+    if (!a.prospectId) return;
+    try {
+      const res = await api.post<{ logged: boolean; prospect?: Prospect | null }>('/api/follow-ups/done', { prospectId: a.prospectId, activityId: a.id, channel: 'Telepon/WA' });
+      if (res.prospect) upsertProspect(res.prospect);
+      await load();
+      toast('Follow-up ditandai selesai dan dicatat hari ini', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal menandai selesai', 'error');
+    }
   }
 
   async function onDelete(a: SalesActivity) {
@@ -400,6 +414,15 @@ export function SalesActivityModal() {
                   <tr key={a.id}>
                     <td>
                       <span className={`badge ${TIPE_COLOR[a.tipe] || 'slate'}`}>{TIPE_LABEL[a.tipe] || a.tipe}</span>
+                      {a.status === 'rencana' ? (
+                        <div style={{ marginTop: 4 }}>
+                          <span className="badge amber" title="Jadwal follow-up — belum dihitung di KPI sampai dilakukan">Rencana</span>
+                        </div>
+                      ) : a.sumber ? (
+                        <div style={{ marginTop: 4 }}>
+                          <span className="badge slate" title="Tercatat otomatis dari Follow-up WhatsApp">Otomatis</span>
+                        </div>
+                      ) : null}
                     </td>
                     {!canWrite && <td>{a.se}</td>}
                     <td style={{ fontWeight: 600 }}>{a.customer}</td>
@@ -419,7 +442,8 @@ export function SalesActivityModal() {
                     <td style={{ minWidth: 250 }}>
                       {a.prospectId ? (
                         <span className="badge green" title={p ? `Nilai ${formatRupiah(p.value)}` : undefined}>
-                          Di pipeline{p ? ` · ${STATUS_META[Number(p.status)]?.label ?? ''}` : ''}
+                          {a.sumber === 'followup' ? 'Follow-up prospek' : 'Di pipeline'}
+                          {p ? ` · ${STATUS_META[Number(p.status)]?.label ?? ''}` : ''}
                         </span>
                       ) : canWrite ? (
                         <div className="row-actions" style={{ flexWrap: 'wrap', gap: 4 }}>
@@ -436,10 +460,16 @@ export function SalesActivityModal() {
                     {canWrite && (
                       <td>
                         <div className="row-actions">
-                          <button type="button" className="icon-btn" title="Ubah" onClick={() => onEdit(a)}>
-                            <IconEdit />
-                          </button>
-                          {!a.prospectId && (
+                          {a.status === 'rencana' ? (
+                            <button type="button" className="btn btn-outline btn-sm" style={{ padding: '3px 8px', whiteSpace: 'nowrap' }} title="Tandai follow-up ini sudah dilakukan hari ini" onClick={() => onDonePlan(a)}>
+                              ✓ Selesai
+                            </button>
+                          ) : (
+                            <button type="button" className="icon-btn" title="Ubah" onClick={() => onEdit(a)}>
+                              <IconEdit />
+                            </button>
+                          )}
+                          {(!a.prospectId || (!!a.sumber && a.status !== 'rencana')) && (
                             <button type="button" className="icon-btn danger" title="Hapus" onClick={() => onDelete(a)}>
                               <IconTrash />
                             </button>

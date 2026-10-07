@@ -291,6 +291,7 @@ export function ProspectFormModal() {
         <div className="full">
           <label>Customer *</label>
           <CustomerNameInput required value={customer} onChange={onCustomerChange} placeholder="Nama customer" />
+          <div className="field-note">Customer baru otomatis tercatat di Kelola Customer.</div>
         </div>
         <div className="full">
           <label>No. WhatsApp / HP Customer</label>

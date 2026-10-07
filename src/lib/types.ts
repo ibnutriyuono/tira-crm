@@ -315,6 +315,10 @@ export interface SalesActivity {
   /** PIC customer yang ditemui/dihubungi. Bisa kosong ([]) untuk data sebelum kolom ini ada. */
   pics: ActivityPic[];
   prospectId: string | null;
+  /** "selesai" = sudah dilakukan; "rencana" = jadwal follow-up (tidak dihitung KPI). Baris lama tanpa kolom ini = selesai. */
+  status?: 'selesai' | 'rencana';
+  /** null = isian manual; "followup" = otomatis dari Follow-up WhatsApp. */
+  sumber?: string | null;
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;

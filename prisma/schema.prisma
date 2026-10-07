@@ -147,6 +147,12 @@ model SalesActivity {
   /// JSON seperti Customer.pics; baris lama (sebelum phase27) berisi [].
   pics       Json     @default("[]")
   prospectId String?
+  /// "selesai" (aktivitas yang sudah dilakukan) | "rencana" (jadwal follow-up
+  /// yang belum dilakukan). Rencana tidak dihitung di KPI Aktivitas.
+  status     String   @default("selesai")
+  /// Asal baris: null = diisi manual; "followup" = otomatis dari jadwal /
+  /// realisasi Follow-up WhatsApp.
+  sumber     String?
   createdBy  String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -156,6 +162,7 @@ model SalesActivity {
   @@index([cabang])
   @@index([reg])
   @@index([prospectId])
+  @@index([prospectId, status])
 }
 
 /// Target aktivitas per SE per bulan, diisi atasan (BM/RM/GM/Admin). `targets`

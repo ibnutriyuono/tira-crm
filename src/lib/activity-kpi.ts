@@ -54,7 +54,8 @@ export function buildActivityKpi(activities: SalesActivity[], targets: ActivityT
   const statusById = new Map(prospects.map((p) => [p.id, Number(p.status)]));
   const targetBySe = new Map(targets.map((t) => [t.se.trim().toLowerCase(), t]));
   const bySe = new Map<string, SalesActivity[]>();
-  activities.forEach((a) => {
+  // Planned follow-ups (rencana) aren't work done yet: never counted.
+  activities.filter((a) => a.status !== 'rencana').forEach((a) => {
     const k = a.se.trim().toLowerCase();
     if (!bySe.has(k)) bySe.set(k, []);
     bySe.get(k)!.push(a);
@@ -79,7 +80,9 @@ export function buildActivityKpi(activities: SalesActivity[], targets: ActivityT
     const capped = types.map((x) => Math.min(x.achieve ?? 0, 1));
     const overall = capped.reduce((s, v) => s + v, 0) / types.length;
 
-    const linked = list.filter((a) => a.prospectId);
+    // Conversion = activities that were turned into a prospect -- not the
+    // automatic follow-up logs of an existing one.
+    const linked = list.filter((a) => a.prospectId && !a.sumber);
     let toRequest = 0;
     let toQuote = 0;
     let toPo = 0;

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { ensureCustomerFromProspect } from '@/lib/customer-sync';
 import { prospectScopeWhere } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 import { cleanFaktor, cleanLevel } from '@/lib/qcd';
@@ -80,5 +81,7 @@ export async function POST(req: Request) {
     entityId: prospect.id,
     summary: `Menambah prospek "${prospect.customer}"`,
   });
+  // Customer typed here -> Kelola Customer (created / phone filled).
+  await ensureCustomerFromProspect(user, prospect);
   return NextResponse.json({ prospect }, { status: 201 });
 }

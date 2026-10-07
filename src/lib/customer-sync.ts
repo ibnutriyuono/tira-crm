@@ -152,3 +152,46 @@ export async function syncCustomerPics(user: SafeUser, entries: { customer: stri
     }
   }
 }
+
+/**
+ * A customer typed in Tambah/Edit Prospek is registered in Kelola Customer
+ * straight away: created (name, branch, phone) when it isn't there yet;
+ * an existing one only gets an empty phone filled in -- data already on the
+ * customer is never overwritten. Matching is by name, case-insensitive.
+ * Best-effort: never fails the prospect save.
+ */
+export async function ensureCustomerFromProspect(user: SafeUser, p: { customer: string; cabang: string | null; phone: string | null }): Promise<void> {
+  const name = (p.customer || '').trim().replace(/\s+/g, ' ');
+  if (!name || name.length > 150) return;
+  const phone = (p.phone || '').trim();
+  try {
+    const existing = await prisma.customer.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+    if (!existing) {
+      const customer = await prisma.customer.create({
+        data: {
+          name,
+          cabang: (p.cabang || '').trim().toUpperCase(),
+          pic: '',
+          phone,
+          email: '',
+          address: '',
+          catatan: 'Ditambahkan otomatis dari Prospek',
+          pics: [] as unknown as Prisma.InputJsonValue,
+        },
+      });
+      emitCrmEvent('customer:created', customer);
+      await logActivity({ user, action: 'create', entity: 'customer', entityId: customer.id, summary: `Customer "${name}" ditambahkan otomatis dari Prospek` });
+      return;
+    }
+    const patch: Record<string, string> = {};
+    if (phone && !(existing.phone || '').trim()) patch.phone = phone;
+    if (p.cabang && !(existing.cabang || '').trim()) patch.cabang = p.cabang.trim().toUpperCase();
+    if (Object.keys(patch).length) {
+      const customer = await prisma.customer.update({ where: { id: existing.id }, data: patch });
+      emitCrmEvent('customer:updated', customer);
+      await logActivity({ user, action: 'update', entity: 'customer', entityId: customer.id, summary: `Data customer "${customer.name}" dilengkapi otomatis dari Prospek (${Object.keys(patch).join(', ')})` });
+    }
+  } catch (err) {
+    console.error('[customer-sync] gagal mencatat customer dari prospek', name, err);
+  }
+}

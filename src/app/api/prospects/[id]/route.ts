@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { ensureCustomerFromProspect } from '@/lib/customer-sync';
+import { syncFollowUpPlan } from '@/lib/followup-activity';
 import { diffFields, logActivity, PROSPECT_FIELD_LABELS } from '@/lib/activity';
 import { cleanFaktor, cleanLevel, type QcdInput } from '@/lib/qcd';
 import { deriveFromMaterials, requireQcdOnClose, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
@@ -91,6 +93,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   });
 
   emitCrmEvent('prospect:updated', prospect);
+  // Customer typed in Edit Prospek -> Kelola Customer (created / phone filled).
+  await ensureCustomerFromProspect(user, prospect);
   await logActivity({
     user,
     action: 'update',
@@ -148,6 +152,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const prospect = await prisma.prospect.update({ where: { id }, data });
   emitCrmEvent('prospect:updated', prospect);
+
+  // Follow-up schedule changed: keep its "rencana" row in Aktivitas Harian in
+  // step. Best-effort -- the schedule itself is already saved.
+  if ('followUpAt' in data || 'followUpNote' in data) {
+    try {
+      await syncFollowUpPlan(user, prospect);
+    } catch (err) {
+      console.error('[follow-up] gagal sinkron rencana aktivitas', err);
+    }
+  }
 
   // A bare status flip is the kanban drag (or the inline status dropdown), and
   // it's the single most useful thing to see in the audit trail — give it its
