@@ -364,7 +364,7 @@ export function buildForecastBySe(records: Prospect[], periode: string, periodeT
  */
 export function buildQcdRecap(records: Prospect[]): Prospect[] {
   return records
-    .filter((r) => Number(r.status) === 4 || Number(r.status) === 6)
+    .filter((r) => Number(r.status) === 4 || Number(r.status) === 5 || Number(r.status) === 6)
     .sort((a, b) => (b.tglPenawaran || '').localeCompare(a.tglPenawaran || ''));
 }
 

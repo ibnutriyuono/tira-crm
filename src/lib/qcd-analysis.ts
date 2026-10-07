@@ -4,7 +4,7 @@ import { customerKey } from './reports';
 import type { Prospect } from './types';
 
 /**
- * Dashboard QCD (tab KPI): why deals are won and lost, from the structured
+ * Dashboard QCD (menu Hasil QCD): why deals are won and lost, from the structured
  * QCD captured when a deal closes. A deal belongs to the period it CLOSED in:
  * Won by Tgl PO (then delivery, then offer -- the forecast rule), Lost by the
  * date it moved to Lose (statusChangedAt).

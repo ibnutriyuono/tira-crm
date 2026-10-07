@@ -6,7 +6,7 @@ import { STATUS_META } from '@/lib/constants';
 import { formatRupiah } from '@/lib/format';
 import { buildQcdDashboard } from '@/lib/qcd-analysis';
 import { useDataStore } from '@/store/useDataStore';
-import { useUiStore } from '@/store/useUiStore';
+import { useUiStore, type ModalKey } from '@/store/useUiStore';
 
 const SEG = [
   { k: 'unggul', color: 'var(--green-500)' },
@@ -39,12 +39,12 @@ function StackBar({ counts, options }: { counts: Record<string, number>; options
 }
 
 /**
- * Dashboard QCD inside the KPI tab: win rate, how we compare on Quality /
+ * Dashboard QCD, main view of Hasil QCD: win rate, how we compare on Quality /
  * Cost / Delivery in won vs lost deals, the deciding factors, competitors,
  * per-branch, and the closed deals whose QCD is still incomplete (each one
  * opens the QCD form and comes back here).
  */
-export function QcdDashboard({ cabangList, year, scopeLabel }: { cabangList: string[]; year: string; scopeLabel: string }) {
+export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdRecap' }: { cabangList: string[]; year: string; scopeLabel: string; returnTo?: ModalKey }) {
   const prospects = useDataStore((s) => s.prospects);
   const [month, setMonth] = useState('');
   const periode = month ? `${year}-${month}` : year;
@@ -52,7 +52,7 @@ export function QcdDashboard({ cabangList, year, scopeLabel }: { cabangList: str
   const maxF = Math.max(1, ...d.faktor.map((f) => Math.max(f.won, f.lost)));
 
   function openQcd(id: string, status: number) {
-    useUiStore.setState({ qcdCtx: { mode: 'kanban', statusVal: status, recordId: id, returnTo: 'kpi' } });
+    useUiStore.setState({ qcdCtx: { mode: 'kanban', statusVal: status, recordId: id, returnTo } });
     useUiStore.getState().openModal('qcd');
   }
 

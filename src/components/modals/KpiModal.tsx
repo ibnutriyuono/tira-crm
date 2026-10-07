@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
-import { QcdDashboard } from '../QcdDashboard';
 import { CABANG_LIST } from '@/lib/constants';
 import { formatRupiah } from '@/lib/format';
 import { buildKpiScorecard, MONTH_LABELS } from '@/lib/kpi';
@@ -49,7 +48,6 @@ export function KpiModal() {
 
   const [year, setYear] = useState(thisYear());
   const [scopeKey, setScopeKey] = useState('nasional'); // gm/admin's picker only
-  const [view, setView] = useState<'scorecard' | 'qcd'>('scorecard');
 
   // Cabang -> region is only knowable from prospect rows (no first-class
   // Cabang entity in this app) — identical technique to ForecastModal's own
@@ -225,7 +223,7 @@ export function KpiModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title={view === 'qcd' ? 'KPI — Dashboard QCD' : 'KPI Scorecard'}
+      title="KPI Scorecard"
       xwide
       footer={
         <button type="button" className="btn btn-outline" onClick={closeModal}>
@@ -233,21 +231,11 @@ export function KpiModal() {
         </button>
       }
     >
-      <div className="view-toggle" style={{ marginBottom: 12 }}>
-        <button type="button" className={view === 'scorecard' ? 'active' : ''} onClick={() => setView('scorecard')}>
-          KPI Scorecard
-        </button>
-        <button type="button" className={view === 'qcd' ? 'active' : ''} onClick={() => setView('qcd')}>
-          Dashboard QCD
-        </button>
-      </div>
-      {view === 'scorecard' && (
       <div className="import-summary" style={{ marginBottom: 14 }}>
         Sales Order, Invoice, dan Prospect/Opportunity dihitung otomatis dari data CRM, berjalan kumulatif dari Januari
         (year-to-date) — sama seperti pola budget pada template KPI resmi. Gross Margin masih diisi manual sampai
         terhubung dengan Sage 300.
       </div>
-      )}
 
       <div className="form-grid" style={{ marginBottom: 10 }}>
         <div>
@@ -279,10 +267,6 @@ export function KpiModal() {
         )}
       </div>
 
-      {view === 'qcd' ? (
-        <QcdDashboard cabangList={cabangList} year={year} scopeLabel={scopeLabel} />
-      ) : (
-      <>
       <div className="kpi-grid" style={{ marginBottom: 18 }}>
         <div className="kpi">
           <div className="label">Total Score ({MONTH_LABELS[snapshotIdx]})</div>
@@ -376,8 +360,6 @@ export function KpiModal() {
             </>
           )}
         </>
-      )}
-      </>
       )}
     </Modal>
   );
