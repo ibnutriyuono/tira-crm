@@ -691,4 +691,10 @@ tr.hl-yellow:hover td{ background:rgba(201,130,46,.18); }
 .rt-edit{background:transparent; border:none; color:#F3E2C4; padding:0 10px; height:100%; display:flex; align-items:center; opacity:.8;}
 .rt-edit:hover{opacity:1;}
 .rt-edit svg{width:15px; height:15px;}
-.rt-editor{position:absolute; right:8px; top:36px; z-index:60; width:min(420px, calc(100vw - 16px)); background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,.18);}
+.rt-editor{position:absolute; right:8px; top:36px; z-index:60; width:min(600px, calc(100vw - 16px)); max-height:calc(100vh - 120px); overflow-y:auto; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,.18);}
+.rt-checklist{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:6px 16px;}
+.rt-group-title{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-soft); margin:6px 0 4px;}
+.rt-check{display:flex; gap:8px; align-items:flex-start; padding:3px 0; text-transform:none; letter-spacing:0; font-size:12.5px; font-weight:500; color:var(--text); cursor:pointer;}
+.rt-check input{width:auto; margin-top:2px;}
+.rt-check small{display:block; font-size:11px; color:var(--text-soft); font-weight:400;}
+.rt-kurs{display:flex; flex-direction:column; gap:3px; flex:1; text-transform:none; letter-spacing:0; font-size:12px;}
