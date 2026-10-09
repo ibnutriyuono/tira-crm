@@ -161,3 +161,22 @@ export function materialUnitPrice(m: { beratPc?: unknown; hargaKg?: unknown; har
   const hargaKg = num(m.hargaKg);
   return beratPc > 0 && hargaKg > 0 ? beratPc * hargaKg : num(m.harga);
 }
+
+/**
+ * Each material of a prospect with its value (qty x unit price, where the
+ * unit price is berat/pc x harga/kg when both are filled, else harga -- same
+ * rule as the prospect form). When no material carries a price but the
+ * prospect has a total value, that total is split across the materials by
+ * qty, so per-Line reports never show Rp 0 for a priced prospect.
+ */
+export function materialsWithValue(r: Pick<Prospect, 'materials' | 'qty' | 'value' | 'line' | 'uraian'>): (Material & { nilai: number })[] {
+  const mats = getProspectMaterials(r);
+  const vals = mats.map((m) => num(m.qty) * materialUnitPrice(m));
+  const sum = vals.reduce((s, v) => s + v, 0);
+  const total = num(r.value);
+  if (sum <= 0 && total > 0 && mats.length) {
+    const qtySum = mats.reduce((s, m) => s + Math.max(0, num(m.qty)), 0);
+    return mats.map((m) => ({ ...m, nilai: qtySum > 0 ? (total * Math.max(0, num(m.qty))) / qtySum : total / mats.length }));
+  }
+  return mats.map((m, i) => ({ ...m, nilai: vals[i] }));
+}

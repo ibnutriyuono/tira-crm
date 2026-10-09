@@ -124,6 +124,8 @@ interface UiState {
   cancelDocCtx: CancelDocCtx | null;
   followUpCtx: FollowUpCtx | null;
   salesPlanCtx: SalesPlanCtx | null;
+  /** Opens Aktivitas Harian with these fields filled (e.g. from Marketing > Reaktivasi); returnTo reopens that screen on close. */
+  activityPrefill: { customer: string; keterangan?: string; tipe?: string; returnTo?: ModalKey } | null;
   userEditId: string | null;
   customerEditId: string | null;
   vendorEditId: string | null;
@@ -208,6 +210,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   cancelDocCtx: null,
   followUpCtx: null,
   salesPlanCtx: null,
+  activityPrefill: null,
   userEditId: null,
   customerEditId: null,
   vendorEditId: null,

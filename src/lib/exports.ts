@@ -1,6 +1,7 @@
 import { classify, formatDateID, formatRupiah, materialUnitPrice, num } from './format';
 import { WORKFLOW_META, fupaAsWorkflowDoc, rfqAsWorkflowDoc, workflowStage } from './purchasing-workflow';
-import type { BudgetTarget, Customer, Fupa, Prospect, Rfq, RfqItem, SalesPlan, Vendor } from './types';
+import { ACTIVITY_TYPES, STATUS_META } from './constants';
+import type { BudgetTarget, Customer, Fupa, Prospect, Rfq, RfqItem, SalesActivity, SalesPlan, Vendor } from './types';
 
 /** What every builder below returns — enough for xlsx.utils.aoa_to_sheet plus column widths, and a sheet name that stays under Excel's 31-char sheet-name limit. */
 export interface SheetSpec {
@@ -163,6 +164,36 @@ export function buildBudgetTargetSheet(list: BudgetTarget[]): SheetSpec {
   const rows = list.map((t) => [t.periode, t.cabang, num(t.amount)]);
   const colWidths = [{ wch: 9 }, { wch: 8 }, { wch: 18 }];
   return { sheetName: 'Target Bulanan', header, rows, colWidths };
+}
+
+const ACT_LABEL: Record<string, string> = Object.fromEntries(ACTIVITY_TYPES.map((t) => [t.key, t.label]));
+
+/**
+ * Aktivitas Harian, one row per activity, oldest first. PIC list is joined
+ * into one cell ("Nama (Jabatan); ..."). Pipeline = current status of the
+ * linked prospect when the viewer can see it.
+ */
+export function buildSalesActivitySheet(list: SalesActivity[], prospects: Pick<Prospect, 'id' | 'status'>[] = []): SheetSpec {
+  const statusById = new Map(prospects.map((p) => [p.id, Number(p.status)]));
+  const header = ['TANGGAL', 'SE', 'CABANG', 'REGIONAL', 'JENIS AKTIVITAS', 'CUSTOMER', 'PIC (JABATAN)', 'KETERANGAN', 'STATUS', 'SUMBER', 'PIPELINE', 'DIISI OLEH'];
+  const rows = list
+    .slice()
+    .sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.se.localeCompare(b.se) || String(a.createdAt).localeCompare(String(b.createdAt)))
+    .map((a) => {
+      const st = a.prospectId ? statusById.get(a.prospectId) : undefined;
+      return [
+        a.tanggal, a.se, a.cabang || '', a.reg ?? '',
+        ACT_LABEL[a.tipe] || a.tipe, a.customer,
+        (a.pics || []).map((p) => (p.jabatan ? `${p.nama} (${p.jabatan})` : p.nama)).filter(Boolean).join('; '),
+        a.keterangan || '',
+        a.status === 'rencana' ? 'Rencana' : 'Selesai',
+        a.sumber === 'followup' ? 'Otomatis (Follow-up)' : 'Manual',
+        a.prospectId ? (st != null ? STATUS_META[st]?.label || 'Di pipeline' : 'Di pipeline') : '',
+        a.createdBy || '',
+      ];
+    });
+  const colWidths = [{ wch: 11 }, { wch: 8 }, { wch: 8 }, { wch: 9 }, { wch: 22 }, { wch: 30 }, { wch: 34 }, { wch: 50 }, { wch: 9 }, { wch: 18 }, { wch: 16 }, { wch: 16 }];
+  return { sheetName: 'Aktivitas Harian', header, rows, colWidths };
 }
 
 export const STATUS_LEGEND: SheetSpec = {

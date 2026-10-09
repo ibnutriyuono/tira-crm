@@ -9,8 +9,9 @@ import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { todayStr } from '@/lib/format';
 import { countNewPurchasingItems } from '@/lib/purchasing-workflow';
 import { countUrgentFollowUps } from '@/lib/reports';
-import { appendSheet, buildBudgetTargetSheet, buildCustomerSheet, buildFupaSheet, buildProspectSheet, buildRfqSheet, buildSalesPlanSheet, buildVendorSheet, STATUS_LEGEND } from '@/lib/exports';
+import { appendSheet, buildBudgetTargetSheet, buildCustomerSheet, buildFupaSheet, buildProspectSheet, buildRfqSheet, buildSalesActivitySheet, buildSalesPlanSheet, buildVendorSheet, STATUS_LEGEND } from '@/lib/exports';
 import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconDownload, IconExport, IconImport, IconPlus, IconPresentation, IconRfq, IconSave, IconSearch, IconTarget, IconTemplate, IconUsers } from './icons';
+import type { SalesActivity } from '@/lib/types';
 
 const ROLE_LABEL: Record<string, { label: string; color: string }> = {
   admin: { label: 'Admin', color: 'amber' },
@@ -77,6 +78,14 @@ export function TopBar() {
   // module's own screen produces.
   async function exportAllExcel() {
     const s = useDataStore.getState();
+    // Aktivitas Harian isn't kept in the store (loaded per month), so it's
+    // fetched here -- all months this role can see. A failure skips the sheet.
+    let activities: SalesActivity[] = [];
+    try {
+      activities = (await api.get<{ activities: SalesActivity[] }>('/api/sales-activities?all=1')).activities;
+    } catch {
+      activities = [];
+    }
     const specs = [
       s.prospects.length && buildProspectSheet(s.prospects),
       s.rfqs.length && buildRfqSheet(s.rfqs),
@@ -85,6 +94,7 @@ export function TopBar() {
       s.vendors.length && buildVendorSheet(s.vendors),
       s.salesPlans.length && buildSalesPlanSheet(s.salesPlans),
       s.budgetTargets.length && buildBudgetTargetSheet(s.budgetTargets),
+      activities.length && buildSalesActivitySheet(activities, s.prospects),
     ].filter(Boolean) as ReturnType<typeof buildProspectSheet>[];
     if (specs.length === 0) return toast('Tidak ada data untuk diexport', 'error');
     const XLSX = await import('xlsx');

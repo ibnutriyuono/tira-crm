@@ -1,15 +1,17 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { IconDownload, IconWa } from '../icons';
 import { STAGE_PROBABILITY, STATUS_META } from '@/lib/constants';
-import { classify, formatDateID, formatRupiah, getProspectMaterials, normalizePhone, num, todayStr } from '@/lib/format';
+import { classify, formatDateID, formatRupiah, getProspectMaterials, materialsWithValue, normalizePhone, num, todayStr } from '@/lib/format';
 import { buildCustomerIntel, type CustomerIntelRow } from '@/lib/reports';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
-import type { Prospect } from '@/lib/types';
+import { activityLabel, buildContactIndex, lastContactAfter } from '@/lib/reaktivasi';
+import { activityOwner } from '@/lib/sales-activity';
+import type { Prospect, SalesActivity } from '@/lib/types';
 
 type Tab = 'tren' | 'hitrate' | 'aktivitas' | 'reaktivasi' | 'kekalahan' | 'crosssell' | 'konten' | 'corong';
 
@@ -24,7 +26,8 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'corong', label: 'Corong Konversi' },
 ];
 
-/** Tags reactivation follow-ups so this screen can recognise its own entries. */
+/** Tag of the old reactivation entries (saved as Sales Activity prospects before
+ * this screen read Aktivitas Harian); still recognised so history isn't lost. */
 const ACTIVITY_TAG = '[Reaktivasi]';
 
 function recordDate(r: Prospect): string {
@@ -65,13 +68,30 @@ export function MarketingModal() {
 
   const currentUser = useDataStore((s) => s.currentUser);
   const prospects = useDataStore((s) => s.prospects);
-  const upsertProspect = useDataStore((s) => s.upsertProspect);
   const toast = useDataStore((s) => s.toast);
 
   const [tab, setTab] = useState<Tab>('tren');
   const [search, setSearch] = useState('');
   const [scope, setScope] = useState<'dingin' | 'semua'>('dingin');
-  const [busyId, setBusyId] = useState('');
+  const openModal = useUiStore((s) => s.openModal);
+  const canLogActivity = !!currentUser && activityOwner(currentUser) !== null;
+  // Aktivitas Harian (every month this role can see) -- what Reaktivasi reads
+  // to know who was already contacted.
+  const [activities, setActivities] = useState<SalesActivity[]>([]);
+  const [actLoaded, setActLoaded] = useState(false);
+  const loadActivities = useCallback(async () => {
+    try {
+      setActivities((await api.get<{ activities: SalesActivity[] }>('/api/sales-activities?all=1')).activities);
+    } catch {
+      setActivities([]);
+    } finally {
+      setActLoaded(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (show && tab === 'reaktivasi') void loadActivities();
+  }, [show, tab, loadActivities]);
+  const contactIndex = useMemo(() => buildContactIndex(activities), [activities]);
   const [aktGran, setAktGran] = useState<'hari' | 'pekan' | 'bulan' | 'tahun'>('hari');
   const [aktSe, setAktSe] = useState('');
   const [aktJenis, setAktJenis] = useState('');
@@ -89,7 +109,14 @@ export function MarketingModal() {
     return [...l].sort((a, b) => b.wonValue - a.wonValue);
   }, [intel, scope, search]);
 
-  const belumDihubungi = targets.filter((c) => !alreadyContacted(c));
+  /** Latest contact after the last order: an Aktivitas Harian entry, else an old [Reaktivasi] note. */
+  const contactOf = (c: CustomerIntelRow): { tanggal: string; act: SalesActivity | null } | null => {
+    const act = lastContactAfter(contactIndex, c.name, c.lastOrderDate);
+    if (act) return { tanggal: act.tanggal, act };
+    const legacy = alreadyContacted(c);
+    return legacy ? { tanggal: (legacy.createdAt || '').slice(0, 10), act: null } : null;
+  };
+  const belumDihubungi = targets.filter((c) => !contactOf(c));
   const potensiValue = belumDihubungi.reduce((s, c) => s + c.wonValue, 0);
 
   function buildMessage(c: CustomerIntelRow): string {
@@ -101,35 +128,36 @@ export function MarketingModal() {
     return sapaan + konteks + `\n\nKami siap bantu cek ketersediaan stok dan harga terbaik. Terima kasih.`;
   }
 
-  function openWa(c: CustomerIntelRow) {
+  async function openWa(c: CustomerIntelRow) {
     const phone = normalizePhone(customerPhone(c));
     if (phone.length < 9) return toast(`Nomor WhatsApp ${c.name} belum ada di data prospek.`, 'error');
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(buildMessage(c))}`, '_blank');
-  }
-
-  async function logContact(c: CustomerIntelRow) {
-    const ref = c.records[0];
-    setBusyId(c.name);
+    // The message going out is the contact: record it in Aktivitas Harian.
     try {
-      const { prospect } = await api.post<{ prospect: Prospect }>('/api/prospects', {
-        reg: ref?.reg ?? null,
-        cabang: c.cabang,
-        se: ref?.se || currentUser?.se || '',
-        customer: c.name,
-        phone: customerPhone(c),
-        status: 0,
-        materials: [{ line: ref?.line || '', uraian: 'Follow-up reaktivasi customer', qty: 1, harga: 0 }],
-        kondisiStock: '',
-        keterangan: `${ACTIVITY_TAG} Dihubungi ${formatDateID(todayStr())} oleh ${currentUser?.name || '-'} — terakhir order ${c.lastOrderDate ? formatDateID(c.lastOrderDate) : '-'} (${c.daysSinceOrder} hari lalu)`,
-      });
-      upsertProspect(prospect);
-      toast(`Follow-up ${c.name} tercatat sebagai Sales Activity`, 'success');
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal mencatat follow-up', 'error');
-    } finally {
-      setBusyId('');
+      const res = await api.post<{ logged: boolean }>('/api/follow-ups/done', { customerName: c.name, channel: 'WhatsApp (Reaktivasi)' });
+      if (res.logged) {
+        toast(`Follow-up ${c.name} tercatat di Aktivitas Harian`, 'success');
+        void loadActivities();
+      }
+    } catch {
+      // logging is best-effort; WhatsApp is already open
     }
   }
+
+  /** Visit / call / meeting not done through WhatsApp: record it in Aktivitas Harian, customer filled in. */
+  function logContact(c: CustomerIntelRow) {
+    useUiStore.setState({
+      activityPrefill: {
+        customer: c.name,
+        tipe: 'telepon',
+        keterangan: `Reaktivasi — terakhir order ${c.lastOrderDate ? formatDateID(c.lastOrderDate) : '-'} (${c.daysSinceOrder} hari lalu). `,
+        returnTo: 'marketing',
+      },
+    });
+    openModal('salesActivity');
+  }
+
+
 
 
   // ---- 0. Tren: 12 bulan terakhir + pergeseran per line ----
@@ -177,9 +205,9 @@ export function MarketingModal() {
       prospects
         .filter((r) => classify(r) === 'Won' && ms.includes((dateOf(r) || '').slice(0, 7)))
         .forEach((r) =>
-          getProspectMaterials(r).forEach((mt) => {
+          materialsWithValue(r).forEach((mt) => {
             const ln = (mt.line || '').trim();
-            if (ln) map.set(ln, (map.get(ln) || 0) + num(mt.qty) * num(mt.harga));
+            if (ln) map.set(ln, (map.get(ln) || 0) + mt.nilai);
           }),
         );
       return map;
@@ -215,9 +243,9 @@ export function MarketingModal() {
       const klas = classify(r);
       // Nilai dihitung per baris material supaya sebuah prospek multi-line
       // tidak dihitung penuh di setiap line-nya.
-      getProspectMaterials(r).forEach((mt) => {
+      materialsWithValue(r).forEach((mt) => {
         const ln = (mt.line || '').trim() || '(Tanpa Line)';
-        const nilai = num(mt.qty) * num(mt.harga);
+        const nilai = mt.nilai;
         const e = touch(ln);
         e.nPenawaran++;
         e.vPenawaran += nilai;
@@ -388,9 +416,9 @@ export function MarketingModal() {
   const kontenIdeas = useMemo(() => {
     const lineValue = new Map<string, number>();
     prospects.filter((r) => classify(r) === 'Won').forEach((r) =>
-      getProspectMaterials(r).forEach((m) => {
+      materialsWithValue(r).forEach((m) => {
         const ln = (m.line || '').trim();
-        if (ln) lineValue.set(ln, (lineValue.get(ln) || 0) + num(m.qty) * num(m.harga));
+        if (ln) lineValue.set(ln, (lineValue.get(ln) || 0) + m.nilai);
       }),
     );
     const ideas: { judul: string; alasan: string; sumber: string }[] = [];
@@ -436,13 +464,16 @@ export function MarketingModal() {
 
   async function exportReaktivasi() {
     const XLSX = await import('xlsx');
-    const aoa: unknown[][] = [['CUSTOMER', 'CABANG', 'ORDER TERAKHIR', 'HARI SEJAK ORDER', 'TOTAL NILAI PEMBELIAN', 'MATERIAL TERAKHIR', 'NO. WHATSAPP', 'SUDAH DIHUBUNGI']];
+    const aoa: unknown[][] = [['CUSTOMER', 'CABANG', 'ORDER TERAKHIR', 'HARI SEJAK ORDER', 'TOTAL NILAI PEMBELIAN', 'MATERIAL TERAKHIR', 'NO. WHATSAPP', 'SUDAH DIHUBUNGI', 'JENIS KONTAK', 'SE', 'KETERANGAN AKTIVITAS']];
     targets.forEach((c) => {
-      const contacted = alreadyContacted(c);
-      aoa.push([c.name, c.cabang || '', c.lastOrderDate ? formatDateID(c.lastOrderDate) : '-', c.daysSinceOrder ?? '', c.wonValue, lastWonItem(c)?.uraian || '', customerPhone(c), contacted ? formatDateID((contacted.createdAt || '').slice(0, 10)) : 'Belum']);
+      const k = contactOf(c);
+      aoa.push([
+        c.name, c.cabang || '', c.lastOrderDate ? formatDateID(c.lastOrderDate) : '-', c.daysSinceOrder ?? '', c.wonValue, lastWonItem(c)?.uraian || '', customerPhone(c),
+        k ? formatDateID(k.tanggal) : 'Belum', k?.act ? activityLabel(k.act.tipe) : '', k?.act?.se || '', k?.act?.keterangan || '',
+      ]);
     });
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 28 }, { wch: 8 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 30 }, { wch: 16 }, { wch: 16 }];
+    ws['!cols'] = [{ wch: 28 }, { wch: 8 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 22 }, { wch: 8 }, { wch: 44 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Reaktivasi');
     XLSX.writeFile(wb, `Kampanye_Reaktivasi_${todayStr()}.xlsx`);
@@ -854,6 +885,7 @@ export function MarketingModal() {
         <div>
           <div className="import-summary" style={{ marginBottom: 14 }}>
             Customer yang sudah lama tidak order, diurutkan dari <b>nilai pembelian terbesar</b> — bukan dari yang paling lama diam. Mereka sudah pernah beli dan kenal kualitas kita, jadi peluang tutupnya lebih tinggi daripada prospek baru.
+            Status follow-up dibaca dari <b>Aktivitas Harian</b>: customer dianggap sudah dihubungi bila ada aktivitas (kunjungan, telepon/WA, meeting, dokumen) setelah order terakhirnya.
           </div>
           <div className="kpi-grid" style={{ marginBottom: 18 }}>
             <div className="kpi rust">
@@ -901,7 +933,7 @@ export function MarketingModal() {
                 </thead>
                 <tbody>
                   {targets.map((c) => {
-                    const contacted = alreadyContacted(c);
+                    const k = contactOf(c);
                     const phone = customerPhone(c);
                     return (
                       <tr key={c.name}>
@@ -916,13 +948,35 @@ export function MarketingModal() {
                         </td>
                         <td className="num">{formatRupiah(c.wonValue)}</td>
                         <td style={{ maxWidth: 220, whiteSpace: 'normal' }}>{lastWonItem(c)?.uraian || '-'}</td>
-                        <td>{contacted ? <span className="badge green">Sudah {formatDateID((contacted.createdAt || '').slice(0, 10))}</span> : <span className="badge slate">Belum</span>}</td>
+                        <td style={{ maxWidth: 240, whiteSpace: 'normal' }}>
+                          {k ? (
+                            <>
+                              <span className="badge green">Sudah {formatDateID(k.tanggal)}</span>
+                              {k.act ? (
+                                <div className="field-note" style={{ marginTop: 3 }}>
+                                  {activityLabel(k.act.tipe)} · SE {k.act.se}
+                                  {k.act.keterangan && <div title={k.act.keterangan}>{k.act.keterangan.length > 90 ? `${k.act.keterangan.slice(0, 90)}…` : k.act.keterangan}</div>}
+                                </div>
+                              ) : (
+                                <div className="field-note" style={{ marginTop: 3 }}>catatan lama</div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="badge slate">{actLoaded ? 'Belum' : '…'}</span>
+                          )}
+                        </td>
                         <td>
                           <div className="row-actions">
                             <button type="button" className="btn btn-wa btn-sm" disabled={!phone} onClick={() => openWa(c)}>
                               <IconWa /> WhatsApp
                             </button>
-                            <button type="button" className="btn btn-outline btn-sm" disabled={busyId === c.name} onClick={() => logContact(c)}>
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm"
+                              disabled={!canLogActivity}
+                              title={canLogActivity ? 'Catat kunjungan / telepon / meeting ke Aktivitas Harian' : 'Pencatatan aktivitas hanya untuk Sales dan BM'}
+                              onClick={() => logContact(c)}
+                            >
                               Catat
                             </button>
                           </div>

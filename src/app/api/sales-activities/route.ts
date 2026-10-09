@@ -11,11 +11,14 @@ export async function GET(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
 
-  const periode = new URL(req.url).searchParams.get('periode') || new Date().toISOString().slice(0, 7);
-  if (!/^\d{4}-\d{2}$/.test(periode)) return NextResponse.json({ error: 'Periode harus YYYY-MM' }, { status: 400 });
+  const params = new URL(req.url).searchParams;
+  // ?all=1 -> every activity this role can see (Export Semua); otherwise one month.
+  const all = params.get('all') === '1';
+  const periode = params.get('periode') || new Date().toISOString().slice(0, 7);
+  if (!all && !/^\d{4}-\d{2}$/.test(periode)) return NextResponse.json({ error: 'Periode harus YYYY-MM' }, { status: 400 });
 
   const activities = await prisma.salesActivity.findMany({
-    where: { AND: [await salesActivityScopeWhere(user), { tanggal: { startsWith: periode } }] },
+    where: { AND: [await salesActivityScopeWhere(user), all ? {} : { tanggal: { startsWith: periode } }] },
     orderBy: [{ tanggal: 'desc' }, { createdAt: 'desc' }],
   });
   return NextResponse.json({ activities });

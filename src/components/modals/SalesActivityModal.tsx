@@ -9,9 +9,10 @@ import { formatDateID, formatRupiah } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { activityOwner, localToday } from '@/lib/sales-activity';
 import { useDataStore } from '@/store/useDataStore';
-import { EMPTY_QCD, useUiStore, type PendingQcd } from '@/store/useUiStore';
+import { EMPTY_QCD, useUiStore, type ModalKey, type PendingQcd } from '@/store/useUiStore';
 import { qcdMissing } from '@/lib/qcd';
 import { QcdFields, qcdPayload } from '../QcdFields';
+import { appendSheet, buildSalesActivitySheet } from '@/lib/exports';
 import type { ActivityPic, Prospect, SalesActivity } from '@/lib/types';
 
 const TIPE_LABEL: Record<string, string> = Object.fromEntries(ACTIVITY_TYPES.map((t) => [t.key, t.label]));
@@ -32,8 +33,12 @@ interface ConvertCtx {
  */
 export function SalesActivityModal() {
   const show = useUiStore((s) => s.modal === 'salesActivity');
-  const closeModal = useUiStore((s) => s.closeModal);
+  const closeModalRaw = useUiStore((s) => s.closeModal);
   const openModal = useUiStore((s) => s.openModal);
+  // Opened from another screen (Reaktivasi) with a customer pre-filled: go
+  // back there on close.
+  const [returnTo, setReturnTo] = useState<ModalKey | null>(null);
+  const closeModal = () => (returnTo ? openModal(returnTo) : closeModalRaw());
 
   const currentUser = useDataStore((s) => s.currentUser);
   const customers = useDataStore((s) => s.customers);
@@ -76,11 +81,30 @@ export function SalesActivityModal() {
     }
   }, [periode, toast]);
 
+  // The whole month this role can see (not only the selected day), same
+  // columns as the "Aktivitas Harian" sheet in Export Semua.
+  async function exportExcel() {
+    if (activities.length === 0) return toast(`Belum ada aktivitas pada ${periode}`, 'error');
+    const XLSX = await import('xlsx');
+    const wb = XLSX.utils.book_new();
+    appendSheet(XLSX, wb, buildSalesActivitySheet(activities, prospects));
+    XLSX.writeFile(wb, `CRM_Aktivitas_Harian_${periode}.xlsx`);
+    toast(`Export berhasil: ${activities.length} aktivitas (${periode})`, 'success');
+  }
+
   useEffect(() => {
     if (!show) return;
     setTanggal(localToday());
     setConvert(null);
     resetForm();
+    const pre = useUiStore.getState().activityPrefill;
+    setReturnTo(pre?.returnTo || null);
+    if (pre) {
+      setCustomer(pre.customer);
+      if (pre.keterangan) setKeterangan(pre.keterangan);
+      if (pre.tipe) setTipe(pre.tipe as ActivityTipe);
+      useUiStore.setState({ activityPrefill: null });
+    }
   }, [show]);
 
   useEffect(() => {
@@ -234,6 +258,9 @@ export function SalesActivityModal() {
       xwide
       footer={
         <>
+          <button type="button" className="btn btn-outline" style={{ marginRight: 'auto' }} onClick={exportExcel} disabled={loading}>
+            Export Excel ({periode})
+          </button>
           <button
             type="button"
             className="btn btn-outline"

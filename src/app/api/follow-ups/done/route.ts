@@ -34,5 +34,18 @@ export async function POST(req: Request) {
     await logActivity({ user, action: 'update', entity: 'customer', entityId: customer.id, summary: `Follow-up via ${channel} ke "${customer.name}"${res.logged ? ' (tercatat di Aktivitas Harian)' : ''}` });
     return NextResponse.json(res);
   }
-  return NextResponse.json({ error: 'prospectId atau customerId wajib diisi' }, { status: 400 });
+  if (body?.customerName) {
+    // Reaktivasi works on customers known from the prospect history; the name
+    // must belong to a prospect this user can see.
+    const name = String(body.customerName).trim();
+    const ref = await prisma.prospect.findFirst({
+      where: { AND: [{ customer: { equals: name, mode: 'insensitive' } }, await prospectScopeWhere(user)] },
+      orderBy: { updatedAt: 'desc' },
+    });
+    if (!ref) return NextResponse.json({ error: 'Customer tidak ditemukan' }, { status: 404 });
+    const res = await logFollowUpDone(user, { customer: { name: ref.customer, cabang: ref.cabang } }, channel);
+    await logActivity({ user, action: 'update', entity: 'customer', summary: `Follow-up via ${channel} ke "${ref.customer}"${res.logged ? ' (tercatat di Aktivitas Harian)' : ''}` });
+    return NextResponse.json(res);
+  }
+  return NextResponse.json({ error: 'prospectId, customerId atau customerName wajib diisi' }, { status: 400 });
 }
