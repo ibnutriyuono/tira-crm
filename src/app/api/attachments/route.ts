@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
+import { docVisibleTo, prospectScopeWhere } from '@/lib/auth';
+import type { SafeUser } from '@/lib/types';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { ATTACHMENT_MAX_BYTES } from '@/lib/constants';
@@ -12,6 +14,10 @@ import { emitCrmEvent } from '@/lib/socket';
 // labels so what the user is told matches what is enforced.
 const MAX_BYTES = ATTACHMENT_MAX_BYTES;
 
+async function prospectVisible(user: SafeUser, id: string): Promise<boolean> {
+  return !!(await prisma.prospect.findFirst({ where: { id, ...prospectScopeWhere(user) }, select: { id: true } }));
+}
+
 export async function GET(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
@@ -19,12 +25,31 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const rfqId = searchParams.get('rfqId');
   const fupaId = searchParams.get('fupaId');
-  if (!rfqId && !fupaId) return NextResponse.json({ error: 'rfqId atau fupaId wajib diisi.' }, { status: 400 });
+  const prospectId = searchParams.get('prospectId');
+  if (!rfqId && !fupaId && !prospectId) return NextResponse.json({ error: 'rfqId, fupaId atau prospectId wajib diisi.' }, { status: 400 });
 
+  if (prospectId && !rfqId && !fupaId) {
+    if (!(await prospectVisible(user, prospectId))) return NextResponse.json({ attachments: [] });
+    const attachments = await prisma.attachment.findMany({ where: { prospectId }, orderBy: { createdAt: 'asc' } });
+    return NextResponse.json({ attachments });
+  }
+
+  if (!(await docVisibleTo(user, { rfqId, fupaId }))) return NextResponse.json({ attachments: [] });
   const attachments = await prisma.attachment.findMany({
     where: rfqId ? { rfqId } : { fupaId },
     orderBy: { createdAt: 'asc' },
   });
+  // withProspect: also the drawings attached to the source prospect (Line 05),
+  // read-only here. Visible to whoever may see the document itself.
+  if (searchParams.get('withProspect')) {
+    const doc = rfqId
+      ? await prisma.rfq.findUnique({ where: { id: rfqId }, select: { prospectId: true } })
+      : await prisma.fupa.findUnique({ where: { id: fupaId as string }, select: { prospectId: true } });
+    if (doc?.prospectId) {
+      const fromProspect = await prisma.attachment.findMany({ where: { prospectId: doc.prospectId }, orderBy: { createdAt: 'asc' } });
+      return NextResponse.json({ attachments: [...fromProspect.map((a: object) => ({ ...a, fromProspect: true })), ...attachments] });
+    }
+  }
   return NextResponse.json({ attachments });
 }
 
@@ -52,15 +77,19 @@ export async function POST(req: Request) {
   const file = form.get('file');
   const rfqId = (form.get('rfqId') as string) || null;
   const fupaId = (form.get('fupaId') as string) || null;
+  const prospectId = !rfqId && !fupaId ? (form.get('prospectId') as string) || null : null;
 
   if (!(file instanceof File)) return NextResponse.json({ error: 'File tidak ditemukan.' }, { status: 400 });
-  if (!rfqId && !fupaId) return NextResponse.json({ error: 'rfqId atau fupaId wajib diisi.' }, { status: 400 });
+  if (!rfqId && !fupaId && !prospectId) return NextResponse.json({ error: 'rfqId, fupaId atau prospectId wajib diisi.' }, { status: 400 });
+  if (prospectId && !(await prospectVisible(user, prospectId))) return NextResponse.json({ error: 'Prospek tidak ditemukan.' }, { status: 404 });
+  if (!prospectId && !(await docVisibleTo(user, { rfqId, fupaId }))) return NextResponse.json({ error: 'Dokumen tidak ditemukan.' }, { status: 404 });
   if (file.size > MAX_BYTES) {
     return NextResponse.json({ error: `File "${file.name}" melebihi batas ${Math.round(MAX_BYTES / 1024 / 1024)}MB.` }, { status: 413 });
   }
 
-  const entity = rfqId ? 'rfq' : 'fupa';
-  const key = buildKey(entity, (rfqId || fupaId) as string, file.name);
+  const entity = rfqId ? 'rfq' : fupaId ? 'fupa' : 'prospect';
+  const parentId = (rfqId || fupaId || prospectId) as string;
+  const key = buildKey(entity, parentId, file.name);
   const buffer = Buffer.from(await file.arrayBuffer());
 
   try {
@@ -70,16 +99,16 @@ export async function POST(req: Request) {
   }
 
   const attachment = await prisma.attachment.create({
-    data: { rfqId, fupaId, name: file.name, type: file.type || null, size: file.size, key, uploadedBy: user.name },
+    data: { rfqId, fupaId, prospectId, name: file.name, type: file.type || null, size: file.size, key, uploadedBy: user.name },
   });
 
   emitCrmEvent('attachment:created', attachment);
   await logActivity({
     user,
     action: 'create',
-    entity: entity === 'rfq' ? 'rfq' : 'fupa',
-    entityId: (rfqId || fupaId) as string,
-    summary: `Melampirkan file "${file.name}" pada ${entity === 'rfq' ? 'RFQ' : 'FUP A'}`,
+    entity,
+    entityId: parentId,
+    summary: `Melampirkan file "${file.name}" pada ${entity === 'rfq' ? 'RFQ' : entity === 'fupa' ? 'FUP A' : 'prospek (gambar Line 05)'}`,
   });
   return NextResponse.json({ attachment }, { status: 201 });
 }

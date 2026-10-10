@@ -12,11 +12,11 @@ import type { Customer, Prospect } from '@/lib/types';
 
 function buildProspectMessage(r: Prospect, senderName: string): string {
   const stMeta = STATUS_META[num(r.status)] || STATUS_META[0];
-  return `Selamat siang Bapak/Ibu ${r.customer},\n\nKami dari PT Tira Austenite (Steel Division) ingin follow up terkait penawaran berikut:\n- Produk: ${r.uraian || '-'}\n- Qty: ${num(r.qty)} pcs\n- Status saat ini: ${stMeta.label}\n\nMohon info perkembangan / kepastian order dari Bapak/Ibu. Terima kasih.\n\nSalam,\n${senderName}`;
+  return `Selamat siang Bapak/Ibu ${r.customer},\n\nKami dari PT. TIRA AUSTENITE, Tbk (Steel Division) ingin follow up terkait penawaran berikut:\n- Produk: ${r.uraian || '-'}\n- Qty: ${num(r.qty)} pcs\n- Status saat ini: ${stMeta.label}\n\nMohon info perkembangan / kepastian order dari Bapak/Ibu. Terima kasih.\n\nSalam,\n${senderName}`;
 }
 function buildCustomerMessage(c: Customer, senderName: string): string {
   const picName = getPrimaryPic(c)?.nama || c.name;
-  return `Selamat siang Bapak/Ibu ${picName},\n\nKami dari PT Tira Austenite (Steel Division) ingin menyapa dan menginformasikan ketersediaan produk baja terbaru kami untuk kebutuhan ${c.name}.\n\nMohon informasi apabila ada kebutuhan yang dapat kami bantu. Terima kasih.\n\nSalam,\n${senderName}`;
+  return `Selamat siang Bapak/Ibu ${picName},\n\nKami dari PT. TIRA AUSTENITE, Tbk (Steel Division) ingin menyapa dan menginformasikan ketersediaan produk baja terbaru kami untuk kebutuhan ${c.name}.\n\nMohon informasi apabila ada kebutuhan yang dapat kami bantu. Terima kasih.\n\nSalam,\n${senderName}`;
 }
 
 export function FollowUpModal() {

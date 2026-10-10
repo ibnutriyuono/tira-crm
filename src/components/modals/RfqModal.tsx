@@ -5,15 +5,37 @@ import { Modal } from '../Modal';
 import { CustomerNameInput } from '../CustomerNameInput';
 import { AttachmentList } from '../AttachmentList';
 import { ItemChat } from '../ItemChat';
-import { IconDownload, IconMail, IconPlus, IconSave, IconTrash, IconWa } from '../icons';
-import { ATTACHMENT_MAX_BYTES, RFQ_LOKAL_OPTIONS } from '@/lib/constants';
-import { formatDateID, formatFileSize, formatRupiah, getProspectMaterials, normalizeLine, normalizePhone, num, todayStr } from '@/lib/format';
+import { MaterialSpecEditor } from '../MaterialSpecEditor';
+import { emptyRow, itemToRow, materialRowsToItemRows, materialToRow, rowToItem, type SpecRow } from '@/lib/material-spec';
+import { IconDownload, IconMail, IconSave, IconWa } from '../icons';
+import { ATTACHMENT_MAX_BYTES } from '@/lib/constants';
+import { formatDateID, formatFileSize, getProspectMaterials, normalizePhone, todayStr } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Rfq, RfqItem } from '@/lib/types';
 
-const emptyItem = (): RfqItem => ({ line: '', grade: '', material: '', dia: '', thick: '', width: '', length: '', pcs: 1, berat: '', lokal: 'LOKAL ATAU IMPORT', estimasi: '' });
+
+/** Purchasing's answer on one material, shown under the row once it exists. */
+function PurchasingAnswer({ it }: { it?: RfqItem }) {
+  if (!it || !(it.hargaPurchasing || it.coo || it.note || it.deliveryTime || it.noQuote)) return null;
+  return (
+    <div className="import-summary" style={{ margin: 0 }}>
+      <b>Jawaban Purchasing:</b>{' '}
+      {it.noQuote ? (
+        <span className="badge rust">No Quote</span>
+      ) : (
+        <>
+          {it.hargaPurchasing ? `${it.currency || 'IDR'} ${Math.round(it.hargaPurchasing).toLocaleString('id-ID')}` : '-'}
+          {it.uom ? ` / ${it.uom}` : ''}
+          {it.deliveryTime ? ` · Delivery: ${it.deliveryTime}` : ''}
+          {it.coo ? ` · Origin: ${it.coo}` : ''}
+          {it.note ? ` · ${it.note}` : ''}
+        </>
+      )}
+    </div>
+  );
+}
 
 export function RfqModal() {
   const modal = useUiStore((s) => s.modal);
@@ -34,7 +56,9 @@ export function RfqModal() {
   const [tglRfq, setTglRfq] = useState('');
   const [cabang, setCabang] = useState('');
   const [cust, setCust] = useState('');
-  const [items, setItems] = useState<RfqItem[]>([emptyItem()]);
+  // Edited as spec rows (bentuk, ukuran, …); `items` is what gets stored / sent.
+  const [rows, setRows] = useState<SpecRow[]>([emptyRow()]);
+  const items = useMemo<RfqItem[]>(() => rows.map(rowToItem), [rows]);
   const [catatan, setCatatan] = useState('');
   const [purchWa, setPurchWa] = useState('');
   const [purchEmail, setPurchEmail] = useState('');
@@ -56,7 +80,7 @@ export function RfqModal() {
         setTglRfq(r.tglRfq || todayStr());
         setCabang(r.cabang || '');
         setCust(r.customer || '');
-        setItems(r.items && r.items.length > 0 ? r.items.map((it) => ({ ...it })) : [emptyItem()]);
+        setRows(r.items && r.items.length > 0 ? r.items.map(itemToRow) : [emptyRow()]);
         setCatatan(r.catatan || '');
       }
     } else if (ctx.prospectId) {
@@ -66,17 +90,15 @@ export function RfqModal() {
         setTglRfq(todayStr());
         setCabang(r.cabang || '');
         setCust(r.customer || '');
-        const materials = getProspectMaterials(r);
-        setItems(
-          materials.map((m) => ({ line: m.line || '', grade: '', material: m.uraian || '', dia: '', thick: '', width: '', length: '', pcs: num(m.qty) || 1, berat: '', lokal: 'LOKAL ATAU IMPORT', estimasi: r.tglPO || '' })),
-        );
+        // Same rows as the prospect (bentuk, ukuran, berat, Line 05), prices dropped.
+        setRows(materialRowsToItemRows(getProspectMaterials(r).map(materialToRow), r.tglPO || ''));
       }
     } else {
       setNoRfq('');
       setTglRfq(todayStr());
       setCabang(currentUser?.cabang || '');
       setCust('');
-      setItems([emptyItem()]);
+      setRows([emptyRow()]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, ctx]);
@@ -112,12 +134,6 @@ export function RfqModal() {
 
   if (!ctx) return null;
 
-  function updateItem(idx: number, patch: Partial<RfqItem>) {
-    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
-  }
-  function removeItem(idx: number) {
-    setItems((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
-  }
 
   async function persistPurchasingContactIfChanged() {
     if (purchWa !== purchasingContact.wa || purchEmail !== purchasingContact.email) {
@@ -296,87 +312,7 @@ export function RfqModal() {
       </div>
       <div className="full" style={{ marginTop: 14 }}>
         <label>Daftar Material yang Diminta</label>
-        {items.map((it, idx) => (
-          <div className="rfq-item-card" key={idx}>
-            {(it.hargaPurchasing || it.coo || it.note || it.deliveryTime || it.noQuote) && (
-              <div className="import-summary" style={{ marginTop: 0, marginBottom: 8 }}>
-                <b>Jawaban Purchasing:</b>{' '}
-                {it.noQuote ? (
-                  <span className="badge rust">No Quote</span>
-                ) : (
-                  <>
-                    {it.hargaPurchasing ? `${it.currency || 'IDR'} ${Math.round(it.hargaPurchasing).toLocaleString('id-ID')}` : '-'}
-                    {it.uom ? ` / ${it.uom}` : ''}
-                    {it.deliveryTime ? ` · Delivery: ${it.deliveryTime}` : ''}
-                    {it.coo ? ` · Origin: ${it.coo}` : ''}
-                    {it.note ? ` · ${it.note}` : ''}
-                  </>
-                )}
-              </div>
-            )}
-            <div className="rfq-item-head">
-              <span>Material #{idx + 1}</span>
-              <button type="button" className="icon-btn danger" disabled={items.length <= 1} onClick={() => removeItem(idx)} title="Hapus material">
-                <IconTrash />
-              </button>
-            </div>
-            <div className="form-grid">
-              <div>
-                <label>Line</label>
-                <input type="text" value={it.line} onChange={(e) => updateItem(idx, { line: e.target.value })} onBlur={(e) => updateItem(idx, { line: normalizeLine(e.target.value) })} />
-              </div>
-              <div>
-                <label>Grade</label>
-                <input type="text" value={it.grade} onChange={(e) => updateItem(idx, { grade: e.target.value })} />
-              </div>
-              <div className="full">
-                <label>Material / Spesifikasi</label>
-                <input type="text" value={it.material} onChange={(e) => updateItem(idx, { material: e.target.value })} placeholder="cth. 12 MM X 320 MM X 1333 MM" />
-              </div>
-              <div>
-                <label>Dia (mm)</label>
-                <input type="number" step="any" min={0} value={it.dia} onChange={(e) => updateItem(idx, { dia: e.target.value })} />
-              </div>
-              <div>
-                <label>Thick (mm)</label>
-                <input type="number" step="any" min={0} value={it.thick} onChange={(e) => updateItem(idx, { thick: e.target.value })} />
-              </div>
-              <div>
-                <label>Width (mm)</label>
-                <input type="number" step="any" min={0} value={it.width} onChange={(e) => updateItem(idx, { width: e.target.value })} />
-              </div>
-              <div>
-                <label>Length (mm)</label>
-                <input type="number" step="any" min={0} value={it.length} onChange={(e) => updateItem(idx, { length: e.target.value })} />
-              </div>
-              <div>
-                <label>PCS</label>
-                <input type="number" step="any" min={0} value={it.pcs} onChange={(e) => updateItem(idx, { pcs: e.target.value })} />
-              </div>
-              <div>
-                <label>Berat (KGS)</label>
-                <input type="number" step="any" min={0} value={it.berat} onChange={(e) => updateItem(idx, { berat: e.target.value })} />
-              </div>
-              <div>
-                <label>Lokal/Import</label>
-                <select value={it.lokal} onChange={(e) => updateItem(idx, { lokal: e.target.value })}>
-                  {RFQ_LOKAL_OPTIONS.map((o) => (
-                    <option key={o.v} value={o.v}>
-                      {o.l}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label>Estimasi Kebutuhan</label>
-                <input type="date" value={it.estimasi} onChange={(e) => updateItem(idx, { estimasi: e.target.value })} />
-              </div>
-            </div>
-          </div>
-        ))}
-        <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 4 }} onClick={() => setItems((prev) => [...prev, emptyItem()])}>
-          <IconPlus /> Tambah Material
-        </button>
+        <MaterialSpecEditor variant="doc" rows={rows} onChange={setRows} renderRowExtra={(row) => <PurchasingAnswer it={row.src as RfqItem | undefined} />} />
       </div>
       <div className="form-grid" style={{ marginTop: 12 }}>
         <div style={{ gridColumn: '1 / -1' }}>
@@ -394,7 +330,7 @@ export function RfqModal() {
       })()}
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>Lampiran File (maks. {formatFileSize(ATTACHMENT_MAX_BYTES)}/file)</label>
-        <AttachmentList rfqId={rfqId} ensureParentId={async () => (await saveOrUpdateRecord(false)).id} />
+        <AttachmentList rfqId={rfqId} withProspect ensureParentId={async () => (await saveOrUpdateRecord(false)).id} />
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>

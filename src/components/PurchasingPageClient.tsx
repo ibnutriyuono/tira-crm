@@ -1,5 +1,6 @@
 'use client';
 
+import { isPurchasingRoleClient } from '@/lib/doc-lines';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -48,7 +49,7 @@ export function PurchasingPageClient() {
 
   if (!loaded) return <div className="app-loading">Memuat data Purchasing…</div>;
 
-  const canEdit = currentUser?.role === 'purchasing' || currentUser?.role === 'admin';
+  const canEdit = isPurchasingRoleClient(currentUser?.role) || currentUser?.role === 'admin';
 
   return (
     <>
@@ -59,7 +60,7 @@ export function PurchasingPageClient() {
             </span>
             <div>
               <h1 style={{ margin: 0 }}>Purchasing TIRA</h1>
-              <span className="sub">Steel Division · PT Tira Austenite</span>
+              <span className="sub">Steel Division · PT. TIRA AUSTENITE, <span style={{ textTransform: 'none' }}>Tbk</span></span>
             </div>
           </div>
           <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -77,7 +78,7 @@ export function PurchasingPageClient() {
             </button>
             {/* Purchasing lives only in this workspace; other roles arrive from
                 the CRM and need a way back. */}
-            {currentUser?.role !== 'purchasing' && (
+            {!isPurchasingRoleClient(currentUser?.role) && (
               <Link className="btn btn-ghost-dark btn-sm" href="/">← Kembali ke CRM</Link>
             )}
             <button type="button" className="btn btn-outline-dark btn-sm" onClick={logout}>Keluar</button>

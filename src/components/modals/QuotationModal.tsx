@@ -115,7 +115,7 @@ export function QuotationModal() {
     return `
   <div style="font-family:Calibri, Arial, sans-serif; font-size:12pt; color:#000;">
     <table style="width:100%; border-bottom:2pt solid #1A222B; margin-bottom:16pt;"><tr><td>
-      <div style="font-size:16pt; font-weight:bold; letter-spacing:1pt;">PT TIRA AUSTENITE</div>
+      <div style="font-size:16pt; font-weight:bold; letter-spacing:1pt;">PT. TIRA AUSTENITE, Tbk</div>
       <div style="font-size:10pt; letter-spacing:2pt; color:#456484;">STEEL DIVISION</div>
     </td></tr></table>
     <p>No&nbsp;&nbsp;&nbsp;&nbsp;: ${escapeHtml(nomor)}<br>Lampiran&nbsp;: -<br>Perihal&nbsp;: <b>${escapeHtml(perihal)}</b></p>
@@ -147,7 +147,7 @@ export function QuotationModal() {
     <p>Demikian penawaran ini kami sampaikan. Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.</p>
     <p>Hormat kami,<br><br><br><br>
     <b>${escapeHtml(currentUser?.name || '')}</b><br>
-    PT Tira Austenite - Steel Division</p>
+    PT. TIRA AUSTENITE, Tbk - Steel Division</p>
   </div>`;
   }
 
@@ -209,7 +209,7 @@ export function QuotationModal() {
       'Terima kasih.',
       '',
       currentUser?.name || '',
-      'PT Tira Austenite - Steel Division',
+      'PT. TIRA AUSTENITE, Tbk - Steel Division',
     ];
     window.open(`mailto:${email}?subject=${subject}&body=${encodeURIComponent(bodyLines.join('\n'))}`, '_blank');
     markSent();

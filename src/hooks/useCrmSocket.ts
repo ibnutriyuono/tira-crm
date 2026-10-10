@@ -1,5 +1,6 @@
 'use client';
 
+import { isPurchasingRoleClient } from '@/lib/doc-lines';
 import { useEffect } from 'react';
 import { getSocket } from '@/lib/socket-client';
 import { matchesBudgetTargetScope, matchesCustomerScope, matchesDocScope, matchesProspectScope, matchesSalesPlanScope, myCabangScope, myRegionCabangs } from '@/lib/client-scope';
@@ -14,7 +15,7 @@ import type { BudgetTarget, SalesPlan, Customer, Fupa, ItemChatMessage, Prospect
  */
 export function openPurchDoc(jenis: 'RFQ' | 'FUPA', id: string) {
   useUiStore.setState({ purchDetailCtx: { jenis, id } });
-  if (useDataStore.getState().currentUser?.role !== 'purchasing') useUiStore.getState().openModal('purchasing');
+  if (!isPurchasingRoleClient(useDataStore.getState().currentUser?.role)) useUiStore.getState().openModal('purchasing');
 }
 
 /** Sales owns a document by name: `requestedBy` is free text, not a user id. */
@@ -123,7 +124,7 @@ export function useCrmSocket() {
     const onRfqCreated = (r: Rfq) => {
       if (!allowedInStore('doc', r)) return;
       useDataStore.getState().upsertRfq(r);
-      if (useDataStore.getState().currentUser?.role !== 'purchasing') return;
+      if (!isPurchasingRoleClient(useDataStore.getState().currentUser?.role)) return;
       useDataStore.getState().toast(
         `RFQ baru masuk: ${r.noRfq || '(tanpa nomor)'} dari ${r.cabang || '-'} — ${r.customer || '-'}`,
         'info',
@@ -133,7 +134,7 @@ export function useCrmSocket() {
     const onFupaCreated = (f: Fupa) => {
       if (!allowedInStore('doc', f)) return;
       useDataStore.getState().upsertFupa(f);
-      if (useDataStore.getState().currentUser?.role !== 'purchasing') return;
+      if (!isPurchasingRoleClient(useDataStore.getState().currentUser?.role)) return;
       useDataStore.getState().toast(
         `FUP A baru masuk: ${f.noFupa || '(tanpa nomor)'} dari ${f.cabang || '-'} — ${f.customer || '-'}`,
         'info',
@@ -154,7 +155,7 @@ export function useCrmSocket() {
           ? useDataStore.getState().rfqs.find((r) => r.id === m.entityId)
           : useDataStore.getState().fupas.find((f) => f.id === m.entityId);
       if (!parent) return;
-      if (me.role !== 'purchasing' && !isOwnedByCurrentUser(parent.requestedBy)) return;
+      if (!isPurchasingRoleClient(me.role) && !isOwnedByCurrentUser(parent.requestedBy)) return;
       const noDoc = (jenis === 'RFQ' ? (parent as Rfq).noRfq : (parent as Fupa).noFupa) || '(tanpa nomor)';
       const text = m.text.length > 60 ? `${m.text.slice(0, 60)}…` : m.text;
       useDataStore.getState().toast(

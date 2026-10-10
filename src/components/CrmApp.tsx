@@ -1,5 +1,6 @@
 'use client';
 
+import { isPurchasingRoleClient } from '@/lib/doc-lines';
 import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { TopBar } from './TopBar';
@@ -73,7 +74,7 @@ export function CrmApp() {
   useEffect(() => {
     // Gate on `loaded` so the redirect can never fire on a role left over from
     // a previous session before bootstrap() has replaced it.
-    if (loaded && currentUser?.role === 'purchasing') router.replace('/purchasing');
+    if (loaded && isPurchasingRoleClient(currentUser?.role)) router.replace('/purchasing');
   }, [loaded, currentUser?.role, router]);
 
   // Deliberately depends on the individual filter/sort fields rather than `ui`

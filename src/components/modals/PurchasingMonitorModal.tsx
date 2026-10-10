@@ -1,5 +1,6 @@
 'use client';
 
+import { isPurchasingRoleClient } from '@/lib/doc-lines';
 import { Modal } from '../Modal';
 import { PurchasingBoard } from '../PurchasingBoard';
 import { useDataStore } from '@/store/useDataStore';
@@ -15,7 +16,7 @@ export function PurchasingMonitorModal() {
   const closeModal = useUiStore((s) => s.closeModal);
   const currentUser = useDataStore((s) => s.currentUser);
 
-  const canEdit = currentUser?.role === 'purchasing' || currentUser?.role === 'admin';
+  const canEdit = isPurchasingRoleClient(currentUser?.role) || currentUser?.role === 'admin';
 
   return (
     <Modal show={show} onClose={closeModal} title="Purchasing" xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>

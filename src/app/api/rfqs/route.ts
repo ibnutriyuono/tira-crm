@@ -119,7 +119,7 @@ export async function POST(req: Request) {
   });
   if (rfq.status === 'Terkirim') {
     await notify({
-      userIds: await purchasingUserIds(),
+      userIds: await purchasingUserIds(rfq.items),
       type: 'rfq_new',
       entity: 'rfq',
       entityId: rfq.id,

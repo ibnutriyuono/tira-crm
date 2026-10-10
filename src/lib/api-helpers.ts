@@ -1,4 +1,5 @@
 import { normalizeItemLines, normalizeLine } from './format';
+import { pickSpecExtra } from './material-extra';
 import { qcdMissing, qcdRequiredOnMove, type QcdInput } from './qcd';
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
@@ -29,6 +30,7 @@ export function num(v: unknown): number {
 export function deriveFromMaterials(materials: Material[]) {
   const clean = materials
     .map((m) => ({
+      ...pickSpecExtra(m),
       line: normalizeLine(m.line),
       uraian: (m.uraian || '').trim(),
       qty: num(m.qty),

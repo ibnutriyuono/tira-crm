@@ -8,7 +8,7 @@ const ibmPlexMono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500', '
 
 export const metadata: Metadata = {
   title: 'CRM TIRA · Steel Division',
-  description: 'CRM Prospek — PT Tira Austenite, Steel Division',
+  description: 'CRM Prospek — PT. TIRA AUSTENITE, Tbk · Steel Division',
   icons: { icon: '/logo.png' },
 };
 

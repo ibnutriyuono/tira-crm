@@ -5,7 +5,7 @@ import { IconEdit, IconTrash, IconWa } from './icons';
 import { AttachmentList } from './AttachmentList';
 import { ItemChat } from './ItemChat';
 import { WORKFLOW_META, WORKFLOW_STAGES, workflowStage } from '@/lib/purchasing-workflow';
-import { formatDateID, formatDateTimeID, formatRupiah, num, todayStr } from '@/lib/format';
+import { formatDateID, formatDateTimeID, formatRupiah, normalizeLine, num, todayStr } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { getSocket } from '@/lib/socket-client';
 import { useDataStore } from '@/store/useDataStore';
@@ -40,6 +40,9 @@ interface PurchDoc {
   jawabanFupaDikirim?: boolean;
   sourceNoRfq?: string;
   items: RfqItem[];
+  /** Masuk ke Purchasing (terkirim, atau dibuat bila tidak tercatat) dan saat jawaban dikirim ke Sales. */
+  sentAt: string;
+  answeredAt: string | null;
 }
 
 function toDoc(r: Rfq | Fupa, jenis: PurchDocType): PurchDoc {
@@ -71,6 +74,8 @@ function toDoc(r: Rfq | Fupa, jenis: PurchDocType): PurchDoc {
     jawabanFupaDikirim: isRfq ? undefined : (r as Fupa).jawabanFupaDikirim,
     sourceNoRfq: isRfq ? undefined : (r as Fupa).sourceNoRfq || '-',
     items: r.items ?? [],
+    sentAt: r.sentToPurchasingAt || r.createdAt,
+    answeredAt: (isRfq ? (r as Rfq).jawabanRfqAt : (r as Fupa).jawabanFupaAt) || null,
   };
 }
 
@@ -89,6 +94,66 @@ function lineColor(line: string): string {
 
 function recordLines(d: PurchDoc): string[] {
   return Array.from(new Set(d.items.map((m) => (m.line || '').trim()).filter(Boolean)));
+}
+
+/** Each line code a document carries, splitting "02, 05" and padding "5" -> "05"; '' when none. */
+function docLineCodes(d: PurchDoc): string[] {
+  const codes = new Set<string>();
+  d.items.forEach((m) => normalizeLine(m.line).split(/\s*,\s*/).forEach((c) => c && codes.add(c)));
+  return Array.from(codes);
+}
+
+const NO_LINE = '(Tanpa Line)';
+
+interface LineKpi {
+  line: string;
+  rfq: number;
+  fupa: number;
+  items: number;
+  stages: Record<number, number>;
+  /** Sum / count of hours from masuk Purchasing to jawaban terkirim, for the average. */
+  respHours: number;
+  respN: number;
+}
+
+/**
+ * Dashboard "KPI per Line": documents and materials per line, by workflow
+ * stage. A document with materials on two lines counts under both.
+ */
+function buildLineKpis(docs: PurchDoc[]): LineKpi[] {
+  const map = new Map<string, LineKpi>();
+  const get = (line: string) => {
+    let k = map.get(line);
+    if (!k) map.set(line, (k = { line, rfq: 0, fupa: 0, items: 0, stages: {}, respHours: 0, respN: 0 }));
+    return k;
+  };
+  docs.forEach((d) => {
+    const stage = workflowStage(d);
+    const codes = docLineCodes(d);
+    const hours = d.answeredAt && d.sentAt ? (Date.parse(d.answeredAt) - Date.parse(d.sentAt)) / 3_600_000 : NaN;
+    (codes.length ? codes : [NO_LINE]).forEach((c) => {
+      const k = get(c);
+      if (Number.isFinite(hours) && hours >= 0) {
+        k.respHours += hours;
+        k.respN++;
+      }
+      if (d.jenis === 'RFQ') k.rfq++;
+      else k.fupa++;
+      k.stages[stage] = (k.stages[stage] || 0) + 1;
+    });
+    d.items.forEach((m) => {
+      const its = normalizeLine(m.line).split(/\s*,\s*/).filter(Boolean);
+      (its.length ? its : [NO_LINE]).forEach((c) => get(c).items++);
+    });
+  });
+  return Array.from(map.values()).sort((a, b) => (a.line === NO_LINE ? 1 : b.line === NO_LINE ? -1 : a.line.localeCompare(b.line)));
+}
+
+/** "5 jam" under a day, else "2,4 hari". */
+function formatDuration(hours: number): string {
+  if (hours < 1) return '< 1 jam';
+  if (hours < 24) return `${Math.round(hours)} jam`;
+  return `${(hours / 24).toLocaleString('id-ID', { maximumFractionDigits: 1 })} hari`;
 }
 
 function recordLineKey(d: PurchDoc): string {
@@ -167,10 +232,12 @@ export function PurchasingBoard({
   const toast = useDataStore((s) => s.toast);
 
   const openModal = useUiStore((s) => s.openModal);
+  const isPic05 = useDataStore((s) => s.currentUser?.role === 'purchasing05');
   const [tab, setTab] = useState<Tab>('dashboard');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [jenisFilter, setJenisFilter] = useState('');
+  const [lineFilter, setLineFilter] = useState('');
   const [masukView, setMasukView] = useState<'table' | 'card'>('table');
   const [groupBy, setGroupBy] = useState<'' | 'line' | 'status'>('');
   const [sortBy, setSortBy] = useState<'waktu' | 'line'>('waktu');
@@ -213,7 +280,7 @@ export function PurchasingBoard({
   const currentUser = useDataStore((s) => s.currentUser);
   // Membatalkan menghentikan dokumen untuk semua orang, jadi dibatasi ke
   // peran yang juga berhak mengisi jawabannya.
-  const canCancel = !!currentUser && ['purchasing', 'admin', 'gm'].includes(currentUser.role);
+  const canCancel = !!currentUser && ['purchasing', 'purchasing05', 'admin', 'gm'].includes(currentUser.role);
   const askCancel = useCallback((d: PurchDoc) => {
     useUiStore.setState({ cancelDocCtx: { jenis: d.jenis, id: d.id, noDoc: d.noDoc, customer: d.customer, cancelled: !!d.cancelledAt } });
     useUiStore.getState().openModal('cancelDoc');
@@ -232,13 +299,19 @@ export function PurchasingBoard({
   const filtered = useMemo(() => {
     let l = docs;
     if (jenisFilter) l = l.filter((d) => d.jenis === jenisFilter);
+    if (lineFilter) l = l.filter((d) => {
+      const codes = docLineCodes(d);
+      return lineFilter === NO_LINE ? codes.length === 0 : codes.includes(lineFilter);
+    });
     if (statusFilter !== '') l = l.filter((d) => String(workflowStage(d)) === statusFilter);
     if (search) {
       const q = search.toLowerCase();
       l = l.filter((d) => d.noDoc.toLowerCase().includes(q) || d.customer.toLowerCase().includes(q) || d.cabang.toLowerCase().includes(q));
     }
     return l;
-  }, [docs, jenisFilter, statusFilter, search]);
+  }, [docs, jenisFilter, lineFilter, statusFilter, search]);
+
+  const lineKpis = useMemo(() => buildLineKpis(docs), [docs]);
 
   // groupBy 'line'/'status' takes over ordering entirely (rows are shown
   // section by section, newest first within each section); otherwise the flat
@@ -336,6 +409,16 @@ export function PurchasingBoard({
         <button type="button" className={tab === 'vendor' ? 'active' : ''} onClick={() => setTab('vendor')}>Database Vendor</button>
       </div>
 
+      {isPic05 && (
+        <div className="pic05-banner">
+          <span className="pic05-tag">PIC LINE 05</span>
+          <span>
+            Anda hanya melihat <b>RFQ dan FUP A yang berisi material Line 05</b> (fabrikasi): {rfqs.length} RFQ · {fupas.length} FUP A.
+            Prospek, customer dan target penjualan tidak ditampilkan.
+          </span>
+        </div>
+      )}
+
       {tab === 'dashboard' && (
         <>
           <div className="kpi-grid">
@@ -349,6 +432,75 @@ export function PurchasingBoard({
             ))}
             <div className="kpi steel"><div className="label">Total Vendor</div><div className="value">{vendors.length}</div></div>
           </div>
+
+          {lineKpis.length > 0 && (
+            <div className="panel" style={{ marginBottom: 18 }}>
+              <div className="panel-head">
+                <h2>KPI per Line</h2>
+                <span className="field-note" style={{ margin: 0 }}>Klik baris untuk membuka Permintaan Masuk line tersebut. Dokumen berisi beberapa line dihitung di tiap line.</span>
+              </div>
+              <div className="table-wrap" style={{ borderTop: 'none' }}>
+                <table className="simple-table line-kpi-table">
+                  <thead>
+                    <tr>
+                      <th>Line</th><th className="center">RFQ</th><th className="center">FUP A</th><th className="center">Material</th>
+                      {WORKFLOW_STAGES.map((st) => (
+                        <th key={st} className="center">{WORKFLOW_META[st].label.replace(/^\d+\.\s*/, '')}</th>
+                      ))}
+                      <th title="Rata-rata waktu dari dokumen masuk Purchasing sampai jawaban dikirim ke Sales">Rata-rata dijawab</th>
+                      <th style={{ width: 170 }}>Terjawab / Selesai</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineKpis.map((k) => {
+                      const total = k.rfq + k.fupa;
+                      const aktif = total - (k.stages[6] || 0);
+                      const beres = (k.stages[3] || 0) + (k.stages[4] || 0) + (k.stages[5] || 0);
+                      const pct = aktif > 0 ? Math.round((beres / aktif) * 100) : 0;
+                      return (
+                        <tr
+                          key={k.line}
+                          className="clickable"
+                          title={`Buka Permintaan Masuk ${k.line === NO_LINE ? 'tanpa line' : `Line ${k.line}`}`}
+                          onClick={() => {
+                            setLineFilter(k.line);
+                            setTab('masuk');
+                          }}
+                        >
+                          <td style={{ fontWeight: 700 }}>
+                            <span className={`line-dot ${lineColor(k.line === NO_LINE ? '' : k.line)}`} />
+                            {k.line === NO_LINE ? k.line : `Line ${k.line}`}
+                          </td>
+                          <td className="center mono">{k.rfq}</td>
+                          <td className="center mono">{k.fupa}</td>
+                          <td className="center mono">{k.items}</td>
+                          {WORKFLOW_STAGES.map((st) => (
+                            <td key={st} className="center mono" style={{ color: k.stages[st] ? undefined : 'var(--slate-300)' }}>{k.stages[st] || 0}</td>
+                          ))}
+                          <td className="mono" title={k.respN ? `Rata-rata dari ${k.respN} dokumen yang sudah dijawab` : 'Belum ada dokumen yang dijawab'}>
+                            {k.respN ? (
+                              <>
+                                {formatDuration(k.respHours / k.respN)}
+                                <span style={{ color: 'var(--slate-500)', fontSize: 11 }}> · {k.respN} dok</span>
+                              </>
+                            ) : (
+                              <span style={{ color: 'var(--slate-300)' }}>-</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="line-kpi-bar" title={`${beres} dari ${aktif} dokumen aktif sudah dijawab / selesai / no quote`}>
+                              <span style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="mono" style={{ fontSize: 12 }}>{pct}% · {beres}/{aktif}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <div className="panel">
             <div className="panel-head"><h2>Permintaan Terbaru</h2></div>
@@ -398,6 +550,12 @@ export function PurchasingBoard({
               <option value="">Semua Jenis</option>
               <option value="RFQ">RFQ</option>
               <option value="FUPA">FUP A</option>
+            </select>
+            <select className="btn-sm" value={lineFilter} onChange={(e) => setLineFilter(e.target.value)} title="Saring per Line">
+              <option value="">Semua Line</option>
+              {lineKpis.map((k) => (
+                <option key={k.line} value={k.line}>{k.line === NO_LINE ? k.line : `Line ${k.line}`}</option>
+              ))}
             </select>
             <select className="btn-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">Semua Status</option>
@@ -687,6 +845,7 @@ function PurchDetail({
         <AttachmentList
           rfqId={doc.jenis === 'RFQ' ? doc.id : undefined}
           fupaId={doc.jenis === 'FUPA' ? doc.id : undefined}
+          withProspect
           readOnly
         />
 
@@ -732,7 +891,7 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
   // Mirrors auth.ts#canEditRfqAnswer, which the PATCH route enforces. Deliberately
   // NOT gated on `readOnly`: gm reaches this panel through the monitor modal, which
   // is read-only for vendors/quotations/status, yet gm may still fill in the answer.
-  const canAnswer = !!currentUser && ['purchasing', 'admin', 'gm'].includes(currentUser.role);
+  const canAnswer = !!currentUser && ['purchasing', 'purchasing05', 'admin', 'gm'].includes(currentUser.role);
 
   function setItem(idx: number, patch: Partial<RfqItem>) {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));

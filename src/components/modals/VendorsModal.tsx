@@ -1,5 +1,6 @@
 'use client';
 
+import { isPurchasingRoleClient } from '@/lib/doc-lines';
 import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { IconEdit, IconTrash, IconWa } from '../icons';
@@ -21,7 +22,7 @@ export function VendorsModal() {
   const currentUser = useDataStore((s) => s.currentUser);
   const toast = useDataStore((s) => s.toast);
 
-  const canEdit = currentUser?.role === 'purchasing' || currentUser?.role === 'admin';
+  const canEdit = isPurchasingRoleClient(currentUser?.role) || currentUser?.role === 'admin';
   const [search, setSearch] = useState('');
 
   const list = useMemo(() => {

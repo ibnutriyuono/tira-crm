@@ -1,3 +1,5 @@
+import type { Role } from '@prisma/client';
+import { itemsHaveLine } from './doc-lines';
 import { prisma } from './prisma';
 import { emitCrmEvent } from './socket';
 
@@ -54,8 +56,10 @@ export async function notify({ userIds, type, entity, entityId, title, message }
  * document company-wide already, so paging them here would be noise for a
  * module they check rather than live in.
  */
-export async function purchasingUserIds(): Promise<string[]> {
-  const rows = await prisma.user.findMany({ where: { role: 'purchasing' }, select: { id: true } });
+export async function purchasingUserIds(items?: unknown): Promise<string[]> {
+  // PIC Line 05 only hears about documents that contain a Line 05 item.
+  const roles: Role[] = itemsHaveLine(items) ? ['purchasing', 'purchasing05'] : ['purchasing'];
+  const rows = await prisma.user.findMany({ where: { role: { in: roles } }, select: { id: true } });
   return rows.map((r) => r.id);
 }
 

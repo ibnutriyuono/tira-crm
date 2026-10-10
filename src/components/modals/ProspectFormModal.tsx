@@ -4,17 +4,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { CustomerNameInput } from '../CustomerNameInput';
 import { ItemChat } from '../ItemChat';
-import { IconPlus, IconTrash } from '../icons';
+import { AttachmentList } from '../AttachmentList';
+import { MaterialSpecEditor } from '../MaterialSpecEditor';
 import { CABANG_LIST } from '@/lib/constants';
-import { formatRupiah, getProspectMaterials, normalizeLine, materialUnitPrice, num } from '@/lib/format';
+import { formatFileSize, formatRupiah, getProspectMaterials, materialUnitPrice, num } from '@/lib/format';
+import { ATTACHMENT_MAX_BYTES } from '@/lib/constants';
+import { emptyRow, isFabRow, materialToRow, rowToMaterial, type SpecRow } from '@/lib/material-spec';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { EMPTY_QCD, useUiStore } from '@/store/useUiStore';
 import { qcdMissing, qcdRequiredOnMove } from '@/lib/qcd';
 import { QcdFields } from '../QcdFields';
-import type { Material, Prospect } from '@/lib/types';
-
-const emptyMaterial = (): Material => ({ line: '', uraian: '', qty: 1, beratPc: 0, hargaKg: 0, harga: 0 });
+import type { Prospect } from '@/lib/types';
 
 export function ProspectFormModal() {
   const modal = useUiStore((s) => s.modal);
@@ -63,7 +64,10 @@ export function ProspectFormModal() {
   const [phone, setPhone] = useState('');
   const [penawaranTerkirim, setPenawaranTerkirim] = useState(false);
   const [terfaktur, setTerfaktur] = useState(false);
-  const [materials, setMaterials] = useState<Material[]>([emptyMaterial()]);
+  // Edited as spec rows (bentuk, ukuran, …); converted back to Material on save.
+  const [rows, setRows] = useState<SpecRow[]>([emptyRow()]);
+  const materials = useMemo(() => rows.map(rowToMaterial), [rows]);
+  const hasFab = rows.some(isFabRow);
   const [kondisiStock, setKondisiStock] = useState('');
   const [tglPenawaran, setTglPenawaran] = useState('');
   const [noPo, setNoPo] = useState('');
@@ -83,7 +87,7 @@ export function ProspectFormModal() {
       setPhone(editing.phone || '');
       setPenawaranTerkirim(!!editing.penawaranTerkirim);
     setTerfaktur(!!editing.terfaktur);
-      setMaterials(getProspectMaterials(editing));
+      setRows(getProspectMaterials(editing).map(materialToRow));
       setKondisiStock(editing.kondisiStock || '');
       setTglPenawaran(editing.tglPenawaran || '');
       setNoPo(editing.noPo || '');
@@ -112,7 +116,7 @@ export function ProspectFormModal() {
       setPhone('');
       setPenawaranTerkirim(false);
       setTerfaktur(false);
-      setMaterials([emptyMaterial()]);
+      setRows([emptyRow()]);
       setKondisiStock('');
       setTglPenawaran('');
       setNoPo('');
@@ -133,12 +137,6 @@ export function ProspectFormModal() {
     return { totalQty, totalBerat, totalValue };
   }, [materials]);
 
-  function updateMaterial(idx: number, patch: Partial<Material>) {
-    setMaterials((prev) => prev.map((m, i) => (i === idx ? { ...m, ...patch } : m)));
-  }
-  function removeMaterial(idx: number) {
-    setMaterials((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
-  }
 
   function onCustomerChange(val: string) {
     setCustomer(val);
@@ -313,31 +311,17 @@ export function ProspectFormModal() {
         )}
         <div className="full">
           <label>Daftar Material</label>
-          <div className="qitem-header">
-            <span>Line</span>
-            <span>Uraian Material</span>
-            <span>Qty</span>
-            <span>Berat/pc (Kg)</span>
-            <span>Harga/Kg</span>
-            <span>Total</span>
-            <span></span>
-          </div>
-          {materials.map((it, idx) => (
-            <div className="qitem-row" key={idx}>
-              <input type="text" placeholder="cth. 04" value={it.line} onChange={(e) => updateMaterial(idx, { line: e.target.value })} onBlur={(e) => updateMaterial(idx, { line: normalizeLine(e.target.value) })} />
-              <input type="text" placeholder="Uraian material" value={it.uraian} onChange={(e) => updateMaterial(idx, { uraian: e.target.value })} />
-              <input type="number" min={0} step="any" value={it.qty} onChange={(e) => updateMaterial(idx, { qty: num(e.target.value) })} />
-              <input type="number" min={0} step="any" placeholder="Kg/pc" value={it.beratPc || ''} onChange={(e) => updateMaterial(idx, { beratPc: num(e.target.value) })} />
-              <input type="number" min={0} step="any" placeholder="Rp/Kg" value={it.hargaKg || ''} onChange={(e) => updateMaterial(idx, { hargaKg: num(e.target.value) })} />
-              <div className="qi-total mono">{formatRupiah(num(it.qty) * materialUnitPrice(it))}</div>
-              <button type="button" className="icon-btn danger qi-remove" disabled={materials.length <= 1} onClick={() => removeMaterial(idx)} title="Hapus material">
-                <IconTrash />
-              </button>
+          <MaterialSpecEditor variant="prospek" rows={rows} onChange={setRows} hideSummary />
+          {hasFab && (
+            <div style={{ marginTop: 10, padding: '10px 12px', border: '1px solid #EEDFC8', borderRadius: 8, background: '#FFFBF4' }}>
+              <label style={{ display: 'block', marginBottom: 6 }}>Gambar kerja Line 05 (maks. {formatFileSize(ATTACHMENT_MAX_BYTES)}/file)</label>
+              {editId ? (
+                <AttachmentList prospectId={editId} />
+              ) : (
+                <div className="field-note" style={{ margin: 0 }}>Simpan prospek dulu, lalu buka Edit Prospek untuk melampirkan gambar.</div>
+              )}
             </div>
-          ))}
-          <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 6 }} onClick={() => setMaterials((prev) => [...prev, emptyMaterial()])}>
-            <IconPlus /> Tambah Material
-          </button>
+          )}
         </div>
         <div>
           <label>Total Qty (Pcs)</label>

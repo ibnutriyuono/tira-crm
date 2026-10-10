@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
+import { itemsHaveLine } from '@/lib/doc-lines';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { notify, requesterUserIds } from '@/lib/notify';
@@ -18,13 +19,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (isResponse(user)) return user;
   // Sejalan dengan hak mengisi jawaban: yang mengerjakan dokumen ini pula
   // yang boleh menghentikannya.
-  if (!['purchasing', 'admin', 'gm'].includes(user.role)) {
+  if (!['purchasing', 'purchasing05', 'admin', 'gm'].includes(user.role)) {
     return NextResponse.json({ error: 'Hanya Purchasing, GM, atau Admin yang dapat membatalkan RFQ.' }, { status: 403 });
   }
 
   const { id } = await params;
   const existing = await prisma.rfq.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
+  if (user.role === 'purchasing05' && !itemsHaveLine(existing.items)) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
 
   const body = await req.json().catch(() => null);
 

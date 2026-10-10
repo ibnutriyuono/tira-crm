@@ -85,6 +85,7 @@ export const AGING_THRESHOLD_DAYS = 14;
 
 export const ROLE_LABELS: Record<string, string> = {
   purchasing: 'Purchasing',
+  purchasing05: 'PIC Line 05',
   admin: 'Admin',
   gm: 'GM',
   rm: 'RM',
@@ -98,6 +99,7 @@ export const BROADCAST_ROLE_OPTIONS = [
   { v: 'rm', l: 'RM (Regional Manager)' },
   { v: 'gm', l: 'GM (General Manager)' },
   { v: 'purchasing', l: 'Purchasing' },
+  { v: 'purchasing05', l: 'PIC Line 05 (Purchasing fabrikasi)' },
   { v: 'admin', l: 'Admin' },
 ];
 

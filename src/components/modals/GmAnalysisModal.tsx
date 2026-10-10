@@ -95,7 +95,7 @@ export function GmAnalysisModal() {
       s1.background = { color: GRAPHITE };
       s1.addText('Laporan Analisa Eksekutif', { x: 0.8, y: 2.1, w: 11, h: 1, fontSize: 36, bold: true, color: 'FFFFFF', fontFace: 'Cambria' });
       s1.addText(`${a.scope.label} · Periode ${a.periodLabel}`, { x: 0.8, y: 3.1, w: 11, h: 0.5, fontSize: 18, color: 'D7E3EC' });
-      s1.addText('PT Tira Austenite — Steel Division', { x: 0.8, y: 3.9, w: 8, h: 0.4, fontSize: 12, bold: true, color: 'FFFFFF' });
+      s1.addText('PT. TIRA AUSTENITE, Tbk — Steel Division', { x: 0.8, y: 3.9, w: 8, h: 0.4, fontSize: 12, bold: true, color: 'FFFFFF' });
       s1.addText(`Dibuat otomatis ${formatDateID(todayStr())} oleh ${currentUser?.name || '-'} — internal & rahasia`, { x: 0.8, y: 6.9, w: 11, h: 0.3, fontSize: 10, color: 'A9B8C6' });
 
       // 2. Ringkasan

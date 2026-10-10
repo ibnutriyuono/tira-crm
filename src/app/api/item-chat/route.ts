@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { docVisibleTo } from '@/lib/auth';
 import { notify, purchasingUserIds, requesterUserIds } from '@/lib/notify';
+import type { SafeUser } from '@/lib/types';
 
 const ENTITIES = ['prospect', 'rfq', 'fupa'] as const;
 type ItemEntity = (typeof ENTITIES)[number];
@@ -16,6 +18,14 @@ function parseEntity(v: string | null): ItemEntity | null {
  * `?entity=rfq&counts=1` returns { counts: { [entityId]: n } } so a list can
  * render its unread badges in a single request instead of one per row.
  */
+/** PIC Line 05 only reads/writes the discussion of RFQ / FUP A with a Line 05 item. */
+async function chatVisible(user: SafeUser, entity: string, entityId: string): Promise<boolean> {
+  if (user.role !== 'purchasing05') return true;
+  if (entity === 'rfq') return docVisibleTo(user, { rfqId: entityId });
+  if (entity === 'fupa') return docVisibleTo(user, { fupaId: entityId });
+  return false;
+}
+
 export async function GET(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
@@ -47,6 +57,7 @@ export async function GET(req: Request) {
   const entityId = searchParams.get('entityId');
   if (!entityId) return NextResponse.json({ error: 'entityId wajib diisi' }, { status: 400 });
 
+  if (!(await chatVisible(user, entity, entityId))) return NextResponse.json({ messages: [] });
   const messages = await prisma.itemMessage.findMany({ where: { entity, entityId }, orderBy: { createdAt: 'asc' } });
   return NextResponse.json({ messages });
 }
@@ -62,6 +73,7 @@ export async function POST(req: Request) {
 
   if (!entity || !entityId) return NextResponse.json({ error: 'entity / entityId tidak valid' }, { status: 400 });
   if (!text) return NextResponse.json({ error: 'Pesan tidak boleh kosong' }, { status: 400 });
+  if (!(await chatVisible(user, entity, entityId))) return NextResponse.json({ error: 'Dokumen tidak ditemukan' }, { status: 404 });
 
   const message = await prisma.itemMessage.create({
     data: { entity, entityId, author: user.name, authorUsername: user.username, role: user.role, text },
@@ -86,7 +98,7 @@ export async function POST(req: Request) {
     if (parent) {
       const noDoc = (entity === 'rfq' ? (parent as { noRfq: string | null }).noRfq : (parent as { noFupa: string | null }).noFupa) || '(tanpa nomor)';
       const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
-      const recipients = new Set([...(await purchasingUserIds()), ...(await requesterUserIds(parent.requestedBy))]);
+      const recipients = new Set([...(await purchasingUserIds(parent.items)), ...(await requesterUserIds(parent.requestedBy))]);
       recipients.delete(user.id);
       await notify({
         userIds: Array.from(recipients),

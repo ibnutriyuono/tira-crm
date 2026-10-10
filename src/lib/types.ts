@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'gm' | 'rm' | 'bm' | 'sales' | 'purchasing';
+export type Role = 'admin' | 'gm' | 'rm' | 'bm' | 'sales' | 'purchasing' | 'purchasing05';
 
 export interface SafeUser {
   id: string;
@@ -215,6 +215,9 @@ export interface Attachment {
   id: string;
   rfqId: string | null;
   fupaId: string | null;
+  prospectId?: string | null;
+  /** Set on the GET with `withProspect`: the file belongs to the source prospect, not this document. */
+  fromProspect?: boolean;
   name: string;
   type: string | null;
   size: number;

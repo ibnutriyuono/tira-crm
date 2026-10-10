@@ -256,7 +256,7 @@ table{width:100%;border-collapse:collapse}
 @media screen{body{padding:16px;max-width:1100px;margin:auto}}
 </style></head><body>
 <div class="head"><div><h1>LAPORAN KUNJUNGAN CUSTOMER</h1>
-<div class="sub">Lampiran Reimbursement Perjalanan Dinas · PT Tira Austenite · Steel Division</div></div>
+<div class="sub">Lampiran Reimbursement Perjalanan Dinas · PT. TIRA AUSTENITE, Tbk · Steel Division</div></div>
 <div class="docno">No. <b>${esc(tripDocNo(trip))}</b><br>Status: <b>${esc(TRIP_STATUS_META[trip.status].label)}</b></div></div>
 ${banner}
 <table class="info">

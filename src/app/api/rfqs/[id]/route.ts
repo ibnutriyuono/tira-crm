@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { diffFields, logActivity, RFQ_FIELD_LABELS } from '@/lib/activity';
 import { isResponse, mergeRfqItemsPreservingAnswer, requireUser } from '@/lib/api-helpers';
 import { canEditPurchasing, canEditRfqAnswer } from '@/lib/auth';
+import { itemsHaveLine } from '@/lib/doc-lines';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { notify, purchasingUserIds, requesterUserIds } from '@/lib/notify';
@@ -16,6 +17,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const existing = await prisma.rfq.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
+  if (user.role === 'purchasing05' && !itemsHaveLine(existing.items)) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
 
   const body = await req.json().catch(() => null);
   // Same rule as create — an edit must not be able to blank the number out.
@@ -73,7 +75,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   // (ditangani di POST), jadi dicek di sini juga.
   if (existing.status !== 'Terkirim' && rfq.status === 'Terkirim') {
     await notify({
-      userIds: await purchasingUserIds(),
+      userIds: await purchasingUserIds(rfq.items),
       type: 'rfq_new',
       entity: 'rfq',
       entityId: rfq.id,
@@ -89,6 +91,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (isResponse(user)) return user;
   const { id } = await params;
   const body = await req.json().catch(() => null);
+
+  // PIC Line 05 may act only on RFQs holding a Line 05 item; to them any
+  // other RFQ does not exist.
+  const existing = await prisma.rfq.findUnique({ where: { id }, select: { items: true } });
+  if (!existing) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
+  if (user.role === 'purchasing05' && !itemsHaveLine(existing.items)) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
 
   // Opening the detail is what moves an RFQ to stage 2 "Diterima". Stamped once
   // and only for Purchasing/Admin — a Sales user peeking at their own document
@@ -123,7 +131,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Purchasing fills the per-material answer onto the RFQ's items and sends it back
   // to Sales. Gated by canEditRfqAnswer (purchasing, admin, gm).
   if (body?.action === 'answer' || body?.action === 'send-jawaban') {
-    if (!canEditRfqAnswer(user)) {
+    if (!canEditRfqAnswer(user, existing.items)) {
       return NextResponse.json({ error: 'Anda tidak berhak mengisi jawaban RFQ.' }, { status: 403 });
     }
     const prev = await prisma.rfq.findUnique({ where: { id } });
@@ -228,6 +236,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
 
   const existing = await prisma.rfq.findUnique({ where: { id } });
+  if (user.role === 'purchasing05' && !itemsHaveLine(existing?.items)) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
   await prisma.rfq.delete({ where: { id } });
   emitCrmEvent('rfq:deleted', { id });
   await logActivity({

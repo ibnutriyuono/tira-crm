@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { diffFields, FUPA_FIELD_LABELS, logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { canEditPurchasing } from '@/lib/auth';
+import { itemsHaveLine } from '@/lib/doc-lines';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { notify, purchasingUserIds, requesterUserIds } from '@/lib/notify';
@@ -15,6 +16,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const existing = await prisma.fupa.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: 'FUP A tidak ditemukan' }, { status: 404 });
+  if (user.role === 'purchasing05' && !itemsHaveLine(existing.items)) return NextResponse.json({ error: 'FUP A tidak ditemukan' }, { status: 404 });
 
   const body = await req.json().catch(() => null);
   const fupa = await prisma.fupa.update({
@@ -43,7 +45,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   });
   if (existing.status !== 'Terkirim' && fupa.status === 'Terkirim') {
     await notify({
-      userIds: await purchasingUserIds(),
+      userIds: await purchasingUserIds(fupa.items),
       type: 'fupa_new',
       entity: 'fupa',
       entityId: fupa.id,
@@ -63,6 +65,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const existing = await prisma.fupa.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: 'FUP A tidak ditemukan' }, { status: 404 });
+  if (user.role === 'purchasing05' && !itemsHaveLine(existing.items)) return NextResponse.json({ error: 'FUP A tidak ditemukan' }, { status: 404 });
 
   // Opening the detail is what moves a FUP A to stage 2 "Diterima" — stamped
   // once, and only for Purchasing/Admin.
@@ -178,6 +181,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   const existing = await prisma.fupa.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: 'FUP A tidak ditemukan' }, { status: 404 });
+  if (user.role === 'purchasing05' && !itemsHaveLine(existing.items)) return NextResponse.json({ error: 'FUP A tidak ditemukan' }, { status: 404 });
 
   await prisma.fupa.delete({ where: { id } });
   // Clear the promoted-to pointer so the source RFQ stops claiming a FUP A.

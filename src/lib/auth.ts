@@ -2,6 +2,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { canEditSalesPlanFor } from './sales-plan-view';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
+import { itemsHaveLine } from './doc-lines';
 import { prisma } from './prisma';
 import { activityOwner } from './sales-activity';
 import type { SafeUser } from './types';
@@ -69,6 +70,14 @@ export const COOKIE_OPTIONS = {
   maxAge: SESSION_TTL_SECONDS,
 };
 
+/** Purchasing staff, including the PIC Line 05 who works only Line 05 documents. */
+export function isPurchasingRole(role: string | null | undefined): boolean {
+  return role === 'purchasing' || role === 'purchasing05';
+}
+
+/** A filter that matches no row — the safe default for a role without access. */
+const NONE = { id: '__none__' };
+
 /** Mirrors the original app's per-role data scoping (getFiltered()'s role branch). */
 export function prospectScopeWhere(user: SafeUser) {
   if (user.role === 'sales') return { se: { equals: user.se || '', mode: 'insensitive' as const } };
@@ -78,6 +87,8 @@ export function prospectScopeWhere(user: SafeUser) {
   // Listed explicitly rather than left to the fallthrough so that adding a
   // future role doesn't silently grant it access to everything.
   if (user.role === 'purchasing') return {};
+  // PIC Line 05 works only RFQ / FUP A that contain a Line 05 item, nothing else.
+  if (user.role === 'purchasing05') return NONE;
   return {}; // gm & admin see everything
 }
 
@@ -116,6 +127,7 @@ async function seCabangs(user: SafeUser): Promise<string[]> {
  * account sees an empty Customer list until its first prospect exists.
  */
 async function cabangOnlyScopeWhere(user: SafeUser, cabangField: string) {
+  if (user.role === 'purchasing05') return NONE;
   if (user.role === 'bm') {
     // No branch on the account means nothing to scope to. Matching on '' would
     // otherwise quietly return any row stored with a blank cabang, which the
@@ -176,9 +188,11 @@ export async function cabangRegMap(): Promise<Record<string, number>> {
  */
 export async function docScopeWhere(
   user: SafeUser,
-  fields: { cabangField?: string; requestedByField?: string; regField?: string } = {},
+  fields: { cabangField?: string; requestedByField?: string; regField?: string; table?: 'rfq' | 'fupa' } = {},
 ) {
-  const { cabangField = 'cabang', requestedByField = 'requestedBy', regField = 'reg' } = fields;
+  const { cabangField = 'cabang', requestedByField = 'requestedBy', regField = 'reg', table = 'rfq' } = fields;
+
+  if (user.role === 'purchasing05') return { id: { in: await line05DocIds(table) } };
 
   if (user.role === 'sales') {
     return {
@@ -254,14 +268,58 @@ export function canDeleteProspect(user: SafeUser) {
   return user.role === 'gm' || user.role === 'admin';
 }
 
+/**
+ * Ids of the RFQs / FUP As holding at least one Line 05 item. `items` is a
+ * JSON array, so the match runs in SQL; "5" counts as "05" and a line may be
+ * a list such as "02, 05" (see normalizeLine).
+ */
+async function line05DocIds(table: 'rfq' | 'fupa'): Promise<string[]> {
+  const tbl = table === 'fupa' ? '"Fupa"' : '"Rfq"';
+  const rows = (await prisma.$queryRawUnsafe(
+    `SELECT d.id FROM ${tbl} d
+      WHERE jsonb_typeof(d.items::jsonb) = 'array'
+        AND EXISTS (
+          SELECT 1 FROM jsonb_array_elements(d.items::jsonb) e,
+                 unnest(string_to_array(COALESCE(e->>'line', ''), ',')) l
+           WHERE lpad(btrim(l), 2, '0') = '05'
+        )`,
+  )) as { id: string }[];
+  return rows.map((r: { id: string }) => r.id);
+}
+
 /** Write-side permission for the purchasing module (vendors, quotations, status moves). */
 export function canEditPurchasing(user: SafeUser) {
+  return isPurchasingRole(user.role) || user.role === 'admin';
+}
+
+/**
+ * Purchasing work on one RFQ / FUP A: Purchasing and Admin on any document,
+ * the PIC Line 05 only on documents that contain a Line 05 item.
+ */
+export function canWorkDoc(user: SafeUser, items: unknown) {
+  if (user.role === 'purchasing05') return itemsHaveLine(items);
   return user.role === 'purchasing' || user.role === 'admin';
 }
 
 /** Who may fill in the purchasing answer on an RFQ / FUP A. */
-export function canEditRfqAnswer(user: SafeUser) {
-  return canEditPurchasing(user) || user.role === 'gm';
+export function canEditRfqAnswer(user: SafeUser, items?: unknown) {
+  if (user.role === 'purchasing05') return itemsHaveLine(items);
+  return user.role === 'purchasing' || user.role === 'admin' || user.role === 'gm';
+}
+
+/**
+ * Read guard for things hanging off one document (quotations, attachments,
+ * discussion). Only the PIC Line 05 is narrowed here; other roles keep the
+ * access they already had.
+ */
+export async function docVisibleTo(user: SafeUser, ref: { rfqId?: string | null; fupaId?: string | null }): Promise<boolean> {
+  if (user.role !== 'purchasing05') return true;
+  const doc = ref.rfqId
+    ? await prisma.rfq.findUnique({ where: { id: ref.rfqId }, select: { items: true } })
+    : ref.fupaId
+      ? await prisma.fupa.findUnique({ where: { id: ref.fupaId }, select: { items: true } })
+      : null;
+  return !!doc && itemsHaveLine(doc.items);
 }
 
 /**

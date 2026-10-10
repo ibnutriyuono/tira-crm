@@ -44,8 +44,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   await logActivity({
     user,
     action: 'delete',
-    entity: attachment.rfqId ? 'rfq' : 'fupa',
-    entityId: (attachment.rfqId || attachment.fupaId) as string,
+    entity: attachment.rfqId ? 'rfq' : attachment.fupaId ? 'fupa' : 'prospect',
+    entityId: (attachment.rfqId || attachment.fupaId || attachment.prospectId) as string,
     summary: `Menghapus lampiran "${attachment.name}"`,
   });
   return NextResponse.json({ ok: true });

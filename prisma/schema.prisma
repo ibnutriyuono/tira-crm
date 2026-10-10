@@ -14,6 +14,8 @@ enum Role {
   bm
   sales
   purchasing
+  /// PIC Line 05 (fabrikasi): UI Purchasing, hanya RFQ / FUP A yang berisi item Line 05.
+  purchasing05
 }
 
 /// Notifikasi persisten per-user — riwayat semua kejadian penting pada RFQ/FUP A
@@ -523,6 +525,8 @@ model Attachment {
   id         String   @id @default(cuid())
   rfqId      String?
   fupaId     String?
+  /// Gambar kerja Line 05 yang dilampirkan di Edit Prospek; ikut terlihat di RFQ / FUP A dari prospek itu.
+  prospectId String?
   name       String
   type       String?
   size       Int      @default(0)
@@ -532,6 +536,7 @@ model Attachment {
 
   @@index([rfqId])
   @@index([fupaId])
+  @@index([prospectId])
 }
 
 // Small key/value bag for app-wide settings — currently just the

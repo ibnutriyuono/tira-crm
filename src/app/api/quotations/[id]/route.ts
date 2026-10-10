@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, num, requireUser } from '@/lib/api-helpers';
-import { canEditPurchasing } from '@/lib/auth';
+import { canEditPurchasing, docVisibleTo } from '@/lib/auth';
 import { PSTATUS_MASUK, PSTATUS_PO } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -17,6 +17,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const existing = await prisma.quotation.findUnique({ where: { id }, include: { vendor: { select: { nama: true } } } });
   if (!existing) return NextResponse.json({ error: 'Penawaran tidak ditemukan' }, { status: 404 });
+  if (!(await docVisibleTo(user, existing))) return NextResponse.json({ error: 'Penawaran tidak ditemukan' }, { status: 404 });
 
   const body = await req.json().catch(() => null);
   const quotation = await prisma.quotation.update({
@@ -69,6 +70,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const existing = await prisma.quotation.findUnique({ where: { id }, include: { vendor: { select: { nama: true } } } });
   if (!existing) return NextResponse.json({ error: 'Penawaran tidak ditemukan' }, { status: 404 });
+  if (!(await docVisibleTo(user, existing))) return NextResponse.json({ error: 'Penawaran tidak ditemukan' }, { status: 404 });
 
   const scope = existing.rfqId ? { rfqId: existing.rfqId } : { fupaId: existing.fupaId };
 
@@ -104,6 +106,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   const existing = await prisma.quotation.findUnique({ where: { id }, include: { vendor: { select: { nama: true } } } });
   if (!existing) return NextResponse.json({ error: 'Penawaran tidak ditemukan' }, { status: 404 });
+  if (!(await docVisibleTo(user, existing))) return NextResponse.json({ error: 'Penawaran tidak ditemukan' }, { status: 404 });
 
   await prisma.quotation.delete({ where: { id } });
   emitCrmEvent('quotation:changed', { rfqId: existing.rfqId, fupaId: existing.fupaId });

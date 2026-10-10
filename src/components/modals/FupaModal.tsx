@@ -1,20 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { CustomerNameInput } from '../CustomerNameInput';
 import { AttachmentList } from '../AttachmentList';
 import { ItemChat } from '../ItemChat';
-import { IconDownload, IconMail, IconPlus, IconSave, IconTrash, IconWa } from '../icons';
-import { ATTACHMENT_MAX_BYTES, RFQ_LOKAL_OPTIONS } from '@/lib/constants';
-import { formatFileSize, getProspectMaterials, normalizeLine, normalizePhone, num, todayStr } from '@/lib/format';
+import { IconDownload, IconMail, IconSave, IconWa } from '../icons';
+import { MaterialSpecEditor } from '../MaterialSpecEditor';
+import { emptyRow, itemToRow, materialRowsToItemRows, materialToRow, rowToItem, type SpecRow } from '@/lib/material-spec';
+import { ATTACHMENT_MAX_BYTES } from '@/lib/constants';
+import { formatFileSize, getProspectMaterials, normalizePhone, todayStr } from '@/lib/format';
 import { buildPurchaseRequestMessage, downloadPurchaseRequestExcel } from '@/lib/purchase-request';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Fupa, Rfq, RfqItem } from '@/lib/types';
 
-const emptyItem = (): RfqItem => ({ line: '', grade: '', material: '', dia: '', thick: '', width: '', length: '', pcs: 1, berat: '', lokal: 'LOKAL ATAU IMPORT', estimasi: '' });
 
 export function FupaModal() {
   const modal = useUiStore((s) => s.modal);
@@ -38,7 +39,9 @@ export function FupaModal() {
   const [cabang, setCabang] = useState('');
   const [customer, setCustomer] = useState('');
   const [catatan, setCatatan] = useState('');
-  const [items, setItems] = useState<RfqItem[]>([emptyItem()]);
+  // Edited as spec rows (bentuk, ukuran, …); `items` is what gets stored / sent.
+  const [rows, setRows] = useState<SpecRow[]>([emptyRow()]);
+  const items = useMemo<RfqItem[]>(() => rows.map(rowToItem), [rows]);
   const [busy, setBusy] = useState(false);
   /** Unread discussion at the moment the thread was opened, for the heading bubble. */
   const [chatUnread, setChatUnread] = useState(0);
@@ -57,7 +60,7 @@ export function FupaModal() {
         setCabang(f.cabang || '');
         setCustomer(f.customer || '');
         setCatatan(f.catatan || '');
-        setItems(f.items?.length ? f.items.map((it) => ({ ...it })) : [emptyItem()]);
+        setRows(f.items?.length ? f.items.map(itemToRow) : [emptyRow()]);
       }
     } else {
       // Fresh FUP A. Three ways to get here, in order of how much detail they
@@ -81,24 +84,16 @@ export function FupaModal() {
       setCustomer(src?.customer || prospect?.customer || '');
       setCatatan('');
       if (src?.items?.length) {
-        setItems(src.items.map((it) => ({ ...it })));
+        setRows(src.items.map(itemToRow));
       } else if (prospect) {
-        setItems(
-          getProspectMaterials(prospect).map((m) => ({
-            line: m.line || '', grade: '', material: m.uraian || '', dia: '', thick: '', width: '', length: '',
-            pcs: num(m.qty) || 1, berat: '', lokal: 'LOKAL ATAU IMPORT', estimasi: prospect.tglPO || '',
-          })),
-        );
+        setRows(materialRowsToItemRows(getProspectMaterials(prospect).map(materialToRow), prospect.tglPO || ''));
       } else {
-        setItems([emptyItem()]);
+        setRows([emptyRow()]);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, ctx?.fupaId, ctx?.sourceRfqId, ctx?.prospectId]);
 
-  function setItem(idx: number, patch: Partial<RfqItem>) {
-    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
-  }
 
   function docPayload() {
     return {
@@ -241,46 +236,7 @@ export function FupaModal() {
 
       <div style={{ marginTop: 16 }}>
         <label style={{ display: 'block', marginBottom: 8 }}>Daftar Material Permintaan Pembelian</label>
-        {items.map((it, idx) => (
-          <div className="rfq-item-card" key={idx}>
-            <div className="rfq-item-head">
-              <span>Material #{idx + 1}</span>
-              <button
-                type="button"
-                className="icon-btn danger"
-                disabled={items.length <= 1}
-                onClick={() => setItems((prev) => (prev.length === 1 ? [emptyItem()] : prev.filter((_, i) => i !== idx)))}
-                title="Hapus material"
-              >
-                <IconTrash />
-              </button>
-            </div>
-            <div className="form-grid">
-              <div><label>Line</label><input type="text" value={it.line} onChange={(e) => setItem(idx, { line: e.target.value })} onBlur={(e) => setItem(idx, { line: normalizeLine(e.target.value) })} /></div>
-              <div><label>Grade</label><input type="text" value={it.grade} onChange={(e) => setItem(idx, { grade: e.target.value })} /></div>
-              <div className="full">
-                <label>Material / Spesifikasi</label>
-                <input type="text" value={it.material} onChange={(e) => setItem(idx, { material: e.target.value })} placeholder="cth. 12 MM X 320 MM X 1333 MM" />
-              </div>
-              <div><label>Dia (mm)</label><input type="number" step="any" min={0} value={it.dia} onChange={(e) => setItem(idx, { dia: e.target.value })} /></div>
-              <div><label>Thick (mm)</label><input type="number" step="any" min={0} value={it.thick} onChange={(e) => setItem(idx, { thick: e.target.value })} /></div>
-              <div><label>Width (mm)</label><input type="number" step="any" min={0} value={it.width} onChange={(e) => setItem(idx, { width: e.target.value })} /></div>
-              <div><label>Length (mm)</label><input type="number" step="any" min={0} value={it.length} onChange={(e) => setItem(idx, { length: e.target.value })} /></div>
-              <div><label>PCS</label><input type="number" step="any" min={0} value={it.pcs} onChange={(e) => setItem(idx, { pcs: e.target.value })} /></div>
-              <div><label>Berat (KGS)</label><input type="number" step="any" min={0} value={it.berat} onChange={(e) => setItem(idx, { berat: e.target.value })} /></div>
-              <div>
-                <label>Lokal/Import</label>
-                <select value={it.lokal} onChange={(e) => setItem(idx, { lokal: e.target.value })}>
-                  {RFQ_LOKAL_OPTIONS.map((o) => (<option key={o.v} value={o.v}>{o.l}</option>))}
-                </select>
-              </div>
-              <div><label>Estimasi Kebutuhan</label><input type="date" value={String(it.estimasi || '')} onChange={(e) => setItem(idx, { estimasi: e.target.value })} /></div>
-            </div>
-          </div>
-        ))}
-        <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 4 }} onClick={() => setItems((prev) => [...prev, emptyItem()])}>
-          <IconPlus /> Tambah Material
-        </button>
+        <MaterialSpecEditor variant="doc" rows={rows} onChange={setRows} />
       </div>
 
       <div className="form-grid" style={{ marginTop: 16 }}>
@@ -304,7 +260,7 @@ export function FupaModal() {
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>Lampiran File (maks. {formatFileSize(ATTACHMENT_MAX_BYTES)}/file)</label>
-        <AttachmentList fupaId={fupaId} ensureParentId={() => save(false)} />
+        <AttachmentList fupaId={fupaId} withProspect ensureParentId={() => save(false)} />
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>

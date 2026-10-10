@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, num, requireUser } from '@/lib/api-helpers';
-import { canEditPurchasing } from '@/lib/auth';
+import { canEditPurchasing, docVisibleTo } from '@/lib/auth';
 import { PSTATUS_DIMINTA } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -14,6 +14,8 @@ export async function GET(req: Request) {
   const rfqId = searchParams.get('rfqId');
   const fupaId = searchParams.get('fupaId');
 
+  // PIC Line 05: only the quotations of a Line 05 document it may see.
+  if (user.role === 'purchasing05' && !(await docVisibleTo(user, { rfqId, fupaId }))) return NextResponse.json({ quotations: [] });
   const quotations = await prisma.quotation.findMany({
     where: rfqId ? { rfqId } : fupaId ? { fupaId } : {},
     include: { vendor: { select: { nama: true } } },
@@ -37,6 +39,7 @@ export async function POST(req: Request) {
   const fupaId = body?.fupaId ? String(body.fupaId) : null;
   if (!vendorId) return NextResponse.json({ error: 'Vendor wajib dipilih' }, { status: 400 });
   if (!rfqId && !fupaId) return NextResponse.json({ error: 'Dokumen RFQ atau FUP A wajib diisi' }, { status: 400 });
+  if (!(await docVisibleTo(user, { rfqId, fupaId }))) return NextResponse.json({ error: 'Dokumen tidak ditemukan' }, { status: 404 });
 
   const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
   if (!vendor) return NextResponse.json({ error: 'Vendor tidak ditemukan' }, { status: 404 });

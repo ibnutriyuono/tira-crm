@@ -1,4 +1,4 @@
-import { classify } from './format';
+import { classify, num } from './format';
 import { effectiveTarget } from './reports';
 import type { BudgetTarget, Prospect } from './types';
 
@@ -77,18 +77,33 @@ function signalFor(achieve: number | null): KpiSignal {
 }
 
 /** Cumulative YTD sum of BudgetTarget.amount across every branch in `cabangList`, Jan through `throughMonth` of `year`. Reused as the Budget basis for both Sales Order and Invoice (see buildKpiScorecard's own note on why) and, doubled, for Prospect/Opportunity. */
-function cumulativeAmountTarget(budgetTargets: BudgetTarget[], cabangList: string[], year: string, throughMonth: number): number {
-  // A month without its own target uses the latest earlier one (same rule
-  // as the Forecast tab, see effectiveTarget).
+export function cumulativeAmountTarget(budgetTargets: BudgetTarget[], cabangList: string[], year: string, throughMonth: number): number {
   const cabangs = Array.from(new Set(budgetTargets.filter((bt) => inCabangList(bt.cabang, cabangList)).map((bt) => (bt.cabang || '').trim().toUpperCase())));
   let sum = 0;
   for (let m = 1; m <= throughMonth; m++) {
-    const p = periodeOf(year, m);
     cabangs.forEach((cb) => {
-      sum += effectiveTarget(budgetTargets, cb, p).amount;
+      sum += yearMonthTarget(budgetTargets, cb, year, m);
     });
   }
-  return sum;
+  return Math.round(sum);
+}
+
+/**
+ * Monthly target used by the scorecard. A month without its own target uses
+ * the latest earlier one (same rule as the Forecast tab, see effectiveTarget);
+ * months BEFORE the first target set in that year use that first target, so
+ * the Budget line runs Jan..Dec even when targets were only entered mid-year
+ * (e.g. set from September -> Jan..Aug use September's amount too).
+ */
+export function yearMonthTarget(budgetTargets: BudgetTarget[], cabang: string, year: string, month: number): number {
+  const p = periodeOf(year, month);
+  const own = effectiveTarget(budgetTargets, cabang, p);
+  if (own.amount > 0) return own.amount;
+  const cb = (cabang || '').trim().toUpperCase();
+  const first = budgetTargets
+    .filter((t) => (t.cabang || '').trim().toUpperCase() === cb && (t.periode || '').startsWith(`${year}-`) && t.periode > p && num(t.amount) > 0)
+    .sort((x, y) => x.periode.localeCompare(y.periode))[0];
+  return first ? num(first.amount) : 0;
 }
 
 /**

@@ -11,7 +11,7 @@ import { notify, purchasingUserIds } from '@/lib/notify';
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
-  const fupas = await prisma.fupa.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } });
+  const fupas = await prisma.fupa.findMany({ where: await docScopeWhere(user, { table: 'fupa' }), orderBy: { createdAt: 'desc' } });
   return NextResponse.json({ fupas });
 }
 
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
   });
   if (fupa.status === 'Terkirim') {
     await notify({
-      userIds: await purchasingUserIds(),
+      userIds: await purchasingUserIds(fupa.items),
       type: 'fupa_new',
       entity: 'fupa',
       entityId: fupa.id,

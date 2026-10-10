@@ -1,5 +1,6 @@
 'use client';
 
+import { isPurchasingRoleClient } from '@/lib/doc-lines';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useDataStore } from '@/store/useDataStore';
@@ -122,11 +123,11 @@ export function TopBar() {
       <div className="brand">
         <span className="logo-chip">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="logo-img" src="/logo.png" alt="Logo PT Tira Austenite" />
+          <img className="logo-img" src="/logo.png" alt="Logo PT. TIRA AUSTENITE, Tbk" />
         </span>
         <div>
           <h1>CRM TIRA</h1>
-          <span className="sub">Steel Division · PT Tira Austenite</span>
+          <span className="sub">Steel Division · PT. TIRA AUSTENITE, <span style={{ textTransform: 'none' }}>Tbk</span></span>
         </div>
       </div>
       <div className="topbar-right">
@@ -163,7 +164,7 @@ export function TopBar() {
               Kelola User
             </button>
           )}
-          {currentUser.role !== 'purchasing' && (
+          {!isPurchasingRoleClient(currentUser.role) && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('gmAnalysis')}>
               <IconPresentation />
               Analisa Eksekutif

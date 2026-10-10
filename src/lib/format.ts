@@ -1,3 +1,4 @@
+import { pickSpecExtra } from './material-extra';
 import type { Customer, CustomerPic, Klasifikasi, Material, Prospect } from './types';
 
 export function num(v: unknown): number {
@@ -105,7 +106,7 @@ export function normalizeItemLines<T>(items: T[]): T[] {
 
 export function getProspectMaterials(r: Pick<Prospect, 'materials' | 'qty' | 'value' | 'line' | 'uraian'>): Material[] {
   if (Array.isArray(r.materials) && r.materials.length > 0) {
-    return r.materials.map((m) => ({ line: normalizeLine(m.line), uraian: m.uraian || '', qty: num(m.qty) || 0, beratPc: num(m.beratPc) || 0, hargaKg: num(m.hargaKg) || 0, harga: num(m.harga) || 0 }));
+    return r.materials.map((m) => ({ ...pickSpecExtra(m), line: normalizeLine(m.line), uraian: m.uraian || '', qty: num(m.qty) || 0, beratPc: num(m.beratPc) || 0, hargaKg: num(m.hargaKg) || 0, harga: num(m.harga) || 0 }));
   }
   const qty = num(r.qty) || 1;
   const harga = qty > 0 ? Math.round(num(r.value) / qty) : num(r.value);

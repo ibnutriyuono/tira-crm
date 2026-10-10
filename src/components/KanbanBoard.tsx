@@ -140,6 +140,32 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
   );
 }
 
+type KolomSort = '' | 'baru' | 'lama' | 'nilai-desc' | 'nilai-asc' | 'customer' | 'se';
+
+const SORT_OPTIONS: { value: KolomSort; label: string }[] = [
+  { value: '', label: 'Urutan: bawaan' },
+  { value: 'baru', label: 'Urutan: masuk tahap terbaru' },
+  { value: 'lama', label: 'Urutan: paling lama di tahap ini' },
+  { value: 'nilai-desc', label: 'Urutan: nilai tertinggi' },
+  { value: 'nilai-asc', label: 'Urutan: nilai terendah' },
+  { value: 'customer', label: 'Urutan: customer A–Z' },
+  { value: 'se', label: 'Urutan: SE A–Z' },
+];
+
+/** Sorts a column's cards; '' keeps the order the list already has (the table's own sort). */
+function sortKolom(list: Prospect[], by: KolomSort): Prospect[] {
+  if (!by) return list;
+  const text = (v: string | null | undefined) => (v || '').trim().toLowerCase();
+  const out = list.slice();
+  if (by === 'baru') out.sort((a, b) => changeDate(b).localeCompare(changeDate(a)));
+  if (by === 'lama') out.sort((a, b) => (changeDate(a) || '9999').localeCompare(changeDate(b) || '9999'));
+  if (by === 'nilai-desc') out.sort((a, b) => num(b.value) - num(a.value));
+  if (by === 'nilai-asc') out.sort((a, b) => num(a.value) - num(b.value));
+  if (by === 'customer') out.sort((a, b) => text(a.customer).localeCompare(text(b.customer), 'id'));
+  if (by === 'se') out.sort((a, b) => text(a.se).localeCompare(text(b.se), 'id') || num(b.value) - num(a.value));
+  return out;
+}
+
 export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
   const openModal = useUiStore((s) => s.openModal);
   // Filter bulan per kolom, berdasar KAPAN prospek masuk ke tahap itu
@@ -148,6 +174,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
   // dibuat bulan ini dan sekarang ada di Negosiasi.
   const [bulanPerKolom, setBulanPerKolom] = useState<Record<number, string>>({});
   const [hariPerKolom, setHariPerKolom] = useState<Record<number, string>>({});
+  const [sortPerKolom, setSortPerKolom] = useState<Record<number, KolomSort>>({});
   // Khusus kolom DO: pisahkan yang sudah terfaktur (Omzet) dari yang belum (GIT).
   const [fakturDo, setFakturDo] = useState<'' | 'omzet' | 'git'>('');
   const purchCounts = useProspectPurchasingCounts(true);
@@ -209,7 +236,9 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
           // mengikuti filter bulan/hari yang sedang aktif.
           const fakturAktif = s === 5 ? fakturDo : '';
           const nOmzet = s === 5 ? dalamHari.filter((r) => r.terfaktur).length : 0;
-          const items = fakturAktif ? dalamHari.filter((r) => (fakturAktif === 'omzet' ? r.terfaktur : !r.terfaktur)) : dalamHari;
+          const sortAktif = sortPerKolom[s] || '';
+          // Diurutkan SEBELUM dipotong CAP, supaya "nilai tertinggi" benar-benar yang tertinggi di kolom.
+          const items = sortKolom(fakturAktif ? dalamHari.filter((r) => (fakturAktif === 'omzet' ? r.terfaktur : !r.terfaktur)) : dalamHari, sortAktif);
           const totalVal = items.reduce((sum, r) => sum + num(r.value), 0);
           const shown = items.slice(0, CAP);
           return (
@@ -256,6 +285,20 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                     {hariOptions.map((d) => (
                       <option key={d} value={d}>
                         {new Date(`${d}T00:00:00`).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: bulanAktif ? undefined : 'numeric' })}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {semua.length > 1 && (
+                  <select
+                    className="kc-month"
+                    value={sortAktif}
+                    onChange={(e) => setSortPerKolom((prev) => ({ ...prev, [s]: e.target.value as KolomSort }))}
+                    title="Urutkan kartu di kolom ini"
+                  >
+                    {SORT_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
                       </option>
                     ))}
                   </select>

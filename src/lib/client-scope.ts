@@ -1,3 +1,4 @@
+import { itemsHaveLine } from './doc-lines';
 import type { BudgetTarget, Customer, Fupa, Prospect, Rfq, SafeUser, SalesPlan } from './types';
 
 /**
@@ -60,6 +61,9 @@ export function matchesProspectScope(user: SafeUser, p: Prospect): boolean {
       return eq(p.cabang, user.cabang || '');
     case 'rm':
       return p.reg === (user.reg ?? -1);
+    // PIC Line 05 sees no prospects, only its Line 05 documents.
+    case 'purchasing05':
+      return false;
     // Purchasing works the whole country's demand; gm and admin see everything.
     default:
       return true;
@@ -86,6 +90,9 @@ export function matchesDocScope(user: SafeUser, doc: Rfq | Fupa, regionCabangs?:
       if (doc.reg != null || !doc.cabang) return false;
       return (regionCabangs ?? new Set<string>()).has(doc.cabang.trim().toLowerCase());
     }
+    // PIC Line 05: only documents holding a Line 05 item (mirrors line05DocIds).
+    case 'purchasing05':
+      return itemsHaveLine(doc.items);
     // gm, admin and purchasing see everything.
     default:
       return true;
@@ -165,6 +172,8 @@ function matchesCabangOnlyScope(user: SafeUser, cabang: string | null, scopeCaba
     case 'bm':
     case 'rm':
       return !!cabang && (scopeCabangs ?? new Set<string>()).has(cabang.trim().toLowerCase());
+    case 'purchasing05':
+      return false;
     // gm, admin, purchasing see everything.
     default:
       return true;

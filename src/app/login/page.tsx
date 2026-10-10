@@ -39,10 +39,10 @@ export default function LoginPage() {
       <div className="auth-card">
         <div className="auth-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="logo-img" src="/logo.png" alt="Logo PT Tira Austenite" />
+          <img className="logo-img" src="/logo.png" alt="Logo PT. TIRA AUSTENITE, Tbk" />
           <h1>CRM TIRA</h1>
         </div>
-        <div className="auth-sub">Steel Division · PT Tira Austenite &mdash; Masuk untuk melanjutkan</div>
+        <div className="auth-sub">Steel Division · PT. TIRA AUSTENITE, Tbk &mdash; Masuk untuk melanjutkan</div>
         <div className={`auth-error${error ? ' show' : ''}`}>{error}</div>
         <form onSubmit={onSubmit}>
           <div className="auth-field">

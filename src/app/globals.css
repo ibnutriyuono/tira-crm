@@ -698,3 +698,40 @@ tr.hl-yellow:hover td{ background:rgba(201,130,46,.18); }
 .rt-check input{width:auto; margin-top:2px;}
 .rt-check small{display:block; font-size:11px; color:var(--text-soft); font-weight:400;}
 .rt-kurs{display:flex; flex-direction:column; gap:3px; flex:1; text-transform:none; letter-spacing:0; font-size:12px;}
+
+/* PIC Line 05: reminder that the Purchasing board is narrowed to Line 05 documents */
+.pic05-banner{display:flex;align-items:center;gap:12px;margin:14px 0 4px;padding:11px 14px;background:#fff4e3;border:1px solid #ecd2a6;border-radius:8px;font-size:14px;color:#5c3d0c}
+.pic05-tag{flex:0 0 auto;font-size:12px;font-weight:700;padding:3px 9px;border-radius:10px;background:#fbe0b8;color:#5c3d0c}
+
+/* Form material seragam (MaterialSpecEditor) — Prospek, RFQ, FUP A */
+.msr{display:flex;flex-direction:column;gap:8px}
+.msr-paste-toggle{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.msr-paste{display:flex;gap:8px;align-items:stretch}
+.msr-paste textarea{flex:1;min-height:70px}
+.msr-row{border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:#FBFCFD;display:flex;flex-direction:column;gap:8px}
+.msr-row.msr-fab{background:#FFFBF4;border-color:#EEDFC8}
+.msr-top,.msr-bottom{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.msr-f{display:flex;flex-direction:column;gap:3px;min-width:0}
+.msr-f label{font-size:10.5px;margin:0;display:flex;align-items:center;gap:6px}
+.msr-f input,.msr-f select{width:100%;min-width:0}
+.msr-line{width:62px}
+.msr-grow{flex:1 1 220px}
+.msr-dims{display:flex;align-items:center;gap:4px}
+.msr-dim{display:flex;align-items:center;gap:4px;flex:1;min-width:0}
+.msr-dim span{color:var(--slate-500)}
+.msr-dim input{min-width:44px}
+.msr-del{align-self:flex-end;margin-bottom:2px}
+.msr-auto{background:#F1F6FA !important;color:#24496B;font-weight:600}
+.msr-tag{font-size:10px;font-weight:700;letter-spacing:0;text-transform:none;padding:1px 7px;border-radius:9px;background:#E3EDF5;color:#24496B}
+.msr-tag.manual{background:var(--amber-100);color:#7A4A0C}
+.msr-total .mono{padding:9px 0;text-align:right;font-size:13px}
+.msr-uraian-fab{font-size:12.5px;color:#6B4A1A;padding:9px 0}
+.msr-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.msr-sum{display:flex;gap:18px;font-size:13px;color:var(--slate-500);flex-wrap:wrap}
+.msr-sum b{color:var(--text,#1B2430)}
+
+/* Purchasing dashboard: KPI per Line */
+.line-kpi-table tr.clickable{cursor:pointer}
+.line-kpi-table tr.clickable:hover td{background:#F4F7FA}
+.line-kpi-bar{height:6px;border-radius:3px;background:#E3E9EF;overflow:hidden;margin-bottom:3px}
+.line-kpi-bar span{display:block;height:100%;background:var(--green-500)}

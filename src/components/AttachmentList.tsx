@@ -9,6 +9,10 @@ import type { Attachment } from '@/lib/types';
 interface Props {
   rfqId?: string | null;
   fupaId?: string | null;
+  /** Gambar kerja Line 05 on a prospect (Edit Prospek). */
+  prospectId?: string | null;
+  /** RFQ / FUP A: also list (read-only) the files attached to the source prospect. */
+  withProspect?: boolean;
   readOnly?: boolean;
   /**
    * Saves the parent as a draft and returns its id. Lets the user attach files
@@ -22,9 +26,9 @@ interface Props {
  * object storage through /api/attachments; downloads go through a redirect to a
  * short-lived presigned URL, so the bucket never has to be public.
  */
-export function AttachmentList({ rfqId, fupaId, readOnly, ensureParentId }: Props) {
-  const parentId = rfqId || fupaId || null;
-  const query = rfqId ? `rfqId=${rfqId}` : `fupaId=${fupaId}`;
+export function AttachmentList({ rfqId, fupaId, prospectId, withProspect, readOnly, ensureParentId }: Props) {
+  const parentId = rfqId || fupaId || prospectId || null;
+  const query = (rfqId ? `rfqId=${rfqId}` : fupaId ? `fupaId=${fupaId}` : `prospectId=${prospectId}`) + (withProspect && !prospectId ? '&withProspect=1' : '');
 
   const toast = useDataStore((s) => s.toast);
   const [items, setItems] = useState<Attachment[]>([]);
@@ -57,7 +61,7 @@ export function AttachmentList({ rfqId, fupaId, readOnly, ensureParentId }: Prop
     if (!target) return;
     // Which column to file it under is decided by the prop the caller passed,
     // not by its value — a brand-new document has a null id either way.
-    const field = fupaId !== undefined ? 'fupaId' : 'rfqId';
+    const field = prospectId !== undefined ? 'prospectId' : fupaId !== undefined ? 'fupaId' : 'rfqId';
     setBusy(true);
     for (const file of Array.from(files)) {
       const body = new FormData();
@@ -125,12 +129,13 @@ export function AttachmentList({ rfqId, fupaId, readOnly, ensureParentId }: Prop
               <tr key={a.id}>
                 <td>
                   <a href={`/api/attachments/${a.id}`} target="_blank" rel="noreferrer">{a.name}</a>
+                  {a.fromProspect && <span className="badge amber" style={{ marginLeft: 8 }}>dari prospek</span>}
                 </td>
                 <td style={{ width: 90, whiteSpace: 'nowrap' }}>{formatFileSize(a.size)}</td>
                 <td style={{ width: 140 }}>{a.uploadedBy || '-'}</td>
                 {!readOnly && (
                   <td style={{ width: 40 }}>
-                    <button type="button" className="icon-btn danger" title="Hapus lampiran" onClick={() => remove(a.id)}>
+                    <button type="button" className="icon-btn danger" title="Hapus lampiran" disabled={a.fromProspect} onClick={() => remove(a.id)}>
                       <IconTrash />
                     </button>
                   </td>

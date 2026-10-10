@@ -121,7 +121,7 @@ export function MarketingModal() {
 
   function buildMessage(c: CustomerIntelRow): string {
     const item = lastWonItem(c);
-    const sapaan = `Selamat pagi Bapak/Ibu,\n\nSaya ${currentUser?.name || ''} dari PT Tira Austenite (Steel Division).`;
+    const sapaan = `Selamat pagi Bapak/Ibu,\n\nSaya ${currentUser?.name || ''} dari PT. TIRA AUSTENITE, Tbk (Steel Division).`;
     const konteks = item
       ? `\n\nTerakhir kami suplai *${item.uraian}* pada ${formatDateID(item.date)}. Sudah ${c.daysSinceOrder} hari, jadi saya ingin menanyakan apakah ada kebutuhan material dalam waktu dekat?`
       : `\n\nSaya ingin menanyakan apakah ada kebutuhan material baja dalam waktu dekat?`;

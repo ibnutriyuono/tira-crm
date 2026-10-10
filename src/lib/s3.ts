@@ -40,7 +40,7 @@ function s3() {
  * together in the console, and prefixed with a UUID so two uploads of the same
  * filename never collide.
  */
-export function buildKey(entity: 'rfq' | 'fupa' | 'trip', entityId: string, filename: string) {
+export function buildKey(entity: 'rfq' | 'fupa' | 'trip' | 'prospect', entityId: string, filename: string) {
   const safe = filename.replace(/[^\w.\- ]+/g, '_').slice(-120);
   return `${prefix}/${entity}/${entityId}/${randomUUID()}-${safe}`;
 }

@@ -14,7 +14,7 @@ export async function GET() {
     prisma.prospect.findMany({ where: prospectScopeWhere(user), orderBy: { createdAt: 'desc' } }),
     prisma.customer.findMany({ where: await customerScopeWhere(user), orderBy: { createdAt: 'desc' } }),
     prisma.rfq.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } }),
-    prisma.fupa.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } }),
+    prisma.fupa.findMany({ where: await docScopeWhere(user, { table: 'fupa' }), orderBy: { createdAt: 'desc' } }),
     // Vendor deliberately stays company-wide read for every role — it has
     // no cabang/reg field at all (vendors quote nationally, not per branch),
     // and sales/managers need to see which vendors were asked to quote on
