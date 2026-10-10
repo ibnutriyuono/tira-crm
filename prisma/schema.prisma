@@ -521,6 +521,27 @@ model ItemRead {
 // (see src/lib/s3.ts); only the key and display metadata are stored here. The
 // single-file prototype inlined 1.5MB base64 data URLs in the record itself,
 // which is why its limit was so low.
+/// Riwayat per item material prospek: penawaran -> PO -> pengiriman.
+/// `items` = [{ itemId, label, qty, of?, from?, to?, sisa? }] -- label dicatat
+/// saat kejadian supaya riwayat tetap terbaca walau materialnya diubah kemudian.
+model ProspectItemEvent {
+  id         String   @id @default(cuid())
+  prospectId String
+  createdAt  DateTime @default(now())
+  /// Tanggal dokumen (YYYY-MM-DD): tgl penawaran / PO / kirim.
+  tgl        String?
+  /// tawar | revisi | po | nopo | kirim
+  type       String
+  docNo      String?
+  title      String
+  items      Json
+  userId     String?
+  actorName  String
+
+  @@index([prospectId, createdAt])
+  @@index([type, tgl])
+}
+
 model Attachment {
   id         String   @id @default(cuid())
   rfqId      String?

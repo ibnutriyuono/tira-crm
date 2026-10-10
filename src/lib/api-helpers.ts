@@ -27,6 +27,46 @@ export function num(v: unknown): number {
 }
 
 /** Derives the flattened legacy fields (line/uraian/qty/value) from a materials array — mirrors the original form submit handler. */
+export function newItemId(): string {
+  return `it${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * PUT replaces the whole materials list; copy the stored qtyPo / qtyKirim back
+ * onto the rows that still exist (matched by itemId) so a form save can neither
+ * drop nor forge them.
+ */
+export function carryItemTracking(before: unknown, after: Record<string, unknown>[]): void {
+  const prev = new Map<string, Record<string, unknown>>();
+  (Array.isArray(before) ? before : []).forEach((m) => {
+    const r = m as Record<string, unknown>;
+    if (typeof r?.itemId === 'string') prev.set(r.itemId, r);
+  });
+  after.forEach((m) => {
+    const p = typeof m.itemId === 'string' ? prev.get(m.itemId) : undefined;
+    if (!p) return;
+    if (typeof p.qtyPo === 'number') m.qtyPo = p.qtyPo;
+    if (typeof p.qtyKirim === 'number') m.qtyKirim = p.qtyKirim;
+  });
+}
+
+/** Gives every stored row an itemId (old records); returns null when nothing changed. */
+export function ensureItemIds(materials: unknown): Record<string, unknown>[] | null {
+  const list = (Array.isArray(materials) ? materials : []).map((m) => ({ ...(m as Record<string, unknown>) }));
+  let changed = false;
+  const seen = new Set<string>();
+  list.forEach((r) => {
+    let id = typeof r.itemId === 'string' ? r.itemId : '';
+    if (!id || seen.has(id)) {
+      id = newItemId();
+      changed = true;
+    }
+    seen.add(id);
+    r.itemId = id;
+  });
+  return changed ? list : null;
+}
+
 export function deriveFromMaterials(materials: Material[]) {
   const clean = materials
     .map((m) => ({
@@ -39,6 +79,19 @@ export function deriveFromMaterials(materials: Material[]) {
       harga: num(m.harga),
     }))
     .filter((m) => m.uraian || m.qty || m.harga || m.beratPc || m.hargaKg);
+  // Every row gets a stable id (kept across edits, unique within the prospect).
+  // qtyPo / qtyKirim are never taken from a form payload -- only the items
+  // endpoint writes them (PUT carries the stored values over, see carryItemTracking).
+  const seen = new Set<string>();
+  clean.forEach((m) => {
+    const r = m as Record<string, unknown>;
+    let id = typeof r.itemId === 'string' ? r.itemId : '';
+    if (!id || seen.has(id)) id = newItemId();
+    seen.add(id);
+    r.itemId = id;
+    delete r.qtyPo;
+    delete r.qtyKirim;
+  });
   // Same unit-price rule as the client (see materialUnitPrice).
   const unit = (m: { beratPc: number; hargaKg: number; harga: number }) =>
     m.beratPc > 0 && m.hargaKg > 0 ? m.beratPc * m.hargaKg : m.harga;

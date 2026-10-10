@@ -1,5 +1,6 @@
 'use client';
 
+import { promptItemFlow } from '@/lib/item-flow-prompt';
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { CustomerNameInput } from '../CustomerNameInput';
@@ -225,6 +226,7 @@ export function ProspectFormModal() {
       upsertProspect(prospect);
       closeModal();
       toast(editId ? 'Perubahan prospek disimpan' : 'Prospek baru ditambahkan', 'success');
+      promptItemFlow(prevStatus, prospect);
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal menyimpan prospek', 'error');
     } finally {

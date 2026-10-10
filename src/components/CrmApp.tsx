@@ -34,6 +34,7 @@ import { SalesPlanModal } from './modals/SalesPlanModal';
 import { NotificationsModal } from './modals/NotificationsModal';
 import { FollowUpBoardModal } from './modals/FollowUpBoardModal';
 import { GmAnalysisModal } from './modals/GmAnalysisModal';
+import { ItemFlowModal } from './modals/ItemFlowModal';
 import { KpiModal } from './modals/KpiModal';
 import { CompetitorLogModal } from './modals/CompetitorLogModal';
 import { ForecastModal } from './modals/ForecastModal';
@@ -141,6 +142,7 @@ export function CrmApp() {
       <NotificationsModal />
       <FollowUpBoardModal />
       <GmAnalysisModal />
+      <ItemFlowModal />
       <KpiModal />
       <SalesActivityModal />
       <ActivityKpiModal />

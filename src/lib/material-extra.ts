@@ -30,6 +30,12 @@ export function pickSpecExtra(m: unknown): Record<string, unknown> {
     const n = Number(o.hargaUnit);
     if (Number.isFinite(n)) out.hargaUnit = n;
   }
+  // Alur item prospek (lib/item-flow.ts): id baris tetap + qty PO / terkirim.
+  if (typeof o.itemId === 'string' && o.itemId) out.itemId = o.itemId.slice(0, 40);
+  for (const k of ['qtyPo', 'qtyKirim'] as const) {
+    const n = typeof o[k] === 'number' ? (o[k] as number) : NaN;
+    if (Number.isFinite(n) && n >= 0) out[k] = n;
+  }
   if (o.beratPc !== undefined && o.uraian === undefined) {
     // RFQ / FUP A items carry berat per pc next to the total `berat`.
     const n = Number(o.beratPc);

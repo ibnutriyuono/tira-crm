@@ -1,5 +1,8 @@
 'use client';
 
+import { promptItemFlow } from '@/lib/item-flow-prompt';
+import { flowItems, flowTotals } from '@/lib/item-flow';
+import { FlowBar } from './modals/ItemFlowModal';
 import { useMemo, useState } from 'react';
 import { KANBAN_STATUSES, STATUS_META } from '@/lib/constants';
 import { classify, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
@@ -65,6 +68,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
           </span>
         </div>
       )}
+      {klas === 'Won' && <ItemFlowChip r={r} />}
       <div className="kc-actions">
         <button
           className="icon-btn wa-btn"
@@ -140,6 +144,31 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
   );
 }
 
+/** Won card: per-item progress (PO vs terkirim); opens Status Item & Riwayat. */
+function ItemFlowChip({ r }: { r: Prospect }) {
+  const items = flowItems(r);
+  const t = flowTotals(items);
+  const sent = items.reduce((s, i) => s + i.sent, 0);
+  const po = items.reduce((s, i) => s + (i.po || 0), 0);
+  const label = !t.confirmed ? 'Konfirmasi qty PO per item' : `Terkirim ${po ? Math.round((sent / po) * 100) : 0}% dari PO`;
+  return (
+    <div className="kc-meta-row">
+      <button
+        type="button"
+        className="kc-item-btn"
+        title="Status Item & Riwayat (penawaran → PO → kirim)"
+        onClick={(e) => {
+          e.stopPropagation();
+          useUiStore.setState({ itemFlowCtx: { prospectId: r.id }, modal: 'itemFlow' });
+        }}
+      >
+        <span>{label}</span>
+        <FlowBar it={{ offered: items.reduce((s, i) => s + i.offered, 0), po, sent }} />
+      </button>
+    </div>
+  );
+}
+
 type KolomSort = '' | 'baru' | 'lama' | 'nilai-desc' | 'nilai-asc' | 'customer' | 'se';
 
 const SORT_OPTIONS: { value: KolomSort; label: string }[] = [
@@ -210,6 +239,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
     try {
       const { prospect } = await api.patch<{ prospect: Prospect }>(`/api/prospects/${id}`, { status: newStatus });
       upsertProspect(prospect);
+      promptItemFlow(prev, prospect);
     } catch (err) {
       upsertProspect(rec); // revert on failure
       toast(err instanceof Error ? err.message : 'Gagal menyimpan perubahan status', 'error');

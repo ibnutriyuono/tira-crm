@@ -735,3 +735,52 @@ tr.hl-yellow:hover td{ background:rgba(201,130,46,.18); }
 .line-kpi-table tr.clickable:hover td{background:#F4F7FA}
 .line-kpi-bar{height:6px;border-radius:3px;background:#E3E9EF;overflow:hidden;margin-bottom:3px}
 .line-kpi-bar span{display:block;height:100%;background:var(--green-500)}
+
+/* Status Item & Riwayat (ItemFlowModal) + tab Product / Pipeline Analisa Eksekutif */
+.if-bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:#E3E9EF;min-width:80px}
+.if-bar span{display:block;height:100%}
+.if-bar .sent,.if-legend .sent{background:var(--green-500)}
+.if-bar .open,.if-legend .open{background:var(--amber-500)}
+.if-bar .off,.if-legend .off{background:#9FB7CC}
+.if-bar .lost,.if-legend .lost{background:#D9A79A}
+.if-legend{display:inline-flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--text-soft);font-weight:400}
+.if-legend span{display:inline-flex;align-items:center;gap:4px}
+.if-legend i{display:inline-block;width:9px;height:9px;border-radius:2px}
+.if-est{display:inline-block;margin-left:6px;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;border:1px dashed #8796A5;color:var(--slate-600)}
+.if-warn{background:var(--amber-100)}
+.if-panel{border:2px solid var(--amber-500);border-radius:8px;padding:12px 14px;margin-bottom:14px;background:var(--surface)}
+.if-panel.kirim{border-color:var(--green-500)}
+.if-panel-head{display:flex;flex-direction:column;gap:2px;margin-bottom:10px;font-size:12.5px;color:var(--text-soft)}
+.if-panel-head > b{font-size:15px;color:var(--graphite-800)}
+.if-panel-foot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;font-size:12.5px}
+.if-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px;align-items:start}
+@media (max-width:980px){.if-grid{grid-template-columns:1fr}}
+.if-nowrap td.mono,.if-nowrap td .badge{white-space:nowrap}
+.if-sec-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 6px;font-size:13px}
+.if-row{cursor:pointer}
+.if-row.sel td{background:var(--amber-100)}
+.if-timeline{list-style:none;margin:0;padding:0}
+.if-timeline li{display:grid;grid-template-columns:96px 14px 1fr;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.if-when{display:flex;flex-direction:column;font-size:11.5px;color:var(--text-soft)}
+.if-when b{color:var(--graphite-800)}
+.if-dot{width:11px;height:11px;border-radius:6px;margin-top:4px;background:var(--slate-600)}
+.if-dot.steel{background:var(--steel-500)}.if-dot.amber{background:var(--amber-500)}.if-dot.green{background:var(--green-500)}.if-dot.rust{background:var(--rust-500)}
+.if-what{display:flex;flex-direction:column;gap:3px;font-size:13px}
+.if-line{font-size:12.5px;color:var(--text-soft)}
+.kc-item-btn{display:flex;align-items:center;gap:8px;width:100%;border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:5px 8px;font-size:11.5px;cursor:pointer;color:var(--graphite-800)}
+.kc-item-btn .if-bar{flex:1;min-width:40px;height:7px}
+.ea-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:-4px 0 14px}
+.ea-tabs button{border:none;background:transparent;padding:10px 14px;font-weight:700;font-size:13.5px;color:var(--text-soft);border-bottom:3px solid transparent;cursor:pointer}
+.ea-tabs button.on{color:var(--steel-600);border-bottom-color:var(--steel-500)}
+.tm-heat td.cell{text-align:center;font-family:var(--font-ibm-plex-mono),monospace;font-size:12px;border:2px solid var(--surface)}
+.tm-spark{display:flex;align-items:flex-end;gap:2px;height:24px}
+.tm-spark span{display:block;width:6px;border-radius:1px;background:#C9D3DD}
+.tm-spark span.in{background:var(--steel-500)}
+.tm-chart{display:flex;align-items:flex-end;gap:6px;height:170px;border-bottom:1px solid var(--border);padding-top:6px}
+.tm-chart .col{flex:1;display:flex;justify-content:center;align-items:flex-end;gap:2px;height:100%}
+.tm-chart .col span{display:block;width:12px;border-radius:2px 2px 0 0}
+.tm-chart .col .o{background:#9FB7CC}.tm-chart .col .w{background:#A8701F}
+.tm-chart-lbl{display:flex;gap:6px;padding-top:4px}
+.tm-chart-lbl span{flex:1;text-align:center;font-size:10.5px;color:var(--text-soft)}
+.tm-row{cursor:pointer}
+.tm-row.sel td{background:var(--amber-100)}

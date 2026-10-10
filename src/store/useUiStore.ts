@@ -36,6 +36,7 @@ export type ModalKey =
   | 'salesActivity'
   | 'activityKpi'
   | 'visitTrip'
+  | 'itemFlow'
   | null;
 
 export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq' | 'vendor' | 'fupa';
@@ -70,6 +71,12 @@ export interface QcdCtx {
   /** Kanban only: the status has NOT been moved yet -- the QCD modal commits it together with the QCD (and No. PO when needed). */
   commit?: boolean;
   /** Modal to return to after save/cancel (e.g. the KPI QCD dashboard). */
+  returnTo?: ModalKey;
+}
+
+export interface ItemFlowCtx {
+  prospectId: string;
+  mode?: 'po' | 'kirim' | null;
   returnTo?: ModalKey;
 }
 
@@ -140,6 +147,8 @@ interface UiState {
   /** Set before opening 'visitTrip' to land directly on one trip's detail (e.g. from a notification). */
   visitTripOpenId: string | null;
   qcdCtx: QcdCtx | null;
+  /** Status Item & Riwayat of one prospect; `mode` opens a form straight away (after a move into PO / DO). */
+  itemFlowCtx: ItemFlowCtx | null;
   importTarget: 'prospect' | 'customer' | 'vendor';
   /** Staged QCD answers for a prospect still being created/edited in the form modal — committed together on Save. */
   pendingProspectQCD: PendingQcd;
@@ -220,6 +229,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   purchDetailCtx: null,
   visitTripOpenId: null,
   qcdCtx: null,
+  itemFlowCtx: null,
   importTarget: 'prospect',
   pendingProspectQCD: { ...EMPTY_QCD },
 

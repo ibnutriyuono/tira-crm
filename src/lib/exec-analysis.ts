@@ -70,7 +70,7 @@ function wonDate(r: Prospect): string {
   return r.tglPO || r.tglDelivery || r.tglPenawaran || '';
 }
 
-const inScope = (scope: ExecScope) => {
+export const inScope = (scope: ExecScope) => {
   const set = new Set(scope.cabangs.map((c) => c.toUpperCase()));
   // A record with no cabang is kept in the SE view (it's the user's own deal);
   // in branch-based views it can't be attributed and is reported under data quality instead.

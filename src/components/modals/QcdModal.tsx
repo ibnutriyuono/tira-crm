@@ -7,6 +7,7 @@ import { api } from '@/lib/api-client';
 import { STATUS_META } from '@/lib/constants';
 import { num } from '@/lib/format';
 import { qcdMissing, qcdRequiredOnMove } from '@/lib/qcd';
+import { promptItemFlow } from '@/lib/item-flow-prompt';
 import { useDataStore } from '@/store/useDataStore';
 import { EMPTY_QCD, useUiStore, type PendingQcd } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
@@ -81,6 +82,7 @@ export function QcdModal() {
       upsertProspect(prospect);
       closeModal();
       toast(commit ? `Status pindah ke ${label} · QCD tersimpan` : 'Data QCD tersimpan', 'success');
+      if (commit && !returnTo) promptItemFlow(prev, prospect);
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal menyimpan', 'error');
     } finally {

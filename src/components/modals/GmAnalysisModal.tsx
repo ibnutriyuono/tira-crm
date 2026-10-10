@@ -6,7 +6,9 @@ import { Modal } from '../Modal';
 import { IconDownload } from '../icons';
 import { STATUS_META } from '@/lib/constants';
 import { formatDateID, formatRupiah, todayStr } from '@/lib/format';
-import { buildExecAnalysis, execScopeFor, localPeriode, type ExecAnalysis } from '@/lib/exec-analysis';
+import { buildExecAnalysis, execScopeFor, inScope, localPeriode, type ExecAnalysis } from '@/lib/exec-analysis';
+import { PipelineTab } from '../analisa/PipelineTab';
+import { ProductTab } from '../analisa/ProductTab';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
@@ -69,6 +71,7 @@ export function GmAnalysisModal() {
     { label: 'Tahun lalu', from: `${Number(thisMonth.slice(0, 4)) - 1}-01`, to: `${Number(thisMonth.slice(0, 4)) - 1}-12` },
   ];
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<'sales' | 'product' | 'pipeline'>('sales');
 
   // The modal key is only client state; the scope check here is what keeps a
   // role with no sales data (purchasing) from rendering anything.
@@ -77,6 +80,8 @@ export function GmAnalysisModal() {
     () => (scope && show ? buildExecAnalysis(prospects, budgetTargets, salesPlans, scope, periode, formatRupiah, new Date(), periodeTo) : null),
     [scope, show, prospects, budgetTargets, salesPlans, periode, periodeTo],
   );
+
+  const scopedProspects = useMemo(() => (!scope ? [] : scope.kind === 'se' ? prospects : prospects.filter(inScope(scope))), [scope, prospects]);
 
   async function onGeneratePpt() {
     if (!a) return;
@@ -194,6 +199,7 @@ export function GmAnalysisModal() {
   }
 
   if (!scope) return null;
+  const tabCabangs = scope.kind === 'se' ? null : scope.cabangs;
 
   const cabangRows = a ? a.rows.filter((r) => r.target > 0 || r.won > 0 || r.openCount > 0 || r.rencana > 0) : [];
   const hiddenCabang = a ? a.rows.length - cabangRows.length : 0;
@@ -211,13 +217,30 @@ export function GmAnalysisModal() {
           <button type="button" className="btn btn-outline" onClick={closeModal}>
             Tutup
           </button>
-          <button type="button" className="btn btn-primary" disabled={busy || !a} onClick={onGeneratePpt}>
-            <IconDownload /> {busy ? 'Membuat PPT…' : 'Buat PPT'}
-          </button>
+          {tab === 'sales' && (
+            <button type="button" className="btn btn-primary" disabled={busy || !a} onClick={onGeneratePpt}>
+              <IconDownload /> {busy ? 'Membuat PPT…' : 'Buat PPT'}
+            </button>
+          )}
         </>
       }
     >
-      {a && (
+      <div className="ea-tabs" role="tablist">
+        {(
+          [
+            ['sales', 'Sales'],
+            ['product', 'Product'],
+            ['pipeline', 'Pipeline'],
+          ] as const
+        ).map(([k, l]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
+            {l}
+          </button>
+        ))}
+      </div>
+      {show && tab === 'product' && <ProductTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={tabCabangs} thisMonth={thisMonth} />}
+      {show && tab === 'pipeline' && <PipelineTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={tabCabangs} thisMonth={thisMonth} />}
+      {a && tab === 'sales' && (
         <>
           <div className="toolbar-row" style={{ alignItems: 'center', marginBottom: 12 }}>
             <label style={{ margin: 0 }}>Periode</label>

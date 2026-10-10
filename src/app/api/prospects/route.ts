@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ensureCustomerFromProspect } from '@/lib/customer-sync';
 import { prospectScopeWhere } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
+import { logPenawaranSent } from '@/lib/item-events';
 import { cleanFaktor, cleanLevel } from '@/lib/qcd';
 import { deriveFromMaterials, requireQcdOnClose, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
@@ -74,6 +75,7 @@ export async function POST(req: Request) {
   });
 
   emitCrmEvent('prospect:created', prospect);
+  if (prospect.penawaranTerkirim) await logPenawaranSent(user, prospect.id, prospect.materials, prospect.tglPenawaran);
   await logActivity({
     user,
     action: 'create',

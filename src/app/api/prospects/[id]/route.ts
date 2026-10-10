@@ -3,12 +3,14 @@ import { ensureCustomerFromProspect } from '@/lib/customer-sync';
 import { syncFollowUpPlan } from '@/lib/followup-activity';
 import { diffFields, logActivity, PROSPECT_FIELD_LABELS } from '@/lib/activity';
 import { cleanFaktor, cleanLevel, type QcdInput } from '@/lib/qcd';
-import { deriveFromMaterials, requireQcdOnClose, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
+import { carryItemTracking, deriveFromMaterials, ensureItemIds, requireQcdOnClose, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
 import { STATUS_META } from '@/lib/constants';
 import { canDeleteProspect } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { logMaterialRevision, logPenawaranSent } from '@/lib/item-events';
+import { assertProspectInScope as assertInScope } from '@/lib/prospect-access';
 import { emitCrmEvent } from '@/lib/socket';
-import type { Material, SafeUser } from '@/lib/types';
+import type { Material } from '@/lib/types';
 
 /** The record's QCD as it will be after this request: request values win, existing ones fill the gaps. */
 function mergeQcd(existing: Record<string, unknown> | null | undefined, body: Record<string, unknown> | null): QcdInput {
@@ -17,21 +19,6 @@ function mergeQcd(existing: Record<string, unknown> | null | undefined, body: Re
 }
 
 const statusLabel = (v: unknown) => STATUS_META[Number(v)]?.label ?? String(v);
-
-async function assertInScope(user: SafeUser, id: string) {
-  const existing = await prisma.prospect.findUnique({ where: { id } });
-  if (!existing) return { error: NextResponse.json({ error: 'Prospek tidak ditemukan' }, { status: 404 }) };
-  if (user.role === 'sales' && (existing.se || '').toUpperCase() !== (user.se || '').toUpperCase()) {
-    return { error: NextResponse.json({ error: 'Tidak diizinkan' }, { status: 403 }) };
-  }
-  if (user.role === 'bm' && (existing.cabang || '').toUpperCase() !== (user.cabang || '').toUpperCase()) {
-    return { error: NextResponse.json({ error: 'Tidak diizinkan' }, { status: 403 }) };
-  }
-  if (user.role === 'rm' && String(existing.reg || '') !== String(user.reg || '')) {
-    return { error: NextResponse.json({ error: 'Tidak diizinkan' }, { status: 403 }) };
-  }
-  return { existing };
-}
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -50,6 +37,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: 'Isi minimal satu uraian material' }, { status: 400 });
   }
   const derived = deriveFromMaterials(materials);
+  carryItemTracking(scoped.existing.materials, derived.materials);
 
   const status = Number(body?.status) || 0;
   const noPo = String(body?.noPo || '').trim();
@@ -93,6 +81,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   });
 
   emitCrmEvent('prospect:updated', prospect);
+  // Riwayat item: penawaran baru dikirim, atau material diubah sesudahnya.
+  if (!scoped.existing.penawaranTerkirim && prospect.penawaranTerkirim) {
+    await logPenawaranSent(user, prospect.id, prospect.materials, prospect.tglPenawaran);
+  } else if (scoped.existing.penawaranTerkirim) {
+    await logMaterialRevision(user, prospect.id, scoped.existing.materials, prospect.materials);
+  }
   // Customer typed in Edit Prospek -> Kelola Customer (created / phone filled).
   await ensureCustomerFromProspect(user, prospect);
   await logActivity({
@@ -150,8 +144,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if ('qcdFaktor' in data) data.qcdFaktor = cleanFaktor(data.qcdFaktor);
   if (typeof data.noPo === 'string') data.noPo = data.noPo.trim() || null;
 
+  // "Penawaran terkirim": snapshot the offered qty per item (rows get their ids first).
+  const sentNow = data.penawaranTerkirim === true && !scoped.existing.penawaranTerkirim;
+  if (sentNow) {
+    const withIds = ensureItemIds(scoped.existing.materials);
+    if (withIds) data.materials = withIds;
+  }
+
   const prospect = await prisma.prospect.update({ where: { id }, data });
   emitCrmEvent('prospect:updated', prospect);
+  if (sentNow) await logPenawaranSent(user, prospect.id, prospect.materials, prospect.tglPenawaran);
 
   // Follow-up schedule changed: keep its "rencana" row in Aktivitas Harian in
   // step. Best-effort -- the schedule itself is already saved.
@@ -197,6 +199,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (scoped.error) return scoped.error;
 
   await prisma.prospect.delete({ where: { id } });
+  await prisma.prospectItemEvent.deleteMany({ where: { prospectId: id } }).catch(() => undefined);
   emitCrmEvent('prospect:deleted', { id });
   await logActivity({
     user,
