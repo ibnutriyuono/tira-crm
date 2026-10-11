@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { formatDateID, formatRupiah, num } from '@/lib/format';
 import { AGING_THRESHOLD_DAYS, CABANG_LIST, STATUS_META } from '@/lib/constants';
@@ -10,7 +10,10 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { buildSalesPlanDetail, canEditSalesPlanFor } from '@/lib/sales-plan-view';
 import { IconTrash } from '../icons';
-import type { BudgetTarget, SalesPlan } from '@/lib/types';
+import type { AnnualTarget, BudgetTarget, RosterUser, SalesPlan } from '@/lib/types';
+import { SeTargetSection, buildAllocations } from '../forecast/SeTargetSection';
+import { seTargetOf } from '@/lib/se-target';
+import { yearMonthTarget } from '@/lib/kpi';
 
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const labelPeriode = (p: string) => `${BULAN[Number(p.slice(5, 7)) - 1] || ''} ${p.slice(0, 4)}`;
@@ -22,7 +25,7 @@ const dots = (n: number) => (n ? Math.round(n).toLocaleString('id-ID') : '');
  * this month yet) is shown as the value with a "dari <bulan>" note; typing a
  * different amount saves it for this month only.
  */
-function TargetInput({ value, from, onSave }: { value: number; from: string | null; onSave: (v: number) => void }) {
+function TargetInput({ value, from, note, onSave }: { value: number; from: string | null; note?: string; onSave: (v: number) => void }) {
   const [text, setText] = useState(dots(value));
   const [synced, setSynced] = useState(value);
   if (synced !== value) {
@@ -48,6 +51,7 @@ function TargetInput({ value, from, onSave }: { value: number; from: string | nu
         style={{ maxWidth: 170, textAlign: 'right', fontFamily: 'var(--font-ibm-plex-mono), monospace', color: from ? 'var(--text-soft)' : undefined }}
       />
       {from && <div className="field-note" style={{ marginTop: 2 }}>dari {labelPeriode(from)}</div>}
+      {!from && note && <div className="field-note" style={{ marginTop: 2 }}>{note}</div>}
     </div>
   );
 }
@@ -64,6 +68,8 @@ export function ForecastModal() {
 
   const records = useDataStore((s) => s.prospects);
   const budgetTargets = useDataStore((s) => s.budgetTargets);
+  const annualTargets = useDataStore((s) => s.annualTargets);
+  const upsertAnnualTarget = useDataStore((s) => s.upsertAnnualTarget);
   const salesPlans = useDataStore((s) => s.salesPlans);
   const upsertBudgetTarget = useDataStore((s) => s.upsertBudgetTarget);
   const upsertSalesPlan = useDataStore((s) => s.upsertSalesPlan);
@@ -74,6 +80,19 @@ export function ForecastModal() {
   const [periode, setPeriode] = useState(currentPeriode());
   const [planCabang, setPlanCabang] = useState('');
   const [deleting, setDeleting] = useState('');
+  const seTargets = useDataStore((s) => s.seTargets);
+  const [roster, setRoster] = useState<RosterUser[]>([]);
+  useEffect(() => {
+    if (!show) return;
+    let alive = true;
+    api
+      .get<{ roster: RosterUser[] }>('/api/users/roster')
+      .then((r) => alive && setRoster(r.roster))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [show]);
 
   // rm may only set targets for branches inside their own region; the region of
   // a branch is only knowable from the prospect rows.
@@ -136,6 +155,44 @@ export function ForecastModal() {
     }
   }
 
+  const year = periode.slice(0, 4);
+  const annualOf = (cabang: string) => num(annualTargets.find((a) => a.cabang.toUpperCase() === cabang.toUpperCase() && a.year === year)?.amount);
+  const monthRow = (cabang: string) => budgetTargets.find((b) => b.cabang.toUpperCase() === cabang.toUpperCase() && b.periode === periode);
+  /** Jumlah target bulanan setahun (dengan carry-forward), untuk dibandingkan dengan target tahunan. */
+  const monthlySum = (cabang: string) => {
+    let s = 0;
+    for (let m = 1; m <= 12; m++) s += yearMonthTarget(budgetTargets, cabang, year, m);
+    return s;
+  };
+  const annualTotal = rows.reduce((s, r) => s + annualOf(r.cabang), 0);
+  const cabangTargets = useMemo(() => rows.map((r) => ({ cabang: r.cabang, target: r.target })), [rows]);
+  const seWon = useMemo(() => new Map(seRows.map((r) => [r.se, r.won])), [seRows]);
+  // BM: pengingat wajib bila target cabangnya belum selesai dibagi ke Sales.
+  const ownAlloc = useMemo(() => {
+    if (currentUser?.role !== 'bm' || !currentUser.cabang) return null;
+    const c = currentUser.cabang.toUpperCase();
+    return buildAllocations(cabangTargets.filter((x) => x.cabang.toUpperCase() === c), seTargets, roster, periode)[0] || null;
+  }, [currentUser, cabangTargets, seTargets, roster, periode]);
+
+  async function saveAnnual(cabang: string, amount: number) {
+    const manual = budgetTargets.filter((b) => b.cabang.toUpperCase() === cabang.toUpperCase() && b.periode.startsWith(`${year}-`) && !b.fromAnnual && num(b.amount) > 0);
+    let overwrite = false;
+    if (manual.length && amount > 0) {
+      overwrite = window.confirm(
+        `${cabang}: ${manual.length} bulan di ${year} sudah diisi manual (${manual.map((b) => labelPeriode(b.periode)).join(', ')}).\n\n` +
+          `OK = ganti juga bulan-bulan itu dengan target tahunan ÷ 12.\nBatal = biarkan bulan manual, isi bulan lainnya saja.`,
+      );
+    }
+    try {
+      const res = await api.put<{ annualTarget: AnnualTarget; budgetTargets: BudgetTarget[] }>('/api/annual-targets', { cabang, year, amount, overwrite });
+      upsertAnnualTarget(res.annualTarget);
+      res.budgetTargets.forEach(upsertBudgetTarget);
+      toast(`Target tahunan ${cabang} ${year} disimpan · ${res.budgetTargets.length} bulan diisi otomatis`, 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal menyimpan target tahunan', 'error');
+    }
+  }
+
   async function saveTarget(cabang: string, amount: number) {
     try {
       const { budgetTarget } = await api.put<{ budgetTarget: BudgetTarget }>('/api/budget-targets', { cabang, periode, amount });
@@ -157,11 +214,18 @@ export function ForecastModal() {
         <input type="month" className="btn-sm" value={periode} onChange={(e) => setPeriode(e.target.value)} />
       </div>
 
+      {ownAlloc && (ownAlloc.status === 'empty' || ownAlloc.status === 'short') && (
+        <div className="import-summary if-warn" style={{ marginTop: 0, marginBottom: 10 }}>
+          <b>Wajib:</b> target cabang {ownAlloc.cabang} {labelPeriode(periode)} {formatRupiah(ownAlloc.target)} {ownAlloc.status === 'empty' ? 'belum dibagi ke Sales' : `baru dibagi ${formatRupiah(ownAlloc.allocated)}${ownAlloc.missing.length ? `; ${ownAlloc.missing.length} Sales belum punya target` : ''}`}.{' '}
+          Isi di bagian <b>Target per Sales</b> di bawah.
+        </div>
+      )}
       <div className="import-summary" style={{ marginTop: 0 }}>
         Forecast dihitung dari pipeline aktif (status Permintaan/Penawaran Harga/Negosiasi) dikalikan probabilitas tiap
         tahap: Permintaan 10%, Penawaran Harga 30%, Negosiasi 60%. Data mengikuti cakupan role Anda yang login. Target
-        cabang berlaku untuk bulan-bulan berikutnya sampai diubah: bulan yang belum diisi otomatis memakai target bulan
-        sebelumnya (ditandai &quot;dari …&quot;).
+        bulanan default = <b>target tahunan ÷ 12</b> (isi kolom Target Tahunan, bulan yang kosong terisi otomatis); angka
+        bulanan yang diketik manual tetap dipakai dan tidak ikut berubah saat target tahunan diubah. Bulan tanpa target
+        memakai target bulan sebelumnya (ditandai &quot;dari …&quot;).
       </div>
 
       <div className="kpi-grid" style={{ marginTop: 12 }}>
@@ -222,15 +286,30 @@ export function ForecastModal() {
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table">
             <thead>
-              <tr><th>Cabang</th><th>Target</th><th>Rencana</th><th>Realisasi (Won)</th><th>Weighted</th><th>Ach. Target</th><th>Realisasi/Rencana</th></tr>
+              <tr><th>Cabang</th><th>Target Tahunan {year}</th><th>Target {labelPeriode(periode)}</th><th>Rencana</th><th>Realisasi (Won)</th><th>Weighted</th><th>Ach. Target</th><th>Realisasi/Rencana</th></tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.cabang}>
                   <td style={{ fontWeight: 600 }}>{r.cabang}</td>
                   <td>
+                    {(() => {
+                      const annual = annualOf(r.cabang);
+                      const sum = monthlySum(r.cabang);
+                      const note = annual > 0 && Math.abs(sum - annual) > annual * 0.005 ? `Σ 12 bulan ${formatRupiah(sum)}` : annual > 0 ? `${formatRupiah(Math.round(annual / 12))}/bulan` : undefined;
+                      return canEdit(r.cabang) ? (
+                        <TargetInput key={`${r.cabang}-${year}-annual`} value={annual} from={null} note={note} onSave={(v) => saveAnnual(r.cabang, v)} />
+                      ) : (
+                        <span className="mono">
+                          {annual > 0 ? formatRupiah(annual) : '-'}
+                          {note && <span className="field-note" style={{ display: 'block' }}>{note}</span>}
+                        </span>
+                      );
+                    })()}
+                  </td>
+                  <td>
                     {canEdit(r.cabang) ? (
-                      <TargetInput key={`${r.cabang}-${periode}`} value={r.target} from={r.targetFrom} onSave={(v) => saveTarget(r.cabang, v)} />
+                      <TargetInput key={`${r.cabang}-${periode}`} value={r.target} from={r.targetFrom} note={monthRow(r.cabang)?.fromAnnual ? 'tahunan ÷ 12' : r.target > 0 ? 'diisi manual' : undefined} onSave={(v) => saveTarget(r.cabang, v)} />
                     ) : (
                       <span className="mono">
                         {formatRupiah(r.target)}
@@ -261,6 +340,7 @@ export function ForecastModal() {
             <tfoot>
               <tr style={{ fontWeight: 700, background: 'var(--steel-100)' }}>
                 <td>NASIONAL</td>
+                <td className="mono">{formatRupiah(annualTotal)}</td>
                 <td className="mono">{formatRupiah(nasional.target)}</td>
                 <td className="mono">{formatRupiah(nasional.rencana)}</td>
                 <td className="mono">{formatRupiah(nasional.won)}</td>
@@ -273,6 +353,12 @@ export function ForecastModal() {
           </table>
         </div>
       )}
+
+      <h4 style={{ marginTop: 18, marginBottom: 6 }}>Target per Sales — pembagian target cabang</h4>
+      <div className="field-note" style={{ marginTop: 0, marginBottom: 8 }}>
+        Alur: pusat menetapkan target cabang (tahunan/bulanan) → BM <b>wajib</b> membagi target cabang ke tiap Sales → Sales menerima notifikasi target → RM/GM memantau status pembagian.
+      </div>
+      <SeTargetSection periode={periode} cabangTargets={cabangTargets} seWon={seWon} canEdit={canEdit} currentUser={currentUser} roster={roster} />
 
       <h4 style={{ marginTop: 18, marginBottom: 6 }}>Rollup per Regional</h4>
       <div className="table-wrap" style={{ borderTop: 'none' }}>
@@ -317,21 +403,24 @@ export function ForecastModal() {
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table">
             <thead>
-              <tr><th>Sales Engineer (SE)</th><th>Cabang</th><th>Aktif Pipeline</th><th>Weighted</th><th>Rencana</th><th>Realisasi (Won)</th><th>Realisasi/Rencana</th><th></th></tr>
+              <tr><th>Sales Engineer (SE)</th><th>Cabang</th><th>Target</th><th>Aktif Pipeline</th><th>Weighted</th><th>Rencana</th><th>Realisasi (Won)</th><th>Ach. Target</th><th>Realisasi/Rencana</th><th></th></tr>
             </thead>
             <tbody>
               {seList.map((r) => {
                 const rencana = seRencana.get(r.se) || 0;
                 const rasio = rencana > 0 ? Math.round((r.won / rencana) * 100) : null;
                 const bolehEdit = canEditSalesPlanFor(currentUser, r.se, r.cabang);
+                const seT = seTargetOf(seTargets, r.se, periode);
                 return (
                   <tr key={r.se}>
                     <td style={{ fontWeight: 600 }}>{r.se}</td>
                     <td>{r.cabang}</td>
+                    <td className="mono">{seT > 0 ? formatRupiah(seT) : <span className="badge rust">Belum ada</span>}</td>
                     <td className="center">{r.openCount}</td>
                     <td className="mono">{formatRupiah(r.weighted)}</td>
                     <td className="mono">{rencana > 0 ? formatRupiah(rencana) : <span className="badge slate">Belum diisi</span>}</td>
                     <td className="mono">{formatRupiah(r.won)}</td>
+                    <td className="center">{seT > 0 ? <span className={`badge ${r.won >= seT ? 'green' : r.won >= seT * 0.6 ? 'amber' : 'rust'}`}>{Math.round((r.won / seT) * 100)}%</span> : '-'}</td>
                     <td className="center">{rasio == null ? '-' : <span className={`badge ${rasio >= 100 ? 'green' : rasio >= 60 ? 'amber' : 'rust'}`}>{rasio}%</span>}</td>
                     <td>
                       {bolehEdit && (

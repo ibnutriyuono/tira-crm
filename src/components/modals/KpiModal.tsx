@@ -72,7 +72,7 @@ export function KpiModal() {
 
   const { cabangList, scopeLabel, scopeIsPicker } = useMemo(() => {
     if (!currentUser) return { cabangList: [] as string[], scopeLabel: '-', scopeIsPicker: false };
-    if (currentUser.role === 'sales' || currentUser.role === 'bm') {
+    if (currentUser.role === 'sales' || currentUser.role === 'bm' || currentUser.role === 'salesadmin') {
       const c = (currentUser.cabang || '').toUpperCase();
       return { cabangList: c ? [c] : [], scopeLabel: c || '(cabang belum diset)', scopeIsPicker: false };
     }

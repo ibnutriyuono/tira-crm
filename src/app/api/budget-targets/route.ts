@@ -4,6 +4,7 @@ import { isResponse, num, requireUser } from '@/lib/api-helpers';
 import { budgetTargetScopeWhere, canEditBudgetTarget } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { notifyBranchTargetSet, periodeLabel } from '@/lib/se-target-server';
 
 export async function GET() {
   const user = await requireUser();
@@ -34,6 +35,8 @@ export async function PUT(req: Request) {
   // needs a concrete number, since a brand new row can't leave it unset.
   const hasAmount = body?.amount !== undefined;
   const amount = hasAmount ? num(body.amount) : undefined;
+  // A monthly amount typed here is a manual override of the annual default
+  // (fromAnnual false), so a later change to the annual target leaves it alone.
   // Gross Margin fields are edited independently of amount (a different
   // section of the same settings screen) — `undefined` means "this call
   // didn't touch it", not "clear it to zero", so Prisma's update only
@@ -44,10 +47,12 @@ export async function PUT(req: Request) {
   const budgetTarget = await prisma.budgetTarget.upsert({
     where: { cabang_periode: { cabang, periode } },
     create: { cabang, periode, amount: amount ?? 0, grossMarginTarget: gmTarget ?? null, grossMarginResult: gmResult ?? null },
-    update: { ...(amount !== undefined ? { amount } : {}), ...(gmTarget !== undefined ? { grossMarginTarget: gmTarget } : {}), ...(gmResult !== undefined ? { grossMarginResult: gmResult } : {}) },
+    update: { ...(amount !== undefined ? { amount, fromAnnual: false } : {}), ...(gmTarget !== undefined ? { grossMarginTarget: gmTarget } : {}), ...(gmResult !== undefined ? { grossMarginResult: gmResult } : {}) },
   });
 
   emitCrmEvent('budget:updated', budgetTarget);
+  // Top-down: target cabang dari pusat -> BM wajib membaginya ke Sales.
+  if (amount !== undefined && amount > 0 && user.role !== 'bm') await notifyBranchTargetSet(cabang, periodeLabel(periode), periode);
   await logActivity({
     user,
     action: 'update',

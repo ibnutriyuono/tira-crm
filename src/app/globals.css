@@ -779,8 +779,153 @@ tr.hl-yellow:hover td{ background:rgba(201,130,46,.18); }
 .tm-chart{display:flex;align-items:flex-end;gap:6px;height:170px;border-bottom:1px solid var(--border);padding-top:6px}
 .tm-chart .col{flex:1;display:flex;justify-content:center;align-items:flex-end;gap:2px;height:100%}
 .tm-chart .col span{display:block;width:12px;border-radius:2px 2px 0 0}
-.tm-chart .col .o{background:#9FB7CC}.tm-chart .col .w{background:#A8701F}
+.tm-chart .col .r{background:#D6DEE6;box-shadow:inset 0 0 0 1px #9FB7CC}.tm-chart .col .o{background:#9FB7CC}.tm-chart .col .w{background:#A8701F}
 .tm-chart-lbl{display:flex;gap:6px;padding-top:4px}
 .tm-chart-lbl span{flex:1;text-align:center;font-size:10.5px;color:var(--text-soft)}
 .tm-row{cursor:pointer}
 .tm-row.sel td{background:var(--amber-100)}
+
+/* KPI Aktivitas: laju, kedisiplinan, hasil */
+.ak-pace{display:inline-flex;align-items:center;gap:10px;padding:6px 12px;background:var(--steel-100);border-radius:8px;font-size:12.5px;color:var(--steel-600)}
+.ak-pace-bar{display:inline-block;width:110px;height:6px;border-radius:3px;background:#C9D6E2;overflow:hidden}
+.ak-pace-bar span{display:block;height:100%;background:var(--steel-500)}
+.ak-legend{display:inline-flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--text-soft)}
+.ak-legend span{display:inline-flex;align-items:center;gap:4px}
+.ak-legend i{display:inline-block;width:9px;height:9px;border-radius:2px}
+.ak-legend i.on,.ak-bar .fill.on,.ak-q-bar .on{background:var(--green-500)}
+.ak-legend i.warn,.ak-bar .fill.warn,.ak-q-bar .warn{background:var(--amber-500)}
+.ak-legend i.off,.ak-bar .fill.off,.ak-q-bar .off{background:var(--rust-500)}
+.ak-legend i.mark{width:2px;height:12px;border-radius:0;background:var(--graphite-800)}
+.ak-table td{padding-left:5px;padding-right:5px}
+.ak-table .ak-grp th{text-align:center;font-size:10.5px;border-left:1px solid var(--border)}
+.ak-bar{position:relative;display:block;height:8px;border-radius:4px;background:#E3E9EF;margin-bottom:4px}
+.ak-bar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#9FB0C2}
+.ak-bar .fill.def{opacity:.5}
+.ak-bar .mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--graphite-800)}
+.ak-val{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:12px}
+.ak-pct{font-size:11px;font-weight:700}
+.ak-pct.on{color:var(--green-600)}.ak-pct.warn{color:var(--amber-600)}.ak-pct.off{color:var(--rust-600)}
+.ak-def{font-size:10px;color:var(--text-soft);border:1px dashed #9FB0C2;border-radius:8px;padding:0 5px}
+.ak-cal{display:flex;gap:1px}
+.ak-cal span{display:block;width:5px;height:15px;border-radius:2px;background:#D7DEE6}
+.ak-cal span.on{background:var(--steel-500)}
+.ak-cal span.future{background:#F1F4F7}
+.ak-row{cursor:pointer}
+.ak-row.sel td{background:var(--amber-100)}
+.ak-group td{background:#EEF2F6;font-weight:700;font-size:12.5px}
+.ak-detail{margin-top:14px;border:2px solid var(--steel-500);border-radius:8px;overflow:hidden}
+.ak-detail-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;background:var(--steel-100);font-size:15px}
+.ak-detail-body{display:grid;grid-template-columns:minmax(240px,1fr) minmax(0,2fr);gap:16px;padding:12px 14px}
+@media (max-width:860px){.ak-detail-body{grid-template-columns:1fr}}
+.ak-quality{display:flex;flex-direction:column;gap:8px}
+.ak-q-row{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px}
+.ak-q-bar{display:block;height:6px;border-radius:3px;background:#E3E9EF;overflow:hidden}
+.ak-q-bar span{display:block;height:100%}
+.link-btn{border:none;background:none;padding:0;color:var(--steel-600);text-decoration:underline;cursor:pointer;font:inherit}
+
+/* ===== Key Account Management ===== */
+.kam-badge{display:inline-flex;align-items:center;gap:2px;margin-left:6px;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.04em;white-space:nowrap;vertical-align:middle;line-height:1.6}
+.kam-badge.strategic{background:#7A2A18;color:#fff}
+.kam-badge.key{background:#C98A2E;color:#2A1C05}
+.kam-badge.development{background:var(--steel-100);color:var(--steel-600)}
+.kam-badge.monitor{background:#EEF1F3;color:var(--slate-600)}
+.kam-badge-group{font-weight:500;opacity:.9;letter-spacing:0}
+.kam-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start}
+.kam-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.kam-title{font-family:var(--font-barlow-condensed),sans-serif;font-size:26px;font-weight:700;letter-spacing:.02em;line-height:1.1}
+.kam-action{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--border)}
+.kam-action input[type=text]{flex:1;min-width:0}
+.kam-org{display:flex;flex-direction:column;align-items:center;padding:6px 0 4px}
+.kam-node{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:280px;max-width:100%;padding:10px 14px;border:1px solid var(--border);border-top:4px solid var(--slate-600);border-radius:10px;background:#fff}
+.kam-node.sponsor{border-top-color:#7A2A18}
+.kam-node.ketua{border-top-color:#C98A2E}
+.kam-node.sek{border-top-color:var(--steel-500)}
+.kam-node.anggota{border-top-color:var(--green-600);min-width:min(520px,100%)}
+.kam-node select{width:260px;max-width:100%}
+.kam-role{font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--text-soft)}
+.kam-line{display:block;width:2px;height:14px;background:var(--border)}
+.kam-chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.kam-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 4px 3px 10px;border-radius:14px;background:var(--steel-100);color:var(--steel-600);font-size:12px;font-weight:600}
+.kam-chip button{border:none;background:transparent;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:0 4px;border-radius:50%}
+.kam-chip button:hover{background:rgba(0,0,0,.08)}
+.kam-roles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px;font-size:12.5px;color:var(--text-soft)}
+.kam-roles>div{background:var(--bg,#F6F7F8);border-radius:8px;padding:8px 10px}
+@media (max-width:900px){.kam-grid,.kam-roles{grid-template-columns:1fr}}
+.kam-flags{display:inline-flex;flex-wrap:wrap;gap:4px;min-width:110px}
+.kam-flags .badge,.if-nowrap td .kam-flags .badge{white-space:normal}
+
+/* ===== Analisa Eksekutif > Target ===== */
+.tg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px}
+.tg-card{border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;background:#fff;min-width:0}
+.tg-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-soft)}
+.tg-chip{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:0;text-transform:none;padding:3px 10px;border-radius:12px;background:#EEF1F3;color:var(--slate-600)}
+.tg-chip.ok{background:var(--green-100);color:var(--green-600)}
+.tg-chip.warn{background:var(--amber-100);color:var(--amber-600)}
+.tg-chip.bad{background:var(--rust-100);color:var(--rust-600)}
+.tg-big{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--text-soft)}
+.tg-big b{font-family:var(--font-ibm-plex-mono),monospace;color:var(--graphite-900)}
+.tg-big small{font-size:12px}
+.tg-big .num{font-family:var(--font-ibm-plex-mono),monospace;font-size:38px;line-height:1;font-weight:600;color:var(--graphite-900)}
+.tg-big .num.ok{color:var(--green-600)}
+.tg-big .num.warn{color:var(--amber-600)}
+.tg-big .num.bad{color:var(--rust-600)}
+.tg-bar{position:relative;height:16px;border-radius:8px;background:#E3E9EF}
+.tg-bar.sm{height:8px;border-radius:4px;flex:1}
+.tg-bar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:inherit;background:var(--green-500)}
+.tg-bar .fill.warn{background:var(--amber-500)}
+.tg-bar .fill.bad{background:var(--rust-500)}
+.tg-bar .git{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,var(--amber-500) 0 4px,#F3DCB5 4px 8px)}
+.tg-bar .mark{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;background:var(--graphite-900)}
+.tg-bar.sm .mark{top:-3px;bottom:-3px}
+.tg-pace{font-size:11.5px;color:var(--graphite-900);margin-top:-8px;white-space:nowrap}
+.tg-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.tg-fact{background:#F5F7F9;border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tg-fact .lb{font-size:11px;color:var(--text-soft)}
+.tg-fact .v{font-size:15px;font-weight:600;color:var(--graphite-900)}
+.tg-fact .v.ok{color:var(--green-600)}
+.tg-fact .v.warn{color:var(--amber-600)}
+.tg-fact .v.bad{color:var(--rust-600)}
+.tg-fact .v.git,.tg-gitc{color:#8A5A14}
+.tg-fact .sub{font-size:11.5px;color:var(--text-soft)}
+.tg-empty{padding:14px;border:1px dashed var(--border);border-radius:8px;font-size:13.5px}
+.tg-chart{display:flex;align-items:stretch;gap:6px;height:140px;border-bottom:1px solid var(--border)}
+.tg-chart .col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:2px 0 0;border:none;background:transparent;border-radius:4px 4px 0 0;cursor:pointer}
+.tg-chart .col.on{background:var(--steel-100)}
+.tg-chart .p{font-size:10.5px;font-weight:700;color:var(--slate-600)}
+.tg-chart .p.ok{color:var(--green-600)}.tg-chart .p.warn{color:var(--amber-600)}.tg-chart .p.bad{color:var(--rust-600)}
+.tg-chart .area{position:relative;flex:1;width:100%}
+.tg-chart .t{position:absolute;left:12%;right:12%;bottom:0;border:1.5px solid #8796A5;border-bottom:none;border-radius:3px 3px 0 0;box-sizing:border-box}
+.tg-chart .r{position:absolute;left:28%;right:28%;bottom:0;border-radius:2px 2px 0 0;background:#8796A5}
+.tg-chart .r.ok{background:var(--green-500)}.tg-chart .r.warn{background:var(--amber-500)}.tg-chart .r.bad{background:var(--rust-500)}
+.tg-chart .g{position:absolute;left:28%;right:28%;background:repeating-linear-gradient(135deg,var(--amber-500) 0 3px,#F3DCB5 3px 6px)}
+.tg-chart .l{font-size:11px;color:var(--text-soft);padding-bottom:3px}
+.tg-chart .col.on .l{color:var(--graphite-900);font-weight:700}
+.tg-legend{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--text-soft);margin:12px 0 16px}
+.tg-legend span{display:inline-flex;align-items:center;gap:6px}
+.tg-legend .sw{display:inline-block;width:14px;height:10px;border-radius:2px}
+.tg-legend .sw.ok{background:var(--green-500)}
+.tg-legend .sw.git{background:repeating-linear-gradient(135deg,var(--amber-500) 0 3px,#F3DCB5 3px 6px)}
+.tg-legend .sw.tgt{border:1.5px solid #8796A5;box-sizing:border-box}
+.tg-legend .sw.mark{width:2px;height:12px;background:var(--graphite-900)}
+.tg-sec-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.tg-table th.r,.tg-table td.r{text-align:right}
+.tg-table tbody tr{cursor:pointer}
+.tg-table tbody tr:hover{background:#F5F7F9}
+.tg-table tbody tr.on{background:var(--steel-100);box-shadow:inset 4px 0 0 var(--steel-500)}
+.tg-table tbody tr.total{cursor:default;background:#F5F7F9;font-weight:700}
+.tg-cell{display:flex;align-items:center;gap:8px}
+.tg-cell .mono{font-size:12.5px;width:42px;text-align:right}
+.tg-cell .ok{color:var(--green-600)}.tg-cell .warn{color:var(--amber-600)}.tg-cell .bad{color:var(--rust-600)}
+@media (max-width:700px){.tg-grid{grid-template-columns:1fr}.tg-facts{grid-template-columns:1fr}}
+
+/* ===== Forecast > Target per Sales ===== */
+.se-alloc{margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:#fff}
+.se-alloc-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:8px;font-size:13.5px}
+.se-alloc-head>b{font-size:14.5px}
+.se-alloc-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px}
+
+/* ===== Antrian Admin Sales ===== */
+.aq-bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);border-radius:8px;background:var(--steel-100);font-size:13px}
+.aq-bar label{display:inline-flex;align-items:center;gap:6px;margin:0;text-transform:none;font-weight:500;font-size:13px;color:var(--text)}
+.aq-bar input{height:34px}
+.aq-bar .btn{margin-left:auto}

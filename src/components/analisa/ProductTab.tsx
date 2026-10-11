@@ -34,7 +34,7 @@ function trendBadge(v: number | null) {
   return <span className="badge slate">Stabil {s}</span>;
 }
 
-const BASIS_LABEL: Record<Basis, string> = { off: 'ditawarkan', po: 'PO', kirim: 'terkirim' };
+const BASIS_LABEL: Record<Basis, string> = { minta: 'permintaan', off: 'ditawarkan', po: 'PO', kirim: 'terkirim' };
 const MEASURE_LABEL: Record<Measure, string> = { kg: 'Tonase', pcs: 'Pcs', nilai: 'Nilai' };
 
 /**
@@ -56,7 +56,7 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
   const selKey = sel && t.grades.some((g) => g.key === sel) ? sel : t.grades[0]?.key || '';
   const selGrade = t.grades.find((g) => g.key === selKey);
   const monthly = useMemo(() => (selKey ? t.monthly(selKey) : []), [t, selKey]);
-  const maxM = Math.max(1, ...monthly.map((m) => Math.max(m.off, m.po)));
+  const maxM = Math.max(1, ...monthly.map((m) => Math.max(m.req, m.off, m.po)));
 
   const fmt = (v: number) => (measure === 'kg' ? formatTon(v, 1) : measure === 'nilai' ? rpShort(v) : v.toLocaleString('id-ID', { maximumFractionDigits: 0 }));
   const label = `${MEASURE_LABEL[measure]} ${BASIS_LABEL[basis]}`;
@@ -70,10 +70,10 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
     const wb = XLSX.utils.book_new();
     appendSheet(XLSX, wb, {
       sheetName: 'Top Grade',
-      header: ['GRADE', 'PENAWARAN', 'CUSTOMER', `PCS ${BASIS_LABEL[basis].toUpperCase()}`, 'KG DITAWARKAN', 'KG PO', 'KG TERKIRIM', 'NILAI PO', 'RP/KG PO', 'KONVERSI KG', 'TREN 3 BLN', 'UKURAN TERBANYAK'],
-      rows: t.grades.map((g) => [g.grade, g.offers, g.customers, Math.round(g.pcs), Math.round(g.offKg), Math.round(g.poKg), Math.round(g.sentKg), Math.round(g.nilaiPo), Math.round(g.rpKg), g.conv == null ? '' : Math.round(g.conv * 100) / 100, g.trend == null ? '' : Math.round(g.trend * 100) / 100, g.topBucket]),
-      colWidths: [{ wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 11 }, { wch: 16 }],
-      numFormats: { 4: '#,##0', 5: '#,##0', 6: '#,##0', 7: '#,##0', 8: '#,##0', 9: '0%', 10: '+0%;-0%' },
+      header: ['GRADE', 'PENAWARAN', 'CUSTOMER', `PCS ${BASIS_LABEL[basis].toUpperCase()}`, 'KG PERMINTAAN', 'KG DITAWARKAN', 'KG PO', 'KG TERKIRIM', 'NILAI PO', 'RP/KG PO', 'KONVERSI KG', 'TREN 3 BLN', 'UKURAN TERBANYAK'],
+      rows: t.grades.map((g) => [g.grade, g.offers, g.customers, Math.round(g.pcs), Math.round(g.reqKg), Math.round(g.offKg), Math.round(g.poKg), Math.round(g.sentKg), Math.round(g.nilaiPo), Math.round(g.rpKg), g.conv == null ? '' : Math.round(g.conv * 100) / 100, g.trend == null ? '' : Math.round(g.trend * 100) / 100, g.topBucket]),
+      colWidths: [{ wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 11 }, { wch: 16 }],
+      numFormats: { 4: '#,##0', 5: '#,##0', 6: '#,##0', 7: '#,##0', 8: '#,##0', 9: '#,##0', 10: '0%', 11: '+0%;-0%' },
     });
     appendSheet(XLSX, wb, {
       sheetName: 'Grade x Ukuran',
@@ -91,10 +91,10 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
     if (t.fab.length) {
       appendSheet(XLSX, wb, {
         sheetName: 'Line 05 Fabrikasi',
-        header: ['PEKERJAAN', 'SATUAN', 'PENAWARAN', 'QTY DITAWARKAN', 'QTY PO', 'KONVERSI'],
-        rows: t.fab.map((f) => [f.label, f.satuan, f.offers, f.off, f.po, f.conv == null ? '' : Math.round(f.conv * 100) / 100]),
-        colWidths: [{ wch: 36 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 10 }],
-        numFormats: { 5: '0%' },
+        header: ['PEKERJAAN', 'SATUAN', 'PENAWARAN', 'QTY PERMINTAAN', 'QTY DITAWARKAN', 'QTY PO', 'KONVERSI'],
+        rows: t.fab.map((f) => [f.label, f.satuan, f.offers, f.req, f.off, f.po, f.conv == null ? '' : Math.round(f.conv * 100) / 100]),
+        colWidths: [{ wch: 36 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 10 }],
+        numFormats: { 6: '0%' },
       });
     }
     XLSX.writeFile(wb, `Tren_Material_${t.group.key}_${scopeText.replace(/[^\w-]+/g, '_')}_${t.months[0]}_sd_${t.months[t.months.length - 1]}.xlsx`);
@@ -132,6 +132,7 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
           ))}
         </select>
         <span style={{ display: 'inline-flex', gap: 4 }}>
+          {seg<Basis>('minta', basis, setBasis, 'Permintaan')}
           {seg<Basis>('off', basis, setBasis, 'Ditawarkan')}
           {seg<Basis>('po', basis, setBasis, 'PO')}
           {seg<Basis>('kirim', basis, setBasis, 'Terkirim')}
@@ -146,10 +147,15 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
         </button>
       </div>
       <div className="field-note" style={{ marginTop: -6, marginBottom: 12 }}>
-        <b>{t.group.label}</b> · {periodText} · {scopeText}. Ditawarkan = bulan tgl penawaran · PO = qty PO per item, bulan tgl PO · Terkirim = qty terkirim, bulan tgl delivery.
+        <b>{t.group.label}</b> · {periodText} · {scopeText}. Permintaan = prospek berstatus Permintaan (belum ditawarkan) · Ditawarkan = mulai status Penawaran Harga, bulan tgl penawaran · PO = qty PO per item, bulan tgl PO · Terkirim = qty terkirim, bulan tgl delivery.
       </div>
 
       <div className="kpi-grid">
+        <div className="kpi">
+          <div className="label">Tonase Permintaan</div>
+          <div className="value">{formatTon(t.kpi.reqKg, 1)}</div>
+          <div className="foot">Belum ditawarkan</div>
+        </div>
         <div className="kpi">
           <div className="label">Tonase Ditawarkan</div>
           <div className="value">{formatTon(t.kpi.offKg, 1)}</div>
@@ -186,7 +192,7 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
               <thead>
                 <tr>
                   <th>#</th><th>Grade</th><th style={{ textAlign: 'right' }}>Penawaran</th><th style={{ textAlign: 'right' }}>Customer</th><th style={{ textAlign: 'right' }}>Pcs</th>
-                  <th style={{ textAlign: 'right' }}>Ditawarkan</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>Terkirim</th><th style={{ textAlign: 'right' }}>Rp/kg PO</th>
+                  <th style={{ textAlign: 'right' }}>Permintaan</th><th style={{ textAlign: 'right' }}>Ditawarkan</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>Terkirim</th><th style={{ textAlign: 'right' }}>Rp/kg PO</th>
                   <th>Konversi</th><th>Tren 3 bln</th><th>12 bulan</th>
                 </tr>
               </thead>
@@ -200,6 +206,7 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
                       <td className="mono" style={{ textAlign: 'right' }}>{g.offers}</td>
                       <td className="mono" style={{ textAlign: 'right' }}>{g.customers}</td>
                       <td className="mono" style={{ textAlign: 'right' }}>{Math.round(g.pcs).toLocaleString('id-ID')}</td>
+                      <td className="mono" style={{ textAlign: 'right' }}>{formatTon(g.reqKg, 1)}</td>
                       <td className="mono" style={{ textAlign: 'right' }}>{formatTon(g.offKg, 1)}</td>
                       <td className="mono" style={{ textAlign: 'right' }}>{formatTon(g.poKg, 1)}</td>
                       <td className="mono" style={{ textAlign: 'right' }}>{formatTon(g.sentKg, 1)}</td>
@@ -262,14 +269,16 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
           )}
         </Sec>
 
-        <Sec title={`Bulanan — ${selGrade?.grade || '-'}`} note={`${MEASURE_LABEL[measure]} ditawarkan vs PO, 12 bulan s/d ${mLabel(t.series12[11])}.`}>
+        <Sec title={`Bulanan — ${selGrade?.grade || '-'}`} note={`${MEASURE_LABEL[measure]} permintaan, ditawarkan & PO, 12 bulan s/d ${mLabel(t.series12[11])}.`}>
           <div className="if-legend" style={{ marginBottom: 6 }}>
+            <span><i style={{ background: '#D6DEE6', border: '1px solid #9FB7CC' }} />Permintaan</span>
             <span><i style={{ background: '#9FB7CC' }} />Ditawarkan</span>
             <span><i style={{ background: '#A8701F' }} />PO</span>
           </div>
           <div className="tm-chart">
             {monthly.map((m, k) => (
-              <div key={m.month} className="col" style={{ opacity: k < fromIdx ? 0.35 : 1 }} title={`${mLabel(m.month)} — ditawarkan ${fmt(m.off)}, PO ${fmt(m.po)}`}>
+              <div key={m.month} className="col" style={{ opacity: k < fromIdx ? 0.35 : 1 }} title={`${mLabel(m.month)} — permintaan ${fmt(m.req)}, ditawarkan ${fmt(m.off)}, PO ${fmt(m.po)}`}>
+                <span className="r" style={{ height: `${Math.round((m.req / maxM) * 100)}%` }} />
                 <span className="o" style={{ height: `${Math.round((m.off / maxM) * 100)}%` }} />
                 <span className="w" style={{ height: `${Math.round((m.po / maxM) * 100)}%` }} />
               </div>
@@ -330,13 +339,14 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
             <div className="table-wrap" style={{ borderTop: 'none' }}>
               <table className="simple-table" style={{ minWidth: 0 }}>
                 <thead>
-                  <tr><th>Pekerjaan</th><th style={{ textAlign: 'right' }}>Penawaran</th><th style={{ textAlign: 'right' }}>Ditawarkan</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>Konversi</th></tr>
+                  <tr><th>Pekerjaan</th><th style={{ textAlign: 'right' }}>Penawaran</th><th style={{ textAlign: 'right' }}>Permintaan</th><th style={{ textAlign: 'right' }}>Ditawarkan</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>Konversi</th></tr>
                 </thead>
                 <tbody>
                   {t.fab.map((f) => (
                     <tr key={`${f.label}|${f.satuan}`}>
                       <td>{f.label}</td>
                       <td className="mono" style={{ textAlign: 'right' }}>{f.offers}</td>
+                      <td className="mono" style={{ textAlign: 'right' }}>{f.req ? `${f.req.toLocaleString('id-ID')} ${f.satuan}` : '–'}</td>
                       <td className="mono" style={{ textAlign: 'right' }}>{f.off.toLocaleString('id-ID')} {f.satuan}</td>
                       <td className="mono" style={{ textAlign: 'right' }}>{f.po.toLocaleString('id-ID')} {f.satuan}</td>
                       <td className="mono" style={{ textAlign: 'right' }}>{pct(f.conv)}</td>
@@ -347,7 +357,7 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
             </div>
           )}
         </Sec>
-        <Sec title="Kualitas Data Material" note={`${t.quality.total} baris material ditawarkan pada periode ini (semua bentuk).`}>
+        <Sec title="Kualitas Data Material" note={`${t.quality.total} baris material permintaan & penawaran pada periode ini (semua bentuk).`}>
           {t.quality.total === 0 ? (
             <div className="field-note">Tidak ada data.</div>
           ) : (

@@ -11,6 +11,9 @@ import { logMaterialRevision, logPenawaranSent } from '@/lib/item-events';
 import { assertProspectInScope as assertInScope } from '@/lib/prospect-access';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Material } from '@/lib/types';
+import { resolveFaktur } from '@/lib/faktur';
+import { canSetFaktur } from '@/lib/roles';
+import { notifyAdminTask } from '@/lib/admin-sales-server';
 
 /** The record's QCD as it will be after this request: request values win, existing ones fill the gaps. */
 function mergeQcd(existing: Record<string, unknown> | null | undefined, body: Record<string, unknown> | null): QcdInput {
@@ -67,7 +70,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       keterangan: String(body?.keterangan || '').trim(),
       status,
       penawaranTerkirim: !!body?.penawaranTerkirim,
-      terfaktur: !!body?.terfaktur,
+      ...resolveFaktur(user.role, body, scoped.existing),
       qcdQuality: body?.qcdQuality ?? undefined,
       qcdCost: body?.qcdCost ?? undefined,
       qcdDelivery: body?.qcdDelivery ?? undefined,
@@ -94,9 +97,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     action: 'update',
     entity: 'prospect',
     entityId: prospect.id,
-    summary: `Mengubah prospek "${prospect.customer}"`,
+    summary: `Mengubah prospek "${prospect.customer}"${user.role === 'salesadmin' && prospect.se ? ` atas nama SE ${prospect.se}` : ''}`,
     changes: diffFields(scoped.existing, prospect, PROSPECT_FIELD_LABELS),
   });
+  await notifyAdminTask(user, scoped.existing, prospect);
   return NextResponse.json({ prospect });
 }
 
@@ -113,11 +117,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const body = await req.json().catch(() => null);
   const data: Record<string, unknown> = {};
-  const allowed = ['status', 'noPo', 'penawaranTerkirim', 'terfaktur', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan', 'qcdQualityLevel', 'qcdCostLevel', 'qcdDeliveryLevel', 'qcdFaktor', 'followUpAt', 'followUpNote'];
+  const allowed = ['status', 'noPo', 'penawaranTerkirim', 'terfaktur', 'tglFaktur', 'noFaktur', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan', 'qcdQualityLevel', 'qcdCostLevel', 'qcdDeliveryLevel', 'qcdFaktor', 'followUpAt', 'followUpNote'];
   for (const key of allowed) {
     if (body && Object.prototype.hasOwnProperty.call(body, key)) data[key] = body[key];
   }
   if (Object.keys(data).length === 0) return NextResponse.json({ error: 'Tidak ada perubahan' }, { status: 400 });
+  if ('terfaktur' in data || 'tglFaktur' in data || 'noFaktur' in data) {
+    if (!canSetFaktur(user.role)) return NextResponse.json({ error: 'Status faktur diisi oleh Admin Sales / BM.' }, { status: 403 });
+    Object.assign(data, resolveFaktur(user.role, data, scoped.existing));
+  }
 
   // Aging measures time without progress, so the clock only resets on a real
   // status move — not when a note or phone number is edited.
@@ -153,6 +161,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const prospect = await prisma.prospect.update({ where: { id }, data });
   emitCrmEvent('prospect:updated', prospect);
+  await notifyAdminTask(user, scoped.existing, prospect);
   if (sentNow) await logPenawaranSent(user, prospect.id, prospect.materials, prospect.tglPenawaran);
 
   // Follow-up schedule changed: keep its "rencana" row in Aktivitas Harian in

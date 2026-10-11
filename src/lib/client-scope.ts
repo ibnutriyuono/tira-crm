@@ -58,7 +58,8 @@ export function matchesProspectScope(user: SafeUser, p: Prospect): boolean {
     case 'sales':
       return eq(p.se, user.se || '');
     case 'bm':
-      return eq(p.cabang, user.cabang || '');
+    case 'salesadmin':
+      return !!user.cabang && eq(p.cabang, user.cabang);
     case 'rm':
       return p.reg === (user.reg ?? -1);
     // PIC Line 05 sees no prospects, only its Line 05 documents.
@@ -82,7 +83,8 @@ export function matchesDocScope(user: SafeUser, doc: Rfq | Fupa, regionCabangs?:
     case 'sales':
       return eq(doc.requestedBy, user.name) || eq(doc.requestedBy, user.username);
     case 'bm':
-      return eq(doc.cabang, user.cabang || '');
+    case 'salesadmin':
+      return !!user.cabang && eq(doc.cabang, user.cabang);
     case 'rm': {
       if (doc.reg === (user.reg ?? -1)) return true;
       // Documents created without a source prospect carry a NULL reg; the
@@ -114,7 +116,8 @@ export function matchesSalesPlanScope(user: SafeUser, plan: SalesPlan, regionCab
     case 'sales':
       return eq(plan.se, user.se || '');
     case 'bm':
-      return eq(plan.cabang, user.cabang || '');
+    case 'salesadmin':
+      return !!user.cabang && eq(plan.cabang, user.cabang);
     case 'rm': {
       if (plan.reg === (user.reg ?? -1)) return true;
       if (plan.reg != null || !plan.cabang) return false;
@@ -139,7 +142,7 @@ export function matchesSalesPlanScope(user: SafeUser, plan: SalesPlan, regionCab
  */
 export function myCabangScope(user: SafeUser, prospects: Prospect[]): Set<string> {
   const mine = new Set<string>();
-  if (user.role === 'bm' || (user.role === 'sales' && user.cabang)) {
+  if (user.role === 'bm' || user.role === 'salesadmin' || (user.role === 'sales' && user.cabang)) {
     if (user.cabang) mine.add(user.cabang.trim().toLowerCase());
     return mine;
   }
@@ -170,6 +173,7 @@ function matchesCabangOnlyScope(user: SafeUser, cabang: string | null, scopeCaba
   switch (user.role) {
     case 'sales':
     case 'bm':
+    case 'salesadmin':
     case 'rm':
       return !!cabang && (scopeCabangs ?? new Set<string>()).has(cabang.trim().toLowerCase());
     case 'purchasing05':

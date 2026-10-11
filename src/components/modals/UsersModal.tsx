@@ -11,6 +11,7 @@ const ROLE_META: Record<string, (u: { reg: number | null; cabang: string | null;
   gm: () => ({ label: 'GM', color: 'rust' }),
   rm: (u) => ({ label: `RM · Regional ${u.reg ?? '-'}`, color: 'steel' }),
   bm: (u) => ({ label: `BM · ${u.cabang || '-'}`, color: 'green' }),
+  salesadmin: (u) => ({ label: `Admin Sales · ${u.cabang || '-'}`, color: 'violet' }),
   sales: (u) => ({ label: `Sales · ${u.se || '-'}`, color: 'slate' }),
 };
 

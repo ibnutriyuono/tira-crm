@@ -3,11 +3,14 @@ import { ensureCustomerFromProspect } from '@/lib/customer-sync';
 import { prospectScopeWhere } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 import { logPenawaranSent } from '@/lib/item-events';
+import { notifyKamCrossBranch } from '@/lib/kam-server';
 import { cleanFaktor, cleanLevel } from '@/lib/qcd';
 import { deriveFromMaterials, requireQcdOnClose, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Material } from '@/lib/types';
+import { resolveFaktur } from '@/lib/faktur';
+import { notifyAdminTask } from '@/lib/admin-sales-server';
 
 export async function GET() {
   const user = await requireUser();
@@ -61,7 +64,7 @@ export async function POST(req: Request) {
       keterangan: String(body?.keterangan || '').trim(),
       status,
       penawaranTerkirim: !!body?.penawaranTerkirim,
-      terfaktur: !!body?.terfaktur,
+      ...resolveFaktur(user.role, body, null),
       qcdQuality: body?.qcdQuality || '',
       qcdCost: body?.qcdCost || '',
       qcdDelivery: body?.qcdDelivery || '',
@@ -75,13 +78,15 @@ export async function POST(req: Request) {
   });
 
   emitCrmEvent('prospect:created', prospect);
+  await notifyAdminTask(user, null, prospect);
+  await notifyKamCrossBranch({ user, customer: prospect.customer, cabang: prospect.cabang, entity: 'prospect', entityId: prospect.id, what: 'prospek baru' });
   if (prospect.penawaranTerkirim) await logPenawaranSent(user, prospect.id, prospect.materials, prospect.tglPenawaran);
   await logActivity({
     user,
     action: 'create',
     entity: 'prospect',
     entityId: prospect.id,
-    summary: `Menambah prospek "${prospect.customer}"`,
+    summary: `Menambah prospek "${prospect.customer}"${user.role === 'salesadmin' && prospect.se ? ` atas nama SE ${prospect.se}` : ''}`,
   });
   // Customer typed here -> Kelola Customer (created / phone filled).
   await ensureCustomerFromProspect(user, prospect);

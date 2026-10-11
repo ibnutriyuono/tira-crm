@@ -9,6 +9,7 @@ import { formatDateID, formatRupiah, todayStr } from '@/lib/format';
 import { buildExecAnalysis, execScopeFor, inScope, localPeriode, type ExecAnalysis } from '@/lib/exec-analysis';
 import { PipelineTab } from '../analisa/PipelineTab';
 import { ProductTab } from '../analisa/ProductTab';
+import { TargetTab } from '../analisa/TargetTab';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
@@ -71,7 +72,7 @@ export function GmAnalysisModal() {
     { label: 'Tahun lalu', from: `${Number(thisMonth.slice(0, 4)) - 1}-01`, to: `${Number(thisMonth.slice(0, 4)) - 1}-12` },
   ];
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<'sales' | 'product' | 'pipeline'>('sales');
+  const [tab, setTab] = useState<'sales' | 'target' | 'product' | 'pipeline'>('sales');
 
   // The modal key is only client state; the scope check here is what keeps a
   // role with no sales data (purchasing) from rendering anything.
@@ -229,6 +230,7 @@ export function GmAnalysisModal() {
         {(
           [
             ['sales', 'Sales'],
+            ['target', 'Target'],
             ['product', 'Product'],
             ['pipeline', 'Pipeline'],
           ] as const
@@ -238,6 +240,7 @@ export function GmAnalysisModal() {
           </button>
         ))}
       </div>
+      {show && tab === 'target' && <TargetTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={scope.cabangs} isSe={scope.kind === 'se'} />}
       {show && tab === 'product' && <ProductTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={tabCabangs} thisMonth={thisMonth} />}
       {show && tab === 'pipeline' && <PipelineTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={tabCabangs} thisMonth={thisMonth} />}
       {a && tab === 'sales' && (

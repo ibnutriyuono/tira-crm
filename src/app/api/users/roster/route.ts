@@ -12,7 +12,7 @@ export async function GET() {
   if (isResponse(user)) return user;
 
   const roster = await prisma.user.findMany({
-    select: { id: true, username: true, name: true, role: true, cabang: true },
+    select: { id: true, username: true, name: true, role: true, cabang: true, se: true },
     orderBy: { name: 'asc' },
   });
   return NextResponse.json({ roster });

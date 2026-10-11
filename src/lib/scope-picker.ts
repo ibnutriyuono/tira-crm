@@ -28,7 +28,7 @@ const up = (s: string | null | undefined) => (s || '').trim().toUpperCase();
 export function scopeAllLabel(user: Pick<SafeUser, 'role' | 'cabang' | 'reg' | 'se'> | null): string {
   if (!user) return 'Semua';
   if (user.role === 'rm') return `Regional ${user.reg ?? ''} (semua)`.replace('  ', ' ');
-  if (user.role === 'bm') return `Cabang ${up(user.cabang)} (semua)`;
+  if (user.role === 'bm' || user.role === 'salesadmin') return `Cabang ${up(user.cabang)} (semua)`;
   if (user.role === 'sales') return `SE ${up(user.se)}`;
   return 'Nasional (semua)';
 }
@@ -49,11 +49,11 @@ export function scopeGroups(user: Pick<SafeUser, 'role'> | null, rows: ScopeRow[
   if (user.role === 'gm' || user.role === 'admin' || user.role === 'purchasing') {
     if (regs.size > 1) groups.push({ label: 'Regional', options: [...regs].sort((a, b) => a - b).map((r) => ({ value: `reg:${r}`, label: `Regional ${r}` })) });
   }
-  if (user.role !== 'bm' && cabs.size > 1) groups.push({ label: 'Cabang', options: [...cabs].sort().map((c) => ({ value: `cab:${c}`, label: c })) });
+  if (user.role !== 'bm' && user.role !== 'salesadmin' && cabs.size > 1) groups.push({ label: 'Cabang', options: [...cabs].sort().map((c) => ({ value: `cab:${c}`, label: c })) });
   if (ses.size > 1)
     groups.push({
       label: 'SE',
-      options: [...ses.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([se, cb]) => ({ value: `se:${se}`, label: cb && user.role !== 'bm' ? `${se} · ${cb}` : se })),
+      options: [...ses.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([se, cb]) => ({ value: `se:${se}`, label: cb && user.role !== 'bm' && user.role !== 'salesadmin' ? `${se} · ${cb}` : se })),
     });
   return groups;
 }

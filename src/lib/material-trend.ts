@@ -14,7 +14,7 @@ import type { Material, Prospect } from './types';
  * counted per qty & satuan on its own, never mixed into the tonnage.
  */
 
-export type Basis = 'off' | 'po' | 'kirim';
+export type Basis = 'minta' | 'off' | 'po' | 'kirim';
 export type Measure = 'kg' | 'pcs' | 'nilai';
 export type ParseSource = 'form' | 'teks' | 'gagal';
 
@@ -76,6 +76,8 @@ export interface TrendRow {
   parse: ParseSource;
   kgPc: number;
   unitPrice: number;
+  /** Status Permintaan (1): belum ditawarkan. */
+  reqQty: number;
   offQty: number;
   poQty: number;
   sentQty: number;
@@ -91,7 +93,9 @@ export function buildTrendRows(prospects: Prospect[]): TrendRow[] {
   const out: TrendRow[] = [];
   prospects.forEach((p) => {
     const status = num(p.status);
-    if (status < 1) return; // Sales Activity: belum ada penawaran
+    // Sales Activity (0) belum berupa permintaan. Permintaan (1) dihitung
+    // terpisah (reqQty); "ditawarkan" mulai Penawaran Harga (2).
+    if (status < 1) return;
     const mats = getProspectMaterials(p) as (Material & { bentuk?: string; grade?: string; dim?: Dims; fabNama?: string; satuan?: string })[];
     const flow = flowItems(p);
     const offMonth = month(p.tglPenawaran) || month(p.createdAt);
@@ -131,7 +135,8 @@ export function buildTrendRows(prospects: Prospect[]): TrendRow[] {
         kgPc,
         // Old rows often have harga/kg but no berat/pc: price them on the computed weight.
         unitPrice: kgPc > 0 && num(m.hargaKg) > 0 ? kgPc * num(m.hargaKg) : materialUnitPrice(m),
-        offQty: num(m.qty),
+        reqQty: status === 1 ? num(m.qty) : 0,
+        offQty: status >= 2 ? num(m.qty) : 0,
         poQty: status === 4 || status === 5 ? f?.po || 0 : 0,
         sentQty: status === 4 || status === 5 ? f?.sent || 0 : 0,
         offMonth,
@@ -154,8 +159,8 @@ export function monthsEnding(end: string, n: number): string[] {
   return out;
 }
 
-const qtyFor = (r: TrendRow, b: Basis) => (b === 'off' ? r.offQty : b === 'po' ? r.poQty : r.sentQty);
-const monthFor = (r: TrendRow, b: Basis) => (b === 'off' ? r.offMonth : b === 'po' ? r.poMonth : r.sentMonth);
+const qtyFor = (r: TrendRow, b: Basis) => (b === 'minta' ? r.reqQty : b === 'off' ? r.offQty : b === 'po' ? r.poQty : r.sentQty);
+const monthFor = (r: TrendRow, b: Basis) => (b === 'minta' || b === 'off' ? r.offMonth : b === 'po' ? r.poMonth : r.sentMonth);
 export function measureOf(r: TrendRow, b: Basis, m: Measure): number {
   const q = qtyFor(r, b);
   return m === 'pcs' ? q : m === 'kg' ? q * r.kgPc : q * r.unitPrice;
@@ -167,6 +172,7 @@ export interface GradeStat {
   offers: number;
   customers: number;
   pcs: number;
+  reqKg: number;
   offKg: number;
   poKg: number;
   sentKg: number;
@@ -192,14 +198,14 @@ export interface TrendResult {
   series12: string[];
   group: ShapeGroup;
   buckets: string[];
-  kpi: { offKg: number; poKg: number; sentKg: number; nilaiPo: number; rpKg: number; conv: number | null; grades: number };
+  kpi: { reqKg: number; offKg: number; poKg: number; sentKg: number; nilaiPo: number; rpKg: number; conv: number | null; grades: number };
   grades: GradeStat[];
   heat: { key: string; grade: string; cells: number[]; total: number }[];
   heatMax: number;
-  monthly: (key: string) => { month: string; off: number; po: number }[];
+  monthly: (key: string) => { month: string; req: number; off: number; po: number }[];
   up: Mover[];
   down: Mover[];
-  fab: { label: string; satuan: string; offers: number; off: number; po: number; conv: number | null }[];
+  fab: { label: string; satuan: string; offers: number; req: number; off: number; po: number; conv: number | null }[];
   quality: { form: number; teks: number; gagal: number; total: number; examples: string[] };
   groupTotals: Record<string, number>;
 }
@@ -237,7 +243,8 @@ export function analyzeTrend(all: TrendRow[], opts: { end: string; period: numbe
 
   const grades: GradeStat[] = Array.from(byGrade.entries()).map(([key, list]) => {
     const inP = (b: Basis) => list.filter((r) => inPeriod.has(monthFor(r, b)));
-    const offRows = inP('off');
+    const offRows = inP('off').filter((r) => r.offQty > 0);
+    const reqKg = sumOf(list, 'minta', 'kg', (mo) => inPeriod.has(mo));
     const offKg = sumOf(list, 'off', 'kg', (mo) => inPeriod.has(mo));
     const poKg = sumOf(list, 'po', 'kg', (mo) => inPeriod.has(mo));
     const sentKg = sumOf(list, 'kirim', 'kg', (mo) => inPeriod.has(mo));
@@ -252,6 +259,7 @@ export function analyzeTrend(all: TrendRow[], opts: { end: string; period: numbe
       offers: new Set(offRows.map((r) => r.prospectId)).size,
       customers: new Set(offRows.map((r) => r.customer.trim().toUpperCase())).size,
       pcs: sumOf(list, opts.basis, 'pcs', (mo) => inPeriod.has(mo)),
+      reqKg,
       offKg,
       poKg,
       sentKg,
@@ -264,8 +272,9 @@ export function analyzeTrend(all: TrendRow[], opts: { end: string; period: numbe
       topBucket: Array.from(bucketTot.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || '-',
     };
   })
-    .filter((g) => g.score > 0 || g.offKg > 0)
-    .sort((a, b) => b.score - a.score);
+    .filter((g) => g.score > 0 || g.offKg > 0 || g.reqKg > 0)
+    // "(Tanpa grade)" / "(Tidak terbaca)" are data-quality buckets, not grades: keep them last.
+    .sort((a, b) => Number(a.key.startsWith('~')) - Number(b.key.startsWith('~')) || b.score - a.score);
 
   const heat = grades.map((g) => {
     const list = byGrade.get(g.key) || [];
@@ -292,21 +301,22 @@ export function analyzeTrend(all: TrendRow[], opts: { end: string; period: numbe
   const down = combos.filter((c) => c.change < -TREND_THRESHOLD).sort((a, b) => a.change - b.change).slice(0, 8);
 
   // Line 05: by job name and satuan.
-  const fabMap = new Map<string, { label: string; satuan: string; ids: Set<string>; off: number; po: number }>();
+  const fabMap = new Map<string, { label: string; satuan: string; ids: Set<string>; req: number; off: number; po: number }>();
   all.filter((r) => r.fab).forEach((r) => {
     const k = `${r.label.toUpperCase()}|${r.satuan}`;
-    const e = fabMap.get(k) || { label: r.label || '(tanpa nama)', satuan: r.satuan, ids: new Set<string>(), off: 0, po: 0 };
+    const e = fabMap.get(k) || { label: r.label || '(tanpa nama)', satuan: r.satuan, ids: new Set<string>(), req: 0, off: 0, po: 0 };
     if (inPeriod.has(r.offMonth)) {
+      e.req += r.reqQty;
       e.off += r.offQty;
-      e.ids.add(r.prospectId);
+      if (r.offQty > 0) e.ids.add(r.prospectId);
     }
     if (inPeriod.has(r.poMonth)) e.po += r.poQty;
     fabMap.set(k, e);
   });
   const fab = Array.from(fabMap.values())
-    .filter((e) => e.off > 0 || e.po > 0)
-    .map((e) => ({ label: e.label, satuan: e.satuan, offers: e.ids.size, off: e.off, po: e.po, conv: e.off > 0 ? e.po / e.off : null }))
-    .sort((a, b) => b.off - a.off)
+    .filter((e) => e.req > 0 || e.off > 0 || e.po > 0)
+    .map((e) => ({ label: e.label, satuan: e.satuan, offers: e.ids.size, req: e.req, off: e.off, po: e.po, conv: e.off > 0 ? e.po / e.off : null }))
+    .sort((a, b) => b.off + b.req - (a.off + a.req))
     .slice(0, 12);
 
   const inOff = steel.filter((r) => inPeriod.has(r.offMonth));
@@ -320,6 +330,7 @@ export function analyzeTrend(all: TrendRow[], opts: { end: string; period: numbe
 
   const kRows = rows;
   const offKg = sumOf(kRows, 'off', 'kg', (mo) => inPeriod.has(mo));
+  const reqKg = sumOf(kRows, 'minta', 'kg', (mo) => inPeriod.has(mo));
   const poKg = sumOf(kRows, 'po', 'kg', (mo) => inPeriod.has(mo));
   const nilaiPo = sumOf(kRows, 'po', 'nilai', (mo) => inPeriod.has(mo));
 
@@ -328,7 +339,7 @@ export function analyzeTrend(all: TrendRow[], opts: { end: string; period: numbe
     series12,
     group,
     buckets,
-    kpi: { offKg, poKg, sentKg: sumOf(kRows, 'kirim', 'kg', (mo) => inPeriod.has(mo)), nilaiPo, rpKg: poKg > 0 ? nilaiPo / poKg : 0, conv: offKg > 0 ? poKg / offKg : null, grades: grades.length },
+    kpi: { reqKg, offKg, poKg, sentKg: sumOf(kRows, 'kirim', 'kg', (mo) => inPeriod.has(mo)), nilaiPo, rpKg: poKg > 0 ? nilaiPo / poKg : 0, conv: offKg > 0 ? poKg / offKg : null, grades: grades.length },
     grades,
     heat,
     heatMax,
@@ -336,6 +347,7 @@ export function analyzeTrend(all: TrendRow[], opts: { end: string; period: numbe
       const list = byGrade.get(key) || [];
       return series12.map((mo) => ({
         month: mo,
+        req: list.reduce((s, r) => s + (r.offMonth === mo ? measureOf(r, 'minta', opts.measure) : 0), 0),
         off: list.reduce((s, r) => s + (r.offMonth === mo ? measureOf(r, 'off', opts.measure) : 0), 0),
         po: list.reduce((s, r) => s + (r.poMonth === mo ? measureOf(r, 'po', opts.measure) : 0), 0),
       }));

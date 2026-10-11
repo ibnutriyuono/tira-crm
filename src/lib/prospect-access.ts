@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from './prisma';
 import type { SafeUser } from './types';
+import { isBranchRole } from './roles';
 
 /** Loads a prospect and checks the caller may change it (own SE / cabang / regional). */
 export async function assertProspectInScope(user: SafeUser, id: string) {
@@ -9,7 +10,7 @@ export async function assertProspectInScope(user: SafeUser, id: string) {
   if (user.role === 'sales' && (existing.se || '').toUpperCase() !== (user.se || '').toUpperCase()) {
     return { error: NextResponse.json({ error: 'Tidak diizinkan' }, { status: 403 }) };
   }
-  if (user.role === 'bm' && (existing.cabang || '').toUpperCase() !== (user.cabang || '').toUpperCase()) {
+  if (isBranchRole(user.role) && (!user.cabang || (existing.cabang || '').toUpperCase() !== user.cabang.toUpperCase())) {
     return { error: NextResponse.json({ error: 'Tidak diizinkan' }, { status: 403 }) };
   }
   if (user.role === 'rm' && String(existing.reg || '') !== String(user.reg || '')) {

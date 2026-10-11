@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AppNotification, BudgetTarget, Customer, Fupa, Prospect, PurchasingContact, Rfq, SafeUser, SalesPlan, Vendor } from '@/lib/types';
+import type { AnnualTarget, SeTarget, AppNotification, BudgetTarget, Customer, CustomerGroup, Fupa, Prospect, PurchasingContact, Rfq, SafeUser, SalesPlan, Vendor } from '@/lib/types';
 
 interface Toast {
   id: number;
@@ -17,10 +17,14 @@ interface DataState {
   fupas: Fupa[];
   vendors: Vendor[];
   budgetTargets: BudgetTarget[];
+  annualTargets: AnnualTarget[];
+  seTargets: SeTarget[];
   salesPlans: SalesPlan[];
   notifications: AppNotification[];
   users: SafeUser[]; // only populated for admins when Kelola User modal opens
   purchasingContact: PurchasingContact;
+  /** Key Account groups (lib/kam.ts). */
+  customerGroups: CustomerGroup[];
   loaded: boolean;
   toasts: Toast[];
 
@@ -40,6 +44,9 @@ interface DataState {
   removeFupa: (id: string) => void;
   refetchFupas: () => Promise<void>;
   upsertBudgetTarget: (b: BudgetTarget) => void;
+  upsertAnnualTarget: (a: AnnualTarget) => void;
+  upsertSeTargets: (list: SeTarget[]) => void;
+  removeSeTargets: (ids: string[]) => void;
   upsertSalesPlan: (p: SalesPlan) => void;
   removeSalesPlan: (id: string) => void;
   upsertNotification: (n: AppNotification) => void;
@@ -51,6 +58,9 @@ interface DataState {
   upsertUser: (u: SafeUser) => void;
   removeUser: (id: string) => void;
   setPurchasingContact: (c: PurchasingContact) => void;
+  upsertCustomerGroup: (g: CustomerGroup) => void;
+  removeCustomerGroup: (id: string) => void;
+  setCustomerGroups: (g: CustomerGroup[]) => void;
   refetchProspects: () => Promise<void>;
   refetchCustomers: () => Promise<void>;
   loadUsers: () => Promise<void>;
@@ -69,10 +79,13 @@ export const useDataStore = create<DataState>((set, get) => ({
   fupas: [],
   vendors: [],
   budgetTargets: [],
+  annualTargets: [],
+  seTargets: [],
   salesPlans: [],
   notifications: [],
   users: [],
   purchasingContact: { wa: '', email: '' },
+  customerGroups: [],
   loaded: false,
   toasts: [],
 
@@ -85,10 +98,13 @@ export const useDataStore = create<DataState>((set, get) => ({
       fupas: [],
       vendors: [],
       budgetTargets: [],
+      annualTargets: [],
+      seTargets: [],
       salesPlans: [],
       notifications: [],
       users: [],
       purchasingContact: { wa: '', email: '' },
+      customerGroups: [],
       loaded: false,
       toasts: [],
     }),
@@ -105,14 +121,28 @@ export const useDataStore = create<DataState>((set, get) => ({
       fupas: data.fupas ?? [],
       vendors: data.vendors ?? [],
       budgetTargets: data.budgetTargets ?? [],
+      annualTargets: data.annualTargets ?? [],
+      seTargets: data.seTargets ?? [],
       salesPlans: data.salesPlans ?? [],
       notifications: data.notifications ?? [],
       purchasingContact: data.purchasingContact,
+      customerGroups: data.customerGroups ?? [],
       loaded: true,
     });
   },
 
   setCurrentUser: (u) => set({ currentUser: u }),
+
+  upsertCustomerGroup: (g) =>
+    set((s) => {
+      const idx = s.customerGroups.findIndex((x) => x.id === g.id);
+      if (idx === -1) return { customerGroups: [...s.customerGroups, g] };
+      const next = s.customerGroups.slice();
+      next[idx] = g;
+      return { customerGroups: next };
+    }),
+  removeCustomerGroup: (id) => set((s) => ({ customerGroups: s.customerGroups.filter((x) => x.id !== id) })),
+  setCustomerGroups: (g) => set({ customerGroups: g }),
 
   upsertProspect: (p) =>
     set((s) => {
@@ -159,6 +189,29 @@ export const useDataStore = create<DataState>((set, get) => ({
     const data = await res.json();
     set({ fupas: data.fupas });
   },
+
+  upsertAnnualTarget: (a) =>
+    set((s) => {
+      const idx = s.annualTargets.findIndex((x) => x.cabang === a.cabang && x.year === a.year);
+      if (idx === -1) return { annualTargets: [...s.annualTargets, a] };
+      const next = s.annualTargets.slice();
+      next[idx] = a;
+      return { annualTargets: next };
+    }),
+
+  upsertSeTargets: (list) =>
+    set((s) => {
+      if (!list.length) return {};
+      const next = s.seTargets.slice();
+      list.forEach((t) => {
+        const idx = next.findIndex((x) => x.id === t.id || (x.se === t.se && x.periode === t.periode));
+        if (idx === -1) next.push(t);
+        else next[idx] = t;
+      });
+      return { seTargets: next };
+    }),
+
+  removeSeTargets: (ids) => set((s) => ({ seTargets: s.seTargets.filter((t) => !ids.includes(t.id)) })),
 
   upsertBudgetTarget: (b) =>
     set((s) => {

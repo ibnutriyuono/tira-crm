@@ -60,6 +60,7 @@ export function UserFormModal() {
     if (!uname || !nm) return toast('Username dan nama wajib diisi', 'error');
     if (!userEditId && (!password || password.length < 4)) return toast('Password wajib diisi (minimal 4 karakter)', 'error');
     if (password && password.length < 4) return toast('Password minimal 4 karakter', 'error');
+    if (role === 'salesadmin' && !cabang.trim()) return toast('Admin Sales wajib diisi Cabang', 'error');
 
     setBusy(true);
     const payload = { username: uname, name: nm, role, reg: reg || null, se: se.trim().toUpperCase(), cabang: cabang.trim().toUpperCase(), password: password || undefined };
@@ -117,6 +118,7 @@ export function UserFormModal() {
           <select value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="sales">Sales</option>
             <option value="bm">BM (Branch Manager)</option>
+            <option value="salesadmin">Admin Sales (satu cabang)</option>
             <option value="rm">RM (Regional Manager)</option>
             <option value="gm">GM (General Manager)</option>
             <option value="purchasing">Purchasing</option>
@@ -154,7 +156,7 @@ export function UserFormModal() {
         </div>
       </div>
       <div className="import-summary" style={{ marginTop: 14 }}>
-        Cakupan data per role: <b>Sales</b> — isi Kode SE (hanya melihat prospek miliknya). <b>BM</b> — isi Cabang (melihat semua sales di cabangnya). <b>RM</b> — isi Regional (melihat semua cabang di regionalnya). <b>Purchasing</b> — melihat seluruh prospek dan RFQ/FUP A, serta mengelola vendor dan penawaran. <b>PIC Line 05</b> — membuka UI Purchasing, tetapi hanya melihat dan mengerjakan RFQ/FUP A yang berisi material Line 05 (fabrikasi); tidak melihat prospek. <b>GM</b> &amp; <b>Admin</b> — melihat seluruh data, field lain tidak perlu diisi.
+        Cakupan data per role: <b>Sales</b> — isi Kode SE (hanya melihat prospek miliknya). <b>BM</b> — isi Cabang (melihat semua sales di cabangnya). <b>Admin Sales</b> — wajib isi Cabang (satu cabang): melihat data cabangnya, mengisi prospek/PO/DO, RFQ/FUP A dan customer atas nama Sales, serta menandai DO terfaktur (tanggal & no faktur); tidak mengubah target, rencana, aktivitas, perjalanan dinas, maupun user. <b>RM</b> — isi Regional (melihat semua cabang di regionalnya). <b>Purchasing</b> — melihat seluruh prospek dan RFQ/FUP A, serta mengelola vendor dan penawaran. <b>PIC Line 05</b> — membuka UI Purchasing, tetapi hanya melihat dan mengerjakan RFQ/FUP A yang berisi material Line 05 (fabrikasi); tidak melihat prospek. <b>GM</b> &amp; <b>Admin</b> — melihat seluruh data, field lain tidak perlu diisi.
       </div>
     </Modal>
   );

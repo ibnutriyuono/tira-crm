@@ -7,6 +7,7 @@ import { cabangRegMap, docScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { notify, purchasingUserIds } from '@/lib/notify';
+import { notifyKamCrossBranch } from '@/lib/kam-server';
 
 export async function GET() {
   const user = await requireUser();
@@ -110,6 +111,7 @@ export async function POST(req: Request) {
   }
 
   emitCrmEvent('rfq:created', rfq);
+  await notifyKamCrossBranch({ user, customer: rfq.customer || '', cabang: rfq.cabang, entity: 'rfq', entityId: rfq.id, what: `RFQ ${rfq.noRfq || ''}`.trim() });
   await logActivity({
     user,
     action: 'create',

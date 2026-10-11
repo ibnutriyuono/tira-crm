@@ -6,6 +6,7 @@ import { itemsHaveLine } from './doc-lines';
 import { prisma } from './prisma';
 import { activityOwner } from './sales-activity';
 import type { SafeUser } from './types';
+import { isBranchRole } from './roles';
 
 export const SESSION_COOKIE = 'crm_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
@@ -81,7 +82,7 @@ const NONE = { id: '__none__' };
 /** Mirrors the original app's per-role data scoping (getFiltered()'s role branch). */
 export function prospectScopeWhere(user: SafeUser) {
   if (user.role === 'sales') return { se: { equals: user.se || '', mode: 'insensitive' as const } };
-  if (user.role === 'bm') return { cabang: { equals: user.cabang || '', mode: 'insensitive' as const } };
+  if (isBranchRole(user.role)) return { cabang: { equals: user.cabang || '__none__', mode: 'insensitive' as const } };
   if (user.role === 'rm') return { reg: user.reg ?? -1 };
   // Purchasing works the whole country's demand, so it reads every prospect.
   // Listed explicitly rather than left to the fallthrough so that adding a
@@ -128,7 +129,7 @@ async function seCabangs(user: SafeUser): Promise<string[]> {
  */
 async function cabangOnlyScopeWhere(user: SafeUser, cabangField: string) {
   if (user.role === 'purchasing05') return NONE;
-  if (user.role === 'bm') {
+  if (isBranchRole(user.role)) {
     // No branch on the account means nothing to scope to. Matching on '' would
     // otherwise quietly return any row stored with a blank cabang, which the
     // client mirror (myCabangScope) treats as no affiliation at all.
@@ -153,6 +154,12 @@ export async function customerScopeWhere(user: SafeUser) {
 }
 
 export async function budgetTargetScopeWhere(user: SafeUser) {
+  return cabangOnlyScopeWhere(user, 'cabang');
+}
+
+/** Target per SE: Sales hanya miliknya sendiri; BM/RM/GM per cakupan cabang. */
+export async function seTargetScopeWhere(user: SafeUser) {
+  if (user.role === 'sales') return { se: { equals: user.se || '__none__', mode: 'insensitive' as const } };
   return cabangOnlyScopeWhere(user, 'cabang');
 }
 
@@ -202,8 +209,8 @@ export async function docScopeWhere(
       ],
     };
   }
-  if (user.role === 'bm') {
-    return { [cabangField]: { equals: user.cabang || '', mode: 'insensitive' as const } };
+  if (isBranchRole(user.role)) {
+    return { [cabangField]: { equals: user.cabang || '__none__', mode: 'insensitive' as const } };
   }
   if (user.role === 'rm') {
     const map = await cabangRegMap();
@@ -233,8 +240,8 @@ export async function salesPlanScopeWhere(user: SafeUser) {
   if (user.role === 'sales') {
     return { se: { equals: user.se || '', mode: 'insensitive' as const } };
   }
-  if (user.role === 'bm') {
-    return { cabang: { equals: user.cabang || '', mode: 'insensitive' as const } };
+  if (isBranchRole(user.role)) {
+    return { cabang: { equals: user.cabang || '__none__', mode: 'insensitive' as const } };
   }
   if (user.role === 'rm') {
     const map = await cabangRegMap();

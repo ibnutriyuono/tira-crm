@@ -31,7 +31,7 @@ export function execScopeFor(user: SafeUser, prospects: Prospect[]): ExecScope |
     const ordered = [...CABANG_LIST.filter((c) => set.has(c)), ...Array.from(set).filter((c) => !CABANG_LIST.includes(c))];
     return { kind: 'regional', label: `Regional ${user.reg ?? '-'}`, cabangs: ordered };
   }
-  if (user.role === 'bm') {
+  if (user.role === 'bm' || user.role === 'salesadmin') {
     const c = (user.cabang || '').trim().toUpperCase();
     return c ? { kind: 'cabang', label: `Cabang ${c}`, cabangs: [c] } : null;
   }

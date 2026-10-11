@@ -214,7 +214,9 @@ export function SalesActivityModal() {
   function startConvert(a: SalesActivity, status: number) {
     resetForm();
     setConvert({ activity: a, status });
-    setUraian(a.keterangan || '');
+    // Hasil kunjungan sudah ikut ke Keterangan prospek (lihat convert route);
+    // uraian material diisi Sales sendiri, bukan disalin dari catatan aktivitas.
+    setUraian('');
     setQty('1');
     setNilai('');
     setNoPo('');
@@ -371,7 +373,8 @@ export function SalesActivityModal() {
           <div className="form-grid">
             <div className="full">
               <label>Uraian material / kebutuhan *</label>
-              <input type="text" value={uraian} onChange={(e) => setUraian(e.target.value)} placeholder="cth. Plate SS304 12 mm x 1250 x 2500" />
+              <input type="text" value={uraian} onChange={(e) => setUraian(e.target.value)} placeholder="cth. Plate SS304 12 mm x 1250 x 2500" autoFocus />
+              <div className="field-note">Catatan aktivitas & PIC otomatis masuk ke <b>Keterangan</b> prospek — di sini cukup isi materialnya.</div>
             </div>
             <div>
               <label>Qty (pcs)</label>

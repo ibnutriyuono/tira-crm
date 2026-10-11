@@ -139,7 +139,7 @@ export function ActivityLogModal() {
       ? 'seluruh perusahaan'
       : currentUser?.role === 'rm'
         ? `Regional ${currentUser.reg ?? '-'}`
-        : currentUser?.role === 'bm'
+        : currentUser?.role === 'bm' || currentUser?.role === 'salesadmin'
           ? `Cabang ${currentUser.cabang || '-'}`
           : 'aktivitas Anda sendiri';
 

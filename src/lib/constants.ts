@@ -51,6 +51,7 @@ export const ACTIVITY_ENTITY_LABEL: Record<string, string> = {
   salesActivity: 'Aktivitas Sales',
   activityTarget: 'Target Aktivitas',
   visitTrip: 'Perjalanan Dinas',
+  customerGroup: 'Key Account',
 };
 
 // Purchasing-side status ladder for RFQ / FUP A, ported from the single-file
@@ -91,11 +92,13 @@ export const ROLE_LABELS: Record<string, string> = {
   rm: 'RM',
   bm: 'BM',
   sales: 'Sales',
+  salesadmin: 'Admin Sales',
 };
 
 export const BROADCAST_ROLE_OPTIONS = [
   { v: 'sales', l: 'Sales' },
   { v: 'bm', l: 'BM (Branch Manager)' },
+  { v: 'salesadmin', l: 'Admin Sales' },
   { v: 'rm', l: 'RM (Regional Manager)' },
   { v: 'gm', l: 'GM (General Manager)' },
   { v: 'purchasing', l: 'Purchasing' },

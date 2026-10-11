@@ -6,7 +6,8 @@ import { getSocket } from '@/lib/socket-client';
 import { matchesBudgetTargetScope, matchesCustomerScope, matchesDocScope, matchesProspectScope, matchesSalesPlanScope, myCabangScope, myRegionCabangs } from '@/lib/client-scope';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
-import type { BudgetTarget, SalesPlan, Customer, Fupa, ItemChatMessage, Prospect, PurchasingContact, Rfq, SafeUser, Vendor, AppNotification } from '@/lib/types';
+import type { AnnualTarget, SeTarget, BudgetTarget, SalesPlan, Customer, CustomerGroup, Fupa, ItemChatMessage, Prospect, PurchasingContact, Rfq, SafeUser, Vendor, AppNotification } from '@/lib/types';
+import { api } from '@/lib/api-client';
 
 /**
  * Notification toasts open the document they are about. Purchasing works from
@@ -174,6 +175,21 @@ export function useCrmSocket() {
       if (!allowedInStore('budgetTarget', b)) return;
       useDataStore.getState().upsertBudgetTarget(b);
     };
+    // Same (cabang) scope rule as a monthly target.
+    const onAnnualUpsert = (a: AnnualTarget) => {
+      if (!allowedInStore('budgetTarget', { ...a, periode: `${a.year}-01`, grossMarginTarget: null, grossMarginResult: null })) return;
+      useDataStore.getState().upsertAnnualTarget(a);
+    };
+    const onSeTargetUpsert = (t: SeTarget) => {
+      const st = useDataStore.getState();
+      const me = st.currentUser;
+      if (!me) return;
+      if (me.role === 'sales') {
+        if ((me.se || '').toUpperCase() !== t.se.toUpperCase()) return;
+      } else if (!allowedInStore('budgetTarget', { id: t.id, cabang: t.cabang, periode: t.periode, amount: t.amount, grossMarginTarget: null, grossMarginResult: null })) return;
+      st.upsertSeTargets([t]);
+    };
+    const onSeTargetDelete = ({ id }: { id: string }) => useDataStore.getState().removeSeTargets([id]);
     // Bulk server-side change (e.g. customer names unified): reload everything.
     const onDataRefresh = () => void useDataStore.getState().bootstrap();
     const onSalesPlanDelete = ({ id }: { id: string }) => useDataStore.getState().removeSalesPlan(id);
@@ -194,6 +210,11 @@ export function useCrmSocket() {
       useDataStore.getState().upsertNotification(n);
     };
 
+    const onGroupUpsert = (g: CustomerGroup) => useDataStore.getState().upsertCustomerGroup(g);
+    const onGroupDelete = ({ id }: { id: string }) => useDataStore.getState().removeCustomerGroup(id);
+    const onGroupBulk = () => {
+      api.get<{ groups: CustomerGroup[] }>('/api/customer-groups').then((r) => useDataStore.getState().setCustomerGroups(r.groups)).catch(() => {});
+    };
     const onVendorUpsert = (v: Vendor) => useDataStore.getState().upsertVendor(v);
     const onVendorDelete = ({ id }: { id: string }) => useDataStore.getState().removeVendor(id);
     const onVendorBulk = () => useDataStore.getState().refetchVendors();
@@ -228,9 +249,15 @@ export function useCrmSocket() {
     s.on('itemchat:message', onItemChatMessage);
 
     s.on('budget:updated', onBudgetUpsert);
+    s.on('annualTarget:updated', onAnnualUpsert);
+    s.on('seTarget:updated', onSeTargetUpsert);
+    s.on('seTarget:deleted', onSeTargetDelete);
     s.on('salesPlan:updated', onSalesPlanUpsert);
     s.on('salesPlan:deleted', onSalesPlanDelete);
     s.on('notification:new', onNotificationNew);
+    s.on('customerGroup:updated', onGroupUpsert);
+    s.on('customerGroup:deleted', onGroupDelete);
+    s.on('customerGroup:bulk', onGroupBulk);
 
     s.on('vendor:created', onVendorUpsert);
     s.on('vendor:updated', onVendorUpsert);
@@ -258,9 +285,15 @@ export function useCrmSocket() {
       s.off('fupa:updated', onFupaUpsert);
       s.off('fupa:deleted', onFupaDelete);
       s.off('budget:updated', onBudgetUpsert);
+      s.off('annualTarget:updated', onAnnualUpsert);
+      s.off('seTarget:updated', onSeTargetUpsert);
+      s.off('seTarget:deleted', onSeTargetDelete);
       s.off('salesPlan:updated', onSalesPlanUpsert);
       s.off('salesPlan:deleted', onSalesPlanDelete);
       s.off('notification:new', onNotificationNew);
+      s.off('customerGroup:updated', onGroupUpsert);
+      s.off('customerGroup:deleted', onGroupDelete);
+      s.off('customerGroup:bulk', onGroupBulk);
       s.off('vendor:created', onVendorUpsert);
       s.off('vendor:updated', onVendorUpsert);
       s.off('vendor:deleted', onVendorDelete);

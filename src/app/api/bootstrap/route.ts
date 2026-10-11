@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { budgetTargetScopeWhere, customerScopeWhere, docScopeWhere, prospectScopeWhere, salesPlanScopeWhere } from '@/lib/auth';
+import { budgetTargetScopeWhere, seTargetScopeWhere, customerScopeWhere, docScopeWhere, prospectScopeWhere, salesPlanScopeWhere } from '@/lib/auth';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import type { PurchasingContact } from '@/lib/types';
@@ -10,7 +10,7 @@ export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
 
-  const [prospects, customers, rfqs, fupas, vendors, budgetTargets, salesPlans, notifications, settingRow] = await Promise.all([
+  const [prospects, customers, rfqs, fupas, vendors, budgetTargets, salesPlans, notifications, settingRow, customerGroups, annualTargets, seTargets] = await Promise.all([
     prisma.prospect.findMany({ where: prospectScopeWhere(user), orderBy: { createdAt: 'desc' } }),
     prisma.customer.findMany({ where: await customerScopeWhere(user), orderBy: { createdAt: 'desc' } }),
     prisma.rfq.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } }),
@@ -30,9 +30,13 @@ export async function GET() {
     // function needed the way prospects/rfqs/salesPlans have.
     prisma.notification.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' }, take: 50 }),
     prisma.setting.findUnique({ where: { key: 'purchasingContact' } }),
+    // Key Account groups: read by every sales-side role for badges & routing.
+    user.role === 'purchasing05' ? Promise.resolve([]) : prisma.customerGroup.findMany({ orderBy: [{ skor: 'desc' }, { name: 'asc' }] }),
+    prisma.annualTarget.findMany({ where: await budgetTargetScopeWhere(user), orderBy: [{ year: 'desc' }, { cabang: 'asc' }] }),
+    prisma.seTarget.findMany({ where: await seTargetScopeWhere(user), orderBy: [{ periode: 'desc' }, { se: 'asc' }] }),
   ]);
 
   const purchasingContact = (settingRow?.value as unknown as PurchasingContact) || { wa: '', email: '' };
 
-  return NextResponse.json({ user, prospects, customers, rfqs, fupas, vendors, budgetTargets, salesPlans, notifications, purchasingContact });
+  return NextResponse.json({ user, prospects, customers, rfqs, fupas, vendors, budgetTargets, salesPlans, notifications, purchasingContact, customerGroups, annualTargets, seTargets });
 }

@@ -3,6 +3,7 @@
 import { promptItemFlow } from '@/lib/item-flow-prompt';
 import { flowItems, flowTotals } from '@/lib/item-flow';
 import { FlowBar } from './modals/ItemFlowModal';
+import { KamBadge } from './KamBadge';
 import { useMemo, useState } from 'react';
 import { KANBAN_STATUSES, STATUS_META } from '@/lib/constants';
 import { classify, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
@@ -41,6 +42,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
       <div className="kc-top">
         <span className="kc-customer">
           {r.customer}
+          <KamBadge customer={r.customer} />
           <NewBadge createdAt={r.createdAt} />
           <ProspectPurchasingBubble count={purchCount} />
           {!!starCount && (

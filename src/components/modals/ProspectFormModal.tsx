@@ -17,6 +17,7 @@ import { EMPTY_QCD, useUiStore } from '@/store/useUiStore';
 import { qcdMissing, qcdRequiredOnMove } from '@/lib/qcd';
 import { QcdFields } from '../QcdFields';
 import type { Prospect } from '@/lib/types';
+import { canSetFaktur } from '@/lib/roles';
 
 export function ProspectFormModal() {
   const modal = useUiStore((s) => s.modal);
@@ -39,7 +40,7 @@ export function ProspectFormModal() {
   // this only saves the user from filling in a field that would be overridden.
   const locks =
     currentUser?.role === 'sales' ? { reg: true, cabang: true, se: true }
-    : currentUser?.role === 'bm' ? { reg: true, cabang: true, se: false }
+    : currentUser?.role === 'bm' || currentUser?.role === 'salesadmin' ? { reg: true, cabang: true, se: false }
     : currentUser?.role === 'rm' ? { reg: true, cabang: false, se: false }
     : { reg: false, cabang: false, se: false };
 
@@ -65,6 +66,9 @@ export function ProspectFormModal() {
   const [phone, setPhone] = useState('');
   const [penawaranTerkirim, setPenawaranTerkirim] = useState(false);
   const [terfaktur, setTerfaktur] = useState(false);
+  const [tglFaktur, setTglFaktur] = useState('');
+  const [noFaktur, setNoFaktur] = useState('');
+  const fakturEditable = canSetFaktur(currentUser?.role);
   // Edited as spec rows (bentuk, ukuran, …); converted back to Material on save.
   const [rows, setRows] = useState<SpecRow[]>([emptyRow()]);
   const materials = useMemo(() => rows.map(rowToMaterial), [rows]);
@@ -88,6 +92,8 @@ export function ProspectFormModal() {
       setPhone(editing.phone || '');
       setPenawaranTerkirim(!!editing.penawaranTerkirim);
     setTerfaktur(!!editing.terfaktur);
+      setTglFaktur(editing.tglFaktur || '');
+      setNoFaktur(editing.noFaktur || '');
       setRows(getProspectMaterials(editing).map(materialToRow));
       setKondisiStock(editing.kondisiStock || '');
       setTglPenawaran(editing.tglPenawaran || '');
@@ -117,6 +123,8 @@ export function ProspectFormModal() {
       setPhone('');
       setPenawaranTerkirim(false);
       setTerfaktur(false);
+      setTglFaktur('');
+      setNoFaktur('');
       setRows([emptyRow()]);
       setKondisiStock('');
       setTglPenawaran('');
@@ -209,6 +217,8 @@ export function ProspectFormModal() {
       status: Number(status),
       penawaranTerkirim,
       terfaktur,
+      tglFaktur: terfaktur ? tglFaktur : '',
+      noFaktur: terfaktur ? noFaktur : '',
       qcdQuality: pendingQCD.quality,
       qcdCost: pendingQCD.cost,
       qcdDelivery: pendingQCD.delivery,
@@ -305,11 +315,23 @@ export function ProspectFormModal() {
         </div>
         {Number(status) === 5 && (
           <div className="full" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: -4 }}>
-            <input type="checkbox" style={{ width: 'auto' }} checked={terfaktur} onChange={(e) => setTerfaktur(e.target.checked)} id="f_terfaktur" />
+            <input type="checkbox" style={{ width: 'auto' }} checked={terfaktur} disabled={!fakturEditable} onChange={(e) => setTerfaktur(e.target.checked)} id="f_terfaktur" />
             <label htmlFor="f_terfaktur" style={{ margin: 0, textTransform: 'none', fontWeight: 500, color: 'var(--text)', fontSize: 13 }}>
-              Sudah terfaktur (invoice) <span style={{ color: 'var(--text-soft)', fontWeight: 400 }}>(centang = masuk Omzet, kosongkan = masih GIT/barang jalan)</span>
+              Sudah terfaktur (invoice) <span style={{ color: 'var(--text-soft)', fontWeight: 400 }}>{fakturEditable ? '(centang = masuk Omzet, kosongkan = masih GIT/barang jalan)' : '(diisi oleh Admin Sales / BM)'}</span>
             </label>
           </div>
+        )}
+        {Number(status) === 5 && terfaktur && (
+          <>
+            <div>
+              <label>Tgl. Faktur</label>
+              <input type="date" value={tglFaktur} onChange={(e) => setTglFaktur(e.target.value)} disabled={!fakturEditable} />
+            </div>
+            <div>
+              <label>No. Faktur</label>
+              <input type="text" value={noFaktur} onChange={(e) => setNoFaktur(e.target.value)} disabled={!fakturEditable} placeholder="cth. INV/DKI/2026/10/0123" />
+            </div>
+          </>
         )}
         <div className="full">
           <label>Daftar Material</label>

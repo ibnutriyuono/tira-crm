@@ -32,6 +32,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const name = String(body?.name || '').trim();
   const role = String(body?.role || target.role);
   if (!name) return NextResponse.json({ error: 'Nama wajib diisi' }, { status: 400 });
+  if (role === 'salesadmin' && !String(body?.cabang ?? target.cabang ?? '').trim()) return NextResponse.json({ error: 'Admin Sales wajib diisi Cabang' }, { status: 400 });
 
   if (target.role === 'admin' && role !== 'admin') {
     const adminCount = await prisma.user.count({ where: { role: 'admin' } });

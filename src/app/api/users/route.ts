@@ -31,6 +31,7 @@ export async function POST(req: Request) {
 
   if (!username || !name) return NextResponse.json({ error: 'Username dan nama wajib diisi' }, { status: 400 });
   if (!password || password.length < 4) return NextResponse.json({ error: 'Password wajib diisi (minimal 4 karakter)' }, { status: 400 });
+  if (role === 'salesadmin' && !String(body?.cabang || '').trim()) return NextResponse.json({ error: 'Admin Sales wajib diisi Cabang' }, { status: 400 });
 
   const exists = await prisma.user.findUnique({ where: { username } });
   if (exists) return NextResponse.json({ error: 'Username sudah digunakan' }, { status: 409 });

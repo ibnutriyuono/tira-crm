@@ -16,6 +16,8 @@ enum Role {
   purchasing
   /// PIC Line 05 (fabrikasi): UI Purchasing, hanya RFQ / FUP A yang berisi item Line 05.
   purchasing05
+  /// Admin Sales: back-office satu cabang — data & dokumen PO/DO, pemilik status terfaktur.
+  salesadmin
 }
 
 /// Notifikasi persisten per-user — riwayat semua kejadian penting pada RFQ/FUP A
@@ -214,6 +216,9 @@ model Prospect {
   status            Int      @default(0)
   penawaranTerkirim Boolean  @default(false)
   terfaktur         Boolean  @default(false)
+  /// Tanggal & nomor faktur — diisi Admin Sales / BM saat DO ditandai terfaktur.
+  tglFaktur         String?
+  noFaktur          String?
   /// Bumped only when `status` actually changes — aging measures time without
   /// progress, so a note edit must not reset the clock.
   statusChangedAt   DateTime @default(now())
@@ -437,11 +442,44 @@ model BudgetTarget {
   /// yang sama, dan dengan nilai yang sama pula (target vs hasil), sampai
   /// integrasi selesai.
   grossMarginResult Float?
+  /// true = amount diisi otomatis dari target tahunan / 12 (ikut berubah bila
+  /// target tahunan diubah); false = diisi manual per bulan.
+  fromAnnual Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([cabang, periode])
   @@index([periode])
+}
+
+/// Target per Sales (SE) per bulan — pembagian target cabang oleh BM.
+/// Jumlah semua SE di satu cabang idealnya = BudgetTarget cabang bulan itu.
+model SeTarget {
+  id        String   @id @default(cuid())
+  se        String
+  cabang    String
+  periode   String
+  amount    Float    @default(0)
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([se, periode])
+  @@index([cabang, periode])
+}
+
+/// Target tahunan per cabang. Menyimpan ini mengisi target bulanan default
+/// (amount / 12) ke BudgetTarget untuk bulan yang kosong atau masih default.
+model AnnualTarget {
+  id        String   @id @default(cuid())
+  cabang    String
+  year      String
+  amount    Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cabang, year])
+  @@index([year])
 }
 
 // Team chat. Replaces the prototype's polling (an 8s timer over a single
@@ -562,6 +600,45 @@ model Attachment {
 
 // Small key/value bag for app-wide settings — currently just the
 // remembered Purchasing WhatsApp/email contact used to prefill the RFQ modal.
+/// Grup customer & Key Account Management (lihat src/lib/kam.ts).
+/// `entities` = nama customer/entitas anggota grup (dicocokkan ke nama di
+/// prospek, aktivitas dan RFQ setelah dinormalisasi). Angka omzet/margin diisi
+/// dari impor analisa KAM (Sage), bukan dihitung dari pipeline CRM.
+model CustomerGroup {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  /// strategic | key | development | monitor
+  tier          String   @default("monitor")
+  skor          Float?
+  /// A = terpusat, lokasi tersebar · B = holding · C = satu lokasi dominan
+  pola          String?
+  segmen        String?
+  homeCabang    String?
+  supportCabang Json     @default("[]")
+  entities      Json     @default("[]")
+  sponsor       String?
+  ketuaId       String?
+  sekretarisId  String?
+  anggotaIds    Json     @default("[]")
+  l12m          Float?
+  growthYtd     Float?
+  margin        Float?
+  avg3y         Float?
+  lastTrx       String?
+  target        Float?
+  reviewNext    String?
+  notes         String?
+  /// [{ id, text, pic, due, status }]
+  actions       Json     @default("[]")
+  /// [{ at, from, to, reason, by }]
+  tierHistory   Json     @default("[]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tier])
+  @@index([ketuaId])
+}
+
 model Setting {
   key   String @id
   value Json
@@ -597,6 +674,7 @@ enum ActivityEntity {
   activityTarget
   visitTrip
   chat
+  customerGroup
 }
 
 // Append-only audit trail. Every actor field is a *snapshot* taken at write

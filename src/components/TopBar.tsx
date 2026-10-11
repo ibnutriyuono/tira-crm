@@ -1,8 +1,10 @@
 'use client';
 
 import { isPurchasingRoleClient } from '@/lib/doc-lines';
+import { canSeeAdminQueue } from '@/lib/roles';
+import { adminTaskCount } from './modals/AdminQueueModal';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { api } from '@/lib/api-client';
@@ -32,6 +34,7 @@ export function TopBar() {
   // the worklist shows, so the badge and the list can never disagree.
   const newPurchasingCount = countNewPurchasingItems(rfqs, fupas);
   const prospects = useDataStore((s) => s.prospects);
+  const adminTasks = useMemo(() => adminTaskCount(prospects), [prospects]);
   // Same builder the Follow-up panel itself renders from (buildFollowUpRows),
   // so this count and what's actually listed inside can never disagree.
   const urgentFollowUpCount = countUrgentFollowUps(prospects);
@@ -43,7 +46,7 @@ export function TopBar() {
   if (!currentUser) return null;
   const rbm = ROLE_LABEL[currentUser.role] || { label: currentUser.role, color: 'slate' };
   const roleExtra =
-    currentUser.role === 'rm' ? ` · Regional ${currentUser.reg ?? '-'}` : currentUser.role === 'bm' ? ` · ${currentUser.cabang || '-'}` : currentUser.role === 'sales' ? ` · ${currentUser.se || '-'}` : '';
+    currentUser.role === 'rm' ? ` · Regional ${currentUser.reg ?? '-'}` : currentUser.role === 'bm' || currentUser.role === 'salesadmin' ? ` · ${currentUser.cabang || '-'}` : currentUser.role === 'sales' ? ` · ${currentUser.se || '-'}` : '';
 
   async function logout() {
     await api.post('/api/auth/logout');
@@ -164,6 +167,17 @@ export function TopBar() {
               Kelola User
             </button>
           )}
+          {canSeeAdminQueue(currentUser.role) && (
+            <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('adminQueue')}>
+              <IconCheckSquare />
+              Antrian Admin
+              {currentUser.role === 'salesadmin' && adminTasks > 0 && (
+                <span className="topbar-badge" title={`${adminTasks} tugas admin terbuka`}>
+                  {adminTasks > 9 ? '9+' : adminTasks}
+                </span>
+              )}
+            </button>
+          )}
           {!isPurchasingRoleClient(currentUser.role) && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('gmAnalysis')}>
               <IconPresentation />
@@ -222,6 +236,12 @@ export function TopBar() {
             <IconSearch />
             Customer Intelligence
           </button>
+          {!isPurchasingRoleClient(currentUser.role) && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('keyAccount')}>
+              <IconTarget />
+              Key Account
+            </button>
+          )}
           <button className="btn btn-ghost-dark" onClick={() => openModal('competitorLog')}>
             <IconBarChart />
             Log Kompetitor

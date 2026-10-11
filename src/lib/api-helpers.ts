@@ -239,7 +239,8 @@ export function requireNoPoOnMoveToPo(prevStatus: number | null, nextStatus: num
 export function prospectScopeLocks(user: SafeUser): { reg: boolean; cabang: boolean; se: boolean } {
   switch (user.role) {
     case 'sales': return { reg: true, cabang: true, se: true };
-    case 'bm': return { reg: true, cabang: true, se: false };
+    case 'bm':
+    case 'salesadmin': return { reg: true, cabang: true, se: false };
     case 'rm': return { reg: true, cabang: false, se: false };
     default: return { reg: false, cabang: false, se: false };
   }

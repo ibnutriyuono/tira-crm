@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
-import { IconBag, IconCalendar, IconChat, IconCheck, IconRfq, IconTrash } from '../icons';
+import { IconBag, IconCalendar, IconChat, IconCheck, IconRfq, IconTarget, IconTrash } from '../icons';
 import { api } from '@/lib/api-client';
 import { openPurchDoc } from '@/hooks/useCrmSocket';
 import { useDataStore } from '@/store/useDataStore';
@@ -25,6 +25,10 @@ const NOTIF_META: Record<NotificationType, { icon: () => React.JSX.Element; colo
   trip_rejected: { icon: IconTrash, color: 'rust' },
   trip_scheduled: { icon: IconCalendar, color: 'steel' },
   trip_cancelled: { icon: IconTrash, color: 'rust' },
+  kam_cross_branch: { icon: IconCalendar, color: 'amber' },
+  target_allocate: { icon: IconTarget, color: 'rust' },
+  target_assigned: { icon: IconTarget, color: 'green' },
+  admin_task: { icon: IconCheck, color: 'amber' },
 };
 
 function timeAgo(iso: string): string {
@@ -70,6 +74,15 @@ export function NotificationsModal() {
       api.patch(`/api/notifications/${n.id}`, {}).catch(() => {});
     }
     closeModal();
+    if (n.entity === 'prospect') {
+      useUiStore.setState({ editProspectId: n.entityId });
+      useUiStore.getState().openModal('prospectForm');
+      return;
+    }
+    if (n.entity === 'target') {
+      useUiStore.getState().openModal('forecast');
+      return;
+    }
     if (n.entity === 'visitTrip') {
       useUiStore.setState({ visitTripOpenId: n.entityId });
       useUiStore.getState().openModal('visitTrip');

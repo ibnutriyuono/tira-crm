@@ -23,12 +23,16 @@ export type NotifType =
   | 'trip_approved'
   | 'trip_rejected'
   | 'trip_scheduled'
-  | 'trip_cancelled';
+  | 'trip_cancelled'
+  | 'kam_cross_branch'
+  | 'target_allocate'
+  | 'target_assigned'
+  | 'admin_task';
 
 interface NotifyInput {
   userIds: string[];
   type: NotifType;
-  entity: 'rfq' | 'fupa' | 'visitTrip';
+  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target';
   entityId: string;
   title: string;
   message: string;

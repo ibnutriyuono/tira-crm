@@ -1,6 +1,7 @@
 import { classify, num } from './format';
 import { effectiveTarget } from './reports';
 import type { BudgetTarget, Prospect } from './types';
+import { omzetPeriode } from './faktur';
 
 export type KpiSignal = 'blue' | 'green' | 'yellow' | 'red' | null;
 
@@ -148,7 +149,7 @@ export function buildKpiScorecard(prospects: Prospect[], budgetTargets: BudgetTa
     salesOrderMonths.push({ month: m, budget: budget || null, result: salesOrderResult, achieve: salesOrderAchieve, score: salesOrderAchieve == null ? null : salesOrderAchieve * 30, signal: signalFor(salesOrderAchieve) });
 
     const invoiceResult = inScope
-      .filter((p) => classify(p) === 'Won' && p.terfaktur && inYtd(p.tglDelivery || p.tglPO, year, m))
+      .filter((p) => classify(p) === 'Won' && p.terfaktur && inYtd(omzetPeriode(p), year, m))
       .reduce((s, p) => s + p.value, 0);
     const invoiceAchieve = clampAchieve(invoiceResult, budget || null);
     invoiceMonths.push({ month: m, budget: budget || null, result: invoiceResult, achieve: invoiceAchieve, score: invoiceAchieve == null ? null : invoiceAchieve * 35, signal: signalFor(invoiceAchieve) });

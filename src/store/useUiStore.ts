@@ -25,6 +25,8 @@ export type ModalKey =
   | 'purchasing'
   | 'marketing'
   | 'customerIntel'
+  | 'keyAccount'
+  | 'adminQueue'
   | 'competitorLog'
   | 'forecast'
   | 'qcdRecap'

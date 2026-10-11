@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'gm' | 'rm' | 'bm' | 'sales' | 'purchasing' | 'purchasing05';
+export type Role = 'admin' | 'gm' | 'rm' | 'bm' | 'sales' | 'purchasing' | 'purchasing05' | 'salesadmin';
 
 export interface SafeUser {
   id: string;
@@ -45,6 +45,9 @@ export interface Prospect {
   penawaranTerkirim: boolean;
   /** DO invoiced — splits Omzet (true) from GIT (false). */
   terfaktur: boolean;
+  /** Tanggal faktur (YYYY-MM-DD) — omzet dibukukan di bulan ini. */
+  tglFaktur?: string | null;
+  noFaktur?: string | null;
   statusChangedAt: string;
   qcdQuality: string | null;
   qcdCost: string | null;
@@ -232,6 +235,7 @@ export interface RosterUser {
   name: string;
   role: Role;
   cabang: string | null;
+  se?: string | null;
 }
 
 export type ItemEntity = 'prospect' | 'rfq' | 'fupa';
@@ -275,6 +279,25 @@ export interface BudgetTarget {
   amount: number;
   grossMarginTarget: number | null;
   grossMarginResult: number | null;
+  /** Diisi otomatis dari target tahunan / 12. */
+  fromAnnual?: boolean;
+}
+
+export interface SeTarget {
+  id: string;
+  se: string;
+  cabang: string;
+  periode: string;
+  amount: number;
+  updatedBy: string | null;
+  updatedAt?: string;
+}
+
+export interface AnnualTarget {
+  id: string;
+  cabang: string;
+  year: string;
+  amount: number;
 }
 
 export type NotificationType =
@@ -292,13 +315,17 @@ export type NotificationType =
   | 'trip_approved'
   | 'trip_rejected'
   | 'trip_scheduled'
-  | 'trip_cancelled';
+  | 'trip_cancelled'
+  | 'kam_cross_branch'
+  | 'target_allocate'
+  | 'target_assigned'
+  | 'admin_task';
 
 export interface AppNotification {
   id: string;
   userId: string;
   type: NotificationType;
-  entity: 'rfq' | 'fupa' | 'visitTrip';
+  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target';
   entityId: string;
   title: string;
   message: string;
@@ -459,7 +486,8 @@ export type ActivityEntity =
   | 'salesActivity'
   | 'activityTarget'
   | 'visitTrip'
-  | 'chat';
+  | 'chat'
+  | 'customerGroup';
 
 export type ActivityChanges = Record<string, { label: string; from: unknown; to: unknown }>;
 
@@ -478,4 +506,59 @@ export interface ActivityLog {
   summary: string;
   changes: ActivityChanges | null;
   ip: string | null;
+}
+
+/** Key Account Management -- see lib/kam.ts. */
+export type KamTier = 'strategic' | 'key' | 'development' | 'monitor';
+
+export interface KamAction {
+  id: string;
+  text: string;
+  pic: string;
+  due: string;
+  status: 'belum' | 'berjalan' | 'selesai' | 'batal';
+}
+
+export interface KamTierChange {
+  at: string;
+  from: KamTier | null;
+  to: KamTier;
+  reason: string;
+  by: string;
+}
+
+export interface CustomerGroup {
+  id: string;
+  name: string;
+  tier: KamTier;
+  skor: number | null;
+  pola: 'A' | 'B' | 'C' | null;
+  segmen: string | null;
+  homeCabang: string | null;
+  supportCabang: string[];
+  entities: string[];
+  sponsor: string | null;
+  ketuaId: string | null;
+  sekretarisId: string | null;
+  anggotaIds: string[];
+  l12m: number | null;
+  growthYtd: number | null;
+  margin: number | null;
+  avg3y: number | null;
+  lastTrx: string | null;
+  target: number | null;
+  reviewNext: string | null;
+  notes: string | null;
+  actions: KamAction[];
+  tierHistory: KamTierChange[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Tim KAM nasional (Setting 'kamTeam'). */
+export interface KamTeam {
+  sponsorId: string | null;
+  ketuaId: string | null;
+  sekretarisId: string | null;
+  anggotaIds: string[];
 }
