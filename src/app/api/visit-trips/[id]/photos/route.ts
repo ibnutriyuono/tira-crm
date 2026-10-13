@@ -7,11 +7,14 @@ import { prisma } from '@/lib/prisma';
 import { buildKey, isS3Configured, putObject } from '@/lib/s3';
 import type { TripVisit } from '@/lib/types';
 import { TRIP_PHOTO_MAX_PER_VISIT, TRIP_PHOTO_TYPES, canEditRealisasi } from '@/lib/visit-trip';
+import { guard } from '@/lib/permissions-server';
 
 /** Photos of one trip, for anyone who can see the trip. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'trip', 'v');
+  if (denied) return denied;
   const { id } = await params;
   const trip = await prisma.visitTrip.findFirst({ where: { AND: [visitTripScopeWhere(user), { id }] }, select: { id: true } });
   if (!trip) return NextResponse.json({ error: 'Perjalanan tidak ditemukan' }, { status: 404 });
@@ -27,6 +30,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'trip', 'e');
+  if (denied) return denied;
   if (!isS3Configured()) return NextResponse.json({ error: 'Penyimpanan file belum dikonfigurasi. Hubungi admin.' }, { status: 503 });
   const { id } = await params;
   const trip = await prisma.visitTrip.findUnique({ where: { id } });

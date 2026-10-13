@@ -5,6 +5,7 @@ import { canManageKam, cleanGroupInput } from '@/lib/kam';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { CustomerGroup, KamTierChange } from '@/lib/types';
+import { guard } from '@/lib/permissions-server';
 
 /**
  * Upsert groups from the KAM analysis workbook (parsed client-side into rows
@@ -15,6 +16,8 @@ import type { CustomerGroup, KamTierChange } from '@/lib/types';
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'kam', 'e');
+  if (denied) return denied;
   if (!canManageKam(user.role)) return NextResponse.json({ error: 'Hanya GM, RM dan Admin yang dapat mengimpor Key Account.' }, { status: 403 });
   const body = await req.json().catch(() => null);
   const rows = (Array.isArray(body?.rows) ? body.rows : []) as Record<string, unknown>[];

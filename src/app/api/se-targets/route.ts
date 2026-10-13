@@ -9,10 +9,13 @@ import { notify } from '@/lib/notify';
 import { periodeLabel } from '@/lib/se-target-server';
 import { emitCrmEvent } from '@/lib/socket';
 import type { BudgetTarget } from '@/lib/types';
+import { guard } from '@/lib/permissions-server';
 
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'forecast', 'v');
+  if (denied) return denied;
   const seTargets = await prisma.seTarget.findMany({ where: await seTargetScopeWhere(user), orderBy: [{ periode: 'desc' }, { se: 'asc' }] });
   return NextResponse.json({ seTargets });
 }
@@ -29,6 +32,8 @@ type Row = { id: string; se: string; cabang: string; periode: string; amount: nu
 export async function PUT(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'forecast', 'e');
+  if (denied) return denied;
   const body = await req.json().catch(() => null);
   const cabang = String(body?.cabang || '').trim().toUpperCase();
   const periode = String(body?.periode || '').trim();

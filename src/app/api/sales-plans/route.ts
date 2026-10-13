@@ -5,10 +5,13 @@ import { cabangRegMap, canEditSalesPlan, salesPlanScopeWhere } from '@/lib/auth'
 import { prisma } from '@/lib/prisma';
 import { removePlanItem } from '@/lib/sales-plan-view';
 import { emitCrmEvent } from '@/lib/socket';
+import { guard } from '@/lib/permissions-server';
 
 export async function GET(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'rencana', 'v');
+  if (denied) return denied;
 
   const periode = new URL(req.url).searchParams.get('periode');
   const where = { ...(await salesPlanScopeWhere(user)), ...(periode ? { periode } : {}) };
@@ -24,6 +27,8 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'rencana', 'e');
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   const se = String(body?.se || '').trim();
@@ -83,6 +88,8 @@ export async function PUT(req: Request) {
 export async function DELETE(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'rencana', 'd');
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   const se = String(body?.se || '').trim();

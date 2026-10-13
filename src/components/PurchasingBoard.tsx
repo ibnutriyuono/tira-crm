@@ -1,6 +1,8 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { IssueBoard } from './issues/IssueBoard';
+import { isOpenIssue } from '@/lib/issues';
 import { IconEdit, IconTrash, IconWa } from './icons';
 import { AttachmentList } from './AttachmentList';
 import { ItemChat } from './ItemChat';
@@ -11,8 +13,9 @@ import { getSocket } from '@/lib/socket-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Fupa, PurchDocType, Rfq, RfqItem } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
-type Tab = 'dashboard' | 'masuk' | 'vendor';
+type Tab = 'dashboard' | 'masuk' | 'vendor' | 'masalah';
 
 /** One row in the combined RFQ + FUP A worklist. */
 interface PurchDoc {
@@ -234,6 +237,12 @@ export function PurchasingBoard({
   const openModal = useUiStore((s) => s.openModal);
   const isPic05 = useDataStore((s) => s.currentUser?.role === 'purchasing05');
   const [tab, setTab] = useState<Tab>('dashboard');
+  // Tab ⚑ Masalah (halaman Purchasing): masalah pipeline yang menjadikan user ini PJ.
+  const issues = useDataStore((s) => s.issues);
+  const myId = useDataStore((s) => s.currentUser?.id || '');
+  const issueCount = issues.filter((i) => isOpenIssue(i) && i.pjIds.includes(myId)).length;
+  const issueFocus = useUiStore((s) => s.issueFocus);
+  if (standalone && issueFocus && tab !== 'masalah') setTab('masalah');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [jenisFilter, setJenisFilter] = useState('');
@@ -406,6 +415,11 @@ export function PurchasingBoard({
       <div className={`purch-tabs${standalone ? ' pagebar' : ''}`}>
         <button type="button" className={tab === 'dashboard' ? 'active' : ''} onClick={() => setTab('dashboard')}>Dashboard</button>
         <button type="button" className={tab === 'masuk' ? 'active' : ''} onClick={() => setTab('masuk')}>Permintaan Masuk</button>
+        {standalone && !isPic05 && (
+          <button type="button" className={tab === 'masalah' ? 'active' : ''} onClick={() => setTab('masalah')}>
+            ⚑ Masalah{issueCount > 0 && <span className="item-chat-bubble">{issueCount > 9 ? '9+' : issueCount}</span>}
+          </button>
+        )}
         <button type="button" className={tab === 'vendor' ? 'active' : ''} onClick={() => setTab('vendor')}>Database Vendor</button>
       </div>
 
@@ -653,6 +667,8 @@ export function PurchasingBoard({
         </>
       )}
 
+      {tab === 'masalah' && standalone && <IssueBoard variant="purchasing" />}
+
       {tab === 'vendor' && (
         <>
           {!readOnly && (
@@ -675,8 +691,12 @@ export function PurchasingBoard({
               >
                 Import Excel
               </button>
-              <button className="btn btn-outline btn-sm" onClick={exportVendors}>Export Excel</button>
-              <button className="btn btn-outline btn-sm" onClick={vendorTemplate}>Unduh Template</button>
+              {canNow('purch', 'x') && (
+                <button className="btn btn-outline btn-sm" onClick={exportVendors}>Export Excel</button>
+              )}
+              {canNow('purch', 'x') && (
+                <button className="btn btn-outline btn-sm" onClick={vendorTemplate}>Unduh Template</button>
+              )}
               <span className="hint">Menampilkan {vendors.length} dari {vendors.length} vendor</span>
             </div>
           )}

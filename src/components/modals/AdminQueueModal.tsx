@@ -117,7 +117,7 @@ export function AdminQueueModal() {
   const pickedValue = git.filter((x) => picked.includes(x.p.id)).reduce((s, x) => s + num(x.p.value), 0);
 
   return (
-    <Modal show={show} onClose={closeModal} title={`Antrian Admin Sales${currentUser?.cabang ? ` — ${currentUser.cabang}` : ''}`} xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title={`Antrian Admin Sales${currentUser?.cabang ? ` — ${currentUser.cabang}` : ''}`} xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
       <div className="kpi-grid">
         <div className="kpi git"><div className="label">DO belum terfaktur</div><div className="value">{git.length}</div><div className="foot">{formatRupiah(gitValue)}</div></div>
         <div className="kpi lost"><div className="label">GIT &gt; 30 hari</div><div className="value">{gitOld}</div><div className="foot">percepat faktur / penagihan</div></div>

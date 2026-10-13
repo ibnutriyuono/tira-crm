@@ -129,7 +129,7 @@ export type ActivityTipe = 'kunjungan' | 'telepon' | 'meeting' | 'dokumen';
 /** `short` is for table headers and one-line summaries. */
 export const ACTIVITY_TYPES: { key: ActivityTipe; label: string; short: string; unit: string }[] = [
   { key: 'kunjungan', label: 'Kunjungan customer', short: 'Kunjungan', unit: 'kunjungan' },
-  { key: 'telepon', label: 'Telepon / WhatsApp', short: 'Telepon/WA', unit: 'kontak' },
+  { key: 'telepon', label: 'Telepon / WA / Email', short: 'Telepon/WA', unit: 'kontak' },
   { key: 'meeting', label: 'Meeting / presentasi', short: 'Meeting', unit: 'meeting' },
   { key: 'dokumen', label: 'Kirim penawaran / dokumen', short: 'Dokumen', unit: 'dokumen' },
 ];

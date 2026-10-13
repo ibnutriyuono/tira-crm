@@ -4,6 +4,7 @@ import { promptItemFlow } from '@/lib/item-flow-prompt';
 import { flowItems, flowTotals } from '@/lib/item-flow';
 import { FlowBar } from './modals/ItemFlowModal';
 import { KamBadge } from './KamBadge';
+import { IssueBadge } from './issues/shared';
 import { useMemo, useState } from 'react';
 import { KANBAN_STATUSES, STATUS_META } from '@/lib/constants';
 import { classify, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
@@ -14,7 +15,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
 import { IconCart, IconDoc, IconEdit, IconRfq, IconTrash, IconWa } from './icons';
-import { changeDate } from '@/lib/filter';
+import { changeDate, periodDate } from '@/lib/filter';
 import { NewBadge } from './NewBadge';
 import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './ProspectPurchasingBubble';
 
@@ -62,6 +63,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
       </div>
       <div className="kc-meta-row">
         <span className={`badge ${r.penawaranTerkirim ? 'green' : 'rust pending-dot'}`}>{r.penawaranTerkirim ? 'Penawaran Terkirim' : 'Penawaran Pending'}</span>
+        <IssueBadge prospectId={r.id} />
       </div>
       {num(r.status) === 5 && (
         <div className="kc-meta-row">
@@ -199,10 +201,10 @@ function sortKolom(list: Prospect[], by: KolomSort): Prospect[] {
 
 export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
   const openModal = useUiStore((s) => s.openModal);
-  // Filter bulan per kolom, berdasar KAPAN prospek masuk ke tahap itu
-  // (statusChangedAt) — bukan tanggal dibuat. Jadi "Negosiasi bulan ini"
-  // berarti yang bergerak ke Negosiasi bulan ini, bukan yang kebetulan
-  // dibuat bulan ini dan sekarang ada di Negosiasi.
+  // Filter bulan per kolom (periodDate): kolom PO/Kontrak memakai bulan PO,
+  // kolom DO memakai bulan faktur untuk yang terfaktur (Omzet) dan bulan
+  // masuk DO untuk GIT; kolom lain memakai KAPAN prospek masuk ke tahap itu
+  // (statusChangedAt) — bukan tanggal dibuat.
   const [bulanPerKolom, setBulanPerKolom] = useState<Record<number, string>>({});
   const [hariPerKolom, setHariPerKolom] = useState<Record<number, string>>({});
   const [sortPerKolom, setSortPerKolom] = useState<Record<number, KolomSort>>({});
@@ -255,15 +257,15 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
           const semua = filtered.filter((r) => num(r.status) === s);
           // Opsi bulan dibangun dari isi kolom itu sendiri, supaya tidak ada
           // pilihan bulan yang hasilnya pasti kosong.
-          const bulanOptions = Array.from(new Set(semua.map((r) => changeDate(r).slice(0, 7)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+          const bulanOptions = Array.from(new Set(semua.map((r) => periodDate(r).slice(0, 7)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
           const bulanAktif = bulanPerKolom[s] || '';
-          const dalamBulan = bulanAktif ? semua.filter((r) => changeDate(r).slice(0, 7) === bulanAktif) : semua;
+          const dalamBulan = bulanAktif ? semua.filter((r) => periodDate(r).slice(0, 7) === bulanAktif) : semua;
           // Penajaman opsional dari filter bulan: opsi hari dibangun dari isi
           // dalamBulan (bukan seluruh kolom), supaya kalau bulan dipilih,
           // pilihan harinya cuma hari-hari yang benar-benar ada di bulan itu.
-          const hariOptions = Array.from(new Set(dalamBulan.map((r) => changeDate(r).slice(0, 10)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+          const hariOptions = Array.from(new Set(dalamBulan.map((r) => periodDate(r).slice(0, 10)).filter(Boolean))).sort((a, b) => b.localeCompare(a));
           const hariAktif = hariPerKolom[s] || '';
-          const dalamHari = hariAktif ? dalamBulan.filter((r) => changeDate(r).slice(0, 10) === hariAktif) : dalamBulan;
+          const dalamHari = hariAktif ? dalamBulan.filter((r) => periodDate(r).slice(0, 10) === hariAktif) : dalamBulan;
           // Filter faktur hanya berlaku di kolom DO; hitungan di opsinya
           // mengikuti filter bulan/hari yang sedang aktif.
           const fakturAktif = s === 5 ? fakturDo : '';
@@ -296,7 +298,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                       // menyaring ke hasil yang diam-diam kosong.
                       setHariPerKolom((prev) => ({ ...prev, [s]: '' }));
                     }}
-                    title="Saring berdasar bulan perubahan status ke tahap ini"
+                    title={s === 4 ? 'Saring berdasar bulan PO' : s === 5 ? 'DO terfaktur (Omzet): bulan faktur · GIT (belum terfaktur): bulan masuk DO' : 'Saring berdasar bulan perubahan status ke tahap ini'}
                   >
                     <option value="">Semua bulan</option>
                     {bulanOptions.map((m) => (
@@ -311,7 +313,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                     className="kc-month"
                     value={hariAktif}
                     onChange={(e) => setHariPerKolom((prev) => ({ ...prev, [s]: e.target.value }))}
-                    title="Persempit lagi ke hari tertentu perubahan status ke tahap ini"
+                    title={s === 4 ? 'Persempit ke tanggal PO tertentu' : s === 5 ? 'Persempit ke tanggal faktur (Omzet) / tanggal masuk DO (GIT)' : 'Persempit lagi ke hari tertentu perubahan status ke tahap ini'}
                   >
                     <option value="">Semua hari{bulanAktif ? ' di bulan ini' : ''}</option>
                     {hariOptions.map((d) => (

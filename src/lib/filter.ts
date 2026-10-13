@@ -21,6 +21,21 @@ export function changeDate(r: Pick<Prospect, 'statusChangedAt' | 'tglPenawaran'>
   return localDateOf(r.statusChangedAt as string | null | undefined) || r.tglPenawaran || '';
 }
 
+/**
+ * Tanggal yang dipakai filter bulan/tahun & filter bulan per kolom Kanban:
+ * - PO / Kontrak (status 4)  -> tanggal PO (bulan PO);
+ * - DO terfaktur (Omzet)     -> tanggal faktur (bulan omzet);
+ * - DO belum terfaktur (GIT) & tahap lain -> tanggal perubahan status
+ *   (masuk DO / tahap itu).
+ * Bila tanggal PO / faktur belum diisi, kembali ke tanggal perubahan status.
+ */
+export function periodDate(r: Pick<Prospect, 'status' | 'statusChangedAt' | 'tglPenawaran' | 'tglPO' | 'tglFaktur' | 'terfaktur'>): string {
+  const st = num(r.status);
+  if (st === 4 && r.tglPO) return String(r.tglPO).slice(0, 10);
+  if (st === 5 && r.terfaktur && r.tglFaktur) return String(r.tglFaktur).slice(0, 10);
+  return changeDate(r);
+}
+
 // Role-based scoping already happened server-side (prospectScopeWhere) —
 // this only re-implements the original's client-side filter/search/sort.
 export function getFilteredProspects(records: Prospect[], f: FilterState): Prospect[] {
@@ -32,10 +47,10 @@ export function getFilteredProspects(records: Prospect[], f: FilterState): Prosp
   if (f.fKlas) list = list.filter((r) => classify(r) === f.fKlas);
   if (f.fPenawaran === 'sent') list = list.filter((r) => !!r.penawaranTerkirim);
   else if (f.fPenawaran === 'pending') list = list.filter((r) => !r.penawaranTerkirim);
-  // Bulan/Tahun = when the prospect last changed status (local date), the
-  // same date the Kanban column filters and Aging use -- not the offer date.
-  if (f.fBulan) list = list.filter((r) => changeDate(r).slice(5, 7) === f.fBulan);
-  if (f.fTahun) list = list.filter((r) => changeDate(r).slice(0, 4) === f.fTahun);
+  // Bulan/Tahun: PO -> bulan PO, DO terfaktur -> bulan faktur, GIT & tahap
+  // lain -> bulan perubahan status (sama dengan filter bulan kolom Kanban).
+  if (f.fBulan) list = list.filter((r) => periodDate(r).slice(5, 7) === f.fBulan);
+  if (f.fTahun) list = list.filter((r) => periodDate(r).slice(0, 4) === f.fTahun);
   if (f.fDibuat) {
     const now = new Date();
     list = list.filter((r) => createdInRange(r, f.fDibuat as CreatedRange, now));

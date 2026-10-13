@@ -4,6 +4,7 @@ import { logActivity } from '@/lib/activity';
 import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { guard } from '@/lib/permissions-server';
 
 interface ImportRow {
   reg?: number | string;
@@ -27,6 +28,8 @@ interface ImportRow {
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'prospek', 'e');
+  if (denied) return denied;
   const adminErr = requireAdmin(user);
   if (adminErr) return adminErr;
 

@@ -7,6 +7,7 @@ import { getPrimaryPic, todayStr } from '@/lib/format';
 import { appendSheet, buildCustomerSheet } from '@/lib/exports';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
+import { canNow } from '@/hooks/useCan';
 
 export function CustomersModal() {
   const modal = useUiStore((s) => s.modal);
@@ -55,7 +56,7 @@ export function CustomersModal() {
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title="Kelola Customer" wide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title="Kelola Customer" xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
       <div className="toolbar-row">
         <button
           className="btn btn-primary btn-sm"
@@ -82,12 +83,16 @@ export function CustomersModal() {
             Satukan Nama Customer
           </button>
         )}
-        <button className="btn btn-outline btn-sm" onClick={exportExcel}>
-          Export Excel
-        </button>
-        <button className="btn btn-outline btn-sm" onClick={downloadTemplate}>
-          Template
-        </button>
+        {canNow('customer', 'x') && (
+          <button className="btn btn-outline btn-sm" onClick={exportExcel}>
+            Export Excel
+          </button>
+        )}
+        {canNow('customer', 'x') && (
+          <button className="btn btn-outline btn-sm" onClick={downloadTemplate}>
+            Template
+          </button>
+        )}
         <input type="search" className="search-grow" placeholder="Cari nama customer / PIC / cabang..." value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       {list.length === 0 ? (
@@ -105,6 +110,7 @@ export function CustomersModal() {
                 <th>PIC</th>
                 <th>No. Telp</th>
                 <th>Email</th>
+                <th>Alamat</th>
                 <th>Prospek</th>
                 <th>Aksi</th>
               </tr>
@@ -125,6 +131,7 @@ export function CustomersModal() {
                     </td>
                     <td className="mono">{primary?.phone || '-'}</td>
                     <td>{primary?.email || '-'}</td>
+                    <td style={{ maxWidth: 280, fontSize: 12.5, color: 'var(--text-soft)' }}>{c.address || '-'}</td>
                     <td className="center">{cnt}</td>
                     <td>
                       <div className="row-actions">

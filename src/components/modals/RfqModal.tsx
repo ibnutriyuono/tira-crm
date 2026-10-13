@@ -14,6 +14,7 @@ import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Rfq, RfqItem } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
 
 /** Purchasing's answer on one material, shown under the row once it exists. */
@@ -276,9 +277,11 @@ export function RfqModal() {
           <button type="button" className="btn btn-outline" disabled={busy} onClick={onSaveDraft}>
             <IconSave /> Simpan RFQ
           </button>
-          <button type="button" className="btn btn-outline" disabled={busy} onClick={onExportExcel}>
-            <IconDownload /> Export Excel
-          </button>
+          {canNow('rfq', 'x') && (
+            <button type="button" className="btn btn-outline" disabled={busy} onClick={onExportExcel}>
+              <IconDownload /> Export Excel
+            </button>
+          )}
           <button type="button" className="btn btn-outline" disabled={busy} onClick={onSendEmail}>
             <IconMail /> Kirim via Email
           </button>

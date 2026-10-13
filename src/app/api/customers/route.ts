@@ -5,10 +5,13 @@ import { customerScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Prisma } from '@prisma/client';
+import { guard } from '@/lib/permissions-server';
 
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'customer', 'v');
+  if (denied) return denied;
   const customers = await prisma.customer.findMany({ where: await customerScopeWhere(user), orderBy: { createdAt: 'desc' } });
   return NextResponse.json({ customers });
 }
@@ -16,6 +19,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'customer', 'e');
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   const name = String(body?.name || '').trim();

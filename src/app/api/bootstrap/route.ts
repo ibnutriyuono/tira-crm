@@ -3,6 +3,9 @@ import { budgetTargetScopeWhere, seTargetScopeWhere, customerScopeWhere, docScop
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import type { PurchasingContact } from '@/lib/types';
+import { effectivePerms } from '@/lib/permissions-server';
+import { sweepFollowUpNotifications } from '@/lib/followup-notify';
+import { issueScopeWhere, sweepIssueEscalation } from '@/lib/issues-server';
 
 // Single round-trip the client makes right after login / on page load —
 // everything the dashboard needs to render before any modal is opened.
@@ -10,7 +13,10 @@ export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
 
-  const [prospects, customers, rfqs, fupas, vendors, budgetTargets, salesPlans, notifications, settingRow, customerGroups, annualTargets, seTargets] = await Promise.all([
+  // Notifikasi follow-up hari H / terlambat (tanpa penjadwal: dicek saat CRM dibuka).
+  await sweepFollowUpNotifications();
+  await sweepIssueEscalation();
+  const [prospects, customers, rfqs, fupas, vendors, budgetTargets, salesPlans, notifications, settingRow, customerGroups, annualTargets, seTargets, issues] = await Promise.all([
     prisma.prospect.findMany({ where: prospectScopeWhere(user), orderBy: { createdAt: 'desc' } }),
     prisma.customer.findMany({ where: await customerScopeWhere(user), orderBy: { createdAt: 'desc' } }),
     prisma.rfq.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } }),
@@ -34,9 +40,34 @@ export async function GET() {
     user.role === 'purchasing05' ? Promise.resolve([]) : prisma.customerGroup.findMany({ orderBy: [{ skor: 'desc' }, { name: 'asc' }] }),
     prisma.annualTarget.findMany({ where: await budgetTargetScopeWhere(user), orderBy: [{ year: 'desc' }, { cabang: 'asc' }] }),
     prisma.seTarget.findMany({ where: await seTargetScopeWhere(user), orderBy: [{ periode: 'desc' }, { se: 'asc' }] }),
+    // Masalah pipeline: aktif + 12 bulan terakhir (badge kartu, papan, saran).
+    prisma.prospectIssue.findMany({
+      where: { AND: [issueScopeWhere(user), { OR: [{ status: { in: ['usulan', 'open', 'proses'] } }, { updatedAt: { gte: new Date(Date.now() - 365 * 86400000) } }] }] },
+      orderBy: { createdAt: 'desc' },
+    }),
   ]);
 
   const purchasingContact = (settingRow?.value as unknown as PurchasingContact) || { wa: '', email: '' };
 
-  return NextResponse.json({ user, prospects, customers, rfqs, fupas, vendors, budgetTargets, salesPlans, notifications, purchasingContact, customerGroups, annualTargets, seTargets });
+  // Kelola Role: modul tanpa hak Lihat tidak dikirim sama sekali.
+  const perms = await effectivePerms(user);
+  const purch = user.role === 'purchasing' || user.role === 'purchasing05';
+  const see = (m: string) => perms[m]?.v !== false;
+  return NextResponse.json({
+    user,
+    perms,
+    prospects: see('prospek') ? prospects : [],
+    customers: see('customer') ? customers : [],
+    rfqs: see(purch ? 'purch' : 'rfq') ? rfqs : [],
+    fupas: see(purch ? 'purch' : 'rfq') ? fupas : [],
+    vendors,
+    budgetTargets,
+    salesPlans: see('rencana') ? salesPlans : [],
+    notifications,
+    purchasingContact,
+    customerGroups: see('kam') ? customerGroups : [],
+    annualTargets,
+    seTargets,
+    issues: see('masalah') ? issues : [],
+  });
 }

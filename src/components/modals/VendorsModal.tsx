@@ -8,6 +8,7 @@ import { normalizePhone, todayStr } from '@/lib/format';
 import { appendSheet, buildVendorSheet } from '@/lib/exports';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
+import { canNow } from '@/hooks/useCan';
 
 const HEADER = ['NAMA VENDOR', 'PIC', 'NO WHATSAPP', 'EMAIL', 'KATEGORI', 'ALAMAT', 'CATATAN'];
 const COLS = [{ wch: 30 }, { wch: 18 }, { wch: 16 }, { wch: 26 }, { wch: 20 }, { wch: 36 }, { wch: 26 }];
@@ -57,7 +58,7 @@ export function VendorsModal() {
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title="Kelola Vendor" wide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title="Kelola Vendor" xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
       <div className="toolbar-row">
         {canEdit && (
           <>
@@ -81,8 +82,12 @@ export function VendorsModal() {
             </button>
           </>
         )}
-        <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
-        <button className="btn btn-outline btn-sm" onClick={downloadTemplate}>Template</button>
+        {canNow('purch', 'x') && (
+          <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+        )}
+        {canNow('purch', 'x') && (
+          <button className="btn btn-outline btn-sm" onClick={downloadTemplate}>Template</button>
+        )}
         <input type="search" className="search-grow" placeholder="Cari nama vendor / PIC / kategori..." value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 

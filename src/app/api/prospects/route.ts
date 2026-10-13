@@ -11,10 +11,13 @@ import { emitCrmEvent } from '@/lib/socket';
 import type { Material } from '@/lib/types';
 import { resolveFaktur } from '@/lib/faktur';
 import { notifyAdminTask } from '@/lib/admin-sales-server';
+import { guard } from '@/lib/permissions-server';
 
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'prospek', 'v');
+  if (denied) return denied;
 
   const prospects = await prisma.prospect.findMany({
     where: prospectScopeWhere(user),
@@ -26,6 +29,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'prospek', 'e');
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   const customer = String(body?.customer || '').trim();

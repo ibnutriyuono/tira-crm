@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { assertProspectInScope } from '@/lib/prospect-access';
 import { canSetFaktur } from '@/lib/roles';
 import { emitCrmEvent } from '@/lib/socket';
+import { guard } from '@/lib/permissions-server';
 
 /**
  * Tandai terfaktur massal (Antrian Admin): { ids, tglFaktur, noFaktur? }.
@@ -14,6 +15,8 @@ import { emitCrmEvent } from '@/lib/socket';
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'faktur', 'e');
+  if (denied) return denied;
   if (!canSetFaktur(user.role)) return NextResponse.json({ error: 'Status faktur diisi oleh Admin Sales / BM.' }, { status: 403 });
 
   const body = await req.json().catch(() => null);

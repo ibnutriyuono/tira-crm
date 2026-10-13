@@ -30,13 +30,27 @@ export function UserFormModal() {
   const [cabang, setCabang] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  // Role tambahan dari Kelola Role (nilai "custom:<key>").
+  const [customRoles, setCustomRoles] = useState<{ key: string; label: string; base: string }[]>([]);
+  useEffect(() => {
+    if (!show) return;
+    let alive = true;
+    api
+      .get<{ roles?: { key: string; label: string; base: string; builtin: boolean }[] }>('/api/roles')
+      .then((r) => alive && setCustomRoles((r.roles || []).filter((x) => !x.builtin)))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [show]);
+  const baseOf = (r: string) => (r.startsWith('custom:') ? customRoles.find((x) => x.key === r.slice(7))?.base || '' : r);
 
   useEffect(() => {
     if (!show) return;
     if (editing) {
       setUsername(editing.username);
       setName(editing.name);
-      setRole(editing.role);
+      setRole(editing.customRole ? `custom:${editing.customRole}` : editing.role);
       setReg(editing.reg ? String(editing.reg) : '');
       setSe(editing.se || '');
       setCabang(editing.cabang || '');
@@ -60,7 +74,7 @@ export function UserFormModal() {
     if (!uname || !nm) return toast('Username dan nama wajib diisi', 'error');
     if (!userEditId && (!password || password.length < 4)) return toast('Password wajib diisi (minimal 4 karakter)', 'error');
     if (password && password.length < 4) return toast('Password minimal 4 karakter', 'error');
-    if (role === 'salesadmin' && !cabang.trim()) return toast('Admin Sales wajib diisi Cabang', 'error');
+    if (baseOf(role) === 'salesadmin' && !cabang.trim()) return toast('Admin Sales wajib diisi Cabang', 'error');
 
     setBusy(true);
     const payload = { username: uname, name: nm, role, reg: reg || null, se: se.trim().toUpperCase(), cabang: cabang.trim().toUpperCase(), password: password || undefined };
@@ -124,6 +138,15 @@ export function UserFormModal() {
             <option value="purchasing">Purchasing</option>
             <option value="purchasing05">PIC Line 05 (Purchasing fabrikasi)</option>
             <option value="admin">Admin</option>
+            {customRoles.length > 0 && (
+              <optgroup label="Role tambahan (Kelola Role)">
+                {customRoles.map((r) => (
+                  <option key={r.key} value={`custom:${r.key}`}>
+                    {r.label} — tipe dasar {r.base}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
         </div>
         <div>

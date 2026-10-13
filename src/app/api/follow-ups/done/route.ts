@@ -5,6 +5,7 @@ import { customerScopeWhere, prospectScopeWhere } from '@/lib/auth';
 import { logFollowUpDone } from '@/lib/followup-activity';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { guard } from '@/lib/permissions-server';
 
 /**
  * A follow-up was just done (the "Buka WhatsApp" button): record it in
@@ -15,6 +16,8 @@ import { emitCrmEvent } from '@/lib/socket';
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'prospek', 'e');
+  if (denied) return denied;
   const body = await req.json().catch(() => null);
   const channel = String(body?.channel || 'WhatsApp').slice(0, 30);
 

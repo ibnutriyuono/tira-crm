@@ -6,6 +6,7 @@ import { Modal } from '../Modal';
 import { CustomerNameInput } from '../CustomerNameInput';
 import { ItemChat } from '../ItemChat';
 import { AttachmentList } from '../AttachmentList';
+import { ProspectIssueSection } from '../issues/ProspectIssueSection';
 import { MaterialSpecEditor } from '../MaterialSpecEditor';
 import { CABANG_LIST } from '@/lib/constants';
 import { formatFileSize, formatRupiah, getProspectMaterials, materialUnitPrice, num } from '@/lib/format';
@@ -397,6 +398,7 @@ export function ProspectFormModal() {
           </div>
         )}
       </div>
+      {editing && <ProspectIssueSection prospect={editing} />}
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>Diskusi</label>
         <ItemChat entity="prospect" entityId={editId} />

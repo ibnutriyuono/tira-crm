@@ -1,4 +1,6 @@
 import { ACTIVITY_TYPES } from './constants';
+import { normalizePhone } from './activity-contact';
+import type { ActivityPic } from './types';
 
 export const TIPE_KEYS: string[] = ACTIVITY_TYPES.map((t) => t.key);
 
@@ -45,15 +47,18 @@ export function localToday(): string {
  * jabatan, fully blank rows (an untouched "add" row) are dropped, and at
  * least one PIC must remain. Returns the cleaned list or an error message.
  */
-export function normalizeActivityPics(raw: unknown): { pics: { nama: string; jabatan: string }[] } | { error: string } {
+export function normalizeActivityPics(raw: unknown): { pics: ActivityPic[] } | { error: string } {
   const list = Array.isArray(raw) ? raw : [];
-  const pics: { nama: string; jabatan: string }[] = [];
+  const pics: ActivityPic[] = [];
   for (const r of list) {
-    const nama = String((r as { nama?: unknown })?.nama ?? '').trim().slice(0, 100);
-    const jabatan = String((r as { jabatan?: unknown })?.jabatan ?? '').trim().slice(0, 100);
-    if (!nama && !jabatan) continue;
+    const o = (r || {}) as { nama?: unknown; jabatan?: unknown; phone?: unknown; email?: unknown; dihubungi?: unknown };
+    const nama = String(o.nama ?? '').trim().slice(0, 100);
+    const jabatan = String(o.jabatan ?? '').trim().slice(0, 100);
+    const phone = normalizePhone(String(o.phone ?? '')).slice(0, 15);
+    const email = String(o.email ?? '').trim().toLowerCase().slice(0, 120);
+    if (!nama && !jabatan && !phone && !email) continue;
     if (!nama || !jabatan) return { error: 'Setiap PIC wajib diisi nama dan jabatannya.' };
-    pics.push({ nama, jabatan });
+    pics.push({ nama, jabatan, ...(phone ? { phone } : {}), ...(email ? { email } : {}), ...(o.dihubungi ? { dihubungi: true } : {}) });
   }
   if (pics.length === 0) return { error: 'Isi minimal satu PIC beserta jabatannya.' };
   if (pics.length > 20) return { error: 'Maksimal 20 PIC per aktivitas.' };

@@ -7,11 +7,14 @@ import { cabangRegMap, visitTripScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { parsePicText, syncCustomerPics } from '@/lib/customer-sync';
 import { TRIP_ROLES, normalizePlanVisits, validateTripHeader } from '@/lib/visit-trip';
+import { guard } from '@/lib/permissions-server';
 
 /** GET ?periode=YYYY-MM (optional): trips whose departure falls in that month. */
 export async function GET(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'trip', 'v');
+  if (denied) return denied;
   const periode = new URL(req.url).searchParams.get('periode') || '';
   if (periode && !/^\d{4}-\d{2}$/.test(periode)) return NextResponse.json({ error: 'Periode harus YYYY-MM' }, { status: 400 });
   const trips = await prisma.visitTrip.findMany({
@@ -25,6 +28,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'trip', 'e');
+  if (denied) return denied;
   if (!TRIP_ROLES.includes(user.role)) return NextResponse.json({ error: 'Hanya GM, RM, dan BM yang membuat rencana perjalanan.' }, { status: 403 });
 
   const body = await req.json().catch(() => null);

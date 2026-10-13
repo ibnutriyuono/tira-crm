@@ -13,11 +13,15 @@ import {
   buildGroupIndex,
   canManageKam,
   groupForCustomer,
+  groupOmzetYtd,
   isKeyTier,
+  normalizeCustomerName,
+  type GroupOmzet,
   kamFlags,
   type KamFlag,
 } from '@/lib/kam';
 import { localToday } from '@/lib/sales-activity';
+import { CABANG_LIST } from '@/lib/constants';
 
 /** 'YYYY-MM-DD' + n days (UTC math on a date-only value, no timezone drift). */
 function addDays(ymd: string, n: number): string {
@@ -28,6 +32,7 @@ function addDays(ymd: string, n: number): string {
 import type { CustomerGroup, KamAction, KamTeam, KamTier, Prospect, SalesActivity } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
+import { canNow } from '@/hooks/useCan';
 
 type Tab = 'ringkasan' | 'daftar' | 'profil' | 'struktur';
 interface RosterUser {
@@ -49,7 +54,7 @@ const EMPTY_TEAM: KamTeam = { sponsorId: null, ketuaId: null, sekretarisId: null
 
 /**
  * Key Account Management: ringkasan & sinyal risiko, daftar grup, profil &
- * account plan, struktur organisasi (tim nasional + tim per akun). Tier,
+ * account plan, struktur organisasi (tim nasional + grup: perusahaan, omzet YTD, ketua, sekretaris, PIC). Tier,
  * skor dan angka omzet/margin berasal dari analisa KAM (impor Excel); kontak
  * terakhir dan pipeline dihitung dari data CRM.
  */
@@ -65,6 +70,8 @@ export function KeyAccountModal() {
   const setGroups = useDataStore((s) => s.setCustomerGroups);
   const toast = useDataStore((s) => s.toast);
 
+  const customers = useDataStore((s) => s.customers);
+  const customerNames = useMemo(() => [...new Set(customers.map((c) => (c.name || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [customers]);
   const manager = canManageKam(currentUser?.role);
   const today = localToday();
 
@@ -251,8 +258,39 @@ export function KeyAccountModal() {
           }}
           teamDirty={teamDirty}
           manager={manager}
+          canDelete={currentUser?.role === 'gm' || currentUser?.role === 'admin'}
           currentUserId={currentUser?.id || ''}
           busy={busy}
+          prospects={prospects}
+          customerNames={customerNames}
+          today={today}
+          createGroup={async (name) => {
+            setBusy(true);
+            try {
+              const { group } = await api.post<{ group: CustomerGroup }>('/api/customer-groups', { name });
+              upsertGroup(group);
+              toast(`Grup "${group.name}" dibuat`, 'success');
+              return true;
+            } catch (err) {
+              toast(err instanceof Error ? err.message : 'Gagal membuat grup', 'error');
+              return false;
+            } finally {
+              setBusy(false);
+            }
+          }}
+          deleteGroup={async (g) => {
+            if (!window.confirm(`Hapus grup "${g.name}"? Perusahaan di dalamnya tidak terhapus, hanya keluar dari grup.`)) return;
+            setBusy(true);
+            try {
+              await api.del(`/api/customer-groups/${g.id}`);
+              removeGroup(g.id);
+              toast(`Grup "${g.name}" dihapus`, 'success');
+            } catch (err) {
+              toast(err instanceof Error ? err.message : 'Gagal menghapus grup', 'error');
+            } finally {
+              setBusy(false);
+            }
+          }}
           saveTeam={async () => {
             setBusy(true);
             try {
@@ -316,7 +354,7 @@ function Ringkasan({
     ...rfqs.filter((r) => (r.tglRfq || r.createdAt || '').slice(0, 10) >= since).map((r) => ({ kind: 'RFQ', id: r.id, no: r.noRfq || '', tgl: (r.tglRfq || r.createdAt).slice(0, 10), cabang: r.cabang, customer: r.customer || '' })),
   ]
     .map((x) => ({ ...x, g: groupForCustomer(stats.idx, x.customer) }))
-    .filter((x) => x.g && isKeyTier(x.g.tier) && x.g.homeCabang && x.cabang && x.cabang.toUpperCase() !== x.g.homeCabang.toUpperCase())
+    .filter((x) => x.g && x.g.homeCabang && x.cabang && x.cabang.toUpperCase() !== x.g.homeCabang.toUpperCase())
     .sort((a, b) => b.tgl.localeCompare(a.tgl))
     .slice(0, 12);
   const reviews = groups.filter((g) => isKeyTier(g.tier) && g.reviewNext && g.reviewNext <= addDays(today, 21)).sort((a, b) => (a.reviewNext || '').localeCompare(b.reviewNext || ''));
@@ -543,9 +581,11 @@ function Daftar({
             {importing ? 'Mengimpor…' : 'Impor dari Excel KAM'}
             <input type="file" accept=".xlsx,.xls" hidden disabled={importing} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void onFile(f); }} />
           </label>
-          <button type="button" className="btn btn-outline btn-sm" onClick={downloadTemplate}>
-            <IconDownload /> Template
-          </button>
+          {canNow('kam', 'x') && (
+            <button type="button" className="btn btn-outline btn-sm" onClick={downloadTemplate}>
+              <IconDownload /> Template
+            </button>
+          )}
           <span className="field-note" style={{ margin: 0 }}>Impor mencocokkan nama grup; tim (ketua/sekretaris/anggota) tidak ditimpa.</span>
         </div>
       )}
@@ -756,7 +796,7 @@ function Profil({
                 {g.pola && <span className="badge slate">Pola {g.pola} · {KAM_POLA[g.pola]}</span>}
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-soft)', marginTop: 4 }}>
-                Segmen <b>{g.segmen || '-'}</b> · Sponsor <b>{g.sponsor || '-'}</b> · Ketua <b>{userName(g.ketuaId) || '—'}</b> · Sekretaris <b>{userName(g.sekretarisId) || '—'}</b> · Anggota {(g.anggotaIds || []).map(userName).filter(Boolean).join(', ') || '—'}
+                Segmen <b>{g.segmen || '-'}</b> · Sponsor <b>{g.sponsor || '-'}</b> · Ketua <b>{userName(g.ketuaId) || '—'}</b> · Sekretaris <b>{userName(g.sekretarisId) || '—'}</b> · PIC {(g.anggotaIds || []).map(userName).filter(Boolean).join(', ') || '—'}
               </div>
             </div>
             <Flags flags={flags} />
@@ -775,7 +815,7 @@ function Profil({
               </>
             ) : (
               <>
-                Home cabang <b>{g.homeCabang || '-'}</b>. Prospek/RFQ dari cabang lain memberi notifikasi ke ketua tim ({userName(g.ketuaId) || 'belum dipilih'}). Review {meta.review}.
+                Home cabang <b>{g.homeCabang || '-'}</b>. Prospek/RFQ dari cabang lain memberi notifikasi ke ketua grup ({userName(g.ketuaId) || 'belum dipilih'}). Review {meta.review}.
               </>
             )}
             {g.notes && <div style={{ marginTop: 6 }}>{g.notes}</div>}
@@ -900,7 +940,7 @@ function Chips({ ids, userName, onRemove, disabled }: { ids: string[]; userName:
 }
 
 function Struktur({
-  groups, roster, userLabel, userName, team, setTeam, teamDirty, manager, currentUserId, busy, saveTeam, saveGroup, openProfile,
+  groups, roster, userLabel, userName, team, setTeam, teamDirty, manager, canDelete, currentUserId, busy, saveTeam, saveGroup, openProfile, prospects, customerNames, today, createGroup, deleteGroup,
 }: {
   groups: CustomerGroup[];
   roster: RosterUser[];
@@ -910,16 +950,38 @@ function Struktur({
   setTeam: (t: KamTeam) => void;
   teamDirty: boolean;
   manager: boolean;
+  canDelete: boolean;
   currentUserId: string;
   busy: boolean;
   saveTeam: () => void;
   saveGroup: (id: string, patch: Record<string, unknown>, ok?: string) => Promise<boolean>;
   openProfile: (id: string) => void;
+  prospects: Prospect[];
+  customerNames: string[];
+  today: string;
+  createGroup: (name: string) => Promise<boolean>;
+  deleteGroup: (g: CustomerGroup) => void;
 }) {
-  const [showAll, setShowAll] = useState(false);
-  const rows = groups.filter((g) => showAll || isKeyTier(g.tier)).sort((a, b) => KAM_TIERS.findIndex((t) => t.key === a.tier) - KAM_TIERS.findIndex((t) => t.key === b.tier) || (b.skor || 0) - (a.skor || 0));
-  const missing = groups.filter((g) => isKeyTier(g.tier) && !g.ketuaId);
-  const notIn = (ids: (string | null)[]) => roster.filter((u) => !ids.includes(u.id));
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const omzet = useMemo(() => groupOmzetYtd(groups, prospects, today), [groups, prospects, today]);
+  const ytdOf = (g: CustomerGroup) => omzet.per.get(g.id)?.ytd || 0;
+  const rows = [...groups].sort((a, b) => ytdOf(b) - ytdOf(a) || a.name.localeCompare(b.name));
+  const total = groups.reduce((s, g) => s + ytdOf(g), 0);
+  const nComp = groups.reduce((s, g) => s + (g.entities || []).length, 0);
+  const max = Math.max(1, ...rows.map(ytdOf));
+  const missing = groups.filter((g) => !g.ketuaId);
+  const share = (v: number) => (omzet.nasional > 0 ? `${((v / omzet.nasional) * 100).toFixed(1).replace('.', ',')}%` : '-');
+  const owner = useMemo(() => {
+    const m = new Map<string, string>();
+    groups.forEach((g) => [g.name, ...(g.entities || [])].forEach((n) => {
+      const k = normalizeCustomerName(n);
+      if (k && !m.has(k)) m.set(k, g.name);
+    }));
+    return m;
+  }, [groups]);
+  const year = today.slice(0, 4);
+  const periodTxt = `Jan–${formatDateID(today).split(' ').slice(1).join(' ') || year}`;
 
   return (
     <>
@@ -939,81 +1001,225 @@ function Struktur({
             <span className="kam-role">SEKRETARIS</span>
             <UserSelect value={team.sekretarisId} onChange={(v) => setTeam({ ...team, sekretarisId: v || null })} roster={roster} userLabel={userLabel} disabled={!manager} />
           </div>
-          <span className="kam-line" aria-hidden="true" />
-          <div className="kam-node anggota">
-            <span className="kam-role">ANGGOTA · {team.anggotaIds.length} orang</span>
-            <div className="kam-chips">
-              <Chips ids={team.anggotaIds} userName={(id) => userName(id)} onRemove={(id) => setTeam({ ...team, anggotaIds: team.anggotaIds.filter((x) => x !== id) })} disabled={!manager} />
-            </div>
-            {manager && (
-              <select value="" onChange={(e) => e.target.value && setTeam({ ...team, anggotaIds: [...team.anggotaIds, e.target.value] })} style={{ width: 260 }}>
-                <option value="">+ Tambah anggota…</option>
-                {notIn([...team.anggotaIds, team.ketuaId, team.sekretarisId]).map((u) => <option key={u.id} value={u.id}>{userLabel(u)}</option>)}
-              </select>
-            )}
-          </div>
           {manager && (
             <button type="button" className="btn btn-primary btn-sm" disabled={!teamDirty || busy} onClick={saveTeam} style={{ marginTop: 10 }}>
               Simpan tim nasional
             </button>
           )}
-        </div>
-        <div className="kam-roles">
-          <div><b>Ketua</b> — memimpin program KAM dan review kuartalan, memutuskan perubahan tier dan ketua tim akun.</div>
-          <div><b>Sekretaris</b> — jadwal & notulen review, memantau rencana aksi, merapikan data grup dan impor bulanan.</div>
-          <div><b>Anggota</b> — ketua tim akun dan perwakilan cabang/marketing yang hadir di review.</div>
+          <span className="kam-line" aria-hidden="true" />
+          <span className="kam-branch" aria-hidden="true" />
         </div>
       </Sec>
 
-      <Sec title="Tim per akun" note="Ketua tim = penanggung jawab akun: menentukan harga & term, menerima notifikasi prospek/RFQ dari cabang lain · Anggota = PIC cabang pendukung / SE">
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, margin: '0 0 8px', fontSize: 13 }}>
-          <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> Tampilkan juga Development & Monitor
-        </label>
-        {missing.length > 0 && <div className="import-summary if-warn" style={{ marginTop: 0, marginBottom: 8 }}><b>{missing.length} akun Strategic/Key belum punya ketua tim:</b> {missing.map((g) => g.name).join(', ')}</div>}
+      <Sec title={`Grup · ${groups.length} grup`} note={`Urut omzet YTD terbesar · DO terfaktur ${periodTxt}`}>
+        <div className="kam-gsum">
+          <div><span className="kam-role">GRUP</span><b className="mono">{groups.length}</b></div>
+          <div><span className="kam-role">OMZET YTD SEMUA GRUP</span><b className="mono">{formatRupiah(total)}</b></div>
+          <div><span className="kam-role">PORSI DARI OMZET NASIONAL</span><b className="mono">{share(total)}</b></div>
+          <div><span className="kam-role">PERUSAHAAN DALAM GRUP</span><b className="mono">{nComp}</b></div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '10px 0' }}>
+          {manager &&
+            (creating ? (
+              <form
+                style={{ display: 'flex', gap: 6, alignItems: 'center' }}
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!newName.trim()) return;
+                  if (await createGroup(newName.trim())) {
+                    setNewName('');
+                    setCreating(false);
+                  }
+                }}
+              >
+                <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nama grup, cth. Grup Wilayah 1" style={{ width: 260 }} autoFocus maxLength={120} />
+                <button type="submit" className="btn btn-primary btn-sm" disabled={busy || !newName.trim()}>Buat</button>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setCreating(false)}>Batal</button>
+              </form>
+            ) : (
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>
+                <IconPlus /> Buat grup
+              </button>
+            ))}
+        </div>
+        {missing.length > 0 && <div className="import-summary if-warn" style={{ marginTop: 0, marginBottom: 10 }}><b>{missing.length} grup belum punya ketua grup:</b> {missing.map((g) => g.name).join(', ')}</div>}
         {rows.length === 0 ? (
-          <div className="field-note">Belum ada grup.</div>
+          <div className="field-note">Belum ada grup.{manager ? ' Klik "Buat grup", lalu isi perusahaan, ketua grup, sekretaris dan PIC.' : ''}</div>
         ) : (
-          <div className="table-wrap" style={{ borderTop: 'none' }}>
-            <table className="simple-table" style={{ minWidth: 1050 }}>
-              <thead>
-                <tr><th>Grup</th><th>Tier</th><th style={{ width: 250 }}>Ketua</th><th style={{ width: 250 }}>Sekretaris</th><th>Anggota</th></tr>
-              </thead>
-              <tbody>
-                {rows.map((g) => {
-                  const canTeam = manager || g.ketuaId === currentUserId;
-                  return (
-                    <tr key={g.id} style={{ verticalAlign: 'top' }}>
-                      <td>
-                        <button type="button" className="link-btn" style={{ fontWeight: 700, textDecoration: 'none', color: 'inherit' }} onClick={() => openProfile(g.id)}>{g.name}</button>
-                        <div className="field-note" style={{ margin: 0 }}>Home {g.homeCabang || '-'}{g.pola ? ` · pola ${g.pola}` : ''}</div>
-                      </td>
-                      <td><TierBadge tier={g.tier} /></td>
-                      <td>
-                        <UserSelect value={g.ketuaId} onChange={(v) => saveGroup(g.id, { ketuaId: v }, `Ketua tim ${g.name} disimpan`)} roster={roster} userLabel={userLabel} disabled={!manager || busy} />
-                      </td>
-                      <td>
-                        <UserSelect value={g.sekretarisId} onChange={(v) => saveGroup(g.id, { sekretarisId: v }, `Sekretaris ${g.name} disimpan`)} roster={roster} userLabel={userLabel} placeholder="— tidak ada —" disabled={!canTeam || busy} />
-                      </td>
-                      <td>
-                        <div className="kam-chips" style={{ justifyContent: 'flex-start' }}>
-                          <Chips ids={g.anggotaIds || []} userName={(id) => userName(id)} disabled={!canTeam || busy} onRemove={(id) => saveGroup(g.id, { anggotaIds: (g.anggotaIds || []).filter((x) => x !== id) }, 'Anggota dihapus')} />
-                          {canTeam && (
-                            <select value="" disabled={busy} onChange={(e) => e.target.value && saveGroup(g.id, { anggotaIds: [...(g.anggotaIds || []), e.target.value] }, 'Anggota ditambahkan')} style={{ width: 170, height: 32, fontSize: 12.5 }}>
-                              <option value="">+ Anggota…</option>
-                              {notIn([...(g.anggotaIds || []), g.ketuaId]).map((u) => <option key={u.id} value={u.id}>{userLabel(u)}</option>)}
-                            </select>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="kam-gcards">
+            {rows.map((g) => (
+              <GroupCard
+                key={g.id}
+                g={g}
+                o={omzet.per.get(g.id)}
+                max={max}
+                share={share}
+                year={year}
+                roster={roster}
+                userLabel={userLabel}
+                userName={userName}
+                manager={manager}
+                canEdit={manager || g.ketuaId === currentUserId}
+                canDelete={canDelete}
+                busy={busy}
+                saveGroup={saveGroup}
+                openProfile={openProfile}
+                deleteGroup={deleteGroup}
+                customerNames={customerNames}
+                owner={owner}
+              />
+            ))}
           </div>
         )}
+        {omzet.ungrouped.length > 0 && (
+          <div className="field-note" style={{ marginTop: 10 }}>
+            Perusahaan belum masuk grup (omzet YTD terbesar): <b>{omzet.ungrouped.slice(0, 5).map((u) => `${u.name} (${formatRupiah(u.ytd)})`).join(', ')}</b>
+          </div>
+        )}
+        <div className="kam-roles">
+          <div><b>Ketua grup</b> — penanggung jawab akun: menentukan harga &amp; term, menerima notifikasi prospek/RFQ grup dari cabang lain; mengatur perusahaan, sekretaris dan PIC grupnya.</div>
+          <div><b>Sekretaris grup</b> — merapikan data grup &amp; perusahaan, mencatat rencana aksi dan hasil review akun.</div>
+          <div><b>PIC</b> — Sales / PIC cabang pendukung yang menangani perusahaan grup di cabangnya.</div>
+        </div>
       </Sec>
     </>
+  );
+}
+
+function GroupCard({
+  g, o, max, share, year, roster, userLabel, userName, manager, canEdit, canDelete, busy, saveGroup, openProfile, deleteGroup, customerNames, owner,
+}: {
+  g: CustomerGroup;
+  o: GroupOmzet | undefined;
+  max: number;
+  share: (v: number) => string;
+  year: string;
+  roster: RosterUser[];
+  userLabel: (u: RosterUser) => string;
+  userName: (id: string | null | undefined) => string;
+  manager: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  busy: boolean;
+  saveGroup: (id: string, patch: Record<string, unknown>, ok?: string) => Promise<boolean>;
+  openProfile: (id: string) => void;
+  deleteGroup: (g: CustomerGroup) => void;
+  customerNames: string[];
+  owner: Map<string, string>;
+}) {
+  const [comp, setComp] = useState('');
+  const ents = g.entities || [];
+  const pics = g.anggotaIds || [];
+  const ytd = o?.ytd || 0;
+  const all = ytd + (o?.git || 0);
+  const growth = o && o.lastYtd > 0 ? Math.round(((all - o.lastYtd) / o.lastYtd) * 100) : null;
+  const listId = `kam-cust-${g.id}`;
+  const notIn = (ids: (string | null)[]) => roster.filter((u) => !ids.includes(u.id));
+  const sortedEnts = [...ents].sort((a, b) => (o?.byEntity.get(b) || 0) - (o?.byEntity.get(a) || 0));
+
+  async function addComp() {
+    const name = comp.trim();
+    if (!name) return;
+    const k = normalizeCustomerName(name);
+    const own = owner.get(k);
+    if (ents.some((e) => normalizeCustomerName(e) === k)) return setComp('');
+    if (own && own !== g.name) return; // satu perusahaan hanya di satu grup
+    if (await saveGroup(g.id, { entities: [...ents, name] }, `${name} masuk ${g.name}`)) setComp('');
+  }
+  const compOwner = comp.trim() ? owner.get(normalizeCustomerName(comp)) : undefined;
+  const compClash = !!compOwner && compOwner !== g.name;
+
+  return (
+    <div className="kam-gcard">
+      <div className="kam-gcard-head">
+        <div style={{ minWidth: 0 }}>
+          <button type="button" className="link-btn" style={{ fontWeight: 700, fontSize: 14.5, textDecoration: 'none', color: 'inherit', textAlign: 'left' }} onClick={() => openProfile(g.id)} title="Buka profil & account plan">
+            {g.name}
+          </button>
+          {isKeyTier(g.tier) && <TierBadge tier={g.tier} />}
+        </div>
+        {canDelete && (
+          <button type="button" className="icon-btn danger" title="Hapus grup" disabled={busy} onClick={() => deleteGroup(g)}>
+            <IconTrash />
+          </button>
+        )}
+      </div>
+
+      <div className="kam-gomzet">
+        <span className="kam-role">OMZET YTD (TERFAKTUR)</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+          <b className="mono" style={{ fontSize: 18 }}>{formatRupiah(ytd)}</b>
+          {growth === null ? (
+            <span className="badge">{o && all > 0 ? 'baru' : '–'}</span>
+          ) : (
+            <span className={`badge ${growth >= 0 ? 'green' : 'rust'}`} title={`DO ${year} (terfaktur + GIT) dibanding periode yang sama ${Number(year) - 1}`}>
+              {growth >= 0 ? '▲' : '▼'} {Math.abs(growth)}% vs {Number(year) - 1}
+            </span>
+          )}
+        </div>
+        <div className="field-note" style={{ margin: 0 }}>+ GIT belum faktur {formatRupiah(o?.git || 0)} · {share(ytd)} dari omzet nasional</div>
+        <div className="kam-gbar"><span style={{ width: `${Math.round((ytd / max) * 100)}%` }} /></div>
+      </div>
+
+      <div className="kam-gsec">
+        <span className="kam-role">PERUSAHAAN · {ents.length}</span>
+        {sortedEnts.length === 0 && <span className="field-note" style={{ margin: 0 }}>Belum ada perusahaan.</span>}
+        {sortedEnts.map((e) => (
+          <div key={e} className="kam-gcomp">
+            <span className="kam-gcomp-name" title={e}>{e}</span>
+            <span className="mono">{formatRupiah(o?.byEntity.get(e) || 0)}</span>
+            {canEdit && (
+              <button type="button" aria-label={`Keluarkan ${e}`} title="Keluarkan dari grup" disabled={busy} onClick={() => saveGroup(g.id, { entities: ents.filter((x) => x !== e) }, `${e} dikeluarkan dari ${g.name}`)}>
+                ×
+              </button>
+            )}
+          </div>
+        ))}
+        {canEdit && (
+          <>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input type="text" list={listId} value={comp} onChange={(e) => setComp(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void addComp(); } }} placeholder="+ Tambah perusahaan…" style={{ flex: 1, minWidth: 0, height: 32, fontSize: 12.5 }} />
+              <button type="button" className="btn btn-outline btn-sm" disabled={busy || !comp.trim() || compClash} onClick={() => void addComp()}>Tambah</button>
+            </div>
+            {compClash && <span className="field-note" style={{ margin: 0, color: 'var(--rust-600)' }}>Sudah di grup {compOwner}.</span>}
+            <datalist id={listId}>
+              {customerNames.filter((n) => !owner.has(normalizeCustomerName(n))).map((n) => <option key={n} value={n} />)}
+            </datalist>
+          </>
+        )}
+      </div>
+
+      <label className="kam-gsec">
+        <span className="kam-role">HOME CABANG</span>
+        <select value={g.homeCabang || ''} disabled={!manager || busy} onChange={(e) => saveGroup(g.id, { homeCabang: e.target.value || null }, `Home cabang ${g.name}: ${e.target.value || '-'}`)}>
+          <option value="">— semua cabang —</option>
+          {CABANG_LIST.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <span className="field-note" style={{ margin: 0 }}>
+          {g.homeCabang ? `Prospek/RFQ dari cabang selain ${g.homeCabang} dinotifikasi ke ketua grup.` : 'Belum dipilih: setiap prospek/RFQ perusahaan grup dinotifikasi ke ketua grup.'}
+        </span>
+      </label>
+      <label className="kam-gsec">
+        <span className="kam-role">KETUA GRUP</span>
+        <UserSelect value={g.ketuaId} onChange={(v) => saveGroup(g.id, { ketuaId: v || null }, `Ketua grup ${g.name} disimpan`)} roster={roster} userLabel={userLabel} placeholder="— pilih ketua grup —" disabled={!manager || busy} width={400} />
+      </label>
+      <label className="kam-gsec">
+        <span className="kam-role">SEKRETARIS GRUP</span>
+        <UserSelect value={g.sekretarisId} onChange={(v) => saveGroup(g.id, { sekretarisId: v || null }, `Sekretaris ${g.name} disimpan`)} roster={roster} userLabel={userLabel} placeholder="— tidak ada —" disabled={!canEdit || busy} width={400} />
+      </label>
+      <div className="kam-gsec">
+        <span className="kam-role">PIC · {pics.length} ORANG</span>
+        <div className="kam-chips" style={{ justifyContent: 'flex-start' }}>
+          <Chips ids={pics} userName={(id) => userName(id)} disabled={!canEdit || busy} onRemove={(id) => saveGroup(g.id, { anggotaIds: pics.filter((x) => x !== id) }, 'PIC dihapus')} />
+        </div>
+        {canEdit && (
+          <select value="" disabled={busy} onChange={(e) => e.target.value && saveGroup(g.id, { anggotaIds: [...pics, e.target.value] }, 'PIC ditambahkan')} style={{ height: 32, fontSize: 12.5 }}>
+            <option value="">+ Tambah PIC…</option>
+            {notIn([...pics, g.ketuaId, g.sekretarisId]).map((u) => <option key={u.id} value={u.id}>{userLabel(u)}</option>)}
+          </select>
+        )}
+      </div>
+    </div>
   );
 }
 

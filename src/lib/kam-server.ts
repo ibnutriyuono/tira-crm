@@ -9,7 +9,7 @@ import type { CustomerGroup, SafeUser } from './types';
  */
 export async function groupOfCustomer(customer: string): Promise<CustomerGroup | null> {
   try {
-    const groups = (await prisma.customerGroup.findMany({ where: { tier: { in: ['strategic', 'key'] } } })) as unknown as CustomerGroup[];
+    const groups = (await prisma.customerGroup.findMany()) as unknown as CustomerGroup[];
     return groupForCustomer(buildGroupIndex(groups), customer);
   } catch {
     return null;
@@ -17,8 +17,9 @@ export async function groupOfCustomer(customer: string): Promise<CustomerGroup |
 }
 
 /**
- * A Strategic / Key account handled from a branch other than its home branch:
- * tell the team lead (ketua tim), who sets price & terms for the group.
+ * Customer milik sebuah grup (tier apa pun) diproses dari cabang selain home
+ * cabang grup — atau, bila home cabang belum diisi, dari cabang mana pun:
+ * beri tahu ketua grup, yang menentukan harga & term untuk grup itu.
  */
 export async function notifyKamCrossBranch(input: {
   user: SafeUser;
@@ -30,16 +31,16 @@ export async function notifyKamCrossBranch(input: {
 }): Promise<void> {
   try {
     const g = await groupOfCustomer(input.customer);
-    if (!g || !isKeyTier(g.tier) || !g.ketuaId || g.ketuaId === input.user.id) return;
+    if (!g || !g.ketuaId || g.ketuaId === input.user.id) return;
     const cab = (input.cabang || '').trim().toUpperCase();
-    if (!cab || !g.homeCabang || cab === g.homeCabang.toUpperCase()) return;
+    if (!cab || (g.homeCabang && cab === g.homeCabang.toUpperCase())) return;
     await notify({
       userIds: [g.ketuaId],
       type: 'kam_cross_branch',
       entity: input.entity,
       entityId: input.entityId,
-      title: `${g.tier === 'strategic' ? 'Strategic' : 'Key'} Account ${g.name}: ${input.what} dari ${cab}`,
-      message: `${input.user.name} (${cab}) membuat ${input.what} untuk ${input.customer}. Sebagai ketua tim, cek harga & term sebelum dikirim ke customer.`,
+      title: `${isKeyTier(g.tier) ? `${g.tier === 'strategic' ? 'Strategic' : 'Key'} Account` : 'Grup'} ${g.name}: ${input.what} dari ${cab}`,
+      message: `${input.user.name} (${cab}) membuat ${input.what} untuk ${input.customer}. Sebagai ketua grup, cek harga & term sebelum dikirim ke customer.`,
     });
   } catch (err) {
     console.error('[kam] gagal mengirim notifikasi lintas cabang', err);

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { closeIssuesOnLose } from '@/lib/issues-server';
 import { ensureCustomerFromProspect } from '@/lib/customer-sync';
 import { syncFollowUpPlan } from '@/lib/followup-activity';
 import { diffFields, logActivity, PROSPECT_FIELD_LABELS } from '@/lib/activity';
@@ -14,6 +15,7 @@ import type { Material } from '@/lib/types';
 import { resolveFaktur } from '@/lib/faktur';
 import { canSetFaktur } from '@/lib/roles';
 import { notifyAdminTask } from '@/lib/admin-sales-server';
+import { guard } from '@/lib/permissions-server';
 
 /** The record's QCD as it will be after this request: request values win, existing ones fill the gaps. */
 function mergeQcd(existing: Record<string, unknown> | null | undefined, body: Record<string, unknown> | null): QcdInput {
@@ -26,6 +28,8 @@ const statusLabel = (v: unknown) => STATUS_META[Number(v)]?.label ?? String(v);
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'prospek', 'e');
+  if (denied) return denied;
   const { id } = await params;
 
   const scoped = await assertInScope(user, id);
@@ -84,6 +88,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   });
 
   emitCrmEvent('prospect:updated', prospect);
+  if (Number(prospect.status) === 6 && Number(scoped.existing.status) !== 6) await closeIssuesOnLose(prospect as never, user);
   // Riwayat item: penawaran baru dikirim, atau material diubah sesudahnya.
   if (!scoped.existing.penawaranTerkirim && prospect.penawaranTerkirim) {
     await logPenawaranSent(user, prospect.id, prospect.materials, prospect.tglPenawaran);
@@ -110,6 +115,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'prospek', 'e');
+  if (denied) return denied;
   const { id } = await params;
 
   const scoped = await assertInScope(user, id);
@@ -161,6 +168,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const prospect = await prisma.prospect.update({ where: { id }, data });
   emitCrmEvent('prospect:updated', prospect);
+  if (Number(prospect.status) === 6 && Number(scoped.existing.status) !== 6) await closeIssuesOnLose(prospect as never, user);
   await notifyAdminTask(user, scoped.existing, prospect);
   if (sentNow) await logPenawaranSent(user, prospect.id, prospect.materials, prospect.tglPenawaran);
 
@@ -199,6 +207,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'prospek', 'd');
+  if (denied) return denied;
   if (!canDeleteProspect(user)) {
     return NextResponse.json({ error: 'Hanya role GM dan Admin yang dapat menghapus prospek.' }, { status: 403 });
   }

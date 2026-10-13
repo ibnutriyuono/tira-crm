@@ -1,4 +1,5 @@
-import type { CustomerGroup, KamAction, KamTier } from './types';
+import { omzetPeriode } from './faktur';
+import type { CustomerGroup, KamAction, KamTier, Prospect } from './types';
 
 /**
  * Key Account Management (lihat deck "Key Account Management Special Steel").
@@ -159,4 +160,116 @@ export function cleanGroupInput(b: Record<string, unknown>): Partial<CustomerGro
     })).filter((a) => a.text);
   }
   return out;
+}
+
+/**
+ * Perusahaan yang sudah dipakai grup lain (satu perusahaan hanya di satu grup).
+ * Dicocokkan dengan nama ternormalisasi (PT/CV/Tbk & tanda baca diabaikan),
+ * termasuk nama grup lain itu sendiri. Hasil: "Nama (grup X)".
+ */
+export function entityConflicts(entities: string[], others: Pick<CustomerGroup, 'id' | 'name' | 'entities'>[], selfId?: string): string[] {
+  const owner = new Map<string, string>();
+  others.forEach((g) => {
+    if (g.id === selfId) return;
+    [g.name, ...(Array.isArray(g.entities) ? g.entities : [])].forEach((n) => {
+      const k = normalizeCustomerName(n);
+      if (k && !owner.has(k)) owner.set(k, g.name);
+    });
+  });
+  const out: string[] = [];
+  entities.forEach((e) => {
+    const o = owner.get(normalizeCustomerName(e));
+    if (o) out.push(`${e} (grup ${o})`);
+  });
+  return out;
+}
+
+/** Hilangkan duplikat nama perusahaan (nama ternormalisasi sama). */
+export function dedupeEntities(list: string[]): string[] {
+  const seen = new Set<string>();
+  return list.filter((e) => {
+    const k = normalizeCustomerName(e);
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+export interface GroupOmzet {
+  /** DO terfaktur Jan s/d bulan berjalan tahun ini. */
+  ytd: number;
+  /** DO tahun ini yang belum terfaktur (GIT). */
+  git: number;
+  /** Semua DO periode yang sama tahun lalu (Jan s/d bulan berjalan). */
+  lastYtd: number;
+  /** Omzet YTD terfaktur per perusahaan anggota (nama seperti tertulis di grup). */
+  byEntity: Map<string, number>;
+}
+
+/**
+ * Omzet YTD per grup dari prospek status DO, bulan omzet = tanggal faktur,
+ * lalu delivery, lalu PO (sama dengan Target vs Pencapaian). Customer prospek
+ * dicocokkan ke perusahaan grup: sama persis atau diawali nama perusahaan
+ * ("INDAH KIAT PULP PERAWANG" -> "INDAH KIAT").
+ */
+export function groupOmzetYtd(groups: CustomerGroup[], prospects: Prospect[], today: string): { per: Map<string, GroupOmzet>; nasional: number; ungrouped: { name: string; ytd: number }[] } {
+  const year = Number(today.slice(0, 4));
+  const mm = today.slice(5, 7);
+  const cur = { from: `${year}-01`, to: `${year}-${mm}` };
+  const prev = { from: `${year - 1}-01`, to: `${year - 1}-${mm}` };
+  const idx = new Map<string, { g: CustomerGroup; label: string }>();
+  groups.forEach((g) => {
+    [...(Array.isArray(g.entities) ? g.entities : []), g.name].forEach((n) => {
+      const k = normalizeCustomerName(n);
+      if (k && !idx.has(k)) idx.set(k, { g, label: n });
+    });
+  });
+  const find = (customer: string | null | undefined) => {
+    const k = normalizeCustomerName(customer);
+    if (!k) return null;
+    const hit = idx.get(k);
+    if (hit) return hit;
+    let best: { g: CustomerGroup; label: string } | null = null;
+    let len = 0;
+    idx.forEach((v, name) => {
+      if (name.length >= 5 && name.length > len && k.startsWith(name + ' ')) {
+        best = v;
+        len = name.length;
+      }
+    });
+    return best as { g: CustomerGroup; label: string } | null;
+  };
+  const per = new Map<string, GroupOmzet>();
+  groups.forEach((g) => per.set(g.id, { ytd: 0, git: 0, lastYtd: 0, byEntity: new Map() }));
+  const free = new Map<string, { name: string; ytd: number }>();
+  let nasional = 0;
+  prospects.forEach((p) => {
+    if (Number(p.status) !== 5) return;
+    const m = omzetPeriode(p);
+    const inCur = m >= cur.from && m <= cur.to;
+    const inPrev = m >= prev.from && m <= prev.to;
+    if (!inCur && !inPrev) return;
+    const v = Number(p.value) || 0;
+    if (inCur && p.terfaktur) nasional += v;
+    const hit = find(p.customer);
+    if (!hit) {
+      if (inCur && p.terfaktur) {
+        const k = normalizeCustomerName(p.customer);
+        if (k) {
+          const f = free.get(k) || { name: String(p.customer || '').trim(), ytd: 0 };
+          f.ytd += v;
+          free.set(k, f);
+        }
+      }
+      return;
+    }
+    const o = per.get(hit.g.id)!;
+    if (inPrev) o.lastYtd += v;
+    else if (p.terfaktur) {
+      o.ytd += v;
+      o.byEntity.set(hit.label, (o.byEntity.get(hit.label) || 0) + v);
+    } else o.git += v;
+  });
+  const ungrouped = [...free.values()].sort((a, b) => b.ytd - a.ytd);
+  return { per, nasional, ungrouped };
 }

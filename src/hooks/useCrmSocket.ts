@@ -6,7 +6,9 @@ import { getSocket } from '@/lib/socket-client';
 import { matchesBudgetTargetScope, matchesCustomerScope, matchesDocScope, matchesProspectScope, matchesSalesPlanScope, myCabangScope, myRegionCabangs } from '@/lib/client-scope';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
+import type { Perms } from '@/lib/permissions';
 import type { AnnualTarget, SeTarget, BudgetTarget, SalesPlan, Customer, CustomerGroup, Fupa, ItemChatMessage, Prospect, PurchasingContact, Rfq, SafeUser, Vendor, AppNotification } from '@/lib/types';
+import type { PipelineIssue } from '@/lib/issues';
 import { api } from '@/lib/api-client';
 
 /**
@@ -167,6 +169,19 @@ export function useCrmSocket() {
     };
 
 
+    // Kelola Role disimpan: muat ulang hak user ini, lalu data (modul yang
+    // baru boleh dilihat ikut termuat, yang dicabut ikut hilang).
+    const onRolesUpdated = () => {
+      api
+        .get<{ perms: Perms }>('/api/roles')
+        .then((r) => {
+          const st = useDataStore.getState();
+          const before = JSON.stringify(st.perms);
+          st.setPerms(r.perms);
+          if (before !== JSON.stringify(r.perms)) void st.bootstrap();
+        })
+        .catch(() => {});
+    };
     const onBudgetUpsert = (b: BudgetTarget) => {
       // Unlike Prospect/Customer, a target's (cabang, periode) pair is its
       // identity — the upsert never changes which branch it belongs to, so
@@ -211,6 +226,16 @@ export function useCrmSocket() {
     };
 
     const onGroupUpsert = (g: CustomerGroup) => useDataStore.getState().upsertCustomerGroup(g);
+    // Masalah pipeline disiarkan ke semua; simpan hanya yang memang terlihat user ini.
+    const onIssueUpsert = (i: PipelineIssue) => {
+      const st = useDataStore.getState();
+      const me = st.currentUser;
+      if (!me) return;
+      const known = st.issues.some((x) => x.id === i.id);
+      const wide = me.role === 'gm' || me.role === 'admin' || me.role === 'purchasing';
+      const visible = wide || (Array.isArray(i.pjIds) && i.pjIds.includes(me.id)) || st.prospects.some((p) => p.id === i.prospectId);
+      if (known || visible) st.upsertIssue(i);
+    };
     const onGroupDelete = ({ id }: { id: string }) => useDataStore.getState().removeCustomerGroup(id);
     const onGroupBulk = () => {
       api.get<{ groups: CustomerGroup[] }>('/api/customer-groups').then((r) => useDataStore.getState().setCustomerGroups(r.groups)).catch(() => {});
@@ -249,6 +274,7 @@ export function useCrmSocket() {
     s.on('itemchat:message', onItemChatMessage);
 
     s.on('budget:updated', onBudgetUpsert);
+    s.on('roles:updated', onRolesUpdated);
     s.on('annualTarget:updated', onAnnualUpsert);
     s.on('seTarget:updated', onSeTargetUpsert);
     s.on('seTarget:deleted', onSeTargetDelete);
@@ -256,6 +282,7 @@ export function useCrmSocket() {
     s.on('salesPlan:deleted', onSalesPlanDelete);
     s.on('notification:new', onNotificationNew);
     s.on('customerGroup:updated', onGroupUpsert);
+    s.on('issue:updated', onIssueUpsert);
     s.on('customerGroup:deleted', onGroupDelete);
     s.on('customerGroup:bulk', onGroupBulk);
 
@@ -285,6 +312,7 @@ export function useCrmSocket() {
       s.off('fupa:updated', onFupaUpsert);
       s.off('fupa:deleted', onFupaDelete);
       s.off('budget:updated', onBudgetUpsert);
+      s.off('roles:updated', onRolesUpdated);
       s.off('annualTarget:updated', onAnnualUpsert);
       s.off('seTarget:updated', onSeTargetUpsert);
       s.off('seTarget:deleted', onSeTargetDelete);
@@ -292,6 +320,7 @@ export function useCrmSocket() {
       s.off('salesPlan:deleted', onSalesPlanDelete);
       s.off('notification:new', onNotificationNew);
       s.off('customerGroup:updated', onGroupUpsert);
+      s.off('issue:updated', onIssueUpsert);
       s.off('customerGroup:deleted', onGroupDelete);
       s.off('customerGroup:bulk', onGroupBulk);
       s.off('vendor:created', onVendorUpsert);

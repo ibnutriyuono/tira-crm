@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
-import { IconBag, IconCalendar, IconChat, IconCheck, IconRfq, IconTarget, IconTrash } from '../icons';
+import { IconBag, IconCalendar, IconChat, IconCheck, IconFlag, IconRfq, IconTarget, IconTrash } from '../icons';
 import { api } from '@/lib/api-client';
 import { openPurchDoc } from '@/hooks/useCrmSocket';
 import { useDataStore } from '@/store/useDataStore';
@@ -29,6 +29,13 @@ const NOTIF_META: Record<NotificationType, { icon: () => React.JSX.Element; colo
   target_allocate: { icon: IconTarget, color: 'rust' },
   target_assigned: { icon: IconTarget, color: 'green' },
   admin_task: { icon: IconCheck, color: 'amber' },
+  prospect_chat: { icon: IconChat, color: 'amber' },
+  followup_due: { icon: IconCalendar, color: 'steel' },
+  followup_overdue: { icon: IconCalendar, color: 'rust' },
+  issue_proposed: { icon: IconFlag, color: 'violet' },
+  issue_new: { icon: IconFlag, color: 'rust' },
+  issue_update: { icon: IconCheck, color: 'steel' },
+  issue_escalated: { icon: IconFlag, color: 'rust' },
 };
 
 function timeAgo(iso: string): string {
@@ -79,6 +86,19 @@ export function NotificationsModal() {
       useUiStore.getState().openModal('prospectForm');
       return;
     }
+    if (n.entity === 'issue') {
+      // Masalah pipeline: Purchasing membuka tab ⚑ Masalah di halamannya, role lain papan Masalah Pipeline.
+      useUiStore.setState({ issueFocus: { id: n.entityId } });
+      const role = useDataStore.getState().currentUser?.role;
+      if (role !== 'purchasing' && role !== 'purchasing05') useUiStore.getState().openModal('pipelineIssues');
+      return;
+    }
+    if (n.entity === 'activity') {
+      // Rencana follow-up: buka Aktivitas Harian di tanggal rencana itu.
+      useUiStore.setState({ activityFocus: { id: n.entityId } });
+      useUiStore.getState().openModal('salesActivity');
+      return;
+    }
     if (n.entity === 'target') {
       useUiStore.getState().openModal('forecast');
       return;
@@ -113,7 +133,7 @@ export function NotificationsModal() {
       show={show}
       onClose={closeModal}
       title="Notifikasi"
-      wide
+      wide2
       footer={
         <button type="button" className="btn btn-outline" onClick={closeModal}>
           Tutup

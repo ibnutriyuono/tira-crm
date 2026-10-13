@@ -8,6 +8,7 @@ import { achSignal, buildTargetAchievement } from '@/lib/target-achievement';
 import { localToday } from '@/lib/sales-activity';
 import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
+import { canNow } from '@/hooks/useCan';
 
 const BLN3 = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -147,9 +148,11 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
           <input type="checkbox" checked={showGit} onChange={(e) => setShowGit(e.target.checked)} /> Tampilkan GIT sebagai potensi
         </label>
-        <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: 'auto' }} onClick={exportExcel}>
-          <IconDownload /> Export Excel
-        </button>
+        {canNow('analisa', 'x') && (
+          <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: 'auto' }} onClick={exportExcel}>
+            <IconDownload /> Export Excel
+          </button>
+        )}
       </div>
       {isSe && <div className="field-note" style={{ marginTop: -4, marginBottom: 10 }}>Target yang ditampilkan adalah target cabang sebagai acuan; pencapaian = DO terfaktur milik Anda.</div>}
 

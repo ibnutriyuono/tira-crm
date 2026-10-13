@@ -5,6 +5,7 @@ import { canManageKam } from '@/lib/kam';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { KamTeam } from '@/lib/types';
+import { guard } from '@/lib/permissions-server';
 
 const KEY = 'kamTeam';
 const EMPTY: KamTeam = { sponsorId: null, ketuaId: null, sekretarisId: null, anggotaIds: [] };
@@ -14,6 +15,8 @@ const id = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'kam', 'v');
+  if (denied) return denied;
   const row = await prisma.setting.findUnique({ where: { key: KEY } });
   return NextResponse.json({ team: { ...EMPTY, ...((row?.value as unknown as KamTeam) || {}) } });
 }
@@ -21,6 +24,8 @@ export async function GET() {
 export async function PUT(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'kam', 'e');
+  if (denied) return denied;
   if (!canManageKam(user.role)) return NextResponse.json({ error: 'Hanya GM, RM dan Admin yang dapat mengatur tim KAM.' }, { status: 403 });
   const b = await req.json().catch(() => null);
   const team: KamTeam = {

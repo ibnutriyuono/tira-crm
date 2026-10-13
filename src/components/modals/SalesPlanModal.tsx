@@ -239,7 +239,7 @@ export function SalesPlanModal() {
       show={show}
       onClose={closeModal}
       title="Rencana Penjualan"
-      wide
+      xwide
       footer={
         <>
           {savedPlan && (

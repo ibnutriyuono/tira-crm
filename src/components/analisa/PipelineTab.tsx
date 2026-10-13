@@ -11,6 +11,7 @@ import { monthsEnding } from '@/lib/material-trend';
 import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
+import { canNow } from '@/hooks/useCan';
 
 type Kondisi = '' | 'belum' | 'sisa' | 'lunas' | 'tidakpo';
 
@@ -128,9 +129,11 @@ export function PipelineTab({ prospects, scopeLabel, cabangs, thisMonth }: { pro
           ))}
         </select>
         <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari customer / No. PO" style={{ maxWidth: 220 }} />
-        <button type="button" className="btn btn-outline btn-sm" onClick={exportExcel}>
-          <IconDownload /> Excel
-        </button>
+        {canNow('analisa', 'x') && (
+          <button type="button" className="btn btn-outline btn-sm" onClick={exportExcel}>
+            <IconDownload /> Excel
+          </button>
+        )}
       </div>
 
       <div className="kpi-grid">

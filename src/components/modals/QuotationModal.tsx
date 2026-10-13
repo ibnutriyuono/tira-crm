@@ -220,7 +220,7 @@ export function QuotationModal() {
       show={show}
       onClose={closeModal}
       title="Buat Surat Penawaran"
-      wide
+      wide2
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>

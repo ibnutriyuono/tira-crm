@@ -74,7 +74,7 @@ export function DatabaseModal() {
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title="Kelola Database" wide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title="Kelola Database" wide2 footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
       <div className="import-summary" style={{ marginBottom: 14 }}>
         {stats ? (
           <>

@@ -5,10 +5,13 @@ import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { CustomerPic } from '@/lib/types';
 import type { Prisma } from '@prisma/client';
+import { guard } from '@/lib/permissions-server';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'customer', 'e');
+  if (denied) return denied;
   const { id } = await params;
 
   const body = await req.json().catch(() => null);
@@ -53,6 +56,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'customer', 'e');
+  if (denied) return denied;
   const { id } = await params;
   const body = await req.json().catch(() => null);
   if (typeof body?.phone !== 'string') return NextResponse.json({ error: 'Tidak ada perubahan' }, { status: 400 });
@@ -86,6 +91,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'customer', 'd');
+  if (denied) return denied;
   const adminErr = requireAdmin(user);
   if (adminErr) return adminErr;
   const { id } = await params;

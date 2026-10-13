@@ -27,12 +27,19 @@ export type NotifType =
   | 'kam_cross_branch'
   | 'target_allocate'
   | 'target_assigned'
-  | 'admin_task';
+  | 'admin_task'
+  | 'prospect_chat'
+  | 'followup_due'
+  | 'followup_overdue'
+  | 'issue_proposed'
+  | 'issue_new'
+  | 'issue_update'
+  | 'issue_escalated';
 
 interface NotifyInput {
   userIds: string[];
   type: NotifType;
-  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target';
+  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target' | 'activity' | 'issue';
   entityId: string;
   title: string;
   message: string;
@@ -114,5 +121,21 @@ export async function tripHostIds(cabang: string, reg: number | null): Promise<s
   const or: Record<string, unknown>[] = [{ role: 'bm', cabang: { equals: cabang, mode: 'insensitive' } }];
   if (reg != null) or.push({ role: 'rm', reg });
   const rows = await prisma.user.findMany({ where: { OR: or }, select: { id: true } });
+  return rows.map((r) => r.id);
+}
+
+/** Users holding a Sales code (SE) — the owner of a prospect / activity. */
+export async function seUserIds(se: string | null | undefined): Promise<string[]> {
+  const code = (se || '').trim();
+  if (!code) return [];
+  const rows = await prisma.user.findMany({ where: { se: { equals: code, mode: 'insensitive' } }, select: { id: true } });
+  return rows.map((r) => r.id);
+}
+
+/** BM(s) of a branch. */
+export async function bmUserIds(cabang: string | null | undefined): Promise<string[]> {
+  const c = (cabang || '').trim();
+  if (!c) return [];
+  const rows = await prisma.user.findMany({ where: { role: 'bm', cabang: { equals: c, mode: 'insensitive' } }, select: { id: true } });
   return rows.map((r) => r.id);
 }

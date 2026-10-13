@@ -5,10 +5,13 @@ import { canEditPurchasing, docVisibleTo } from '@/lib/auth';
 import { PSTATUS_DIMINTA } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { guard } from '@/lib/permissions-server';
 
 export async function GET(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'purch', 'v');
+  if (denied) return denied;
 
   const { searchParams } = new URL(req.url);
   const rfqId = searchParams.get('rfqId');
@@ -29,6 +32,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'purch', 'e');
+  if (denied) return denied;
   if (!canEditPurchasing(user)) {
     return NextResponse.json({ error: 'Hanya Purchasing dan Admin yang dapat meminta penawaran.' }, { status: 403 });
   }

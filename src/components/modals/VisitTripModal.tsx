@@ -26,6 +26,7 @@ import {
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { TripPhoto, TripVisit, VisitTrip } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
 const ROLE_SHORT: Record<string, string> = { gm: 'GM', rm: 'RM', bm: 'BM' };
 const blankVisit = (): TripVisit => ({ id: '', customer: '', pic: '', tanggal: '', tujuan: '', realisasi: '', uraian: '', hasil: '', tambahan: false });
@@ -411,9 +412,11 @@ export function VisitTripModal() {
                         <button type="button" className="btn btn-outline btn-sm" onClick={() => openDetail(t)}>
                           Buka
                         </button>
-                        <button type="button" className="btn btn-outline btn-sm" title="Cetak laporan kunjungan (lampiran reimbursement)" onClick={() => onPrint(t)}>
-                          Cetak
-                        </button>
+                        {canNow('trip', 'x') && (
+                          <button type="button" className="btn btn-outline btn-sm" title="Cetak laporan kunjungan (lampiran reimbursement)" onClick={() => onPrint(t)}>
+                            Cetak
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -751,9 +754,11 @@ export function VisitTripModal() {
         <button type="button" className="btn btn-outline" onClick={() => setView('list')} style={{ marginRight: 'auto' }}>
           ← Daftar
         </button>
-        <button type="button" className={`btn ${current.status === 'selesai' ? 'btn-primary' : 'btn-outline'}`} onClick={() => onPrint(current)} title="Laporan kunjungan untuk lampiran reimbursement ke Keuangan">
-          Cetak Laporan
-        </button>
+        {canNow('trip', 'x') && (
+          <button type="button" className={`btn ${current.status === 'selesai' ? 'btn-primary' : 'btn-outline'}`} onClick={() => onPrint(current)} title="Laporan kunjungan untuk lampiran reimbursement ke Keuangan">
+            Cetak Laporan
+          </button>
+        )}
         {isOwner && current.status === 'draft' && (
           <button type="button" className="btn btn-outline" disabled={busy} onClick={deleteDraft}>
             Hapus Draft

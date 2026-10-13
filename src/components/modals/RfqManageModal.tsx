@@ -12,6 +12,7 @@ import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Rfq, RfqItem } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
 /** Mirrors the single-file app's rfqJawabanSummary(). */
 function jawabanSummary(items: RfqItem[]): string {
@@ -70,7 +71,7 @@ export function RfqManageModal() {
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title="Kelola RFQ" wide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title="Kelola RFQ" xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
       <div className="toolbar-row">
         <button
           className="btn btn-primary btn-sm"
@@ -88,7 +89,9 @@ export function RfqManageModal() {
           <option value="Selesai">Selesai</option>
         </select>
         <input type="search" className="search-grow" placeholder="Cari No RFQ / Customer / Cabang..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+        {canNow('rfq', 'x') && (
+          <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+        )}
       </div>
       <div className="import-summary">
         RFQ digunakan untuk meminta ketersediaan/harga material ke Purchasing selama prospek masih berjalan (Aktif).

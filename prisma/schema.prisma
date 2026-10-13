@@ -45,6 +45,9 @@ model User {
   passwordHash String
   name         String
   role         Role
+  /// Role tambahan (RoleDef.key) — bila diisi, hak per modul diambil dari
+  /// role ini; `role` tetap tipe dasarnya (cakupan data & alur kerja).
+  customRole   String?
   se           String?
   cabang       String?
   reg          Int?
@@ -157,6 +160,18 @@ model SalesActivity {
   /// Asal baris: null = diisi manual; "followup" = otomatis dari jadwal /
   /// realisasi Follow-up WhatsApp.
   sumber     String?
+  /// Saluran: telepon | wa | email | kurir (tipe telepon & dokumen).
+  kanal      String?
+  /// Hasil kontak: tersambung | tidak_diangkat | belum_dibalas | minta_lagi.
+  hasil      String?
+  /// Langkah berikutnya (wajib untuk meeting).
+  langkah    String?
+  /// Lokasi saat disimpan (kunjungan) — dari GPS perangkat bila diizinkan.
+  lat        Float?
+  lng        Float?
+  akurasi    Float?
+  /// Rencana follow-up yang dibuat dari hasil kontak aktivitas ini.
+  followUpId String?
   createdBy  String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -468,6 +483,21 @@ model SeTarget {
   @@index([cabang, periode])
 }
 
+/// Hak akses per role (Kelola Role). key = nama role bawaan (sales, bm, …)
+/// atau key role tambahan. perms = { modul: { v, e, d, x } } — Lihat,
+/// Tambah/Ubah, Hapus, Download. Role bawaan tanpa baris = semua diizinkan
+/// (dibatasi aturan tipe dasarnya seperti biasa).
+model RoleDef {
+  key       String   @id
+  label     String
+  base      String
+  perms     Json     @default("{}")
+  builtin   Boolean  @default(false)
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 /// Target tahunan per cabang. Menyimpan ini mengisi target bulanan default
 /// (amount / 12) ke BudgetTarget untuk bulan yang kosong atau masih default.
 model AnnualTarget {
@@ -710,4 +740,52 @@ model ActivityLog {
   @@index([action])
   @@index([actorCabang])
   @@index([actorReg])
+}
+
+/// Masalah pipeline per prospek (phase43). Sales mengajukan (status "usulan"),
+/// BM membuat laporan resmi ("open") dengan penanggung jawab (user), PJ
+/// menangani ("proses") lalu menutup dengan solusi & hasil ("selesai").
+/// Usulan yang ditolak = "ditolak"; saran otomatis yang diabaikan = "diabaikan".
+/// Satu prospek hanya boleh punya satu masalah aktif (usulan/open/proses).
+model ProspectIssue {
+  id             String    @id @default(cuid())
+  prospectId     String
+  /// usulan | open | proses | selesai | ditolak | diabaikan
+  status         String    @default("open")
+  /// harga | kompetitor | stok | leadtime | spek | bayar | tunda | internal
+  kategori       String
+  /// tinggi | sedang | rendah
+  urgensi        String    @default("sedang")
+  keterangan     String    @default("")
+  targetDate     String?
+  /// user id penanggung jawab; index 0 = PJ utama
+  pjIds          Json      @default("[]")
+  /// salinan dari prospek untuk cakupan data & laporan
+  se             String?
+  cabang         String?
+  reg            Int?
+  customer       String    @default("")
+  /// saran otomatis asal (stagnan | rfq | penawaran), bila dibuat dari saran
+  saran          String?
+  diajukanOleh   String?
+  diajukanNama   String?
+  dilaporOleh    String?
+  dilaporNama    String?
+  /// saat laporan resmi dibuat BM (awal hitungan SLA / eskalasi)
+  dilaporAt      DateTime?
+  ditanganiAt    DateTime?
+  ditanganiNama  String?
+  selesaiAt      DateTime?
+  selesaiNama    String?
+  solusi         String?
+  /// deal | jalan | lose
+  hasil          String?
+  alasanTolak    String?
+  /// 0 = belum, 1 = sudah ke RM, 2 = sudah ke GM
+  eskalasi       Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([prospectId, status])
+  @@index([status, cabang])
 }

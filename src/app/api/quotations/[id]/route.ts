@@ -5,11 +5,14 @@ import { canEditPurchasing, docVisibleTo } from '@/lib/auth';
 import { PSTATUS_MASUK, PSTATUS_PO } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { guard } from '@/lib/permissions-server';
 
 /** Fill in a vendor's answer (price / lead time / notes). */
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'purch', 'e');
+  if (denied) return denied;
   if (!canEditPurchasing(user)) {
     return NextResponse.json({ error: 'Hanya Purchasing dan Admin yang dapat mengisi penawaran.' }, { status: 403 });
   }
@@ -61,6 +64,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'purch', 'e');
+  if (denied) return denied;
   if (!canEditPurchasing(user)) {
     return NextResponse.json({ error: 'Hanya Purchasing dan Admin yang dapat menentukan pemenang.' }, { status: 403 });
   }
@@ -99,6 +104,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'purch', 'd');
+  if (denied) return denied;
   if (!canEditPurchasing(user)) {
     return NextResponse.json({ error: 'Hanya Purchasing dan Admin yang dapat menghapus penawaran.' }, { status: 403 });
   }

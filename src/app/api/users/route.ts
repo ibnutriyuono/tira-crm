@@ -6,6 +6,7 @@ import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Role } from '@/lib/types';
+import { resolveRoleInput } from '@/lib/permissions-server';
 
 export async function GET() {
   const user = await requireUser();
@@ -26,7 +27,9 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const username = String(body?.username || '').trim().toLowerCase();
   const name = String(body?.name || '').trim();
-  const role = String(body?.role || 'sales');
+  const resolved = await resolveRoleInput(body?.role, 'sales');
+  if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: 400 });
+  const { role, customRole } = resolved;
   const password = String(body?.password || '');
 
   if (!username || !name) return NextResponse.json({ error: 'Username dan nama wajib diisi' }, { status: 400 });
@@ -42,6 +45,7 @@ export async function POST(req: Request) {
       username,
       name,
       role: role as Role,
+      customRole,
       se: String(body?.se || '').trim().toUpperCase(),
       cabang: String(body?.cabang || '').trim().toUpperCase(),
       reg: body?.reg ? Number(body.reg) : null,

@@ -3,7 +3,8 @@ import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { docVisibleTo } from '@/lib/auth';
-import { notify, purchasingUserIds, requesterUserIds } from '@/lib/notify';
+import { bmUserIds, notify, purchasingUserIds, requesterUserIds, seUserIds } from '@/lib/notify';
+import { groupOfCustomer } from '@/lib/kam-server';
 import type { SafeUser } from '@/lib/types';
 
 const ENTITIES = ['prospect', 'rfq', 'fupa'] as const;
@@ -23,6 +24,10 @@ async function chatVisible(user: SafeUser, entity: string, entityId: string): Pr
   if (user.role !== 'purchasing05') return true;
   if (entity === 'rfq') return docVisibleTo(user, { rfqId: entityId });
   if (entity === 'fupa') return docVisibleTo(user, { fupaId: entityId });
+  if (entity === 'prospect') {
+    const pj = await prisma.prospectIssue.findFirst({ where: { prospectId: entityId, pjIds: { array_contains: [user.id] } }, select: { id: true } });
+    return !!pj;
+  }
   return false;
 }
 
@@ -87,9 +92,8 @@ export async function POST(req: Request) {
 
   emitCrmEvent('itemchat:message', message);
 
-  // Diskusi hanya relevan untuk RFQ/FUP A — thread prospek tidak melibatkan
-  // Purchasing. Penerimanya: semua staf Purchasing + pengaju dokumen,
-  // dikurangi siapapun yang justru sedang mengirim pesan ini.
+  // RFQ/FUP A: semua staf Purchasing + pengaju dokumen, dikurangi siapapun
+  // yang justru sedang mengirim pesan ini.
   if (entity === 'rfq' || entity === 'fupa') {
     const parent =
       entity === 'rfq'
@@ -106,6 +110,34 @@ export async function POST(req: Request) {
         entity,
         entityId,
         title: `Pesan baru di ${entity === 'rfq' ? 'RFQ' : 'FUP A'} ${noDoc}`,
+        message: `${user.name}: ${preview}`,
+      });
+    }
+  }
+
+  // Diskusi di kartu prospek: Sales pemilik, BM cabangnya, ketua grup Key
+  // Account customer tsb, dan siapa saja yang sudah ikut berdiskusi —
+  // dikurangi pengirim.
+  if (entity === 'prospect') {
+    const p = await prisma.prospect.findUnique({ where: { id: entityId }, select: { se: true, cabang: true, customer: true } });
+    if (p) {
+      const recipients = new Set<string>([...(await seUserIds(p.se)), ...(await bmUserIds(p.cabang))]);
+      const g = await groupOfCustomer(p.customer);
+      if (g?.ketuaId) recipients.add(g.ketuaId);
+      // Penanggung jawab masalah aktif (mis. Purchasing) ikut menerima diskusi kartu.
+      const issue = await prisma.prospectIssue.findFirst({ where: { prospectId: entityId, status: { in: ['open', 'proses'] } }, select: { pjIds: true } });
+      (Array.isArray(issue?.pjIds) ? (issue!.pjIds as string[]) : []).forEach((id) => recipients.add(id));
+      const prior = await prisma.itemMessage.findMany({ where: { entity, entityId }, select: { authorUsername: true }, distinct: ['authorUsername'] });
+      const names = prior.map((m) => m.authorUsername).filter((u): u is string => !!u && u !== user.username);
+      if (names.length) (await prisma.user.findMany({ where: { username: { in: names } }, select: { id: true } })).forEach((u) => recipients.add(u.id));
+      recipients.delete(user.id);
+      const preview = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+      await notify({
+        userIds: Array.from(recipients),
+        type: 'prospect_chat',
+        entity: 'prospect',
+        entityId,
+        title: `Diskusi prospek ${p.customer}${p.se ? ` (${p.se})` : ''}`,
         message: `${user.name}: ${preview}`,
       });
     }

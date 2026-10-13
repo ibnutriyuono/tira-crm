@@ -23,6 +23,7 @@ import { activityOwner } from '@/lib/sales-activity';
 import type { SalesActivity } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
+import { canNow } from '@/hooks/useCan';
 
 type Row = CustomerIntelRow & { contact: ContactSummary };
 const WRAP = { whiteSpace: 'normal', lineHeight: 1.35 } as const;
@@ -397,7 +398,9 @@ export function CustomerIntelModal() {
           <option value="stale">Urutkan: Paling Lama Tidak Order</option>
           <option value="contact">Urutkan: Paling Lama Tidak Dihubungi</option>
         </select>
-        <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+        {canNow('marketing', 'x') && (
+          <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+        )}
       </div>
       <div className="import-summary">Menampilkan <b>{list.length}</b> dari <b>{rows.length}</b> customer</div>
       {list.length === 0 ? (

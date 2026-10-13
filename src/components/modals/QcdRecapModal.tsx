@@ -12,6 +12,7 @@ import { buildQcdRecap } from '@/lib/reports';
 import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
+import { canNow } from '@/hooks/useCan';
 
 /** "Lebih murah — selisih 5%" from the level dropdown plus the optional note. */
 function dimText(r: Prospect, key: 'quality' | 'cost' | 'delivery'): string {
@@ -179,9 +180,11 @@ export function QcdRecapModal() {
               <option value="5">DO</option>
               <option value="6">Lose Order</option>
             </select>
-            <button className="btn btn-outline btn-sm" onClick={exportExcel}>
-              Export Excel
-            </button>
+            {canNow('marketing', 'x') && (
+              <button className="btn btn-outline btn-sm" onClick={exportExcel}>
+                Export Excel
+              </button>
+            )}
           </div>
           <div className="import-summary">
             Menampilkan <b>{list.length}</b> dari <b>{rows.length}</b> deal yang sudah ditutup (PO / DO / Lose). QCD wajib diisi saat deal ditutup.

@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma';
 import { assertProspectInScope } from '@/lib/prospect-access';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Material, Prospect } from '@/lib/types';
+import { guard } from '@/lib/permissions-server';
 
 /**
  * Status item & riwayat (Ditawarkan -> PO -> Terkirim) of one prospect.
@@ -44,6 +45,8 @@ async function eventsOf(prospectId: string) {
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'prospek', 'v');
+  if (denied) return denied;
   if (user.role === 'purchasing05') return NextResponse.json({ error: 'Prospek tidak ditemukan' }, { status: 404 });
   const { id } = await params;
   const scoped = await assertProspectInScope(user, id);
@@ -61,6 +64,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'prospek', 'e');
+  if (denied) return denied;
   if (isPurchasingRole(user.role)) return NextResponse.json({ error: 'Tidak diizinkan' }, { status: 403 });
   const { id } = await params;
   const scoped = await assertProspectInScope(user, id);

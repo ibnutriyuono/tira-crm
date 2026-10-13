@@ -6,6 +6,7 @@ import { mergePics } from '@/lib/customer-sync';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { CustomerPic, TripVisit } from '@/lib/types';
+import { guard } from '@/lib/permissions-server';
 
 /**
  * Satukan Nama Customer: every record written with one of the `from`
@@ -17,6 +18,8 @@ import type { CustomerPic, TripVisit } from '@/lib/types';
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'customer', 'e');
+  if (denied) return denied;
   if (user.role !== 'gm' && user.role !== 'admin') {
     return NextResponse.json({ error: 'Hanya GM / Admin yang dapat menyatukan nama customer.' }, { status: 403 });
   }

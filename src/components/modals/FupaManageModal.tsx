@@ -12,6 +12,7 @@ import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Fupa } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
 function statusColor(status: string): string {
   return status === 'Selesai' ? 'green' : status === 'Terkirim' ? 'steel' : 'slate';
@@ -67,7 +68,7 @@ export function FupaManageModal() {
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title="Kelola FUP A" wide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title="Kelola FUP A" xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
       <div className="toolbar-row">
         <button
           className="btn btn-primary btn-sm"
@@ -85,7 +86,9 @@ export function FupaManageModal() {
           <option value="Selesai">Selesai</option>
         </select>
         <input type="search" className="search-grow" placeholder="Cari No FUP A / RFQ / Customer..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+        {canNow('rfq', 'x') && (
+          <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+        )}
       </div>
       <div className="import-summary">
         FUP A adalah permintaan pembelian (purchase request) resmi yang dibuat setelah RFQ dinyatakan Won. Setiap FUP A

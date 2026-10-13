@@ -4,10 +4,13 @@ import { isResponse, requireUser } from '@/lib/api-helpers';
 import { canEditBudgetTarget, salesActivityScopeWhere } from '@/lib/auth';
 import { ACTIVITY_TYPES } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
+import { guard } from '@/lib/permissions-server';
 
 export async function GET(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'kpi', 'v');
+  if (denied) return denied;
   const periode = new URL(req.url).searchParams.get('periode') || new Date().toISOString().slice(0, 7);
   if (!/^\d{4}-\d{2}$/.test(periode)) return NextResponse.json({ error: 'Periode harus YYYY-MM' }, { status: 400 });
   const targets = await prisma.activityTarget.findMany({ where: { AND: [await salesActivityScopeWhere(user), { periode }] }, orderBy: { se: 'asc' } });
@@ -23,6 +26,8 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'kpi', 'e');
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   const se = String(body?.se || '').trim().toUpperCase();

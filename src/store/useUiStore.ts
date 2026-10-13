@@ -26,7 +26,9 @@ export type ModalKey =
   | 'marketing'
   | 'customerIntel'
   | 'keyAccount'
+  | 'pipelineIssues'
   | 'adminQueue'
+  | 'roles'
   | 'competitorLog'
   | 'forecast'
   | 'qcdRecap'
@@ -135,6 +137,10 @@ interface UiState {
   salesPlanCtx: SalesPlanCtx | null;
   /** Opens Aktivitas Harian with these fields filled (e.g. from Marketing > Reaktivasi); returnTo reopens that screen on close. */
   activityPrefill: { customer: string; keterangan?: string; tipe?: string; returnTo?: ModalKey } | null;
+  /** Buka Aktivitas Harian langsung di satu aktivitas/rencana (dari notifikasi follow-up). */
+  activityFocus: { id: string } | null;
+  /** Buka papan Masalah Pipeline / tab Masalah Purchasing langsung di satu masalah. */
+  issueFocus: { id: string } | null;
   userEditId: string | null;
   customerEditId: string | null;
   vendorEditId: string | null;
@@ -222,6 +228,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   followUpCtx: null,
   salesPlanCtx: null,
   activityPrefill: null,
+  activityFocus: null,
+  issueFocus: null,
   userEditId: null,
   customerEditId: null,
   vendorEditId: null,

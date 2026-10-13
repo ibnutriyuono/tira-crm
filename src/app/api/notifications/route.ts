@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
+import { sweepFollowUpNotifications } from '@/lib/followup-notify';
+import { sweepIssueEscalation } from '@/lib/issues-server';
 
 /** Latest 50 notifications for the caller — plenty for a dropdown/panel; older history lives in Log Aktivitas for anything that needs full audit depth. */
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
 
+  await sweepFollowUpNotifications();
+  await sweepIssueEscalation();
   const notifications = await prisma.notification.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: 'desc' },

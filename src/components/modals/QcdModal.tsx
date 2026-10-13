@@ -95,7 +95,7 @@ export function QcdModal() {
       show={show}
       onClose={closeModal}
       title="Quality · Cost · Delivery"
-      wide
+      wide2
       onSubmit={onSubmit}
       footer={
         <>

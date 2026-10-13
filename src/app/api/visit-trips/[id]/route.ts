@@ -9,11 +9,14 @@ import { parsePicText, syncCustomerPics } from '@/lib/customer-sync';
 import { deleteObject } from '@/lib/s3';
 import type { TripVisit } from '@/lib/types';
 import { canEditPlan, canEditRealisasi, mergeRealisasi, normalizePlanVisits, validateTripHeader } from '@/lib/visit-trip';
+import { guard } from '@/lib/permissions-server';
 
 /** One trip, within the viewer's scope -- used when opening a trip from a notification. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'trip', 'v');
+  if (denied) return denied;
   const { id } = await params;
   const trip = await prisma.visitTrip.findFirst({ where: { AND: [visitTripScopeWhere(user), { id }] } });
   if (!trip) return NextResponse.json({ error: 'Perjalanan tidak ditemukan atau di luar akses Anda' }, { status: 404 });
@@ -29,6 +32,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'trip', 'e');
+  if (denied) return denied;
   const { id } = await params;
   const existing = await prisma.visitTrip.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: 'Perjalanan tidak ditemukan' }, { status: 404 });
@@ -88,6 +93,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'trip', 'd');
+  if (denied) return denied;
   const { id } = await params;
   const existing = await prisma.visitTrip.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: 'Perjalanan tidak ditemukan' }, { status: 404 });

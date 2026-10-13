@@ -8,10 +8,13 @@ import { itemsHaveLine } from '@/lib/doc-lines';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { notify, purchasingUserIds, requesterUserIds } from '@/lib/notify';
+import { guard } from '@/lib/permissions-server';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'rfq', 'e');
+  if (denied) return denied;
   const { id } = await params;
 
   const existing = await prisma.fupa.findUnique({ where: { id } });
@@ -60,6 +63,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'rfq', 'e');
+  if (denied) return denied;
   const { id } = await params;
   const body = await req.json().catch(() => null);
 
@@ -177,6 +182,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'rfq', 'd');
+  if (denied) return denied;
   const { id } = await params;
 
   const existing = await prisma.fupa.findUnique({ where: { id } });

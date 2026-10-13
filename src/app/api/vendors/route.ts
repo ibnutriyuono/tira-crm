@@ -4,10 +4,13 @@ import { isResponse, requireUser } from '@/lib/api-helpers';
 import { canEditPurchasing } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { guard } from '@/lib/permissions-server';
 
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'purch', 'v');
+  if (denied) return denied;
   // Readable by everyone: sales and managers see which vendors were asked to
   // quote. Only purchasing/admin can write (see the guard in POST).
   const vendors = await prisma.vendor.findMany({ orderBy: { nama: 'asc' } });
@@ -17,6 +20,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'purch', 'e');
+  if (denied) return denied;
   if (!canEditPurchasing(user)) {
     return NextResponse.json({ error: 'Hanya Purchasing dan Admin yang dapat mengelola vendor.' }, { status: 403 });
   }

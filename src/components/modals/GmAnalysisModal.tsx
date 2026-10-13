@@ -12,6 +12,7 @@ import { ProductTab } from '../analisa/ProductTab';
 import { TargetTab } from '../analisa/TargetTab';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
+import { canNow } from '@/hooks/useCan';
 
 const GRAPHITE = '1A2A3D';
 const STEEL = '2E5C7E';
@@ -218,7 +219,7 @@ export function GmAnalysisModal() {
           <button type="button" className="btn btn-outline" onClick={closeModal}>
             Tutup
           </button>
-          {tab === 'sales' && (
+          {tab === 'sales' && canNow('analisa', 'x') && (
             <button type="button" className="btn btn-primary" disabled={busy || !a} onClick={onGeneratePpt}>
               <IconDownload /> {busy ? 'Membuat PPT…' : 'Buat PPT'}
             </button>

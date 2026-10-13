@@ -8,10 +8,13 @@ import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { notify, purchasingUserIds } from '@/lib/notify';
 import { notifyKamCrossBranch } from '@/lib/kam-server';
+import { guard } from '@/lib/permissions-server';
 
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'rfq', 'v');
+  if (denied) return denied;
   const rfqs = await prisma.rfq.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } });
   return NextResponse.json({ rfqs });
 }
@@ -61,6 +64,8 @@ async function createDenganNomorOtomatis(dataDasar: Record<string, unknown>, per
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'rfq', 'e');
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   // Nomor boleh dikosongkan — kalau kosong, dibuatkan otomatis saat create.

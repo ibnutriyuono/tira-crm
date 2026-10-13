@@ -7,10 +7,13 @@ import { cabangRegMap, docScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { notify, purchasingUserIds } from '@/lib/notify';
+import { guard } from '@/lib/permissions-server';
 
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'rfq', 'v');
+  if (denied) return denied;
   const fupas = await prisma.fupa.findMany({ where: await docScopeWhere(user, { table: 'fupa' }), orderBy: { createdAt: 'desc' } });
   return NextResponse.json({ fupas });
 }
@@ -18,6 +21,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'rfq', 'e');
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   const sourceRfqId = body?.sourceRfqId ? String(body.sourceRfqId) : null;

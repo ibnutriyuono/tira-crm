@@ -12,6 +12,7 @@ import { useUiStore } from '@/store/useUiStore';
 import { activityLabel, buildContactIndex, lastContactAfter } from '@/lib/reaktivasi';
 import { activityOwner } from '@/lib/sales-activity';
 import type { Prospect, SalesActivity } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
 type Tab = 'tren' | 'hitrate' | 'aktivitas' | 'reaktivasi' | 'kekalahan' | 'crosssell' | 'konten' | 'corong';
 
@@ -686,9 +687,11 @@ export function MarketingModal() {
           </div>
 
           <div className="toolbar-row">
-            <button className="btn btn-outline btn-sm" onClick={exportHitRate}>
-              <IconDownload /> Export Excel
-            </button>
+            {canNow('marketing', 'x') && (
+              <button className="btn btn-outline btn-sm" onClick={exportHitRate}>
+                <IconDownload /> Export Excel
+              </button>
+            )}
           </div>
 
           {hitRate.length === 0 ? (
@@ -763,9 +766,11 @@ export function MarketingModal() {
           </div>
 
           <div className="toolbar-row">
-            <button className="btn btn-outline btn-sm" onClick={exportAktivitas}>
-              <IconDownload /> Export Excel
-            </button>
+            {canNow('marketing', 'x') && (
+              <button className="btn btn-outline btn-sm" onClick={exportAktivitas}>
+                <IconDownload /> Export Excel
+              </button>
+            )}
             <select className="btn-sm" value={aktGran} onChange={(e) => { setAktGran(e.target.value as typeof aktGran); setAktPeriode(''); }}>
               <option value="hari">Per Hari</option>
               <option value="pekan">Per Pekan</option>
@@ -903,9 +908,11 @@ export function MarketingModal() {
             </div>
           </div>
           <div className="toolbar-row">
-            <button className="btn btn-outline btn-sm" onClick={exportReaktivasi}>
-              <IconDownload /> Export Excel
-            </button>
+            {canNow('marketing', 'x') && (
+              <button className="btn btn-outline btn-sm" onClick={exportReaktivasi}>
+                <IconDownload /> Export Excel
+              </button>
+            )}
             <select className="btn-sm" value={scope} onChange={(e) => setScope(e.target.value as typeof scope)}>
               <option value="dingin">Dingin saja (&gt;90 hari)</option>
               <option value="semua">Dingin + Menghangat (&gt;45 hari)</option>
@@ -997,9 +1004,11 @@ export function MarketingModal() {
             Kekalahan dipecah <b>per Line</b> beserta alasannya, supaya penanganannya bisa berbeda: line yang kalah karena harga perlu negosiasi ke prinsipal, sedangkan yang kalah karena delivery perlu stok buffer — bukan diskon.
           </div>
           <div className="toolbar-row">
-            <button className="btn btn-outline btn-sm" onClick={exportKekalahan}>
-              <IconDownload /> Export Excel
-            </button>
+            {canNow('marketing', 'x') && (
+              <button className="btn btn-outline btn-sm" onClick={exportKekalahan}>
+                <IconDownload /> Export Excel
+              </button>
+            )}
           </div>
           {kekalahan.length === 0 ? (
             <div className="empty-state">
@@ -1051,9 +1060,11 @@ export function MarketingModal() {
             Customer yang sudah beli tapi <b>line-nya masih sedikit</b>, dibandingkan line yang paling banyak dibeli customer lain. Diurutkan dari yang belanjanya besar tapi cakupan line-nya sempit.
           </div>
           <div className="toolbar-row">
-            <button className="btn btn-outline btn-sm" onClick={exportCrossSell}>
-              <IconDownload /> Export Excel
-            </button>
+            {canNow('marketing', 'x') && (
+              <button className="btn btn-outline btn-sm" onClick={exportCrossSell}>
+                <IconDownload /> Export Excel
+              </button>
+            )}
           </div>
           {crossSell.length === 0 ? (
             <div className="empty-state">

@@ -14,6 +14,27 @@ import { qcdMissing } from '@/lib/qcd';
 import { QcdFields, qcdPayload } from '../QcdFields';
 import { appendSheet, buildSalesActivitySheet } from '@/lib/exports';
 import type { ActivityPic, Prospect, SalesActivity } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
+import { HASIL_KEYS, HASIL_LABEL, KANAL_BY_TIPE, KANAL_LABEL, contactErrors, emailError, kanalNeeds, needsHasil, normalizePhone, phoneError, waLink, type Hasil, type Kanal } from '@/lib/activity-contact';
+
+const plusDays = (ymd: string, n: number) => {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+const EMPTY_PIC: ActivityPic = { nama: '', jabatan: '', phone: '', email: '', dihubungi: true };
+
+/** Lokasi perangkat (untuk kunjungan); null bila ditolak / tidak tersedia dalam 8 detik. */
+function getLocation(): Promise<{ lat: number; lng: number; akurasi: number } | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, akurasi: Math.round(pos.coords.accuracy) }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+    );
+  });
+}
 
 const TIPE_LABEL: Record<string, string> = Object.fromEntries(ACTIVITY_TYPES.map((t) => [t.key, t.label]));
 const TIPE_COLOR: Record<string, string> = { kunjungan: 'green', telepon: 'steel', meeting: 'amber', dokumen: 'slate' };
@@ -57,8 +78,16 @@ export function SalesActivityModal() {
   const [tipe, setTipe] = useState<ActivityTipe>('kunjungan');
   const [customer, setCustomer] = useState('');
   const [keterangan, setKeterangan] = useState('');
-  const [pics, setPics] = useState<ActivityPic[]>([{ nama: '', jabatan: '' }]);
+  const [pics, setPics] = useState<ActivityPic[]>([{ ...EMPTY_PIC }]);
+  const [kanal, setKanal] = useState<Kanal | ''>('');
+  const [hasil, setHasil] = useState<Hasil | ''>('');
+  const [followUp, setFollowUp] = useState('');
+  const [langkah, setLangkah] = useState('');
+  const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Dibuka dari notifikasi follow-up: rencana ini disorot (juga untuk BM yang
+  // melihat rencana Sales-nya).
+  const [focusId, setFocusId] = useState<string | null>(null);
 
   const [convert, setConvert] = useState<ConvertCtx | null>(null);
   const [uraian, setUraian] = useState('');
@@ -105,7 +134,20 @@ export function SalesActivityModal() {
       if (pre.tipe) setTipe(pre.tipe as ActivityTipe);
       useUiStore.setState({ activityPrefill: null });
     }
-  }, [show]);
+    const focus = useUiStore.getState().activityFocus;
+    setFocusId(null);
+    if (focus) {
+      useUiStore.setState({ activityFocus: null });
+      api
+        .get<{ activity: SalesActivity }>(`/api/sales-activities/${focus.id}`)
+        .then(({ activity }) => {
+          setTanggal(activity.tanggal);
+          setFocusId(activity.id);
+        })
+        .catch((err) => toast(err instanceof Error ? err.message : 'Rencana tidak ditemukan', 'error'));
+    }
+  }, [show, toast]);
+
 
   useEffect(() => {
     if (show) void load();
@@ -116,11 +158,26 @@ export function SalesActivityModal() {
     setTipe('kunjungan');
     setCustomer('');
     setKeterangan('');
-    setPics([{ nama: '', jabatan: '' }]);
+    setPics([{ ...EMPTY_PIC }]);
+    setKanal('');
+    setHasil('');
+    setFollowUp('');
+    setLangkah('');
+    setTried(false);
   }
 
   const mine = useMemo(() => activities.filter((a) => (owner ? a.se.toLowerCase() === owner.toLowerCase() : true)), [activities, owner]);
-  const dayList = useMemo(() => mine.filter((a) => a.tanggal === tanggal), [mine, tanggal]);
+  const dayList = useMemo(() => {
+    const own = mine.filter((a) => a.tanggal === tanggal);
+    const f = focusId ? activities.find((a) => a.id === focusId && a.tanggal === tanggal) : null;
+    return f && !own.includes(f) ? [f, ...own] : own;
+  }, [mine, activities, focusId, tanggal]);
+  // Gulirkan ke baris yang disorot setelah daftar tanggalnya termuat.
+  useEffect(() => {
+    if (!focusId || loading) return;
+    const el = document.querySelector(`[data-act-id="${focusId}"]`);
+    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [focusId, loading, dayList]);
   const monthCount = useMemo(() => {
     const m: Record<string, number> = {};
     mine.filter((a) => a.status !== 'rencana').forEach((a) => (m[a.tipe] = (m[a.tipe] || 0) + 1));
@@ -135,14 +192,16 @@ export function SalesActivityModal() {
     return (c?.pics || []).filter((p) => p.nama);
   }, [customers, customer]);
 
-  function setPic(i: number, field: keyof ActivityPic, value: string) {
+  function setPic(i: number, field: 'nama' | 'jabatan' | 'phone' | 'email', value: string) {
     setPics((list) =>
       list.map((p, idx) => {
         if (idx !== i) return p;
         const next = { ...p, [field]: value };
-        if (field === 'nama' && !p.jabatan) {
+        if (field === 'nama') {
           const hit = knownPics.find((k) => k.nama.trim().toLowerCase() === value.trim().toLowerCase());
-          if (hit?.jabatan) next.jabatan = hit.jabatan;
+          if (hit?.jabatan && !p.jabatan) next.jabatan = hit.jabatan;
+          if (hit?.phone && !p.phone) next.phone = hit.phone;
+          if (hit?.email && !p.email) next.email = hit.email;
         }
         return next;
       }),
@@ -151,23 +210,54 @@ export function SalesActivityModal() {
 
   const prospectById = useMemo(() => new Map(prospects.map((p) => [p.id, p])), [prospects]);
 
+  const filledPics = useMemo(
+    () => pics.map((p) => ({ ...p, nama: p.nama.trim(), jabatan: p.jabatan.trim(), phone: (p.phone || '').trim(), email: (p.email || '').trim() })).filter((p) => p.nama || p.jabatan || p.phone || p.email),
+    [pics],
+  );
+  const kanals = KANAL_BY_TIPE[tipe] || null;
+  const need = kanals ? kanalNeeds(kanal) : null;
+  const showHasil = needsHasil(tipe, kanal);
+  const ruleErrors = useMemo(() => contactErrors({ tipe, kanal, hasil, followUp, langkah, pics: filledPics }), [tipe, kanal, hasil, followUp, langkah, filledPics]);
+  const firstContacted = filledPics.find((p) => p.dihubungi) || null;
+
+  // Customer dipilih (form baru, PIC masih kosong): isi PIC & kontak dari Kelola Customer.
+  const [prefilledFor, setPrefilledFor] = useState('');
+  if (!editId && customer && prefilledFor !== customer.trim().toLowerCase() && knownPics.length && pics.every((p) => !p.nama && !p.jabatan && !p.phone && !p.email)) {
+    setPrefilledFor(customer.trim().toLowerCase());
+    setPics(knownPics.slice(0, 6).map((k, i) => ({ nama: k.nama, jabatan: k.jabatan || '', phone: k.phone || '', email: k.email || '', dihubungi: i === 0 })));
+  }
+
   async function onSave() {
+    setTried(true);
     if (!customer.trim()) return toast('Nama customer wajib diisi', 'error');
-    const filled = pics.map((p) => ({ nama: p.nama.trim(), jabatan: p.jabatan.trim() })).filter((p) => p.nama || p.jabatan);
-    if (filled.length === 0) return toast('Isi minimal satu PIC beserta jabatannya', 'error');
-    if (filled.some((p) => !p.nama || !p.jabatan)) return toast('Setiap PIC wajib diisi nama dan jabatannya', 'error');
+    if (filledPics.length === 0) return toast('Isi minimal satu PIC beserta jabatannya', 'error');
+    if (filledPics.some((p) => !p.nama || !p.jabatan)) return toast('Setiap PIC wajib diisi nama dan jabatannya', 'error');
+    if (ruleErrors.length) return toast(ruleErrors[0], 'error');
     setBusy(true);
     try {
-      const payload = { tanggal, tipe, customer: customer.trim(), keterangan, pics: filled };
-      const { activity } = editId
+      const loc = tipe === 'kunjungan' ? await getLocation() : null;
+      const payload = {
+        tanggal,
+        tipe,
+        customer: customer.trim(),
+        keterangan,
+        pics: filledPics.map((p) => ({ ...p, phone: p.phone ? normalizePhone(p.phone) : '' })),
+        kanal: kanals ? kanal : null,
+        hasil: showHasil ? hasil : null,
+        followUp: showHasil && hasil && hasil !== 'tersambung' ? followUp : null,
+        langkah: langkah.trim(),
+        ...(loc || {}),
+      };
+      const res = editId
         ? await api.put<{ activity: SalesActivity }>(`/api/sales-activities/${editId}`, payload)
-        : await api.post<{ activity: SalesActivity }>('/api/sales-activities', payload);
+        : await api.post<{ activity: SalesActivity; followUpCreated?: boolean }>('/api/sales-activities', payload);
+      const activity = res.activity;
       setActivities((list) => (list.some((a) => a.id === activity.id) ? list.map((a) => (a.id === activity.id ? activity : a)) : [activity, ...list]));
-      toast(editId ? 'Aktivitas diperbarui' : 'Aktivitas tersimpan', 'success');
+      const extra = [activity.followUpId ? `rencana follow-up ${formatDateID(followUp)} dibuat` : '', tipe === 'kunjungan' ? (loc ? 'lokasi tercatat' : 'lokasi tidak tersedia') : ''].filter(Boolean).join(' · ');
+      toast(`${editId ? 'Aktivitas diperbarui' : 'Aktivitas tersimpan'}${extra ? ` — ${extra}` : ''}`, 'success');
       resetForm();
-      // An edit may have moved the entry into another month; refetch keeps the
-      // month summary honest.
-      if (editId) void load();
+      // Rencana follow-up / perubahan bulan: muat ulang supaya daftar & ringkasan bulan benar.
+      void load();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal menyimpan aktivitas', 'error');
     } finally {
@@ -182,7 +272,14 @@ export function SalesActivityModal() {
     setTipe(a.tipe);
     setCustomer(a.customer);
     setKeterangan(a.keterangan || '');
-    setPics(a.pics?.length ? a.pics.map((p) => ({ ...p })) : [{ nama: '', jabatan: '' }]);
+    setPics(a.pics?.length ? a.pics.map((p) => ({ phone: '', email: '', ...p })) : [{ ...EMPTY_PIC }]);
+    setKanal((a.kanal as Kanal) || '');
+    setHasil(a.status === 'rencana' ? '' : (a.hasil as Hasil) || '');
+    setFollowUp('');
+    setLangkah(a.langkah || '');
+    setTried(false);
+    // Menyelesaikan rencana follow-up dari hasil kontak: dicatat hari ini.
+    if (a.status === 'rencana') setTanggal(localToday());
   }
 
   // A planned follow-up done (possibly earlier than its date): it becomes
@@ -260,9 +357,11 @@ export function SalesActivityModal() {
       xwide
       footer={
         <>
-          <button type="button" className="btn btn-outline" style={{ marginRight: 'auto' }} onClick={exportExcel} disabled={loading}>
-            Export Excel ({periode})
-          </button>
+          {canNow('aktivitas', 'x') && (
+            <button type="button" className="btn btn-outline" style={{ marginRight: 'auto' }} onClick={exportExcel} disabled={loading}>
+              Export Excel ({periode})
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-outline"
@@ -309,7 +408,14 @@ export function SalesActivityModal() {
           <div className="form-grid">
             <div>
               <label>Jenis aktivitas</label>
-              <select value={tipe} onChange={(e) => setTipe(e.target.value as ActivityTipe)}>
+              <select
+                value={tipe}
+                onChange={(e) => {
+                  setTipe(e.target.value as ActivityTipe);
+                  setKanal('');
+                  setHasil('');
+                }}
+              >
                 {ACTIVITY_TYPES.map((t) => (
                   <option key={t.key} value={t.key}>
                     {t.label}
@@ -321,9 +427,29 @@ export function SalesActivityModal() {
               <label>Customer *</label>
               <CustomerNameInput value={customer} onChange={setCustomer} />
             </div>
+            {kanals && (
+              <div className="full">
+                <label>
+                  Saluran <span style={{ color: 'var(--rust-600)' }}>*</span>{' '}
+                  <span className="field-note" style={{ display: 'inline', textTransform: 'none' }}>
+                    — menentukan kontak yang wajib diisi
+                  </span>
+                </label>
+                <div className="sa-pills" role="group" aria-label="Saluran">
+                  {kanals.map((k) => (
+                    <button key={k} type="button" className={kanal === k ? 'on' : ''} aria-pressed={kanal === k} onClick={() => setKanal(k)}>
+                      {KANAL_LABEL[k]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="full">
               <label>
-                PIC &amp; Jabatan <span style={{ color: 'var(--rust-600)' }}>*</span>
+                PIC customer <span style={{ color: 'var(--rust-600)' }}>*</span>{' '}
+                <span className="field-note" style={{ display: 'inline', textTransform: 'none' }}>
+                  — centang yang dihubungi{need === 'phone' ? '; No. HP/WA wajib untuk PIC yang dicentang' : need === 'email' ? '; Email wajib untuk PIC yang dicentang' : ''}
+                </span>
               </label>
               <datalist id="salesActPics">
                 {knownPics.map((k) => (
@@ -332,34 +458,110 @@ export function SalesActivityModal() {
                   </option>
                 ))}
               </datalist>
-              {pics.map((p, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-                  <input type="text" list="salesActPics" value={p.nama} onChange={(e) => setPic(i, 'nama', e.target.value)} placeholder="Nama PIC" style={{ flex: 1 }} />
-                  <input type="text" value={p.jabatan} onChange={(e) => setPic(i, 'jabatan', e.target.value)} placeholder="Jabatan (cth. Purchasing Manager)" style={{ flex: 1 }} />
-                  <button
-                    type="button"
-                    className="icon-btn danger"
-                    title="Hapus PIC ini"
-                    disabled={pics.length === 1}
-                    onClick={() => setPics((list) => list.filter((_, idx) => idx !== i))}
-                  >
-                    <IconTrash />
-                  </button>
-                </div>
-              ))}
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => setPics((list) => [...list, { nama: '', jabatan: '' }])}>
+              {pics.map((p, i) => {
+                const must = !!p.dihubungi && need;
+                const pe = must === 'phone' || (p.phone || '').trim() ? phoneError(p.phone) : '';
+                const ee = must === 'email' || (p.email || '').trim() ? emailError(p.email) : '';
+                const showErr = tried || (p.phone || p.email);
+                return (
+                  <div key={i} className="sa-pic">
+                    <label className="sa-chk" title="PIC ini yang dihubungi">
+                      <input type="checkbox" checked={!!p.dihubungi} onChange={(e) => setPics((list) => list.map((x, idx) => (idx === i ? { ...x, dihubungi: e.target.checked } : x)))} aria-label={`Dihubungi: ${p.nama || 'PIC ' + (i + 1)}`} />
+                    </label>
+                    <input type="text" list="salesActPics" value={p.nama} onChange={(e) => setPic(i, 'nama', e.target.value)} placeholder="Nama PIC" />
+                    <input type="text" value={p.jabatan} onChange={(e) => setPic(i, 'jabatan', e.target.value)} placeholder="Jabatan" />
+                    <div>
+                      <input type="text" inputMode="tel" value={p.phone || ''} onChange={(e) => setPic(i, 'phone', e.target.value)} placeholder={must === 'phone' ? 'No. HP/WA *' : 'No. HP/WA'} className={must === 'phone' ? 'req' : ''} style={{ fontFamily: 'var(--font-ibm-plex-mono), monospace', borderColor: pe && showErr ? 'var(--rust-500)' : undefined }} />
+                      {pe && showErr ? <small className="bad">{pe}</small> : must === 'phone' && p.phone ? <small className="ok">✓ {normalizePhone(p.phone)}</small> : null}
+                    </div>
+                    <div>
+                      <input type="text" inputMode="email" value={p.email || ''} onChange={(e) => setPic(i, 'email', e.target.value)} placeholder={must === 'email' ? 'Email *' : 'Email'} className={must === 'email' ? 'req' : ''} style={{ borderColor: ee && showErr ? 'var(--rust-500)' : undefined }} />
+                      {ee && showErr ? <small className="bad">{ee}</small> : must === 'email' && p.email ? <small className="ok">✓ valid</small> : null}
+                    </div>
+                    <button type="button" className="icon-btn danger" title="Hapus PIC ini" disabled={pics.length === 1} onClick={() => setPics((list) => list.filter((_, idx) => idx !== i))}>
+                      <IconTrash />
+                    </button>
+                  </div>
+                );
+              })}
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setPics((list) => [...list, { ...EMPTY_PIC, dihubungi: false }])}>
                 <IconPlus /> Tambah PIC
               </button>
-              {knownPics.length > 0 && <div className="field-note" style={{ marginTop: 4 }}>Ketik/pilih nama PIC yang sudah terdaftar di customer ini — jabatannya terisi otomatis.</div>}
+              <div className="field-note" style={{ marginTop: 4 }}>
+                PIC & kontak terisi dari Kelola Customer; nomor/email yang diketik di sini ikut disimpan ke data customer. No. HP dirapikan otomatis ke format 08….
+              </div>
             </div>
+            {showHasil && (
+              <div className="full">
+                <label>
+                  Hasil kontak <span style={{ color: 'var(--rust-600)' }}>*</span>
+                </label>
+                <div className="sa-pills" role="group" aria-label="Hasil kontak">
+                  {HASIL_KEYS.map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      className={hasil === h ? 'on' : ''}
+                      aria-pressed={hasil === h}
+                      onClick={() => {
+                        setHasil(h);
+                        if (h !== 'tersambung' && !followUp) setFollowUp(plusDays(localToday(), 2));
+                      }}
+                    >
+                      {HASIL_LABEL[h]}
+                    </button>
+                  ))}
+                </div>
+                {hasil && hasil !== 'tersambung' && (
+                  <div className="sa-fu">
+                    <b>Jadwalkan follow-up</b>
+                    <input type="date" value={followUp} min={tanggal} onChange={(e) => setFollowUp(e.target.value)} aria-label="Tanggal follow-up" />
+                    <span>→ dibuat otomatis sebagai <b>rencana</b> di Aktivitas Harian (belum dihitung KPI sampai dilakukan).</span>
+                  </div>
+                )}
+              </div>
+            )}
+            {tipe === 'meeting' && (
+              <div className="full">
+                <label>
+                  Langkah berikutnya <span style={{ color: 'var(--rust-600)' }}>*</span>
+                </label>
+                <input type="text" value={langkah} onChange={(e) => setLangkah(e.target.value)} placeholder="cth. kirim penawaran revisi SUS304 minggu depan" />
+              </div>
+            )}
+            {tipe === 'kunjungan' && (
+              <div className="full field-note" style={{ margin: 0 }}>
+                Lokasi GPS diambil otomatis saat Simpan (izinkan akses lokasi di browser/HP) dan tampil di daftar aktivitas sebagai bukti kunjungan.
+              </div>
+            )}
             <div className="full">
               <label>Hasil / keterangan</label>
               <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="cth. Bertemu Pak Andi (Purchasing), minta penawaran plate SS304 12mm" />
             </div>
           </div>
-          <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 8 }} disabled={busy} onClick={onSave}>
-            <IconPlus /> {editId ? 'Simpan Perubahan' : 'Simpan Aktivitas'}
-          </button>
+          {tried && ruleErrors.length > 0 && (
+            <div className="sa-errs">
+              <b>Belum bisa disimpan:</b>
+              {ruleErrors.map((e) => (
+                <span key={e}>• {e}</span>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8, alignItems: 'center' }}>
+            {(need === 'phone' || tipe === 'kunjungan' || tipe === 'meeting') && firstContacted && waLink(firstContacted.phone) && (
+              <a className="btn btn-outline btn-sm sa-wa" href={waLink(firstContacted.phone) as string} target="_blank" rel="noreferrer">
+                Kirim WA ke {firstContacted.nama || 'PIC'}
+              </a>
+            )}
+            {need === 'email' && firstContacted && !emailError(firstContacted.email) && (
+              <a className="btn btn-outline btn-sm sa-wa" href={`mailto:${firstContacted.email}`}>
+                Kirim Email ke {firstContacted.nama || 'PIC'}
+              </a>
+            )}
+            <button type="button" className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }} disabled={busy} onClick={onSave}>
+              <IconPlus /> {editId ? 'Simpan Perubahan' : 'Simpan Aktivitas'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -441,14 +643,20 @@ export function SalesActivityModal() {
               {dayList.map((a) => {
                 const p = a.prospectId ? prospectById.get(a.prospectId) : null;
                 return (
-                  <tr key={a.id}>
+                  <tr key={a.id} data-act-id={a.id} className={a.id === focusId ? 'sa-focus' : undefined}>
                     <td>
                       <span className={`badge ${TIPE_COLOR[a.tipe] || 'slate'}`}>{TIPE_LABEL[a.tipe] || a.tipe}</span>
+                      {a.kanal && <div className="field-note" style={{ margin: '3px 0 0' }}>via {KANAL_LABEL[a.kanal as Kanal] || a.kanal}</div>}
+                      {a.hasil && a.status !== 'rencana' && (
+                        <div style={{ marginTop: 3 }}>
+                          <span className={`badge ${a.hasil === 'tersambung' ? 'green' : 'amber'}`}>{HASIL_LABEL[a.hasil as Hasil] || a.hasil}</span>
+                        </div>
+                      )}
                       {a.status === 'rencana' ? (
                         <div style={{ marginTop: 4 }}>
                           <span className="badge amber" title="Jadwal follow-up — belum dihitung di KPI sampai dilakukan">Rencana</span>
                         </div>
-                      ) : a.sumber ? (
+                      ) : a.sumber === 'followup' ? (
                         <div style={{ marginTop: 4 }}>
                           <span className="badge slate" title="Tercatat otomatis dari Follow-up WhatsApp">Otomatis</span>
                         </div>
@@ -460,15 +668,30 @@ export function SalesActivityModal() {
                       {a.pics?.length
                         ? a.pics.map((p, i) => (
                             <div key={i} style={{ marginBottom: 4, minWidth: 140 }}>
-                              <div>{p.nama}</div>
+                              <div>
+                                {p.nama}
+                                {p.dihubungi && <span className="badge steel" style={{ marginLeft: 4, fontSize: 10 }}>dihubungi</span>}
+                              </div>
                               <div className="field-note" style={{ margin: 0 }}>
                                 {p.jabatan}
+                                {p.phone ? ` · ${p.phone}` : ''}
+                                {p.email ? ` · ${p.email}` : ''}
                               </div>
                             </div>
                           ))
                         : '-'}
                     </td>
-                    <td>{a.keterangan || '-'}</td>
+                    <td>
+                      {a.keterangan || '-'}
+                      {a.langkah && <div className="field-note" style={{ margin: '3px 0 0' }}>Langkah berikutnya: {a.langkah}</div>}
+                      {a.lat != null && a.lng != null && (
+                        <div style={{ marginTop: 3 }}>
+                          <a href={`https://www.google.com/maps?q=${a.lat},${a.lng}`} target="_blank" rel="noreferrer" className="field-note" style={{ margin: 0 }}>
+                            Lokasi kunjungan{a.akurasi ? ` (±${Math.round(a.akurasi)} m)` : ''}
+                          </a>
+                        </div>
+                      )}
+                    </td>
                     <td style={{ minWidth: 250 }}>
                       {a.prospectId ? (
                         <span className="badge green" title={p ? `Nilai ${formatRupiah(p.value)}` : undefined}>
@@ -487,10 +710,19 @@ export function SalesActivityModal() {
                         '-'
                       )}
                     </td>
-                    {canWrite && (
+                    {canWrite && owner && a.se.toLowerCase() !== owner.toLowerCase() && (
+                      <td>
+                        <span className="field-note" style={{ margin: 0 }}>Milik {a.se}</span>
+                      </td>
+                    )}
+                    {canWrite && (!owner || a.se.toLowerCase() === owner.toLowerCase()) && (
                       <td>
                         <div className="row-actions">
-                          {a.status === 'rencana' ? (
+                          {a.status === 'rencana' && a.sumber === 'aktivitas' ? (
+                            <button type="button" className="btn btn-outline btn-sm" style={{ padding: '3px 8px', whiteSpace: 'nowrap' }} title="Isi hasil follow-up ini lalu simpan — tercatat hari ini" onClick={() => onEdit(a)}>
+                              ✓ Kerjakan
+                            </button>
+                          ) : a.status === 'rencana' ? (
                             <button type="button" className="btn btn-outline btn-sm" style={{ padding: '3px 8px', whiteSpace: 'nowrap' }} title="Tandai follow-up ini sudah dilakukan hari ini" onClick={() => onDonePlan(a)}>
                               ✓ Selesai
                             </button>

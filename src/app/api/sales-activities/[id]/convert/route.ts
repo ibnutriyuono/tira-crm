@@ -8,6 +8,7 @@ import { ACTIVITY_CONVERT_STATUSES } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Material } from '@/lib/types';
+import { guard } from '@/lib/permissions-server';
 
 /**
  * "Masukkan ke Pipeline": turns one logged activity into a Prospect at
@@ -22,6 +23,8 @@ import type { Material } from '@/lib/types';
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'aktivitas', 'e');
+  if (denied) return denied;
   if (!canWriteSalesActivity(user)) return NextResponse.json({ error: 'Tidak berhak memasukkan aktivitas ke pipeline.' }, { status: 403 });
   const { id } = await params;
 

@@ -10,6 +10,7 @@ import { getSocket } from '@/lib/socket-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { ActivityLog } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
 interface Actor {
   userId: string;
@@ -148,7 +149,7 @@ export function ActivityLogModal() {
       show={show}
       onClose={closeModal}
       title="Log Aktivitas"
-      xwide
+      xwide stickyHead
       footer={
         <>
           <div className="pg-info" style={{ marginRight: 'auto' }}>
@@ -225,10 +226,12 @@ export function ActivityLogModal() {
             >
               Reset
             </button>
-            <button type="button" className="btn btn-outline btn-sm" onClick={exportExcel}>
-              <IconDownload />
-              Export
-            </button>
+            {canNow('log', 'x') && (
+              <button type="button" className="btn btn-outline btn-sm" onClick={exportExcel}>
+                <IconDownload />
+                Export
+              </button>
+            )}
           </div>
         </div>
       </div>

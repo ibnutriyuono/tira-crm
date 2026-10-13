@@ -5,6 +5,7 @@ import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import type { TripVisit } from '@/lib/types';
 import { canApproveTrip, finishBlocker } from '@/lib/visit-trip';
+import { guard } from '@/lib/permissions-server';
 
 /**
  * Status transitions: submit (owner, draft/ditolak -> diajukan; a GM's own
@@ -15,6 +16,8 @@ import { canApproveTrip, finishBlocker } from '@/lib/visit-trip';
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'trip', 'e');
+  if (denied) return denied;
   const { id } = await params;
   const trip = await prisma.visitTrip.findUnique({ where: { id } });
   if (!trip) return NextResponse.json({ error: 'Perjalanan tidak ditemukan' }, { status: 404 });

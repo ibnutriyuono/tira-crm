@@ -126,7 +126,7 @@ export function FollowUpBoardModal() {
       show={show}
       onClose={closeModal}
       title="Follow-up"
-      wide
+      xwide
       footer={
         <button type="button" className="btn btn-outline" onClick={closeModal}>
           Tutup

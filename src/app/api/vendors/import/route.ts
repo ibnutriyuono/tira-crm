@@ -4,6 +4,7 @@ import { isResponse, requireUser } from '@/lib/api-helpers';
 import { canEditPurchasing } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
+import { guard } from '@/lib/permissions-server';
 
 interface ImportRow {
   nama?: string;
@@ -18,6 +19,8 @@ interface ImportRow {
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'purch', 'e');
+  if (denied) return denied;
   if (!canEditPurchasing(user)) {
     return NextResponse.json({ error: 'Hanya Purchasing dan Admin yang dapat mengimport vendor.' }, { status: 403 });
   }

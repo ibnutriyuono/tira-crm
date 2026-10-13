@@ -3,12 +3,15 @@ import type { Prisma } from '@prisma/client';
 import { activityScopeWhere } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
+import { guard } from '@/lib/permissions-server';
 
 const MAX_PAGE_SIZE = 200;
 
 export async function GET(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'log', 'v');
+  if (denied) return denied;
 
   const sp = new URL(req.url).searchParams;
   const page = Math.max(1, Number(sp.get('page')) || 1);

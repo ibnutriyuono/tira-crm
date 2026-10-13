@@ -35,6 +35,18 @@ export function ItemChat({
 }) {
   const currentUser = useDataStore((s) => s.currentUser);
   const toast = useDataStore((s) => s.toast);
+  const allIssues = useDataStore((s) => s.issues);
+  // Diskusi prospek: pesan yang dikirim selama ada masalah (laporan/usulan)
+  // diberi label "⚑ Masalah" — thread-nya sama dengan tab Masalah Purchasing.
+  const issueRanges = entity === 'prospect' && entityId
+    ? allIssues
+        .filter((i) => i.prospectId === entityId && i.status !== 'diabaikan' && i.status !== 'ditolak')
+        .map((i) => [new Date(i.createdAt).getTime(), i.selesaiAt ? new Date(i.selesaiAt).getTime() : Infinity] as const)
+    : [];
+  const inIssue = (iso: string) => {
+    const t = new Date(iso).getTime();
+    return issueRanges.some(([a, b]) => t >= a && t <= b);
+  };
   const [messages, setMessages] = useState<ItemChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -104,6 +116,13 @@ export function ItemChat({
           <div className="text-muted" style={{ fontSize: 12, padding: 8 }}>Belum ada diskusi pada dokumen ini.</div>
         ) : (
           messages.map((m) => {
+            if (m.role === 'system') {
+              return (
+                <div key={m.id} className="tc-msg system">
+                  <div className="tc-bubble">{m.text}<span className="tc-sys-time"> · {timeLabel(m.createdAt)}</span></div>
+                </div>
+              );
+            }
             const mine = m.authorUsername === currentUser?.username;
             return (
               <div key={m.id} className={`tc-msg${mine ? ' mine' : ''}`}>
@@ -111,6 +130,7 @@ export function ItemChat({
                   <span className="tc-meta-name">{m.author}</span>
                   {m.role ? ` · ${ROLE_LABELS[m.role] || m.role}` : ''}
                   {` · ${timeLabel(m.createdAt)}`}
+                  {inIssue(m.createdAt) && <span className="badge rust tc-issue-tag">⚑ Masalah</span>}
                 </div>
                 <div className="tc-bubble">{m.text}</div>
               </div>

@@ -5,6 +5,8 @@ export interface SafeUser {
   username: string;
   name: string;
   role: Role;
+  /** Role tambahan (Kelola Role); null = memakai role bawaan. */
+  customRole?: string | null;
   se: string | null;
   cabang: string | null;
   reg: number | null;
@@ -319,13 +321,20 @@ export type NotificationType =
   | 'kam_cross_branch'
   | 'target_allocate'
   | 'target_assigned'
-  | 'admin_task';
+  | 'admin_task'
+  | 'prospect_chat'
+  | 'followup_due'
+  | 'followup_overdue'
+  | 'issue_proposed'
+  | 'issue_new'
+  | 'issue_update'
+  | 'issue_escalated';
 
 export interface AppNotification {
   id: string;
   userId: string;
   type: NotificationType;
-  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target';
+  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target' | 'activity' | 'issue';
   entityId: string;
   title: string;
   message: string;
@@ -347,8 +356,15 @@ export interface SalesActivity {
   prospectId: string | null;
   /** "selesai" = sudah dilakukan; "rencana" = jadwal follow-up (tidak dihitung KPI). Baris lama tanpa kolom ini = selesai. */
   status?: 'selesai' | 'rencana';
-  /** null = isian manual; "followup" = otomatis dari Follow-up WhatsApp. */
+  /** null = isian manual; "followup" = otomatis dari Follow-up WhatsApp; "aktivitas" = rencana dari hasil kontak. */
   sumber?: string | null;
+  kanal?: string | null;
+  hasil?: string | null;
+  langkah?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  akurasi?: number | null;
+  followUpId?: string | null;
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
@@ -357,6 +373,10 @@ export interface SalesActivity {
 export interface ActivityPic {
   nama: string;
   jabatan: string;
+  /** No. HP/WA (format 08…) dan email PIC; dihubungi = PIC yang dikontak. */
+  phone?: string;
+  email?: string;
+  dihubungi?: boolean;
 }
 
 export interface ActivityTarget {

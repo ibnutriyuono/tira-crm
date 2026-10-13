@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prospectScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { guard } from '@/lib/permissions-server';
 
 /**
  * Latest per-item events (penawaran / PO / kirim) across the prospects the
@@ -11,6 +12,8 @@ import { prisma } from '@/lib/prisma';
 export async function GET(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'prospek', 'v');
+  if (denied) return denied;
   const url = new URL(req.url);
   const limit = Math.min(300, Math.max(1, Number(url.searchParams.get('limit')) || 80));
   const type = url.searchParams.get('type') || '';

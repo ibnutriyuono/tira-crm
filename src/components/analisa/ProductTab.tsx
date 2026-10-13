@@ -15,6 +15,7 @@ import {
 } from '@/lib/material-trend';
 import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
+import { canNow } from '@/hooks/useCan';
 
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const mLabel = (m: string) => `${BULAN[Number(m.slice(5, 7)) - 1]} ${m.slice(2, 4)}`;
@@ -142,9 +143,11 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
           {seg<Measure>('pcs', measure, setMeasure, 'Pcs')}
           {seg<Measure>('nilai', measure, setMeasure, 'Nilai')}
         </span>
-        <button type="button" className="btn btn-outline btn-sm" onClick={exportExcel}>
-          <IconDownload /> Excel
-        </button>
+        {canNow('analisa', 'x') && (
+          <button type="button" className="btn btn-outline btn-sm" onClick={exportExcel}>
+            <IconDownload /> Excel
+          </button>
+        )}
       </div>
       <div className="field-note" style={{ marginTop: -6, marginBottom: 12 }}>
         <b>{t.group.label}</b> · {periodText} · {scopeText}. Permintaan = prospek berstatus Permintaan (belum ditawarkan) · Ditawarkan = mulai status Penawaran Harga, bulan tgl penawaran · PO = qty PO per item, bulan tgl PO · Terkirim = qty terkirim, bulan tgl delivery.

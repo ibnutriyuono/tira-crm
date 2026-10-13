@@ -69,7 +69,7 @@ export function CustomerUnifyModal() {
   }
 
   return (
-    <Modal show={show} onClose={close} title="Satukan Nama Customer" xwide footer={<button type="button" className="btn btn-outline" onClick={close}>Kembali ke Kelola Customer</button>}>
+    <Modal show={show} onClose={close} title="Satukan Nama Customer" xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={close}>Kembali ke Kelola Customer</button>}>
       <div className="import-summary" style={{ marginTop: 0 }}>
         Daftar customer yang ditulis dengan ejaan berbeda. Pilih <b>nama baku</b>, centang ejaan yang mau disatukan, lalu klik
         <b> Satukan</b> — semua prospek, aktivitas harian, RFQ, FUP A, perjalanan dinas dan data Kelola Customer ikut diganti, dan

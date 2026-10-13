@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import type { Perms } from '@/lib/permissions';
+import type { PipelineIssue } from '@/lib/issues';
 import type { AnnualTarget, SeTarget, AppNotification, BudgetTarget, Customer, CustomerGroup, Fupa, Prospect, PurchasingContact, Rfq, SafeUser, SalesPlan, Vendor } from '@/lib/types';
 
 interface Toast {
@@ -11,6 +13,9 @@ interface Toast {
 
 interface DataState {
   currentUser: SafeUser | null;
+  /** Hak per modul user yang login (Kelola Role); null = belum dimuat (semua diizinkan). */
+  perms: Perms | null;
+  setPerms: (p: Perms) => void;
   prospects: Prospect[];
   customers: Customer[];
   rfqs: Rfq[];
@@ -25,6 +30,10 @@ interface DataState {
   purchasingContact: PurchasingContact;
   /** Key Account groups (lib/kam.ts). */
   customerGroups: CustomerGroup[];
+  /** Masalah pipeline yang terlihat user (lib/issues.ts). */
+  issues: PipelineIssue[];
+  upsertIssue: (i: PipelineIssue) => void;
+  setIssues: (l: PipelineIssue[]) => void;
   loaded: boolean;
   toasts: Toast[];
 
@@ -73,6 +82,7 @@ let toastSeq = 1;
 
 export const useDataStore = create<DataState>((set, get) => ({
   currentUser: null,
+  perms: null,
   prospects: [],
   customers: [],
   rfqs: [],
@@ -86,12 +96,14 @@ export const useDataStore = create<DataState>((set, get) => ({
   users: [],
   purchasingContact: { wa: '', email: '' },
   customerGroups: [],
+  issues: [],
   loaded: false,
   toasts: [],
 
   reset: () =>
     set({
       currentUser: null,
+      perms: null,
       prospects: [],
       customers: [],
       rfqs: [],
@@ -105,6 +117,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       users: [],
       purchasingContact: { wa: '', email: '' },
       customerGroups: [],
+      issues: [],
       loaded: false,
       toasts: [],
     }),
@@ -115,6 +128,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     const data = await res.json();
     set({
       currentUser: data.user,
+      perms: data.perms ?? null,
       prospects: data.prospects,
       customers: data.customers,
       rfqs: data.rfqs,
@@ -127,6 +141,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       notifications: data.notifications ?? [],
       purchasingContact: data.purchasingContact,
       customerGroups: data.customerGroups ?? [],
+      issues: data.issues ?? [],
       loaded: true,
     });
   },
@@ -143,6 +158,15 @@ export const useDataStore = create<DataState>((set, get) => ({
     }),
   removeCustomerGroup: (id) => set((s) => ({ customerGroups: s.customerGroups.filter((x) => x.id !== id) })),
   setCustomerGroups: (g) => set({ customerGroups: g }),
+  upsertIssue: (i) =>
+    set((s) => {
+      const idx = s.issues.findIndex((x) => x.id === i.id);
+      if (idx === -1) return { issues: [i, ...s.issues] };
+      const next = s.issues.slice();
+      next[idx] = i;
+      return { issues: next };
+    }),
+  setIssues: (l) => set({ issues: l }),
 
   upsertProspect: (p) =>
     set((s) => {
@@ -198,6 +222,8 @@ export const useDataStore = create<DataState>((set, get) => ({
       next[idx] = a;
       return { annualTargets: next };
     }),
+
+  setPerms: (p) => set({ perms: p }),
 
   upsertSeTargets: (list) =>
     set((s) => {

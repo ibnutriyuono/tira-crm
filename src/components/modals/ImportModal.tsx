@@ -141,7 +141,7 @@ export function ImportModal() {
         reset();
       }}
       title={title}
-      wide
+      wide2
       footer={
         <>
           <button

@@ -105,6 +105,10 @@ export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hi
         return (
           <div className={`msr-row${fab ? ' msr-fab' : ''}`} key={r.key}>
             <div className="msr-top">
+              <div className="msr-f msr-no">
+                <label>No.</label>
+                <div className="msr-no-val mono" title={`Material ke-${idx + 1} dari ${rows.length}`}>{idx + 1}</div>
+              </div>
               <div className="msr-f msr-line">
                 <label>Line</label>
                 <input type="text" value={r.line} placeholder="02" onChange={(e) => update(idx, { line: e.target.value })} onBlur={(e) => update(idx, { line: normalizeLine(e.target.value) })} />

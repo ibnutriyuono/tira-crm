@@ -6,10 +6,13 @@ import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { monthlyFromAnnual } from '@/lib/annual-target';
 import { notifyBranchTargetSet } from '@/lib/se-target-server';
+import { guard } from '@/lib/permissions-server';
 
 export async function GET() {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'forecast', 'v');
+  if (denied) return denied;
   const annualTargets = await prisma.annualTarget.findMany({ where: await budgetTargetScopeWhere(user), orderBy: [{ year: 'desc' }, { cabang: 'asc' }] });
   return NextResponse.json({ annualTargets });
 }
@@ -22,6 +25,8 @@ export async function GET() {
 export async function PUT(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'forecast', 'e');
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   const cabang = String(body?.cabang || '').trim().toUpperCase();

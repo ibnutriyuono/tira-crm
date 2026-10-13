@@ -1,7 +1,9 @@
 'use client';
 
 import { isPurchasingRoleClient } from '@/lib/doc-lines';
+import { isOpenIssue } from '@/lib/issues';
 import { canSeeAdminQueue } from '@/lib/roles';
+import { can, type PermAct } from '@/lib/permissions';
 import { adminTaskCount } from './modals/AdminQueueModal';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -27,6 +29,7 @@ const ROLE_LABEL: Record<string, { label: string; color: string }> = {
 export function TopBar() {
   const router = useRouter();
   const currentUser = useDataStore((s) => s.currentUser);
+  const issues = useDataStore((s) => s.issues);
   const toast = useDataStore((s) => s.toast);
   const rfqs = useDataStore((s) => s.rfqs);
   const fupas = useDataStore((s) => s.fupas);
@@ -35,6 +38,16 @@ export function TopBar() {
   const newPurchasingCount = countNewPurchasingItems(rfqs, fupas);
   const prospects = useDataStore((s) => s.prospects);
   const adminTasks = useMemo(() => adminTaskCount(prospects), [prospects]);
+  // Kelola Role: menu yang tidak berhak dilihat disembunyikan.
+  const perms = useDataStore((s) => s.perms);
+  const c = (mod: string, act: PermAct = 'v') => can(perms, mod, act);
+  // Badge Masalah: yang menunggu tindakan user ini — PJ dari masalah terbuka,
+  // atau (BM) usulan Sales di cabangnya yang belum diproses.
+  const issueCount = issues.filter(
+    (i) =>
+      (isOpenIssue(i) && i.pjIds.includes(currentUser?.id || '')) ||
+      (i.status === 'usulan' && (currentUser?.role === 'admin' || (currentUser?.role === 'bm' && (i.cabang || '').toUpperCase() === (currentUser?.cabang || '').toUpperCase()))),
+  ).length;
   // Same builder the Follow-up panel itself renders from (buildFollowUpRows),
   // so this count and what's actually listed inside can never disagree.
   const urgentFollowUpCount = countUrgentFollowUps(prospects);
@@ -167,7 +180,13 @@ export function TopBar() {
               Kelola User
             </button>
           )}
-          {canSeeAdminQueue(currentUser.role) && (
+          {currentUser.role === 'admin' && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('roles')}>
+              <IconUsers />
+              Kelola Role
+            </button>
+          )}
+          {canSeeAdminQueue(currentUser.role) && c('faktur') && (
             <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('adminQueue')}>
               <IconCheckSquare />
               Antrian Admin
@@ -178,83 +197,118 @@ export function TopBar() {
               )}
             </button>
           )}
-          {!isPurchasingRoleClient(currentUser.role) && (
+          {!isPurchasingRoleClient(currentUser.role) && c('analisa') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('gmAnalysis')}>
               <IconPresentation />
               Analisa Eksekutif
             </button>
           )}
-          <button className="btn btn-ghost-dark" onClick={() => openModal('customers')}>
-            <IconCustomers />
-            Kelola Customer
-          </button>
-          <button className="btn btn-ghost-dark" onClick={() => openModal('rfqManage')}>
-            <IconRfq />
-            Kelola RFQ
-          </button>
-          <button className="btn btn-ghost-dark" onClick={() => openModal('fupaManage')}>
-            <IconCart />
-            Kelola FUP A
-          </button>
-          <button className="btn btn-ghost-dark" onClick={() => openModal('qcdRecap')}>
-            <IconCheckSquare />
-            Hasil QCD
-          </button>
-          <button className="btn btn-ghost-dark" onClick={() => openModal('forecast')}>
-            <IconChartLine />
-            Forecast
-          </button>
-          <button className="btn btn-ghost-dark" onClick={() => openModal('kpi')}>
-            <IconTarget />
-            KPI
-          </button>
-          <button className="btn btn-ghost-dark" onClick={() => openModal('activityKpi')}>
-            <IconTarget />
-            KPI Aktivitas
-          </button>
-          {['admin', 'gm', 'rm', 'bm'].includes(currentUser.role) && (
+          {c('customer') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('customers')}>
+              <IconCustomers />
+              Kelola Customer
+            </button>
+          )}
+          {c('rfq') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('rfqManage')}>
+              <IconRfq />
+              Kelola RFQ
+            </button>
+          )}
+          {c('rfq') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('fupaManage')}>
+              <IconCart />
+              Kelola FUP A
+            </button>
+          )}
+          {c('marketing') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('qcdRecap')}>
+              <IconCheckSquare />
+              Hasil QCD
+            </button>
+          )}
+          {c('forecast') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('forecast')}>
+              <IconChartLine />
+              Forecast
+            </button>
+          )}
+          {c('kpi') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('kpi')}>
+              <IconTarget />
+              KPI
+            </button>
+          )}
+          {c('kpi') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('activityKpi')}>
+              <IconTarget />
+              KPI Aktivitas
+            </button>
+          )}
+          {['admin', 'gm', 'rm', 'bm'].includes(currentUser.role) && c('trip') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('visitTrip')}>
               <IconCalendar />
               Perjalanan Dinas
             </button>
           )}
-          <button
-            className="btn btn-ghost-dark"
-            onClick={() => {
-              useUiStore.setState({ salesPlanCtx: null });
-              openModal('salesPlan');
-            }}
-          >
-            <IconChartLine />
-            Rencana Penjualan
-          </button>
-          <button className="btn btn-ghost-dark" onClick={() => openModal('marketing')}>
-            <IconCustomers />
-            Marketing
-          </button>
-          <button className="btn btn-ghost-dark" onClick={() => openModal('customerIntel')}>
-            <IconSearch />
-            Customer Intelligence
-          </button>
-          {!isPurchasingRoleClient(currentUser.role) && (
+          {c('rencana') && (
+            <button
+              className="btn btn-ghost-dark"
+              onClick={() => {
+                useUiStore.setState({ salesPlanCtx: null });
+                openModal('salesPlan');
+              }}
+            >
+              <IconChartLine />
+              Rencana Penjualan
+            </button>
+          )}
+          {c('marketing') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('marketing')}>
+              <IconCustomers />
+              Marketing
+            </button>
+          )}
+          {c('marketing') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('customerIntel')}>
+              <IconSearch />
+              Customer Intelligence
+            </button>
+          )}
+          {!isPurchasingRoleClient(currentUser.role) && c('kam') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('keyAccount')}>
               <IconTarget />
               Key Account
             </button>
           )}
-          <button className="btn btn-ghost-dark" onClick={() => openModal('competitorLog')}>
-            <IconBarChart />
-            Log Kompetitor
-          </button>
-          <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('followUpBoard')}>
-            <IconCalendar />
-            Follow-up
-            {urgentFollowUpCount > 0 && (
-              <span className="topbar-badge" title={`${urgentFollowUpCount} follow-up perlu segera`}>
-                {urgentFollowUpCount > 9 ? '9+' : urgentFollowUpCount}
-              </span>
-            )}
-          </button>
+          {!isPurchasingRoleClient(currentUser.role) && c('masalah') && (
+            <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('pipelineIssues')}>
+              <span aria-hidden="true">⚑</span>
+              Masalah
+              {issueCount > 0 && (
+                <span className="topbar-badge" title={`${issueCount} masalah perlu tindakan Anda`}>
+                  {issueCount > 9 ? '9+' : issueCount}
+                </span>
+              )}
+            </button>
+          )}
+          {c('marketing') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('competitorLog')}>
+              <IconBarChart />
+              Log Kompetitor
+            </button>
+          )}
+          {c('prospek') && (
+            <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('followUpBoard')}>
+              <IconCalendar />
+              Follow-up
+              {urgentFollowUpCount > 0 && (
+                <span className="topbar-badge" title={`${urgentFollowUpCount} follow-up perlu segera`}>
+                  {urgentFollowUpCount > 9 ? '9+' : urgentFollowUpCount}
+                </span>
+              )}
+            </button>
+          )}
           <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('notifications')}>
             <IconBell />
             Notifikasi
@@ -264,19 +318,23 @@ export function TopBar() {
               </span>
             )}
           </button>
-          <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('purchasing')}>
-            <IconBag />
-            Purchasing
-            {newPurchasingCount > 0 && (
-              <span className="topbar-badge" title={`${newPurchasingCount} RFQ/FUP A baru belum diproses`}>
-                {newPurchasingCount > 9 ? '9+' : newPurchasingCount}
-              </span>
-            )}
-          </button>
-          <button className="btn btn-ghost-dark" onClick={downloadTemplate}>
-            <IconTemplate />
-            Template
-          </button>
+          {c(isPurchasingRoleClient(currentUser.role) ? 'purch' : 'rfq') && (
+            <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('purchasing')}>
+              <IconBag />
+              Purchasing
+              {newPurchasingCount > 0 && (
+                <span className="topbar-badge" title={`${newPurchasingCount} RFQ/FUP A baru belum diproses`}>
+                  {newPurchasingCount > 9 ? '9+' : newPurchasingCount}
+                </span>
+              )}
+            </button>
+          )}
+          {c('prospek', 'x') && (
+            <button className="btn btn-ghost-dark" onClick={downloadTemplate}>
+              <IconTemplate />
+              Template
+            </button>
+          )}
           {currentUser.role === 'admin' && (
             <button
               className="btn btn-ghost-dark"
@@ -289,38 +347,48 @@ export function TopBar() {
               Import Excel
             </button>
           )}
-          <button className="btn btn-ghost-dark" onClick={exportExcel}>
-            <IconExport />
-            Export Excel
-          </button>
-          <button className="btn btn-ghost-dark" onClick={exportAllExcel} title="Satu file Excel berisi semua data (Prospek, RFQ, FUP A, Customer, Vendor, Rencana Penjualan, Target), tiap jenis di sheet terpisah">
-            <IconDownload />
-            Export Semua
-          </button>
+          {c('prospek', 'x') && (
+            <button className="btn btn-ghost-dark" onClick={exportExcel}>
+              <IconExport />
+              Export Excel
+            </button>
+          )}
+          {c('prospek', 'x') && (
+            <button className="btn btn-ghost-dark" onClick={exportAllExcel} title="Satu file Excel berisi semua data (Prospek, RFQ, FUP A, Customer, Vendor, Rencana Penjualan, Target), tiap jenis di sheet terpisah">
+              <IconDownload />
+              Export Semua
+            </button>
+          )}
           {/* Not in the single-file app's toolbar — this build's own addition,
               kept last so the shared buttons match it 1:1. */}
-          <button className="btn btn-ghost-dark" onClick={() => openModal('activity')}>
-            <IconActivity />
-            Log Aktivitas
-          </button>
+          {c('log') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('activity')}>
+              <IconActivity />
+              Log Aktivitas
+            </button>
+          )}
           <button className="btn btn-outline" onClick={saveAllNow}>
             <IconSave />
             Simpan Perubahan
           </button>
-          <button className="btn btn-activity" onClick={() => openModal('salesActivity')}>
-            <IconCalendar />
-            Aktivitas Harian
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              useUiStore.setState({ editProspectId: null });
-              openModal('prospectForm');
-            }}
-          >
-            <IconPlus />
-            Tambah Prospek
-          </button>
+          {c('aktivitas') && (
+            <button className="btn btn-activity" onClick={() => openModal('salesActivity')}>
+              <IconCalendar />
+              Aktivitas Harian
+            </button>
+          )}
+          {c('prospek', 'e') && (
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                useUiStore.setState({ editProspectId: null });
+                openModal('prospectForm');
+              }}
+            >
+              <IconPlus />
+              Tambah Prospek
+            </button>
+          )}
         </div>
       </div>
     </div>

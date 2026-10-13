@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { ActivityChanges } from '@/lib/types';
 import type { Role } from '@/lib/types';
+import { resolveRoleInput } from '@/lib/permissions-server';
 
 /**
  * The audit log is readable by more people than the user table is, so a
@@ -30,7 +31,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const body = await req.json().catch(() => null);
   const name = String(body?.name || '').trim();
-  const role = String(body?.role || target.role);
+  const resolved = await resolveRoleInput(body?.role, target.customRole ? `custom:${target.customRole}` : target.role);
+  if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: 400 });
+  const { role, customRole } = resolved;
   if (!name) return NextResponse.json({ error: 'Nama wajib diisi' }, { status: 400 });
   if (role === 'salesadmin' && !String(body?.cabang ?? target.cabang ?? '').trim()) return NextResponse.json({ error: 'Admin Sales wajib diisi Cabang' }, { status: 400 });
 
@@ -51,6 +54,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     data: {
       name,
       role: role as Role,
+      customRole,
       se: String(body?.se || '').trim().toUpperCase(),
       cabang: String(body?.cabang || '').trim().toUpperCase(),
       reg: body?.reg ? Number(body.reg) : null,

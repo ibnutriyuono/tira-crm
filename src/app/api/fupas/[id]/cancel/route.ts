@@ -5,6 +5,7 @@ import { itemsHaveLine } from '@/lib/doc-lines';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { notify, requesterUserIds } from '@/lib/notify';
+import { guard } from '@/lib/permissions-server';
 
 /**
  * Membatalkan FUP A beserta alasannya. Dokumen TIDAK dihapus — statusnya
@@ -17,6 +18,8 @@ import { notify, requesterUserIds } from '@/lib/notify';
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'rfq', 'e');
+  if (denied) return denied;
   // Sejalan dengan hak mengisi jawaban: yang mengerjakan dokumen ini pula
   // yang boleh menghentikannya.
   if (!['purchasing', 'purchasing05', 'admin', 'gm'].includes(user.role)) {

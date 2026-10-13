@@ -5,11 +5,14 @@ import { visitTripScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { deleteObject, isS3Configured, presignGet } from '@/lib/s3';
 import { canEditRealisasi } from '@/lib/visit-trip';
+import { guard } from '@/lib/permissions-server';
 
 /** Redirects to a short-lived URL for the photo (inline, so it renders in <img> and in the printed report). Scoped to the trip. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string; photoId: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'trip', 'v');
+  if (denied) return denied;
   if (!isS3Configured()) return NextResponse.json({ error: 'Penyimpanan file belum dikonfigurasi.' }, { status: 503 });
   const { id, photoId } = await params;
   const trip = await prisma.visitTrip.findFirst({ where: { AND: [visitTripScopeWhere(user), { id }] }, select: { id: true } });
@@ -26,6 +29,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string; photoId: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'trip', 'd');
+  if (denied) return denied;
   const { id, photoId } = await params;
   const trip = await prisma.visitTrip.findUnique({ where: { id } });
   if (!trip) return NextResponse.json({ error: 'Perjalanan tidak ditemukan' }, { status: 404 });

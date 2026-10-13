@@ -8,6 +8,9 @@ import type { CustomerPic, SafeUser } from './types';
 export interface PicInput {
   nama: string;
   jabatan?: string | null;
+  /** No. HP/WA & email dari Aktivitas Harian — mengisi / memperbarui kontak PIC customer. */
+  phone?: string | null;
+  email?: string | null;
 }
 
 const norm = (s: string | null | undefined) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -62,15 +65,26 @@ export function mergePics(existing: CustomerPic[], incoming: PicInput[], newId: 
     const nama = (inc.nama || '').trim().replace(/\s+/g, ' ');
     if (!nama) continue;
     const jabatan = (inc.jabatan || '').trim() || null;
+    const phone = (inc.phone || '').trim() || null;
+    const email = (inc.email || '').trim() || null;
     const hit = out.find((p) => norm(p.nama) === norm(nama));
     if (hit) {
       if (!hit.jabatan && jabatan) {
         hit.jabatan = jabatan;
         changed = true;
       }
+      // Kontak yang baru diketik di Aktivitas Harian dianggap paling baru.
+      if (phone && hit.phone !== phone) {
+        hit.phone = phone;
+        changed = true;
+      }
+      if (email && (hit.email || '').toLowerCase() !== email.toLowerCase()) {
+        hit.email = email;
+        changed = true;
+      }
       continue;
     }
-    out.push({ id: newId(), nama, jabatan, phone: null, email: null, isPrimary: out.length === 0 });
+    out.push({ id: newId(), nama, jabatan, phone, email, isPrimary: out.length === 0 });
     changed = true;
   }
   return changed ? out : null;
@@ -145,7 +159,7 @@ export async function syncCustomerPics(user: SafeUser, entries: { customer: stri
         action: 'update',
         entity: 'customer',
         entityId: customer.id,
-        summary: added > 0 ? `${added} PIC baru ditambahkan otomatis ke "${customer.name}" dari ${source}` : `Jabatan PIC "${customer.name}" dilengkapi otomatis dari ${source}`,
+        summary: added > 0 ? `${added} PIC baru ditambahkan otomatis ke "${customer.name}" dari ${source}` : `Data PIC "${customer.name}" (jabatan/kontak) dilengkapi otomatis dari ${source}`,
       });
     } catch (err) {
       console.error('[customer-sync] gagal sinkron', g.name, err);

@@ -6,6 +6,7 @@ import { formatDateID, formatRupiah, todayStr } from '@/lib/format';
 import { buildCompetitorLog } from '@/lib/reports';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
+import { canNow } from '@/hooks/useCan';
 
 export function CompetitorLogModal() {
   const modal = useUiStore((s) => s.modal);
@@ -109,7 +110,9 @@ export function CompetitorLogModal() {
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
-        <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+        {canNow('marketing', 'x') && (
+          <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+        )}
         <span className="hint">Menampilkan {rows.length} dari {allRows.length} kompetitor</span>
       </div>
 

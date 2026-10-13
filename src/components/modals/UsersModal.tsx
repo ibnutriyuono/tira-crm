@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api-client';
 import { Modal } from '../Modal';
 import { IconEdit, IconTrash } from '../icons';
 import { useDataStore } from '@/store/useDataStore';
@@ -28,17 +29,35 @@ export function UsersModal() {
   useEffect(() => {
     if (show) loadUsers();
   }, [show, loadUsers]);
+  // Nama role tambahan (Kelola Role) untuk badge.
+  const [roleLabels, setRoleLabels] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!show) return;
+    let alive = true;
+    api
+      .get<{ roles?: { key: string; label: string }[] }>('/api/roles')
+      .then((r) => alive && setRoleLabels(Object.fromEntries((r.roles || []).map((x) => [x.key, x.label]))))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [show]);
 
   return (
     <Modal
       show={show}
       onClose={closeModal}
       title="Kelola User"
-      wide
+      xwide stickyHead
       footer={
+        <>
+        <button type="button" className="btn btn-outline" style={{ marginRight: 'auto' }} onClick={() => openModal('roles')}>
+          Kelola Role
+        </button>
         <button type="button" className="btn btn-outline" onClick={closeModal}>
           Tutup
         </button>
+        </>
       }
     >
       <button
@@ -65,7 +84,8 @@ export function UsersModal() {
         </thead>
         <tbody>
           {users.map((u) => {
-            const meta = (ROLE_META[u.role] || (() => ({ label: u.role, color: 'slate' })))(u);
+            const baseMeta = (ROLE_META[u.role] || (() => ({ label: u.role, color: 'slate' })))(u);
+            const meta = u.customRole ? { label: `${roleLabels[u.customRole] || u.customRole}${u.cabang ? ` · ${u.cabang}` : ''}`, color: 'pink' } : baseMeta;
             return (
               <tr key={u.id}>
                 <td className="mono">{u.username}</td>

@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
-import { canManageKam, cleanGroupInput } from '@/lib/kam';
+import { canManageKam, cleanGroupInput, dedupeEntities, entityConflicts } from '@/lib/kam';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { CustomerGroup, KamTierChange } from '@/lib/types';
+import { guard } from '@/lib/permissions-server';
 
-/** Fields the team lead (ketua tim) of the group may change on their own. */
-const KETUA_FIELDS = ['actions', 'notes', 'reviewNext', 'sekretarisId', 'anggotaIds'];
+/** Fields the team lead (ketua grup) may change on their own: perusahaan, sekretaris, PIC, rencana aksi. */
+const KETUA_FIELDS = ['actions', 'notes', 'reviewNext', 'sekretarisId', 'anggotaIds', 'entities'];
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'kam', 'e');
+  if (denied) return denied;
   const { id } = await params;
   const existing = (await prisma.customerGroup.findUnique({ where: { id } })) as unknown as CustomerGroup | null;
   if (!existing) return NextResponse.json({ error: 'Grup tidak ditemukan' }, { status: 404 });
@@ -27,6 +30,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (data.name && data.name !== existing.name) {
     const clash = await prisma.customerGroup.findUnique({ where: { name: data.name as string } });
     if (clash) return NextResponse.json({ error: `Grup "${data.name}" sudah ada` }, { status: 409 });
+  }
+
+  if (Array.isArray(data.entities)) {
+    data.entities = dedupeEntities(data.entities as string[]);
+    const others = await prisma.customerGroup.findMany({ select: { id: true, name: true, entities: true } });
+    const clash = entityConflicts(data.entities as string[], others as never, id);
+    if (clash.length) return NextResponse.json({ error: `Perusahaan sudah masuk grup lain: ${clash.join(', ')}` }, { status: 409 });
   }
 
   // A tier move is a management decision: keep it with its reason.
@@ -52,6 +62,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
+  const denied = await guard(user, 'kam', 'd');
+  if (denied) return denied;
   if (user.role !== 'gm' && user.role !== 'admin') return NextResponse.json({ error: 'Hanya GM dan Admin yang dapat menghapus grup.' }, { status: 403 });
   const { id } = await params;
   const existing = await prisma.customerGroup.findUnique({ where: { id } });
