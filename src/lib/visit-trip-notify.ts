@@ -1,6 +1,6 @@
 import { notify, tripApproverIds, tripHostIds } from './notify';
 
-export type TripRow = { id: string; ownerId: string; ownerName: string; ownerRole: string; ownerReg: number | null; cabang: string; reg: number | null; tglBerangkat: string; tglPulang: string; visits: unknown; status: string };
+export type TripRow = { id: string; ownerId: string; ownerName: string; ownerRole: string; ownerReg: number | null; cabang: string; reg: number | null; tglBerangkat: string; tglPulang: string; visits: unknown; status: string; pesertaIds?: unknown };
 
 const ROLE_SHORT: Record<string, string> = { gm: 'GM', rm: 'RM', bm: 'BM' };
 
@@ -25,6 +25,7 @@ export async function notifyTripChange(prev: TripRow, newStatus: string, actorId
   const who = `${ROLE_SHORT[prev.ownerRole] || prev.ownerRole} ${prev.ownerName}`;
   const base = { entity: 'visitTrip' as const, entityId: prev.id };
   const notMe = (ids: string[]) => ids.filter((x) => x !== actorId);
+  const peserta = (Array.isArray(prev.pesertaIds) ? (prev.pesertaIds as string[]) : []).filter((x) => x !== prev.ownerId);
 
   if (newStatus === 'diajukan') {
     await notify({
@@ -47,6 +48,13 @@ export async function notifyTripChange(prev: TripRow, newStatus: string, actorId
       title: `Kunjungan ${who} ke cabang ${prev.cabang}`,
       message: `${who} akan berkunjung ke ${prev.cabang} pada ${range}, ${n} kunjungan customer. Buka untuk melihat daftar customer & tujuannya.`,
     });
+    await notify({
+      ...base,
+      userIds: notMe(peserta),
+      type: 'trip_scheduled',
+      title: `Anda ikut perjalanan ${who} ke ${prev.cabang}`,
+      message: `Perjalanan ${range} disetujui, ${n} kunjungan customer. Kunjungan yang Anda ikuti tercatat di Aktivitas Harian setelah realisasi diisi.`,
+    });
     return;
   }
   if (newStatus === 'ditolak') {
@@ -57,7 +65,7 @@ export async function notifyTripChange(prev: TripRow, newStatus: string, actorId
     const ids = prev.status === 'disetujui' ? await tripHostIds(prev.cabang, prev.reg) : prev.status === 'diajukan' ? await tripApproverIds(prev.ownerRole, prev.ownerReg) : [];
     await notify({
       ...base,
-      userIds: notMe(ids).filter((x) => x !== prev.ownerId),
+      userIds: notMe([...ids, ...peserta]).filter((x, i, a) => x !== prev.ownerId && a.indexOf(x) === i),
       type: 'trip_cancelled',
       title: `Perjalanan ${who} ke ${prev.cabang} dibatalkan`,
       message: `Perjalanan ${range} dibatalkan.${note ? ` Alasan: ${note}` : ''}`,

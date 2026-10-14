@@ -151,9 +151,8 @@ export function TopBar() {
           <div className="user-chip">
             <div>
               <div className="u-name">{currentUser.name}</div>
-              <span className={`badge ${rbm.color} u-role`}>
-                {rbm.label}
-                {roleExtra}
+              <span className={`badge ${rbm.color} u-role`} title={currentUser.customRoleLabel ? `Role: ${currentUser.customRoleLabel} (tipe dasar ${rbm.label})` : undefined}>
+                {currentUser.customRoleLabel ? `${currentUser.customRoleLabel} · ${rbm.label}${roleExtra.replace(/^ · /, ' ')}` : `${rbm.label}${roleExtra}`}
               </span>
             </div>
           </div>

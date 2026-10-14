@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { api } from '@/lib/api-client';
+import { IconTrash } from '../icons';
 import { formatRupiah } from '@/lib/format';
-import { ALLOC_META, allocStatus, seKey, splitEven } from '@/lib/se-target';
+import { ALLOC_META, allocStatus, seKey, splitEven, userTargetKey } from '@/lib/se-target';
 import type { RosterUser, SafeUser, SeTarget } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 
@@ -18,6 +19,8 @@ export interface CabangAlloc {
   allocated: number;
   ses: string[];
   missing: string[];
+  /** Sales cabang yang sengaja dikeluarkan dari pembagian bulan ini (baris target 0). */
+  excluded: string[];
   status: ReturnType<typeof allocStatus>;
 }
 
@@ -25,13 +28,16 @@ export interface CabangAlloc {
 export function buildAllocations(cabangTargets: { cabang: string; target: number }[], seTargets: SeTarget[], roster: RosterUser[], periode: string): CabangAlloc[] {
   return cabangTargets.map(({ cabang, target }) => {
     const cb = cabang.toUpperCase();
-    const rows = seTargets.filter((t) => t.periode === periode && t.cabang.toUpperCase() === cb && t.amount > 0);
-    const rosterSe = roster.filter((u) => u.role === 'sales' && (u.cabang || '').toUpperCase() === cb && u.se).map((u) => seKey(u.se));
+    const all = seTargets.filter((t) => t.periode === periode && t.cabang.toUpperCase() === cb);
+    const rows = all.filter((t) => t.amount > 0);
+    // Target 0 = dikeluarkan BM dari pembagian (tombol hapus): tidak ditampilkan & tidak dihitung "belum punya target".
+    const excluded = all.filter((t) => !(t.amount > 0)).map((t) => seKey(t.se));
+    const rosterSe = roster.filter((u) => u.role === 'sales' && (u.cabang || '').toUpperCase() === cb && u.se).map((u) => seKey(u.se)).filter((s) => !excluded.includes(s));
     const ses = Array.from(new Set([...rosterSe, ...rows.map((t) => seKey(t.se))])).sort();
     const has = new Set(rows.map((t) => seKey(t.se)));
     const missing = rosterSe.filter((s) => !has.has(s));
     const allocated = rows.reduce((s, t) => s + t.amount, 0);
-    return { cabang: cb, target, allocated, ses, missing, status: allocStatus(target, allocated, missing.length) };
+    return { cabang: cb, target, allocated, ses, missing, excluded, status: allocStatus(target, allocated, missing.length) };
   });
 }
 
@@ -71,6 +77,8 @@ export function SeTargetSection({
   // ---- editor state (per cabang + periode)
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [extra, setExtra] = useState<string[]>([]);
+  // Baris yang dihapus BM di editor ini (disimpan sebagai "dikeluarkan").
+  const [removedSe, setRemovedSe] = useState<string[]>([]);
   const [applyRest, setApplyRest] = useState(true);
   const [busy, setBusy] = useState(false);
   const draftKey = `${sel}|${periode}|${cur?.ses.join(',')}`;
@@ -84,6 +92,7 @@ export function SeTargetSection({
     });
     setDraft(d);
     setExtra([]);
+    setRemovedSe([]);
   }
 
   if (role === 'sales') {
@@ -99,13 +108,23 @@ export function SeTargetSection({
     );
   }
 
-  const ses = cur ? [...cur.ses, ...extra] : [];
+  const ses = cur ? [...cur.ses, ...extra].filter((se) => !removedSe.includes(se)) : [];
   const val = (se: string) => Number((draft[se] || '').replace(/\D/g, '')) || 0;
   const total = ses.reduce((s, se) => s + val(se), 0);
   const draftStatus = cur ? allocStatus(cur.target, total, ses.filter((se) => cur.missing.includes(se) && !val(se)).length) : 'noTarget';
   const editable = !!cur && canEdit(cur.cabang);
-  const addable = roster.filter((u) => u.role === 'sales' && u.se && !ses.includes(seKey(u.se)));
-  const nameOf = (se: string) => roster.find((u) => seKey(u.se) === se)?.name || '';
+  // Semua user bisa ditambahkan (Sales, Marketing, BM, dll.); user tanpa Kode SE memakai username.
+  const addable = roster.filter((u) => u.role !== 'purchasing05' && !ses.includes(userTargetKey(u))).sort((a, b) => Number(b.role === 'sales') - Number(a.role === 'sales') || a.name.localeCompare(b.name));
+  const userOf = (se: string) => roster.find((u) => userTargetKey(u) === se);
+  const nameOf = (se: string) => userOf(se)?.name || '';
+  const ROLE_SHORT: Record<string, string> = { sales: 'Sales', salesadmin: 'Admin Sales', bm: 'BM', rm: 'RM', gm: 'GM', admin: 'Admin', purchasing: 'Purchasing' };
+  const removeRow = (se: string) => {
+    if (extra.includes(se) && !cur?.ses.includes(se)) setExtra(extra.filter((x) => x !== se));
+    else setRemovedSe([...removedSe, se]);
+    const d = { ...draft };
+    delete d[se];
+    setDraft(d);
+  };
 
   async function save() {
     if (!cur) return;
@@ -115,7 +134,7 @@ export function SeTargetSection({
         cabang: cur.cabang,
         periode,
         applyRest,
-        rows: ses.map((se) => ({ se, amount: val(se) })),
+        rows: [...ses.map((se) => ({ se, amount: val(se) })), ...removedSe.map((se) => ({ se, amount: 0, exclude: true }))],
       });
       upsertSeTargets(res.seTargets);
       removeSeTargets(res.removedIds);
@@ -182,7 +201,7 @@ export function SeTargetSection({
               <div className="table-wrap" style={{ borderTop: 'none' }}>
                 <table className="simple-table">
                   <thead>
-                    <tr><th>SE</th><th>Nama</th><th>Target {label(periode)}</th><th>Porsi</th><th>Realisasi (Won)</th><th>Ach.</th></tr>
+                    <tr><th>SE</th><th>Nama</th><th>Target {label(periode)}</th><th>Porsi</th><th>Realisasi (Won)</th><th>Ach.</th>{editable && <th aria-label="Hapus" />}</tr>
                   </thead>
                   <tbody>
                     {ses.length === 0 && <tr><td colSpan={6} className="field-note">Belum ada user Sales terdaftar di cabang {cur.cabang}. Tambahkan Sales di bawah.</td></tr>}
@@ -192,7 +211,14 @@ export function SeTargetSection({
                       return (
                         <tr key={se}>
                           <td style={{ fontWeight: 600 }}>{se}</td>
-                          <td>{nameOf(se) || <span className="field-note" style={{ margin: 0 }}>(bukan user cabang ini)</span>}</td>
+                          <td>
+                            {nameOf(se) || <span className="field-note" style={{ margin: 0 }}>(user tidak ditemukan)</span>}
+                            {userOf(se) && (userOf(se)!.role !== 'sales' || (userOf(se)!.cabang || '').toUpperCase() !== cur.cabang) && (
+                              <span className="field-note" style={{ margin: 0, display: 'block' }}>
+                                {ROLE_SHORT[userOf(se)!.role] || userOf(se)!.role}{userOf(se)!.cabang ? ` ${userOf(se)!.cabang}` : ''}
+                              </span>
+                            )}
+                          </td>
                           <td>
                             {editable ? (
                               <input
@@ -214,6 +240,13 @@ export function SeTargetSection({
                           <td className="mono">{pct(v, cur.target)}</td>
                           <td className="mono">{formatRupiah(won)}</td>
                           <td className="center">{v ? <span className={`badge ${won >= v ? 'green' : won >= v * 0.6 ? 'amber' : 'rust'}`}>{pct(won, v)}</span> : '-'}</td>
+                          {editable && (
+                            <td>
+                              <button type="button" className="icon-btn danger" title={`Hapus ${se} dari pembagian target ${label(periode)}`} aria-label={`Hapus ${se}`} onClick={() => removeRow(se)}>
+                                <IconTrash />
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -223,7 +256,7 @@ export function SeTargetSection({
                       <td colSpan={2}>Total dibagi</td>
                       <td className="mono">{formatRupiah(total)}</td>
                       <td className="mono">{pct(total, cur.target)}</td>
-                      <td colSpan={2} className="mono">{total === cur.target ? 'Pas dengan target cabang' : total < cur.target ? `Kurang ${formatRupiah(cur.target - total)}` : `Lebih ${formatRupiah(total - cur.target)}`}</td>
+                      <td colSpan={editable ? 3 : 2} className="mono">{total === cur.target ? 'Pas dengan target cabang' : total < cur.target ? `Kurang ${formatRupiah(cur.target - total)}` : `Lebih ${formatRupiah(total - cur.target)}`}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -239,9 +272,23 @@ export function SeTargetSection({
                     Bagi rata
                   </button>
                   {addable.length > 0 && (
-                    <select value="" onChange={(e) => e.target.value && setExtra([...extra, e.target.value])} style={{ maxWidth: 240 }} aria-label="Tambah Sales">
-                      <option value="">+ Tambah Sales…</option>
-                      {addable.map((u) => <option key={u.id} value={seKey(u.se)}>{seKey(u.se)} · {u.name}{u.cabang ? ` (${u.cabang})` : ''}</option>)}
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const k = e.target.value;
+                        if (!k) return;
+                        if (removedSe.includes(k)) setRemovedSe(removedSe.filter((x) => x !== k));
+                        else setExtra([...extra, k]);
+                      }}
+                      style={{ maxWidth: 300 }}
+                      aria-label="Tambah user"
+                    >
+                      <option value="">+ Tambah user…</option>
+                      {addable.map((u) => (
+                        <option key={u.id} value={userTargetKey(u)}>
+                          {userTargetKey(u)} · {u.name} — {ROLE_SHORT[u.role] || u.role}{u.cabang ? ` ${u.cabang}` : ''}
+                        </option>
+                      ))}
                     </select>
                   )}
                   <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
@@ -253,7 +300,8 @@ export function SeTargetSection({
                 </div>
               )}
               <div className="field-note" style={{ marginTop: 6 }}>
-                Wajib: jumlah target Sales = target cabang, dan setiap Sales di cabang punya target. Mengosongkan target satu Sales menghapusnya. &quot;Terapkan porsi
+                {cur.excluded.length > 0 && <>Dikeluarkan dari pembagian bulan ini: <b>{cur.excluded.join(', ')}</b> (tambahkan lagi lewat &quot;+ Tambah user&quot;). </>}
+                Wajib: jumlah target = target cabang, dan setiap Sales di cabang punya target kecuali yang dihapus (🗑 = dikeluarkan dari pembagian). Semua user bisa ditambahkan; user tanpa Kode SE memakai username. &quot;Terapkan porsi
                 yang sama&quot; mengisi bulan berikutnya s.d. Desember dengan persentase yang sama dari target cabang bulan itu. Sales menerima notifikasi targetnya.
               </div>
             </>

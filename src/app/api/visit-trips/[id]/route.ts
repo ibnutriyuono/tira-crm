@@ -10,6 +10,7 @@ import { deleteObject } from '@/lib/s3';
 import type { TripVisit } from '@/lib/types';
 import { canEditPlan, canEditRealisasi, mergeRealisasi, normalizePlanVisits, validateTripHeader } from '@/lib/visit-trip';
 import { guard } from '@/lib/permissions-server';
+import { cleanPeserta, syncTripActivitiesSafe } from '@/lib/trip-activity-server';
 
 /** One trip, within the viewer's scope -- used when opening a trip from a notification. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -57,6 +58,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         tglPulang,
         keperluan: String(body?.keperluan || '').trim().slice(0, 1000) || null,
         visits: plan.visits as unknown as Prisma.InputJsonValue,
+        ...('pesertaIds' in (body || {}) ? { pesertaIds: (await cleanPeserta(body?.pesertaIds, existing.ownerId)) as unknown as Prisma.InputJsonValue } : {}),
       },
     });
     await logActivity({ user, action: 'update', entity: 'visitTrip', entityId: id, summary: `Mengubah rencana perjalanan ke ${cabang} (${tglBerangkat})` });
@@ -81,9 +83,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       await Promise.all(orphans.map((o) => deleteObject(o.key).catch(() => {})));
       await prisma.tripPhoto.deleteMany({ where: { id: { in: orphans.map((o) => o.id) } } });
     }
+    const sync = await syncTripActivitiesSafe(id);
     await logActivity({ user, action: 'update', entity: 'visitTrip', entityId: id, summary: `Mengisi realisasi perjalanan ke ${existing.cabang} (${existing.tglBerangkat})` });
     await syncCustomerPics(user, merged.visits.map((v) => ({ customer: v.customer, pics: parsePicText(v.pic), cabang: existing.cabang })), 'Perjalanan Dinas');
-    return NextResponse.json({ trip });
+    return NextResponse.json({ trip, aktivitas: sync });
   }
 
   return NextResponse.json({ error: 'Perjalanan ini tidak dapat diubah pada status sekarang.' }, { status: 403 });

@@ -26,6 +26,8 @@ import {
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { TripPhoto, TripVisit, VisitTrip } from '@/lib/types';
+import { UserPicker } from '../UserPicker';
+import { useRoster, type RosterUser } from '../issues/shared';
 import { canNow } from '@/hooks/useCan';
 
 const ROLE_SHORT: Record<string, string> = { gm: 'GM', rm: 'RM', bm: 'BM' };
@@ -107,6 +109,8 @@ export function VisitTripModal() {
   const [tglPulang, setTglPulang] = useState('');
   const [keperluan, setKeperluan] = useState('');
   const [planVisits, setPlanVisits] = useState<TripVisit[]>([blankVisit()]);
+  const [peserta, setPeserta] = useState<string[]>([]);
+  const roster = useRoster();
 
   // detail: realisasi + approval
   const [realVisits, setRealVisits] = useState<TripVisit[]>([]);
@@ -176,6 +180,7 @@ export function VisitTripModal() {
     setTglPulang(today);
     setKeperluan('');
     setPlanVisits([blankVisit()]);
+    setPeserta([]);
     setView('edit');
   }
 
@@ -186,6 +191,7 @@ export function VisitTripModal() {
     setTglPulang(t.tglPulang);
     setKeperluan(t.keperluan || '');
     setPlanVisits(t.visits.length ? t.visits.map((v) => ({ ...v })) : [blankVisit()]);
+    setPeserta(Array.isArray(t.pesertaIds) ? t.pesertaIds : []);
     setView('edit');
   }
 
@@ -245,7 +251,7 @@ export function VisitTripModal() {
     if (bad) return toast('Setiap kunjungan wajib diisi customer dan tujuan kunjungannya', 'error');
     setBusy(true);
     try {
-      const payload = { cabang, tglBerangkat, tglPulang, keperluan, visits: visits.map((v) => ({ ...v, id: v.id.startsWith('new-') ? '' : v.id })) };
+      const payload = { cabang, tglBerangkat, tglPulang, keperluan, pesertaIds: peserta, visits: visits.map((v) => ({ ...v, id: v.id.startsWith('new-') ? '' : v.id })) };
       let { trip } = currentId ? await api.put<{ trip: VisitTrip }>(`/api/visit-trips/${currentId}`, payload) : await api.post<{ trip: VisitTrip }>('/api/visit-trips', payload);
       if (submit) ({ trip } = await api.post<{ trip: VisitTrip }>(`/api/visit-trips/${trip.id}/action`, { action: 'submit' }));
       upsertLocal(trip);
@@ -459,6 +465,11 @@ export function VisitTripModal() {
           <label>Keperluan perjalanan</label>
           <input type="text" value={keperluan} onChange={(e) => setKeperluan(e.target.value)} placeholder="cth. Review cabang & kunjungan key account Q4" />
         </div>
+        <div className="full">
+          <label>Peserta perjalanan (selain Anda)</label>
+          <UserPicker value={peserta} onChange={setPeserta} roster={roster} exclude={currentUser ? [currentUser.id] : []} placeholder="+ Tambah peserta (pilih user)…" />
+          <div className="field-note" style={{ margin: 0 }}>Peserta diberi notifikasi saat perjalanan disetujui/dibatalkan dan bisa melihat perjalanan ini. Saat realisasi, pilih personil yang ikut ke tiap customer — kunjungan tercatat di Aktivitas Harian mereka.</div>
+        </div>
       </div>
 
       <div style={{ fontWeight: 700, fontSize: 13, margin: '14px 0 6px' }}>Rencana kunjungan customer</div>
@@ -525,6 +536,11 @@ export function VisitTripModal() {
             {statusBadge(current)} <span className="field-note" style={{ display: 'inline' }}>{tripDocNo(current)}</span>
           </div>
           {current.keperluan && <div style={{ gridColumn: '1 / -1' }}>Keperluan: {current.keperluan}</div>}
+          {!!current.pesertaIds?.length && (
+            <div style={{ gridColumn: '1 / -1' }}>
+              Peserta: <b>{current.pesertaIds.map((id) => roster.find((u) => u.id === id)?.name || '(user)').join(', ')}</b>
+            </div>
+          )}
           {current.approverName && (
             <div style={{ gridColumn: '1 / -1' }}>
               {current.status === 'ditolak' ? 'Ditolak' : 'Disetujui'} oleh <b>{current.approverName}</b>
@@ -550,6 +566,7 @@ export function VisitTripModal() {
                 <th>Tujuan kunjungan (rencana)</th>
                 <th>Realisasi</th>
                 <th>Hasil</th>
+                <th title="Personil yang ikut ke customer ini — kunjungan tercatat di Aktivitas Harian mereka">Personil ikut → Aktivitas Harian</th>
                 {editReal && <th />}
               </tr>
             </thead>
@@ -590,6 +607,9 @@ export function VisitTripModal() {
                     ) : (
                       TRIP_HASIL_LABEL[v.hasil] || '-'
                     )}
+                  </td>
+                  <td style={{ minWidth: 230 }}>
+                    <PersonilCell trip={current} v={v} roster={roster} edit={editReal} onChange={(ids) => setRealVisits((list) => list.map((x, idx) => (idx === i ? { ...x, personilIds: ids } : x)))} />
                   </td>
                   {editReal && (
                     <td>
@@ -799,5 +819,51 @@ export function VisitTripModal() {
     <Modal show={show} onClose={closeModal} title={title} xwide footer={footer}>
       {view === 'list' ? listView : view === 'edit' ? editView : detailView}
     </Modal>
+  );
+}
+
+const up = (x: string | null | undefined) => (x || '').trim().toUpperCase();
+/** Punya Aktivitas Harian sendiri (sama dengan activityOwner di server): Sales ber-SE, atau BM. */
+const ownsActivity = (u: RosterUser) => (u.role === 'sales' && !!u.se) || u.role === 'bm';
+
+/**
+ * Personil yang ikut ke satu customer (pemilik + peserta + Sales/BM cabang
+ * tujuan) dan pratinjau baris Aktivitas Harian yang akan tercatat.
+ */
+function PersonilCell({ trip, v, roster, edit, onChange }: { trip: VisitTrip; v: TripVisit; roster: RosterUser[]; edit: boolean; onChange: (ids: string[]) => void }) {
+  const peserta = Array.isArray(trip.pesertaIds) ? trip.pesertaIds : [];
+  const base = [trip.ownerId, ...peserta];
+  const local = roster.filter((u) => (u.role === 'sales' || u.role === 'bm') && up(u.cabang) === up(trip.cabang) && !base.includes(u.id)).map((u) => u.id);
+  const options = [...base, ...local];
+  const ikut = v.personilIds?.length ? v.personilIds : base;
+  const users = ikut.map((id) => roster.find((u) => u.id === id)).filter((u): u is RosterUser => !!u);
+  const owners = users.filter(ownsActivity);
+  const others = (uid: string) => users.filter((u) => u.id !== uid).map((u) => u.name);
+  const counts = !!v.realisasi.trim() && v.hasil !== 'batal';
+  const name = (id: string) => roster.find((u) => u.id === id)?.name || (id === trip.ownerId ? trip.ownerName : '(user)');
+  return (
+    <div className="trip-personil">
+      {edit ? (
+        <div className="trip-personil-opts">
+          {options.map((id) => {
+            const on = ikut.includes(id);
+            return (
+              <button key={id} type="button" className={on ? 'on' : ''} aria-pressed={on} onClick={() => onChange(on ? ikut.filter((x) => x !== id) : [...ikut, id])}>
+                {on ? '✓' : '+'} {name(id)}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div>{ikut.map(name).join(', ') || '-'}</div>
+      )}
+      <div className="field-note" style={{ margin: '3px 0 0' }}>
+        {!counts
+          ? v.hasil === 'batal' ? 'Tidak dicatat (tidak jadi dikunjungi).' : 'Tercatat setelah realisasi diisi.'
+          : owners.length
+            ? `→ ${owners.map((u) => `${u.name}${others(u.id).length ? ` (didampingi ${others(u.id).join(', ')})` : ''}`).join('; ')}`
+            : `→ Sales pemilik customer di ${trip.cabang}${users.length ? ` (didampingi ${users.map((u) => u.name).join(', ')})` : ''}`}
+      </div>
+    </div>
   );
 }

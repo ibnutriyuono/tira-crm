@@ -24,7 +24,7 @@ type Row = { id: string; se: string; cabang: string; periode: string; amount: nu
 
 /**
  * Simpan pembagian target satu cabang untuk satu bulan: { cabang, periode,
- * rows: [{ se, amount }], applyRest? }. amount 0 menghapus target SE itu.
+ * rows: [{ se, amount }], applyRest? }. amount 0 menghapus target SE itu; amount 0 + exclude menyimpan baris 0 = dikeluarkan dari pembagian.
  * applyRest: proporsi yang sama (amount / target cabang bulan ini) diterapkan
  * ke bulan-bulan berikutnya s.d. Desember mengikuti target cabang tiap bulan.
  * Hanya BM cabang itu, RM regionalnya, GM/Admin.
@@ -38,9 +38,9 @@ export async function PUT(req: Request) {
   const cabang = String(body?.cabang || '').trim().toUpperCase();
   const periode = String(body?.periode || '').trim();
   const applyRest = body?.applyRest === true;
-  const input: { se: string; amount: number }[] = Array.isArray(body?.rows)
-    ? (body.rows as { se?: unknown; amount?: unknown }[])
-        .map((r) => ({ se: String(r?.se || '').trim().toUpperCase().slice(0, 40), amount: Math.max(0, Math.round(num(r?.amount))) }))
+  const input: { se: string; amount: number; exclude: boolean }[] = Array.isArray(body?.rows)
+    ? (body.rows as { se?: unknown; amount?: unknown; exclude?: unknown }[])
+        .map((r) => ({ se: String(r?.se || '').trim().toUpperCase().slice(0, 40), amount: Math.max(0, Math.round(num(r?.amount))), exclude: r?.exclude === true }))
         .filter((r) => r.se)
     : [];
   if (!cabang || !/^\d{4}-\d{2}$/.test(periode)) return NextResponse.json({ error: 'Cabang dan periode (YYYY-MM) wajib diisi' }, { status: 400 });
@@ -67,7 +67,8 @@ export async function PUT(req: Request) {
       const factor = p === periode || !(baseTarget > 0) ? 1 : yearMonthTarget(budgets, cabang, year, Number(p.slice(5, 7))) / baseTarget;
       for (const r of input) {
         const amt = p === periode ? r.amount : Math.round((r.amount * factor) / 1000) * 1000;
-        if (amt > 0) {
+        if (amt > 0 || r.exclude) {
+          // exclude: baris target 0 = dikeluarkan dari pembagian (bukan "belum dibagi").
           saved.push(
             (await tx.seTarget.upsert({
               where: { se_periode: { se: r.se, periode: p } },
@@ -93,10 +94,15 @@ export async function PUT(req: Request) {
   // Beri tahu tiap Sales target bulan ini.
   const mine = saved.filter((t) => t.periode === periode);
   if (mine.length) {
-    const users = await prisma.user.findMany({ where: { role: 'sales', se: { in: mine.map((t) => t.se), mode: 'insensitive' } }, select: { id: true, se: true } });
+    // Target dikunci Kode SE, atau username untuk user tanpa SE (Marketing, BM, dll.).
+    const keys = mine.filter((t) => t.amount > 0).map((t) => t.se);
+    const users = await prisma.user.findMany({
+      where: { OR: [{ se: { in: keys, mode: 'insensitive' } }, { username: { in: keys, mode: 'insensitive' } }] },
+      select: { id: true, se: true, username: true },
+    });
     await Promise.all(
-      users.map((u: { id: string; se: string | null }) => {
-        const t = mine.find((x) => x.se === (u.se || '').toUpperCase());
+      users.map((u: { id: string; se: string | null; username: string }) => {
+        const t = mine.find((x) => x.amount > 0 && (x.se === (u.se || '').toUpperCase() || (!u.se && x.se === u.username.toUpperCase())));
         if (!t) return null;
         return notify({
           userIds: [u.id],

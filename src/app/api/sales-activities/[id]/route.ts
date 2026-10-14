@@ -15,6 +15,9 @@ async function loadOwn(userSe: string, id: string) {
   if (existing.se.trim().toLowerCase() !== userSe.trim().toLowerCase()) {
     return { error: NextResponse.json({ error: 'Anda hanya dapat mengubah aktivitas milik sendiri.' }, { status: 403 }) };
   }
+  if (existing.sumber === 'perjalanan') {
+    return { error: NextResponse.json({ error: 'Kunjungan ini berasal dari realisasi Perjalanan Dinas — ubah lewat perjalanannya.' }, { status: 409 }) };
+  }
   return { existing };
 }
 

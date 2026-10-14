@@ -374,12 +374,14 @@ export function canWriteSalesActivity(user: SafeUser): boolean {
  */
 export function visitTripScopeWhere(user: SafeUser) {
   if (user.role === 'admin' || user.role === 'gm') return {};
+  // Peserta perjalanan selalu bisa melihat perjalanan yang diikutinya.
+  const peserta = { pesertaIds: { array_contains: [user.id] } };
   if (user.role === 'rm') {
     const reg = user.reg ?? -1;
-    return { OR: [{ ownerId: user.id }, { ownerReg: reg }, { reg }] };
+    return { OR: [{ ownerId: user.id }, { ownerReg: reg }, { reg }, peserta] };
   }
   if (user.role === 'bm') {
-    return { OR: [{ ownerId: user.id }, { cabang: { equals: user.cabang || '__none__', mode: 'insensitive' as const } }] };
+    return { OR: [{ ownerId: user.id }, { cabang: { equals: user.cabang || '__none__', mode: 'insensitive' as const } }, peserta] };
   }
-  return { id: '__none__' };
+  return peserta;
 }

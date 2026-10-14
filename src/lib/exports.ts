@@ -187,7 +187,7 @@ export function buildSalesActivitySheet(list: SalesActivity[], prospects: Pick<P
         (a.pics || []).map((p) => (p.jabatan ? `${p.nama} (${p.jabatan})` : p.nama)).filter(Boolean).join('; '),
         a.keterangan || '',
         a.status === 'rencana' ? 'Rencana' : 'Selesai',
-        a.sumber === 'followup' ? 'Otomatis (Follow-up)' : 'Manual',
+        a.sumber === 'followup' ? 'Otomatis (Follow-up)' : a.sumber === 'perjalanan' ? `Perjalanan Dinas${a.pendamping ? ` (didampingi ${a.pendamping})` : ''}` : a.sumber === 'aktivitas' ? 'Rencana dari hasil kontak' : 'Manual',
         a.prospectId ? (st != null ? STATUS_META[st]?.label || 'Di pipeline' : 'Di pipeline') : '',
         a.createdBy || '',
       ];

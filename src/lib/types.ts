@@ -7,6 +7,8 @@ export interface SafeUser {
   role: Role;
   /** Role tambahan (Kelola Role); null = memakai role bawaan. */
   customRole?: string | null;
+  /** Nama role tambahan untuk ditampilkan (diisi bootstrap). */
+  customRoleLabel?: string | null;
   se: string | null;
   cabang: string | null;
   reg: number | null;
@@ -365,6 +367,11 @@ export interface SalesActivity {
   lng?: number | null;
   akurasi?: number | null;
   followUpId?: string | null;
+  /** sumber "perjalanan": asal perjalanan dinas & kunjungannya. */
+  tripId?: string | null;
+  tripVisitId?: string | null;
+  /** Personil lain yang ikut ("didampingi …"). */
+  pendamping?: string | null;
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
@@ -409,6 +416,8 @@ export interface TripVisit {
   hasil: TripHasil;
   /** true = kunjungan di luar rencana, ditambahkan saat realisasi. */
   tambahan: boolean;
+  /** Personil yang ikut ke customer ini (user id); kosong/undefined = pemilik + semua peserta. */
+  personilIds?: string[];
 }
 
 export interface TripPhoto {
@@ -435,6 +444,8 @@ export interface VisitTrip {
   tglPulang: string;
   keperluan: string | null;
   visits: TripVisit[];
+  /** Peserta selain pemilik (user id). */
+  pesertaIds?: string[];
   status: TripStatus;
   submittedAt: string | null;
   approverName: string | null;

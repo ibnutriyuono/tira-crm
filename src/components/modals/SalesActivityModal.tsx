@@ -660,6 +660,10 @@ export function SalesActivityModal() {
                         <div style={{ marginTop: 4 }}>
                           <span className="badge slate" title="Tercatat otomatis dari Follow-up WhatsApp">Otomatis</span>
                         </div>
+                      ) : a.sumber === 'perjalanan' ? (
+                        <div style={{ marginTop: 4 }}>
+                          <span className="badge steel" title="Dari realisasi Perjalanan Dinas — diubah lewat perjalanannya">✈ Perjalanan Dinas</span>
+                        </div>
                       ) : null}
                     </td>
                     {!canWrite && <td>{a.se}</td>}
@@ -684,6 +688,7 @@ export function SalesActivityModal() {
                     <td>
                       {a.keterangan || '-'}
                       {a.langkah && <div className="field-note" style={{ margin: '3px 0 0' }}>Langkah berikutnya: {a.langkah}</div>}
+                      {a.pendamping && <div className="field-note" style={{ margin: '3px 0 0', color: 'var(--steel-600)' }}>Kunjungan bersama: didampingi {a.pendamping}</div>}
                       {a.lat != null && a.lng != null && (
                         <div style={{ marginTop: 3 }}>
                           <a href={`https://www.google.com/maps?q=${a.lat},${a.lng}`} target="_blank" rel="noreferrer" className="field-note" style={{ margin: 0 }}>
@@ -715,7 +720,14 @@ export function SalesActivityModal() {
                         <span className="field-note" style={{ margin: 0 }}>Milik {a.se}</span>
                       </td>
                     )}
-                    {canWrite && (!owner || a.se.toLowerCase() === owner.toLowerCase()) && (
+                    {canWrite && (!owner || a.se.toLowerCase() === owner.toLowerCase()) && a.sumber === 'perjalanan' && (
+                      <td>
+                        <button type="button" className="btn btn-outline btn-sm" style={{ padding: '3px 8px', whiteSpace: 'nowrap' }} title="Kunjungan ini diubah lewat realisasi perjalanannya" onClick={() => { useUiStore.setState({ visitTripOpenId: a.tripId || null }); openModal('visitTrip'); }}>
+                          ✈ Buka perjalanan
+                        </button>
+                      </td>
+                    )}
+                    {canWrite && (!owner || a.se.toLowerCase() === owner.toLowerCase()) && a.sumber !== 'perjalanan' && (
                       <td>
                         <div className="row-actions">
                           {a.status === 'rencana' && a.sumber === 'aktivitas' ? (

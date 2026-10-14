@@ -115,6 +115,9 @@ model VisitTrip {
   /// Maksud perjalanan secara umum.
   keperluan        String?
   visits           Json      @default("[]")
+  /// Peserta perjalanan selain pemilik (user id). Tiap kunjungan menyimpan
+  /// personil yang ikut (visits[].personilIds) dari pemilik + peserta + Sales/BM cabang tujuan.
+  pesertaIds       Json      @default("[]")
   status           String    @default("draft")
   submittedAt      DateTime?
   approverName     String?
@@ -150,6 +153,11 @@ model SalesActivity {
   customer   String
   /// Hasil/ringkasan singkat; juga dipakai sebagai uraian awal saat dikonversi.
   keterangan String?
+  /// sumber "perjalanan": kunjungan dari realisasi Perjalanan Dinas (tidak diedit manual).
+  tripId      String?
+  tripVisitId String?
+  /// Nama personil lain yang ikut kunjungan ("didampingi …").
+  pendamping  String?
   /// PIC customer yang ditemui/dihubungi: [{ nama, jabatan }], minimal satu.
   /// JSON seperti Customer.pics; baris lama (sebelum phase27) berisi [].
   pics       Json     @default("[]")
@@ -158,7 +166,8 @@ model SalesActivity {
   /// yang belum dilakukan). Rencana tidak dihitung di KPI Aktivitas.
   status     String   @default("selesai")
   /// Asal baris: null = diisi manual; "followup" = otomatis dari jadwal /
-  /// realisasi Follow-up WhatsApp.
+  /// realisasi Follow-up WhatsApp; "aktivitas" = rencana dari hasil kontak;
+  /// "perjalanan" = realisasi Perjalanan Dinas.
   sumber     String?
   /// Saluran: telepon | wa | email | kurir (tipe telepon & dokumen).
   kanal      String?
@@ -182,6 +191,7 @@ model SalesActivity {
   @@index([reg])
   @@index([prospectId])
   @@index([prospectId, status])
+  @@index([tripId])
 }
 
 /// Target aktivitas per SE per bulan, diisi atasan (BM/RM/GM/Admin). `targets`

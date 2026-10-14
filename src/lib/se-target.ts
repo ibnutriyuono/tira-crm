@@ -44,6 +44,12 @@ export function restOfYear(periode: string): string[] {
 
 export const seKey = (s: string | null | undefined) => (s || '').trim().toUpperCase();
 
+/**
+ * Kunci target seorang user: Kode SE bila ada, selain itu username (huruf
+ * besar) — supaya user non-Sales (Marketing, BM, dll.) juga bisa diberi target.
+ */
+export const userTargetKey = (u: { se?: string | null; username: string }) => seKey(u.se) || seKey(u.username).slice(0, 40);
+
 /** Target SE pada periode (0 bila belum ada). */
 export function seTargetOf(list: SeTarget[], se: string, periode: string): number {
   const k = seKey(se);

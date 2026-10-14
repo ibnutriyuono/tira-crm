@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import type { TripVisit } from '@/lib/types';
 import { canApproveTrip, finishBlocker } from '@/lib/visit-trip';
 import { guard } from '@/lib/permissions-server';
+import { syncTripActivitiesSafe } from '@/lib/trip-activity-server';
 
 /**
  * Status transitions: submit (owner, draft/ditolak -> diajukan; a GM's own
@@ -68,6 +69,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const updated = await prisma.visitTrip.update({ where: { id }, data });
   await logActivity({ user, action: 'status_change', entity: 'visitTrip', entityId: id, summary });
+  // Kunjungan berrealisasi <-> Aktivitas Harian (batal / ditolak -> baris dihapus).
+  await syncTripActivitiesSafe(id);
 
   // Notifications are best-effort: a failed notification must not undo or
   // fail a status change that has already been saved.

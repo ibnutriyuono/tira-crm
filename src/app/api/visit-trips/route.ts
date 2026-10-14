@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { parsePicText, syncCustomerPics } from '@/lib/customer-sync';
 import { TRIP_ROLES, normalizePlanVisits, validateTripHeader } from '@/lib/visit-trip';
 import { guard } from '@/lib/permissions-server';
+import { cleanPeserta } from '@/lib/trip-activity-server';
 
 /** GET ?periode=YYYY-MM (optional): trips whose departure falls in that month. */
 export async function GET(req: Request) {
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
       tglPulang,
       keperluan: String(body?.keperluan || '').trim().slice(0, 1000) || null,
       visits: plan.visits as unknown as Prisma.InputJsonValue,
+      pesertaIds: (await cleanPeserta(body?.pesertaIds, user.id)) as unknown as Prisma.InputJsonValue,
     },
   });
   await logActivity({ user, action: 'create', entity: 'visitTrip', entityId: trip.id, summary: `Membuat rencana perjalanan ke ${cabang} (${tglBerangkat} s/d ${tglPulang}), ${plan.visits.length} kunjungan` });

@@ -3,7 +3,7 @@ import { budgetTargetScopeWhere, seTargetScopeWhere, customerScopeWhere, docScop
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import type { PurchasingContact } from '@/lib/types';
-import { effectivePerms } from '@/lib/permissions-server';
+import { effectivePerms, roleDefs } from '@/lib/permissions-server';
 import { sweepFollowUpNotifications } from '@/lib/followup-notify';
 import { issueScopeWhere, sweepIssueEscalation } from '@/lib/issues-server';
 
@@ -53,8 +53,10 @@ export async function GET() {
   const perms = await effectivePerms(user);
   const purch = user.role === 'purchasing' || user.role === 'purchasing05';
   const see = (m: string) => perms[m]?.v !== false;
+  // Nama role tambahan (Kelola Role) untuk badge di top bar.
+  const customRoleLabel = user.customRole ? (await roleDefs()).get(user.customRole)?.label || null : null;
   return NextResponse.json({
-    user,
+    user: { ...user, customRoleLabel },
     perms,
     prospects: see('prospek') ? prospects : [],
     customers: see('customer') ? customers : [],

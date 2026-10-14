@@ -64,7 +64,7 @@ export function canEditPlan(user: Actor, trip: Pick<TripAuthRow, 'ownerId' | 'st
   return trip.ownerId === user.id && (trip.status === 'draft' || trip.status === 'ditolak');
 }
 
-/** Realisasi is filled by the owner once the trip is approved. */
+/** Realisasi diisi pemilik setelah disetujui (personil per kunjungan dipilih di sini). */
 export function canEditRealisasi(user: Actor, trip: Pick<TripAuthRow, 'ownerId' | 'status'>): boolean {
   return trip.ownerId === user.id && trip.status === 'disetujui';
 }
@@ -76,6 +76,7 @@ function isDate(v: string): boolean {
 }
 
 const clip = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
+const ids = (v: unknown[]) => Array.from(new Set(v.map((x) => clip(x, 40)).filter(Boolean))).slice(0, 20);
 
 export function validateTripHeader(body: { cabang?: unknown; tglBerangkat?: unknown; tglPulang?: unknown }): string | null {
   const cabang = clip(body.cabang, 20);
@@ -128,7 +129,7 @@ export function mergeRealisasi(stored: TripVisit[], raw: unknown, newId: () => s
     if (!r && v.tambahan) continue; // an added visit removed again
     const hasil = clip(r?.hasil ?? v.hasil, 20);
     if (!hasilOk(hasil)) return { error: 'Hasil kunjungan tidak valid.' };
-    out.push({ ...v, realisasi: clip(r?.realisasi ?? v.realisasi, 2000), uraian: clip(r?.uraian ?? v.uraian, 10000), hasil, pic: v.tambahan ? clip(r?.pic ?? v.pic, 200) : v.pic });
+    out.push({ ...v, realisasi: clip(r?.realisasi ?? v.realisasi, 2000), uraian: clip(r?.uraian ?? v.uraian, 10000), hasil, pic: v.tambahan ? clip(r?.pic ?? v.pic, 200) : v.pic, personilIds: r && Array.isArray(r.personilIds) ? ids(r.personilIds) : v.personilIds });
   }
   const storedIds = new Set(stored.map((v) => v.id));
   for (const r of incoming) {
@@ -140,7 +141,7 @@ export function mergeRealisasi(stored: TripVisit[], raw: unknown, newId: () => s
     if (!customer) return { error: 'Kunjungan tambahan wajib diisi nama customer.' };
     const hasil = clip(r?.hasil, 20);
     if (!hasilOk(hasil)) return { error: 'Hasil kunjungan tidak valid.' };
-    out.push({ id: newId(), customer, pic: clip(r?.pic, 200), tanggal: clip(r?.tanggal, 10), tujuan: clip(r?.tujuan, 1000) || '(di luar rencana)', realisasi, uraian: clip(r?.uraian, 10000), hasil, tambahan: true });
+    out.push({ id: newId(), customer, pic: clip(r?.pic, 200), tanggal: clip(r?.tanggal, 10), tujuan: clip(r?.tujuan, 1000) || '(di luar rencana)', realisasi, uraian: clip(r?.uraian, 10000), hasil, tambahan: true, personilIds: Array.isArray(r?.personilIds) ? ids(r.personilIds) : undefined });
   }
   return { visits: out };
 }
