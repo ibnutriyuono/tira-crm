@@ -8,6 +8,7 @@ import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Material, Prospect } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
 function escapeHtml(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
@@ -152,7 +153,7 @@ export function QuotationModal() {
   }
 
   async function markSent() {
-    if (!record || record.penawaranTerkirim) return;
+    if (!record || record.penawaranTerkirim || !canNow('prospek', 'e')) return;
     try {
       const { prospect } = await api.patch<{ prospect: Prospect }>(`/api/prospects/${record.id}`, { penawaranTerkirim: true });
       upsertProspect(prospect);

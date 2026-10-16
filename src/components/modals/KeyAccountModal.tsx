@@ -32,7 +32,7 @@ function addDays(ymd: string, n: number): string {
 import type { CustomerGroup, KamAction, KamTeam, KamTier, Prospect, SalesActivity } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
-import { canNow } from '@/hooks/useCan';
+import { canNow, useCan } from '@/hooks/useCan';
 
 type Tab = 'ringkasan' | 'daftar' | 'profil' | 'struktur';
 interface RosterUser {
@@ -72,7 +72,10 @@ export function KeyAccountModal() {
 
   const customers = useDataStore((s) => s.customers);
   const customerNames = useMemo(() => [...new Set(customers.map((c) => (c.name || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [customers]);
-  const manager = canManageKam(currentUser?.role);
+  // Kelola Role: tanpa hak Tambah/Ubah Key Account semua isian jadi hanya-baca; hapus grup butuh hak Hapus.
+  const kamE = useCan('kam', 'e');
+  const kamD = useCan('kam', 'd');
+  const manager = kamE && canManageKam(currentUser?.role);
   const today = localToday();
 
   const [tab, setTab] = useState<Tab>('ringkasan');
@@ -227,8 +230,8 @@ export function KeyAccountModal() {
             groups={groups}
             setSelId={setSelId}
             manager={manager}
-            isKetua={!!currentUser && sel.ketuaId === currentUser.id}
-            canDelete={currentUser?.role === 'gm' || currentUser?.role === 'admin'}
+            isKetua={kamE && !!currentUser && sel.ketuaId === currentUser.id}
+            canDelete={kamD && (currentUser?.role === 'gm' || currentUser?.role === 'admin')}
             stat={stats.m.get(sel.id)}
             flags={flagsOf(sel)}
             daysSince={daysSince(sel)}
@@ -258,8 +261,8 @@ export function KeyAccountModal() {
           }}
           teamDirty={teamDirty}
           manager={manager}
-          canDelete={currentUser?.role === 'gm' || currentUser?.role === 'admin'}
-          currentUserId={currentUser?.id || ''}
+          canDelete={kamD && (currentUser?.role === 'gm' || currentUser?.role === 'admin')}
+          currentUserId={kamE ? currentUser?.id || '' : ''}
           busy={busy}
           prospects={prospects}
           customerNames={customerNames}
@@ -1059,7 +1062,7 @@ function Struktur({
                 userLabel={userLabel}
                 userName={userName}
                 manager={manager}
-                canEdit={manager || g.ketuaId === currentUserId}
+                canEdit={manager || (!!currentUserId && g.ketuaId === currentUserId)}
                 canDelete={canDelete}
                 busy={busy}
                 saveGroup={saveGroup}

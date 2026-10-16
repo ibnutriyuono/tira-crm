@@ -9,6 +9,7 @@ import { buildFollowUpRows, type FollowUpRow, type FollowUpSource } from '@/lib/
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
 const SOURCE_META: Record<FollowUpSource, { label: string; color: string }> = {
   terjadwal: { label: 'Terjadwal', color: 'steel' },
@@ -95,24 +96,28 @@ export function FollowUpBoardModal() {
           <div className="followup-detail">{r.detail}</div>
         </div>
         <div className="followup-actions">
-          <button type="button" className="btn btn-wa btn-sm" onClick={() => openFollowUp(r.prospect)} title="Follow Up via WhatsApp">
-            <IconWa /> Follow Up
-          </button>
-          <input
-            type="date"
-            className="followup-date-input"
-            value={draftDate[r.prospect.id] ?? ''}
-            onChange={(e) => setDraftDate((d) => ({ ...d, [r.prospect.id]: e.target.value }))}
-          />
-          <button
-            type="button"
-            className="icon-btn"
-            title="Jadwalkan follow-up berikutnya"
-            disabled={savingId === r.prospect.id || !draftDate[r.prospect.id]}
-            onClick={() => saveSchedule(r.prospect)}
-          >
-            <IconCheck />
-          </button>
+          {canNow('prospek', 'e') && (
+            <>
+              <button type="button" className="btn btn-wa btn-sm" onClick={() => openFollowUp(r.prospect)} title="Follow Up via WhatsApp">
+                <IconWa /> Follow Up
+              </button>
+              <input
+                type="date"
+                className="followup-date-input"
+                value={draftDate[r.prospect.id] ?? ''}
+                onChange={(e) => setDraftDate((d) => ({ ...d, [r.prospect.id]: e.target.value }))}
+              />
+              <button
+                type="button"
+                className="icon-btn"
+                title="Jadwalkan follow-up berikutnya"
+                disabled={savingId === r.prospect.id || !draftDate[r.prospect.id]}
+                onClick={() => saveSchedule(r.prospect)}
+              >
+                <IconCheck />
+              </button>
+            </>
+          )}
           <button type="button" className="icon-btn" title="Buka prospek" onClick={() => openProspect(r.prospect)}>
             <IconEdit />
           </button>

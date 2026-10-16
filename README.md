@@ -90,3 +90,23 @@ immediately for everyone else without a page refresh.
   session cookie rather than data the client could inspect or forge.
 - Role-based data scoping (Sales sees own SE, BM sees own Cabang, RM sees own Regional) is enforced server-side in
   the API routes, not just hidden in the UI.
+
+## Notifikasi email
+
+Setiap notifikasi CRM bisa juga dikirim lewat email. Isi di `.env` lalu restart:
+
+```env
+SMTP_HOST="mail.domain.co.id"     # atau smtp-relay.brevo.com
+SMTP_PORT=587                     # 465 = SSL
+SMTP_USER="crm@domain.co.id"
+SMTP_PASS="..."
+SMTP_FROM="CRM TIRA <crm@domain.co.id>"
+APP_URL="https://crm.domain.co.id" # untuk tombol "Buka di CRM"
+```
+
+- Email penerima diisi Admin di Kelola User, atau oleh user sendiri di Notifikasi › ⚙ Pengaturan email.
+- Per kategori user memilih Langsung / Ringkasan / Tidak, plus jam & hari ringkasan harian (WIB).
+- Email langsung dibatasi 20 per user per hari; sisanya masuk ringkasan.
+- `server.js` menjalankan penjadwal tiap 5 menit (hanya bila `SMTP_HOST` diisi) yang juga menjalankan
+  pengecekan follow-up & eskalasi masalah walau tidak ada yang membuka CRM.
+- Admin melihat status server email (terkirim / gagal hari ini, kesalahan terakhir) di halaman pengaturan yang sama.

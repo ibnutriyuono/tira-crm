@@ -33,10 +33,29 @@ model Notification {
   title     String
   message   String
   readAt    DateTime?
+  /// Sudah dikirim lewat email (langsung atau dalam ringkasan harian).
+  emailedAt DateTime?
   createdAt DateTime  @default(now())
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+}
+
+/// Jejak email notifikasi yang dikirim (atau gagal) — untuk status server,
+/// batas email langsung per user per hari, dan penanda ringkasan harian.
+/// kind: langsung | ringkasan | ringkasan-kosong | uji
+model EmailLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  kind      String
+  to        String
+  subject   String
+  ok        Boolean  @default(true)
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, kind, createdAt])
+  @@index([createdAt])
 }
 
 model User {
@@ -51,6 +70,12 @@ model User {
   se           String?
   cabang       String?
   reg          Int?
+  /// Email untuk notifikasi (opsional — kosong = tidak menerima email).
+  email        String?
+  /// Pengaturan notifikasi email: { modes: { <kategori>: langsung|ringkasan|mati }, jam: "07.00", hari: "kerja"|"semua" }.
+  notifPrefs   Json     @default("{}")
+  /// true setelah Admin mereset password: user wajib membuat password baru saat login.
+  mustChangePassword Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

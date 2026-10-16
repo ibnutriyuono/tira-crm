@@ -9,6 +9,7 @@ import { localToday } from '@/lib/sales-activity';
 import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
+import { canNow } from '@/hooks/useCan';
 
 const DAY = 86400000;
 const daysSince = (d: string | null | undefined, today: string) => (d ? Math.max(0, Math.floor((Date.parse(today) - Date.parse(d.slice(0, 10))) / DAY)) : null);
@@ -53,7 +54,7 @@ export function AdminQueueModal() {
   const [noFaktur, setNoFaktur] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const fakturOk = canSetFaktur(currentUser?.role);
+  const fakturOk = canNow('faktur', 'e') && (canSetFaktur(currentUser?.role));
   const list = useMemo(() => prospects.filter((p) => !se || (p.se || '').toUpperCase() === se), [prospects, se]);
   const seOptions = useMemo(() => Array.from(new Set(prospects.map((p) => (p.se || '').toUpperCase()).filter(Boolean))).sort(), [prospects]);
 
@@ -226,7 +227,7 @@ export function AdminQueueModal() {
                   <td>{age == null ? '-' : <span className={`badge ${age > 7 ? 'rust' : age > 3 ? 'amber' : 'slate'}`}>{age} hari</span>}</td>
                   <td className="mono">{formatRupiah(num(p.value))}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    <button type="button" className="btn btn-outline btn-sm" onClick={() => markSent(p)} style={{ marginRight: 6 }}>Tandai terkirim</button>
+                    {canNow('prospek', 'e') && <button type="button" className="btn btn-outline btn-sm" onClick={() => markSent(p)} style={{ marginRight: 6 }}>Tandai terkirim</button>}
                     <button type="button" className="btn btn-outline btn-sm" onClick={() => openProspect(p.id)}>Buka</button>
                   </td>
                 </tr>

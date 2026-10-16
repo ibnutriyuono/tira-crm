@@ -73,6 +73,7 @@ export function RfqManageModal() {
   return (
     <Modal show={show} onClose={closeModal} title="Kelola RFQ" xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
       <div className="toolbar-row">
+        {canNow('rfq', 'e') && (
         <button
           className="btn btn-primary btn-sm"
           onClick={() => {
@@ -82,6 +83,7 @@ export function RfqManageModal() {
         >
           + Buat RFQ Baru
         </button>
+        )}
         <select className="btn-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">Semua Status</option>
           <option value="Draft">Draft</option>
@@ -162,7 +164,7 @@ export function RfqManageModal() {
                     <div className="row-actions">
                       <button
                         className="icon-btn"
-                        title="Buka / Edit"
+                        title={canNow('rfq', 'e') ? 'Buka / Edit' : 'Lihat (hanya-baca)'}
                         onClick={() => {
                           useUiStore.setState({ rfqCtx: { prospectId: r.prospectId, rfqId: r.id } });
                           openModal('rfq');
@@ -170,11 +172,12 @@ export function RfqManageModal() {
                       >
                         <IconEdit />
                       </button>
-                      {r.status !== 'Selesai' && (
+                      {r.status !== 'Selesai' && canNow('rfq', 'e') && (
                         <button className="icon-btn" title="Tandai Selesai" onClick={() => markDone(r.id)}>
                           <IconCheck />
                         </button>
                       )}
+                      {canNow('rfq', 'd') && (
                       <button
                         className="icon-btn danger"
                         title="Hapus"
@@ -187,6 +190,7 @@ export function RfqManageModal() {
                       >
                         <IconTrash />
                       </button>
+                      )}
                     </div>
                   </td>
                 </tr>

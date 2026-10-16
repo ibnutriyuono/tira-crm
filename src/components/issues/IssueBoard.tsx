@@ -18,7 +18,7 @@ import {
   type PipelineIssue,
 } from '@/lib/issues';
 import { localToday } from '@/lib/sales-activity';
-import { canNow } from '@/hooks/useCan';
+import { canNow, useCan } from '@/hooks/useCan';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { IssueDetail, IssueForm, issueAgeText, nameOf, useRoster } from './shared';
@@ -124,8 +124,9 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
     .sort((a, b) => b.open - a.open || b.late - a.late);
 
   const isBmLike = me?.role === 'bm' || me?.role === 'admin';
+  const canE = useCan('masalah', 'e');
   const isSales = me?.role === 'sales';
-  const suggestions = purch || !(isBmLike || isSales) ? [] : issueSuggestions(prospects, rfqs, issues, today).filter((s) => !cabang || up(s.prospect.cabang) === cabang);
+  const suggestions = purch || !canE || !(isBmLike || isSales) ? [] : issueSuggestions(prospects, rfqs, issues, today).filter((s) => !cabang || up(s.prospect.cabang) === cabang);
 
   async function abaikan(s: IssueSuggestion) {
     try {

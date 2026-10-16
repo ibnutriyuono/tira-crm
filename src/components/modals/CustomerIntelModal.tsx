@@ -42,7 +42,7 @@ export function CustomerIntelModal() {
   const records = useDataStore((s) => s.prospects);
   const currentUser = useDataStore((s) => s.currentUser);
   const toast = useDataStore((s) => s.toast);
-  const canLogActivity = !!currentUser && activityOwner(currentUser) !== null;
+  const canLogActivity = !!currentUser && activityOwner(currentUser) !== null && canNow('aktivitas', 'e');
 
   const [search, setSearch] = useState('');
   const [detail, setDetail] = useState<string | null>(null);

@@ -267,30 +267,36 @@ export function RfqModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="Buat RFQ ke Purchasing"
+      title={canNow('rfq', 'e') ? 'Buat RFQ ke Purchasing' : 'RFQ (hanya-baca)'}
       wide2
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
             Tutup
           </button>
-          <button type="button" className="btn btn-outline" disabled={busy} onClick={onSaveDraft}>
-            <IconSave /> Simpan RFQ
-          </button>
+          {canNow('rfq', 'e') && (
+            <button type="button" className="btn btn-outline" disabled={busy} onClick={onSaveDraft}>
+              <IconSave /> Simpan RFQ
+            </button>
+          )}
           {canNow('rfq', 'x') && (
             <button type="button" className="btn btn-outline" disabled={busy} onClick={onExportExcel}>
               <IconDownload /> Export Excel
             </button>
           )}
-          <button type="button" className="btn btn-outline" disabled={busy} onClick={onSendEmail}>
-            <IconMail /> Kirim via Email
-          </button>
-          <button type="button" className="btn btn-wa" disabled={busy} onClick={onSendWa}>
-            <IconWa /> Kirim via WhatsApp
-          </button>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={onSendPurchasing}>
-            Kirim ke Purchasing
-          </button>
+          {canNow('rfq', 'e') && (
+            <>
+              <button type="button" className="btn btn-outline" disabled={busy} onClick={onSendEmail}>
+                <IconMail /> Kirim via Email
+              </button>
+              <button type="button" className="btn btn-wa" disabled={busy} onClick={onSendWa}>
+                <IconWa /> Kirim via WhatsApp
+              </button>
+              <button type="button" className="btn btn-primary" disabled={busy} onClick={onSendPurchasing}>
+                Kirim ke Purchasing
+              </button>
+            </>
+          )}
         </>
       }
     >

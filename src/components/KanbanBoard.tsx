@@ -18,6 +18,7 @@ import { IconCart, IconDoc, IconEdit, IconRfq, IconTrash, IconWa } from './icons
 import { changeDate, periodDate } from '@/lib/filter';
 import { NewBadge } from './NewBadge';
 import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './ProspectPurchasingBubble';
+import { useCan, canNow } from '@/hooks/useCan';
 
 const CAP = 40;
 
@@ -27,13 +28,16 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
   const klas = classify(r);
   // Mirrors auth.ts#canDeleteProspect, which the DELETE route still enforces —
   // this only hides a button that would 403 for everyone else.
-  const canDelete = currentUser?.role === 'gm' || currentUser?.role === 'admin';
+  const canE = useCan('prospek', 'e');
+  const canX = useCan('prospek', 'x');
+  const canRfq = useCan('rfq', 'e');
+  const canDelete = useCan('prospek', 'd') && (currentUser?.role === 'gm' || currentUser?.role === 'admin');
   const [dragging, setDragging] = useState(false);
 
   return (
     <div
       className={`kanban-card${dragging ? ' dragging' : ''}${valueHighlightClass(r.value) ? ' ' + valueHighlightClass(r.value) : ''}`}
-      draggable
+      draggable={canE}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', r.id);
         setDragging(true);
@@ -74,6 +78,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
       )}
       {klas === 'Won' && <ItemFlowChip r={r} />}
       <div className="kc-actions">
+        {canE && (
         <button
           className="icon-btn wa-btn"
           title="WhatsApp"
@@ -85,6 +90,8 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         >
           <IconWa />
         </button>
+        )}
+        {canX && (
         <button
           className="icon-btn doc-btn"
           title="Buat Surat Penawaran"
@@ -96,6 +103,8 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         >
           <IconDoc />
         </button>
+        )}
+        {canRfq && (
         <button
           className="icon-btn rfq-btn"
           title="Buat RFQ ke Purchasing"
@@ -107,6 +116,8 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         >
           <IconRfq />
         </button>
+        )}
+        {canRfq && (
         <button
           className="icon-btn fupa-btn"
           title={klas === 'Won' ? 'Buat FUP A (Permintaan Pembelian)' : 'FUP A hanya tersedia untuk prospek berstatus Won (PO/Kontrak atau DO)'}
@@ -119,9 +130,10 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         >
           <IconCart />
         </button>
+        )}
         <button
           className="icon-btn"
-          title="Edit"
+          title={canE ? 'Edit' : 'Lihat (hanya-baca)'}
           onClick={(e) => {
             e.stopPropagation();
             useUiStore.setState({ editProspectId: r.id });
@@ -220,6 +232,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
   async function handleDrop(newStatus: number, e: React.DragEvent) {
     e.preventDefault();
     setDragOverStatus(null);
+    if (!canNow('prospek', 'e')) return toast('Role Anda tidak memiliki hak mengubah status prospek', 'error');
     const id = e.dataTransfer.getData('text/plain');
     const rec = filtered.find((x) => x.id === id) || useDataStore.getState().prospects.find((x) => x.id === id);
     if (!rec || num(rec.status) === newStatus) return;

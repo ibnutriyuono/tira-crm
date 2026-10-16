@@ -58,6 +58,7 @@ export function CustomersModal() {
   return (
     <Modal show={show} onClose={closeModal} title="Kelola Customer" xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
       <div className="toolbar-row">
+        {canNow('customer', 'e') && (
         <button
           className="btn btn-primary btn-sm"
           onClick={() => {
@@ -67,6 +68,7 @@ export function CustomersModal() {
         >
           + Tambah Customer
         </button>
+        )}
         {currentUser?.role === 'admin' && (
           <button
             className="btn btn-outline btn-sm"
@@ -78,7 +80,7 @@ export function CustomersModal() {
             Import Excel
           </button>
         )}
-        {(currentUser?.role === 'gm' || currentUser?.role === 'admin') && (
+        {(currentUser?.role === 'gm' || currentUser?.role === 'admin') && canNow('customer', 'e') && (
           <button className="btn btn-outline btn-sm" onClick={() => openModal('customerUnify')}>
             Satukan Nama Customer
           </button>
@@ -145,6 +147,7 @@ export function CustomersModal() {
                         >
                           <IconWa />
                         </button>
+                        {canNow('customer', 'e') && (
                         <button
                           className="icon-btn"
                           title="Edit"
@@ -155,6 +158,7 @@ export function CustomersModal() {
                         >
                           <IconEdit />
                         </button>
+                        )}
                         {currentUser?.role === 'admin' && (
                           <button
                             className="icon-btn danger"

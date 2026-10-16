@@ -3,7 +3,8 @@
  * API memakai aturan yang sama.
  *
  * - Telepon / WA / Email (tipe "telepon") dan Kirim dokumen punya saluran.
- *   Saluran Telepon/WhatsApp mewajibkan No. HP/WA, Email mewajibkan email,
+ *   Saluran Telepon mewajibkan No. HP atau telepon kantor (boleh ext.),
+ *   WhatsApp mewajibkan No. HP, Email mewajibkan email,
  *   untuk setiap PIC yang dicentang "dihubungi" (minimal satu).
  * - Hasil kontak wajib untuk saluran Telepon/WA/Email; selain "Tersambung"
  *   wajib tanggal follow-up (dibuat sebagai rencana).
@@ -28,21 +29,52 @@ export interface ContactPic {
   dihubungi?: boolean;
 }
 
-/** "+62 812-3456-7890" / "0812 3456 7890" -> "081234567890". */
-export function normalizePhone(v: string | null | undefined): string {
-  let d = String(v || '').replace(/\D/g, '');
+/** Ekstensi di akhir nomor kantor: "ext. 8090", "ext 12", "x8090", "#8090", "pes. 8090". */
+const EXT_RE = /\s*(?:ext\.?|ekst\.?|extension|pes(?:awat)?\.?|x|#)\s*:?\s*(\d{1,6})\s*$/i;
+
+/** Pisahkan nomor utama dan ekstensi. */
+export function splitPhone(v: string | null | undefined): { main: string; ext: string } {
+  const raw = String(v || '').trim();
+  const m = raw.match(EXT_RE);
+  let d = (m ? raw.slice(0, m.index) : raw).replace(/\D/g, '');
   if (d.startsWith('62')) d = '0' + d.slice(2);
   else if (d.startsWith('8')) d = '0' + d;
-  return d;
+  return { main: d, ext: m ? m[1] : '' };
 }
 
-/** '' bila valid, atau alasan singkat. */
-export function phoneError(v: string | null | undefined): string {
-  const d = normalizePhone(v);
+/**
+ * Bentuk baku: HP "+62 812-3456-7890" -> "081234567890"; telepon kantor
+ * "+6221 30068000 Ext. 8090" -> "02130068000 ext. 8090".
+ */
+export function normalizePhone(v: string | null | undefined): string {
+  const { main, ext } = splitPhone(v);
+  return main && ext ? `${main} ext. ${ext}` : main;
+}
+
+/** true bila nomor HP (08…) — bukan telepon kantor. */
+export function isMobile(v: string | null | undefined): boolean {
+  const { main, ext } = splitPhone(v);
+  return main.startsWith('08') && !ext;
+}
+
+/**
+ * '' bila valid, atau alasan singkat. Telepon menerima HP (08…) dan telepon
+ * kantor dengan kode area (021…, 0254…, boleh + ext.); WhatsApp (mobileOnly)
+ * hanya HP.
+ */
+export function phoneError(v: string | null | undefined, opts: { mobileOnly?: boolean } = {}): string {
+  const { main: d, ext } = splitPhone(v);
   if (!d) return 'wajib diisi';
-  if (!d.startsWith('08')) return 'harus diawali 08 / +62';
-  if (d.length < 10 || d.length > 13) return 'panjang 10–13 digit';
-  if (/^08(\d)\1{6,}/.test(d) || /^08(0{6,}|123456789)/.test(d)) return 'nomor tidak wajar';
+  if (d.startsWith('08')) {
+    if (ext) return 'nomor HP tidak memakai ext.';
+    if (d.length < 10 || d.length > 13) return 'panjang 10–13 digit';
+    if (/^08(\d)\1{6,}/.test(d) || /^08(0{6,}|123456789)/.test(d)) return 'nomor tidak wajar';
+    return '';
+  }
+  if (opts.mobileOnly) return 'WhatsApp harus nomor HP (08 / +62 8…)';
+  if (!/^0[1-79]/.test(d)) return 'awali 08 (HP) atau kode area, cth. 021 / +6221';
+  if (d.length < 9 || d.length > 12) return 'telepon kantor 9–12 digit termasuk kode area';
+  if (/^0\d{1,3}(\d)\1{6,}$/.test(d)) return 'nomor tidak wajar';
   return '';
 }
 
@@ -78,7 +110,7 @@ export function contactErrors(a: ContactInput): string[] {
   a.pics.forEach((p, i) => {
     const who = p.nama || `PIC baris ${i + 1}`;
     const must = !!p.dihubungi && need;
-    const pe = must === 'phone' || (p.phone || '').trim() ? phoneError(p.phone) : '';
+    const pe = must === 'phone' || (p.phone || '').trim() ? phoneError(p.phone, { mobileOnly: !!p.dihubungi && a.kanal === 'wa' }) : '';
     const ee = must === 'email' || (p.email || '').trim() ? emailError(p.email) : '';
     if (pe) errs.push(`${who}: No. HP/WA ${pe}.`);
     if (ee) errs.push(`${who}: Email ${ee}.`);
@@ -93,6 +125,6 @@ export function contactErrors(a: ContactInput): string[] {
 
 /** Link WhatsApp (wa.me) untuk nomor PIC; null bila nomor tidak valid. */
 export function waLink(phone: string | null | undefined): string | null {
-  if (phoneError(phone)) return null;
+  if (phoneError(phone, { mobileOnly: true })) return null;
   return `https://wa.me/62${normalizePhone(phone).slice(1)}`;
 }

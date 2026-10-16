@@ -41,6 +41,7 @@ export type ModalKey =
   | 'activityKpi'
   | 'visitTrip'
   | 'itemFlow'
+  | 'account'
   | null;
 
 export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq' | 'vendor' | 'fupa';

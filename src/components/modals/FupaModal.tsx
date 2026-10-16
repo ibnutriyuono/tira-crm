@@ -15,6 +15,7 @@ import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Fupa, Rfq, RfqItem } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
 
 export function FupaModal() {
@@ -183,26 +184,34 @@ export function FupaModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title={fupaId ? 'Edit FUP A' : 'Buat FUP A (Permintaan Pembelian)'}
+      title={!canNow('rfq', 'e') ? 'FUP A (hanya-baca)' : fupaId ? 'Edit FUP A' : 'Buat FUP A (Permintaan Pembelian)'}
       wide2
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>
-          <button type="button" className="btn btn-outline" disabled={busy} onClick={() => save(false)}>
-            <IconSave /> Simpan Draft
-          </button>
-          <button type="button" className="btn btn-outline" disabled={busy} onClick={exportExcel}>
-            <IconDownload /> Excel
-          </button>
-          <button type="button" className="btn btn-outline" disabled={busy} onClick={sendEmail}>
-            <IconMail /> Email
-          </button>
-          <button type="button" className="btn btn-wa" disabled={busy} onClick={sendWa}>
-            <IconWa /> Kirim WhatsApp
-          </button>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={sendToPurchasing}>
-            Kirim ke Purchasing
-          </button>
+          {canNow('rfq', 'e') && (
+            <button type="button" className="btn btn-outline" disabled={busy} onClick={() => save(false)}>
+              <IconSave /> Simpan Draft
+            </button>
+          )}
+          {canNow('rfq', 'x') && (
+            <button type="button" className="btn btn-outline" disabled={busy} onClick={exportExcel}>
+              <IconDownload /> Excel
+            </button>
+          )}
+          {canNow('rfq', 'e') && (
+            <>
+              <button type="button" className="btn btn-outline" disabled={busy} onClick={sendEmail}>
+                <IconMail /> Email
+              </button>
+              <button type="button" className="btn btn-wa" disabled={busy} onClick={sendWa}>
+                <IconWa /> Kirim WhatsApp
+              </button>
+              <button type="button" className="btn btn-primary" disabled={busy} onClick={sendToPurchasing}>
+                Kirim ke Purchasing
+              </button>
+            </>
+          )}
         </>
       }
     >

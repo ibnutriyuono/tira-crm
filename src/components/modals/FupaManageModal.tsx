@@ -70,6 +70,7 @@ export function FupaManageModal() {
   return (
     <Modal show={show} onClose={closeModal} title="Kelola FUP A" xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
       <div className="toolbar-row">
+        {canNow('rfq', 'e') && (
         <button
           className="btn btn-primary btn-sm"
           onClick={() => {
@@ -79,6 +80,7 @@ export function FupaManageModal() {
         >
           + Buat FUP A Baru
         </button>
+        )}
         <select className="btn-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">Semua Status</option>
           <option value="Draft">Draft</option>
@@ -142,7 +144,7 @@ export function FupaManageModal() {
                       <div className="row-actions">
                         <button
                           className="icon-btn"
-                          title="Edit"
+                          title={canNow('rfq', 'e') ? 'Edit' : 'Lihat (hanya-baca)'}
                           onClick={() => {
                             useUiStore.setState({ fupaCtx: { fupaId: f.id, sourceRfqId: f.sourceRfqId } });
                             openModal('fupa');
@@ -150,11 +152,12 @@ export function FupaManageModal() {
                         >
                           <IconEdit />
                         </button>
-                        {f.status !== 'Selesai' && (
+                        {f.status !== 'Selesai' && canNow('rfq', 'e') && (
                           <button className="icon-btn" title="Tandai selesai" onClick={() => markDone(f.id)}>
                             <IconCheck />
                           </button>
                         )}
+                        {canNow('rfq', 'd') && (
                         <button
                           className="icon-btn danger"
                           title="Hapus"
@@ -165,6 +168,7 @@ export function FupaManageModal() {
                         >
                           <IconTrash />
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>

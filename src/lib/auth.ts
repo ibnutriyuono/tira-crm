@@ -34,8 +34,8 @@ async function verifySessionToken(token: string): Promise<string | null> {
   }
 }
 
-export function toSafeUser(u: { id: string; username: string; name: string; role: string; customRole?: string | null; se: string | null; cabang: string | null; reg: number | null }): SafeUser {
-  return { id: u.id, username: u.username, name: u.name, role: u.role as SafeUser['role'], customRole: u.customRole ?? null, se: u.se, cabang: u.cabang, reg: u.reg };
+export function toSafeUser(u: { id: string; username: string; name: string; role: string; customRole?: string | null; se: string | null; cabang: string | null; reg: number | null; email?: string | null; mustChangePassword?: boolean }): SafeUser {
+  return { id: u.id, username: u.username, name: u.name, role: u.role as SafeUser['role'], customRole: u.customRole ?? null, se: u.se, cabang: u.cabang, reg: u.reg, email: u.email ?? null, mustChangePassword: !!u.mustChangePassword };
 }
 
 /** Server Component / Route Handler helper: reads the session cookie via next/headers. */

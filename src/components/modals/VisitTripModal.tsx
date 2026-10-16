@@ -28,7 +28,7 @@ import { useUiStore } from '@/store/useUiStore';
 import type { TripPhoto, TripVisit, VisitTrip } from '@/lib/types';
 import { UserPicker } from '../UserPicker';
 import { useRoster, type RosterUser } from '../issues/shared';
-import { canNow } from '@/hooks/useCan';
+import { canNow, useCan } from '@/hooks/useCan';
 
 const ROLE_SHORT: Record<string, string> = { gm: 'GM', rm: 'RM', bm: 'BM' };
 const blankVisit = (): TripVisit => ({ id: '', customer: '', pic: '', tanggal: '', tujuan: '', realisasi: '', uraian: '', hasil: '', tambahan: false });
@@ -94,7 +94,10 @@ export function VisitTripModal() {
   const prospects = useDataStore((s) => s.prospects);
   const toast = useDataStore((s) => s.toast);
 
-  const canPlan = !!currentUser && TRIP_ROLES.includes(currentUser.role);
+  // Kelola Role: rencana, persetujuan & realisasi butuh hak Tambah/Ubah; hapus draft butuh hak Hapus.
+  const permE = useCan('trip', 'e');
+  const permD = useCan('trip', 'd');
+  const canPlan = permE && !!currentUser && TRIP_ROLES.includes(currentUser.role);
 
   const [view, setView] = useState<'list' | 'edit' | 'detail'>('list');
   const [periode, setPeriode] = useState(localToday().slice(0, 7));
@@ -165,7 +168,7 @@ export function VisitTripModal() {
     return Array.from(new Set(out)).sort();
   }, [customers]);
 
-  const pending = useMemo(() => (currentUser ? trips.filter((t) => canApproveTrip(currentUser, t)) : []), [trips, currentUser]);
+  const pending = useMemo(() => (currentUser ? trips.filter((t) => permE && canApproveTrip(currentUser, t)) : []), [trips, currentUser, permE]);
 
   function upsertLocal(trip: VisitTrip) {
     setOpenTrip(trip);
@@ -515,8 +518,8 @@ export function VisitTripModal() {
   // ---------------------------------------------------------------- detail
   let detailView = null;
   if (current && currentUser) {
-    const editReal = canEditRealisasi(currentUser, current);
-    const approve = canApproveTrip(currentUser, current);
+    const editReal = (permE && canEditRealisasi(currentUser, current));
+    const approve = (permE && canApproveTrip(currentUser, current));
     const isOwner = current.ownerId === currentUser.id;
     const r = tripRealisasiRate(editReal ? realVisits : current.visits);
     detailView = (
@@ -668,7 +671,7 @@ export function VisitTripModal() {
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={photoUrl(current.id, p.id)} alt={p.name} style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border)', display: 'block' }} />
                           </a>
-                          {editReal && (
+                          {editReal && permD && (
                             <button type="button" className="icon-btn danger" title="Hapus foto" onClick={() => deletePhoto(p)} style={{ position: 'absolute', top: 4, right: 4, background: '#fff' }}>
                               <IconTrash />
                             </button>
@@ -779,17 +782,17 @@ export function VisitTripModal() {
             Cetak Laporan
           </button>
         )}
-        {isOwner && current.status === 'draft' && (
+        {isOwner && permD && current.status === 'draft' && (
           <button type="button" className="btn btn-outline" disabled={busy} onClick={deleteDraft}>
             Hapus Draft
           </button>
         )}
-        {isOwner && current.status !== 'selesai' && current.status !== 'batal' && current.status !== 'draft' && (
+        {isOwner && permE && current.status !== 'selesai' && current.status !== 'batal' && current.status !== 'draft' && (
           <button type="button" className="btn btn-outline" disabled={busy} onClick={() => doAction('cancel')}>
             Batalkan
           </button>
         )}
-        {canEditPlan(currentUser, current) && (
+        {(permE && canEditPlan(currentUser, current)) && (
           <>
             <button type="button" className="btn btn-outline" onClick={() => openEdit(current)}>
               Ubah Rencana
@@ -799,7 +802,7 @@ export function VisitTripModal() {
             </button>
           </>
         )}
-        {canEditRealisasi(currentUser, current) && (
+        {(permE && canEditRealisasi(currentUser, current)) && (
           <>
             <button type="button" className="btn btn-outline" disabled={busy} onClick={() => saveRealisasi(false)}>
               Simpan Realisasi

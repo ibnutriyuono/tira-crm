@@ -9,6 +9,7 @@ import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
 import { IconDoc, IconEdit, IconRfq, IconTrash, IconWa } from './icons';
 import { Pagination } from './Pagination';
+import { useCan } from '@/hooks/useCan';
 import { NewBadge } from './NewBadge';
 import { IssueBadge } from './issues/shared';
 import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './ProspectPurchasingBubble';
@@ -32,6 +33,12 @@ const COLS: { key: string; label: string; sortable?: boolean }[] = [
 export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total: number }) {
   const ui = useUiStore();
   const openModal = useUiStore((s) => s.openModal);
+  // Kelola Role: tombol hanya tampil bila aksinya diizinkan (server tetap menjaga).
+  const role = useDataStore((s) => s.currentUser?.role);
+  const canE = useCan('prospek', 'e');
+  const canD = useCan('prospek', 'd') && (role === 'gm' || role === 'admin');
+  const canX = useCan('prospek', 'x');
+  const canRfq = useCan('rfq', 'e');
   // Above the empty-list early return — hooks cannot run conditionally.
   const purchCounts = useProspectPurchasingCounts(true);
   const salesPlans = useDataStore((s) => s.salesPlans);
@@ -128,6 +135,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                   <td className="mono">{formatDateID(r.tglPenawaran)}</td>
                   <td>
                     <div className="row-actions">
+                      {canE && (
                       <button
                         className="icon-btn wa-btn"
                         title="Follow Up WhatsApp"
@@ -138,6 +146,8 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                       >
                         <IconWa />
                       </button>
+                      )}
+                      {canX && (
                       <button
                         className="icon-btn doc-btn"
                         title="Buat Surat Penawaran"
@@ -148,6 +158,8 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                       >
                         <IconDoc />
                       </button>
+                      )}
+                      {canRfq && (
                       <button
                         className="icon-btn rfq-btn"
                         title="Buat RFQ ke Purchasing"
@@ -158,9 +170,10 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                       >
                         <IconRfq />
                       </button>
+                      )}
                       <button
                         className="icon-btn edit-btn"
-                        title="Edit"
+                        title={canE ? 'Edit' : 'Lihat (hanya-baca)'}
                         onClick={() => {
                           useUiStore.setState({ editProspectId: r.id });
                           openModal('prospectForm');
@@ -168,6 +181,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                       >
                         <IconEdit />
                       </button>
+                      {canD && (
                       <button
                         className="icon-btn danger del-btn"
                         title="Hapus"
@@ -180,6 +194,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                       >
                         <IconTrash />
                       </button>
+                      )}
                     </div>
                   </td>
                 </tr>

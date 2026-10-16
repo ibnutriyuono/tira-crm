@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useCan } from '@/hooks/useCan';
 import { api } from '@/lib/api-client';
 import { ROLE_LABELS, STATUS_META } from '@/lib/constants';
 import { formatRupiah } from '@/lib/format';
@@ -290,6 +291,7 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
   const [editPj, setEditPj] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [terima, setTerima] = useState(false);
+  const canE = useCan('masalah', 'e');
 
   const docs = useMemo(
     () => [
@@ -300,7 +302,7 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
   );
   const isBm = !!me && (me.role === 'admin' || (me.role === 'bm' && up(me.cabang) === up(issue.cabang)));
   const isPj = !!me && issue.pjIds.includes(me.id);
-  const canHandle = isPj || isBm;
+  const canHandle = canE && (isPj || isBm);
   const st = ISSUE_STATUS_META[issue.status];
 
   async function act(action: string, extra: Record<string, unknown> = {}, ok = 'Tersimpan') {
@@ -369,7 +371,7 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
         <ItemChat entity="prospect" entityId={issue.prospectId} />
       </div>
 
-      {issue.status === 'usulan' && isBm && (
+      {issue.status === 'usulan' && isBm && canE && (
         <div className="issue-card">
           {terima && prospect ? (
             <IssueForm mode="terima" prospect={prospect} issue={issue} onDone={() => setTerima(false)} onCancel={() => setTerima(false)} />
@@ -421,7 +423,7 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
           ) : (
             <span className="field-note" style={{ margin: 0 }}>Ditangani oleh penanggung jawab. Anda bisa ikut berdiskusi di atas.</span>
           )}
-          {isBm && (
+          {isBm && canE && (
             <div style={{ marginTop: 8 }}>
               {editPj ? (
                 <>

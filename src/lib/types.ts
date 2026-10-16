@@ -12,6 +12,10 @@ export interface SafeUser {
   se: string | null;
   cabang: string | null;
   reg: number | null;
+  /** Email untuk notifikasi (opsional). */
+  email?: string | null;
+  /** Password baru direset Admin — wajib diganti sebelum memakai aplikasi. */
+  mustChangePassword?: boolean;
 }
 
 export interface Material {

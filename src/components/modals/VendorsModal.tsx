@@ -23,7 +23,7 @@ export function VendorsModal() {
   const currentUser = useDataStore((s) => s.currentUser);
   const toast = useDataStore((s) => s.toast);
 
-  const canEdit = isPurchasingRoleClient(currentUser?.role) || currentUser?.role === 'admin';
+  const canEdit = canNow('purch', 'e') && isPurchasingRoleClient(currentUser?.role) || currentUser?.role === 'admin';
   const [search, setSearch] = useState('');
 
   const list = useMemo(() => {
@@ -146,6 +146,7 @@ export function VendorsModal() {
                           >
                             <IconEdit />
                           </button>
+                          {canNow('purch', 'd') && (
                           <button
                             className="icon-btn danger"
                             title="Hapus"
@@ -156,6 +157,7 @@ export function VendorsModal() {
                           >
                             <IconTrash />
                           </button>
+                          )}
                         </>
                       )}
                     </div>

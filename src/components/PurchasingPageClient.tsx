@@ -11,10 +11,12 @@ import { api } from '@/lib/api-client';
 import { ToastHost } from './ToastHost';
 import { CancelDocModal } from './modals/CancelDocModal';
 import { NotificationsModal } from './modals/NotificationsModal';
+import { AccountModal } from './modals/AccountModal';
 import { TeamChatWidget } from './TeamChatWidget';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { useCrmSocket } from '@/hooks/useCrmSocket';
+import { useNotifDeepLink } from '@/hooks/useNotifDeepLink';
 
 /**
  * Dedicated purchasing workspace. The same board renders read-only inside a
@@ -41,6 +43,7 @@ export function PurchasingPageClient() {
   }
 
   useCrmSocket();
+  useNotifDeepLink();
 
   useEffect(() => {
     bootstrap();
@@ -81,6 +84,7 @@ export function PurchasingPageClient() {
             {!isPurchasingRoleClient(currentUser?.role) && (
               <Link className="btn btn-ghost-dark btn-sm" href="/">← Kembali ke CRM</Link>
             )}
+            <button type="button" className="btn btn-outline-dark btn-sm" onClick={() => openModal('account')}>Akun Saya</button>
             <button type="button" className="btn btn-outline-dark btn-sm" onClick={logout}>Keluar</button>
             <span style={{ fontSize: 11, color: 'var(--slate-300)', fontFamily: 'var(--font-ibm-plex-mono), monospace' }}>
               Tersimpan {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
@@ -92,6 +96,7 @@ export function PurchasingPageClient() {
       </div>
       <CancelDocModal />
       <NotificationsModal />
+      <AccountModal />
       <ToastHost />
       <TeamChatWidget />
     </>

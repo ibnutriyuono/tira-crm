@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCan } from '@/hooks/useCan';
 import { IconTrash, IconUpload } from './icons';
 import { formatFileSize } from '@/lib/format';
 import { useDataStore } from '@/store/useDataStore';
@@ -26,7 +27,12 @@ interface Props {
  * object storage through /api/attachments; downloads go through a redirect to a
  * short-lived presigned URL, so the bucket never has to be public.
  */
-export function AttachmentList({ rfqId, fupaId, prospectId, withProspect, readOnly, ensureParentId }: Props) {
+export function AttachmentList({ rfqId, fupaId, prospectId, withProspect, readOnly: readOnlyProp, ensureParentId }: Props) {
+  // Kelola Role: unggah butuh hak Tambah/Ubah, hapus butuh hak Hapus pada modul pemilik lampiran.
+  const permMod = rfqId || fupaId ? 'rfq' : 'prospek';
+  const permE = useCan(permMod, 'e');
+  const permD = useCan(permMod, 'd');
+  const readOnly = !!readOnlyProp || !permE;
   const parentId = rfqId || fupaId || prospectId || null;
   const query = (rfqId ? `rfqId=${rfqId}` : fupaId ? `fupaId=${fupaId}` : `prospectId=${prospectId}`) + (withProspect && !prospectId ? '&withProspect=1' : '');
 
@@ -83,7 +89,7 @@ export function AttachmentList({ rfqId, fupaId, prospectId, withProspect, readOn
   };
 
   const remove = async (id: string) => {
-    if (readOnly) return;
+    if (readOnly || !permD) return;
     try {
       const res = await fetch(`/api/attachments/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Gagal menghapus lampiran.');
@@ -133,7 +139,7 @@ export function AttachmentList({ rfqId, fupaId, prospectId, withProspect, readOn
                 </td>
                 <td style={{ width: 90, whiteSpace: 'nowrap' }}>{formatFileSize(a.size)}</td>
                 <td style={{ width: 140 }}>{a.uploadedBy || '-'}</td>
-                {!readOnly && (
+                {!readOnly && permD && (
                   <td style={{ width: 40 }}>
                     <button type="button" className="icon-btn danger" title="Hapus lampiran" disabled={a.fromProspect} onClick={() => remove(a.id)}>
                       <IconTrash />

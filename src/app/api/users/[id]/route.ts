@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { validEmail } from '@/lib/notif-prefs';
 import { NextResponse } from 'next/server';
 import { toSafeUser } from '@/lib/auth';
 import { diffFields, logActivity, USER_FIELD_LABELS } from '@/lib/activity';
@@ -42,6 +43,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (adminCount <= 1) return NextResponse.json({ error: 'Tidak dapat mengubah role admin terakhir' }, { status: 400 });
   }
 
+  const emailRaw = String(body?.email ?? target.email ?? '').trim().toLowerCase();
+  if (emailRaw && !validEmail(emailRaw)) return NextResponse.json({ error: 'Format email tidak valid' }, { status: 400 });
+
   const password = String(body?.password || '');
   let passwordHash: string | undefined;
   if (password) {
@@ -58,6 +62,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       se: String(body?.se || '').trim().toUpperCase(),
       cabang: String(body?.cabang || '').trim().toUpperCase(),
       reg: body?.reg ? Number(body.reg) : null,
+      email: emailRaw || null,
       ...(passwordHash ? { passwordHash } : {}),
     },
   });

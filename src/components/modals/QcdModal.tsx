@@ -11,6 +11,7 @@ import { promptItemFlow } from '@/lib/item-flow-prompt';
 import { useDataStore } from '@/store/useDataStore';
 import { EMPTY_QCD, useUiStore, type PendingQcd } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
 /**
  * QCD for one prospect, opened from the Kanban (a drag into a closing
@@ -67,6 +68,7 @@ export function QcdModal() {
   const label = STATUS_META[target]?.label ?? String(target);
 
   async function onSubmit() {
+    if (!canNow('prospek', 'e')) return;
     if (poRequired && !noPo.trim()) return toast('No. PO wajib diisi sebelum status dipindahkan ke PO/Kontrak atau DO', 'error');
     const payload = qcdPayload(qcd);
     if (qcdRequired) {
@@ -102,9 +104,11 @@ export function QcdModal() {
           <button type="button" className="btn btn-outline" onClick={closeModal}>
             Batal
           </button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>
-            {commit ? 'Simpan & Pindahkan' : 'Simpan QCD'}
-          </button>
+          {canNow('prospek', 'e') && (
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {commit ? 'Simpan & Pindahkan' : 'Simpan QCD'}
+            </button>
+          )}
         </>
       }
     >

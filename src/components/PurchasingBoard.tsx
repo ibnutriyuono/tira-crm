@@ -13,7 +13,7 @@ import { getSocket } from '@/lib/socket-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Fupa, PurchDocType, Rfq, RfqItem } from '@/lib/types';
-import { canNow } from '@/hooks/useCan';
+import { canNow, useCan } from '@/hooks/useCan';
 
 type Tab = 'dashboard' | 'masuk' | 'vendor' | 'masalah';
 
@@ -219,7 +219,7 @@ function PurchasingRow({ d, chatCount, onDetail, onCancel }: { d: PurchDoc; chat
  * prototype's two parallel implementations of the same data.
  */
 export function PurchasingBoard({
-  readOnly = false,
+  readOnly: readOnlyProp = false,
   standalone = false,
 }: {
   readOnly?: boolean;
@@ -227,6 +227,10 @@ export function PurchasingBoard({
       The single-file app words the empty dashboard differently in each. */
   standalone?: boolean;
 }) {
+  // Kelola Role: tanpa hak Tambah/Ubah Purchasing, halaman Purchasing menjadi hanya-baca.
+  const purchE = useCan('purch', 'e');
+  const purchD = useCan('purch', 'd');
+  const readOnly = readOnlyProp || !purchE;
   const rfqs = useDataStore((s) => s.rfqs);
   const fupas = useDataStore((s) => s.fupas);
   const vendors = useDataStore((s) => s.vendors);
@@ -289,7 +293,7 @@ export function PurchasingBoard({
   const currentUser = useDataStore((s) => s.currentUser);
   // Membatalkan menghentikan dokumen untuk semua orang, jadi dibatasi ke
   // peran yang juga berhak mengisi jawabannya.
-  const canCancel = !!currentUser && ['purchasing', 'purchasing05', 'admin', 'gm'].includes(currentUser.role);
+  const canCancel = canNow('rfq', 'e') && !!currentUser && ['purchasing', 'purchasing05', 'admin', 'gm'].includes(currentUser.role);
   const askCancel = useCallback((d: PurchDoc) => {
     useUiStore.setState({ cancelDocCtx: { jenis: d.jenis, id: d.id, noDoc: d.noDoc, customer: d.customer, cancelled: !!d.cancelledAt } });
     useUiStore.getState().openModal('cancelDoc');
@@ -415,7 +419,7 @@ export function PurchasingBoard({
       <div className={`purch-tabs${standalone ? ' pagebar' : ''}`}>
         <button type="button" className={tab === 'dashboard' ? 'active' : ''} onClick={() => setTab('dashboard')}>Dashboard</button>
         <button type="button" className={tab === 'masuk' ? 'active' : ''} onClick={() => setTab('masuk')}>Permintaan Masuk</button>
-        {standalone && !isPic05 && (
+        {standalone && !isPic05 && canNow('masalah', 'v') && (
           <button type="button" className={tab === 'masalah' ? 'active' : ''} onClick={() => setTab('masalah')}>
             ⚑ Masalah{issueCount > 0 && <span className="item-chat-bubble">{issueCount > 9 ? '9+' : issueCount}</span>}
           </button>
@@ -732,6 +736,7 @@ export function PurchasingBoard({
                             >
                               <IconEdit />
                             </button>
+                            {purchD && (
                             <button
                               className="icon-btn danger"
                               title="Hapus"
@@ -744,6 +749,7 @@ export function PurchasingBoard({
                             >
                               <IconTrash />
                             </button>
+                            )}
                           </div>
                         )}
                       </td>
@@ -911,7 +917,7 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
   // Mirrors auth.ts#canEditRfqAnswer, which the PATCH route enforces. Deliberately
   // NOT gated on `readOnly`: gm reaches this panel through the monitor modal, which
   // is read-only for vendors/quotations/status, yet gm may still fill in the answer.
-  const canAnswer = !!currentUser && ['purchasing', 'purchasing05', 'admin', 'gm'].includes(currentUser.role);
+  const canAnswer = canNow('rfq', 'e') && !!currentUser && ['purchasing', 'purchasing05', 'admin', 'gm'].includes(currentUser.role);
 
   function setItem(idx: number, patch: Partial<RfqItem>) {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));

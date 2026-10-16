@@ -9,6 +9,7 @@ import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { BudgetTarget } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
 function thisYear(): string {
   return String(new Date().getFullYear());
@@ -353,9 +354,11 @@ export function KpiModal() {
                   <label>Hasil Aktual (%)</label>
                   <input type="number" step="0.1" value={gmResultPct} onChange={(e) => setGmResultPct(e.target.value)} placeholder="cth. 32" style={{ maxWidth: 110 }} />
                 </div>
-                <button type="button" className="btn btn-primary btn-sm" disabled={savingGm} onClick={onSaveGm}>
-                  Simpan
-                </button>
+                {canNow('kpi', 'e') && (
+                  <button type="button" className="btn btn-primary btn-sm" disabled={savingGm} onClick={onSaveGm}>
+                    Simpan
+                  </button>
+                )}
               </div>
             </>
           )}

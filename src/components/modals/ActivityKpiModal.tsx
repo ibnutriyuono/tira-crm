@@ -10,6 +10,7 @@ import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { ActivityTarget, SalesActivity } from '@/lib/types';
+import { useCan } from '@/hooks/useCan';
 
 const pct = (v: number | null) => (v == null ? '-' : `${Math.round(v * 100)}%`);
 const PACE_META: Record<'on' | 'warn' | 'off', { label: string; badge: string; cls: string }> = {
@@ -43,7 +44,8 @@ export function ActivityKpiModal() {
   const prospects = useDataStore((s) => s.prospects);
   const toast = useDataStore((s) => s.toast);
 
-  const canSetTarget = ['admin', 'gm', 'rm', 'bm'].includes(currentUser?.role || '');
+  const permKpiE = useCan('kpi', 'e');
+  const canSetTarget = permKpiE && ['admin', 'gm', 'rm', 'bm'].includes(currentUser?.role || '');
   const today = localToday();
 
   const [periode, setPeriode] = useState(today.slice(0, 7));

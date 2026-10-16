@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { ATTACHMENT_MAX_BYTES } from '@/lib/constants';
 import { buildKey, isS3Configured, putObject } from '@/lib/s3';
 import { emitCrmEvent } from '@/lib/socket';
+import { guard } from '@/lib/permissions-server';
 
 // Bytes go straight to object storage, so this is generous compared with the
 // prototype's 1.5MB base64 ceiling — but still bounded, since the upload is
@@ -27,6 +28,8 @@ export async function GET(req: Request) {
   const fupaId = searchParams.get('fupaId');
   const prospectId = searchParams.get('prospectId');
   if (!rfqId && !fupaId && !prospectId) return NextResponse.json({ error: 'rfqId, fupaId atau prospectId wajib diisi.' }, { status: 400 });
+  const denied = await guard(user, prospectId && !rfqId && !fupaId ? 'prospek' : 'rfq', 'v');
+  if (denied) return denied;
 
   if (prospectId && !rfqId && !fupaId) {
     if (!(await prospectVisible(user, prospectId))) return NextResponse.json({ attachments: [] });
@@ -81,6 +84,8 @@ export async function POST(req: Request) {
 
   if (!(file instanceof File)) return NextResponse.json({ error: 'File tidak ditemukan.' }, { status: 400 });
   if (!rfqId && !fupaId && !prospectId) return NextResponse.json({ error: 'rfqId, fupaId atau prospectId wajib diisi.' }, { status: 400 });
+  const deniedE = await guard(user, prospectId ? 'prospek' : 'rfq', 'e');
+  if (deniedE) return deniedE;
   if (prospectId && !(await prospectVisible(user, prospectId))) return NextResponse.json({ error: 'Prospek tidak ditemukan.' }, { status: 404 });
   if (!prospectId && !(await docVisibleTo(user, { rfqId, fupaId }))) return NextResponse.json({ error: 'Dokumen tidak ditemukan.' }, { status: 404 });
   if (file.size > MAX_BYTES) {

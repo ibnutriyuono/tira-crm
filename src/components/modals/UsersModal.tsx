@@ -43,6 +43,35 @@ export function UsersModal() {
     };
   }, [show]);
 
+  // Reset password: password sementara tampil sekali di sini.
+  const [resetInfo, setResetInfo] = useState<{ name: string; username: string; password: string } | null>(null);
+  const [busyReset, setBusyReset] = useState('');
+  // Riwayat perubahan akun (Log Aktivitas entitas User).
+  const [history, setHistory] = useState<{ id: string; createdAt: string; actorName: string; summary: string }[]>([]);
+  const loadHistory = () =>
+    api
+      .get<{ logs?: { id: string; createdAt: string; actorName: string; summary: string }[] }>('/api/activity?entity=user&pageSize=15')
+      .then((r) => setHistory(r.logs || []))
+      .catch(() => {});
+  useEffect(() => {
+    if (show) loadHistory();
+    else setResetInfo(null);
+  }, [show]);
+
+  async function resetPassword(u: { id: string; name: string; username: string }) {
+    if (!window.confirm(`Reset password ${u.name} (${u.username})? Password lama tidak berlaku lagi.`)) return;
+    setBusyReset(u.id);
+    try {
+      const r = await api.post<{ password: string; username: string; name: string }>(`/api/users/${u.id}/reset-password`, {});
+      setResetInfo(r);
+      loadHistory();
+    } catch (err) {
+      useDataStore.getState().toast(err instanceof Error ? err.message : 'Gagal reset password', 'error');
+    } finally {
+      setBusyReset('');
+    }
+  }
+
   return (
     <Modal
       show={show}
@@ -70,6 +99,19 @@ export function UsersModal() {
       >
         + Tambah User
       </button>
+      {resetInfo && (
+        <div className="import-summary if-warn" style={{ marginTop: 0, marginBottom: 14 }}>
+          <b>Password sementara untuk {resetInfo.name} ({resetInfo.username}):</b>{' '}
+          <span className="mono" style={{ fontSize: 16, letterSpacing: 1.5, padding: '2px 10px', border: '1px dashed currentColor', borderRadius: 5, marginLeft: 6 }}>{resetInfo.password}</span>{' '}
+          <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: 6 }} onClick={() => navigator.clipboard?.writeText(resetInfo.password).then(() => useDataStore.getState().toast('Password disalin', 'success'))}>
+            Salin
+          </button>{' '}
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => setResetInfo(null)}>
+            Tutup
+          </button>
+          <div className="field-note" style={{ margin: '4px 0 0' }}>Hanya tampil sekali. Sampaikan ke user — saat login user wajib membuat password baru. Password user tidak bisa dilihat siapa pun, termasuk Admin.</div>
+        </div>
+      )}
       <table className="simple-table">
         <thead>
           <tr>
@@ -89,7 +131,10 @@ export function UsersModal() {
             return (
               <tr key={u.id}>
                 <td className="mono">{u.username}</td>
-                <td>{u.name}</td>
+                <td>
+                  {u.name}
+                  {u.email && <div className="field-note" style={{ margin: 0 }}>{u.email}</div>}
+                </td>
                 <td>
                   <span className={`badge ${meta.color}`}>{meta.label}</span>
                 </td>
@@ -106,6 +151,9 @@ export function UsersModal() {
                       }}
                     >
                       <IconEdit />
+                    </button>
+                    <button type="button" className="btn btn-outline btn-sm" disabled={busyReset === u.id} onClick={() => resetPassword(u)} title="Buat password sementara untuk user ini">
+                      Reset password
                     </button>
                     <button
                       className="icon-btn danger"
@@ -129,6 +177,31 @@ export function UsersModal() {
               </tr>
             );
           })}
+        </tbody>
+      </table>
+      <h4 style={{ margin: '18px 0 6px' }}>Riwayat perubahan akun &amp; user</h4>
+      <div className="field-note" style={{ marginTop: 0 }}>Termasuk perubahan username/password/email yang dilakukan user sendiri lewat Akun Saya. Riwayat lengkap di Log Aktivitas.</div>
+      <table className="simple-table">
+        <thead>
+          <tr>
+            <th style={{ width: 160 }}>Waktu</th>
+            <th style={{ width: 200 }}>Oleh</th>
+            <th>Perubahan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {history.length === 0 && (
+            <tr>
+              <td colSpan={3} className="field-note">Belum ada riwayat.</td>
+            </tr>
+          )}
+          {history.map((h) => (
+            <tr key={h.id}>
+              <td className="mono">{new Date(h.createdAt).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+              <td>{h.actorName}</td>
+              <td>{h.summary}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </Modal>

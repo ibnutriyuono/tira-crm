@@ -156,6 +156,9 @@ export function TopBar() {
               </span>
             </div>
           </div>
+          <button className="btn btn-ghost-dark btn-sm" onClick={() => openModal('account')} title="Ubah username, password & email">
+            Akun Saya
+          </button>
           <button className="btn btn-ghost-dark btn-sm" onClick={logout}>
             Keluar
           </button>

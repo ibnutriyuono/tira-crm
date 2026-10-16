@@ -6,6 +6,7 @@ import { docVisibleTo } from '@/lib/auth';
 import { bmUserIds, notify, purchasingUserIds, requesterUserIds, seUserIds } from '@/lib/notify';
 import { groupOfCustomer } from '@/lib/kam-server';
 import type { SafeUser } from '@/lib/types';
+import { guard } from '@/lib/permissions-server';
 
 const ENTITIES = ['prospect', 'rfq', 'fupa'] as const;
 type ItemEntity = (typeof ENTITIES)[number];
@@ -21,6 +22,13 @@ function parseEntity(v: string | null): ItemEntity | null {
  */
 /** PIC Line 05 only reads/writes the discussion of RFQ / FUP A with a Line 05 item. */
 async function chatVisible(user: SafeUser, entity: string, entityId: string): Promise<boolean> {
+  // Kelola Role: diskusi ikut hak Lihat modul dokumennya (prospek → Prospek & Pipeline,
+  // RFQ / FUP A → RFQ / FUP A). Penanggung jawab masalah pada prospek tetap boleh ikut berdiskusi.
+  if (await guard(user, entity === 'prospect' ? 'prospek' : 'rfq', 'v')) {
+    if (entity !== 'prospect') return false;
+    const pj = await prisma.prospectIssue.findFirst({ where: { prospectId: entityId, pjIds: { array_contains: [user.id] } }, select: { id: true } });
+    return !!pj;
+  }
   if (user.role !== 'purchasing05') return true;
   if (entity === 'rfq') return docVisibleTo(user, { rfqId: entityId });
   if (entity === 'fupa') return docVisibleTo(user, { fupaId: entityId });

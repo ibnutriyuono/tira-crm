@@ -14,6 +14,7 @@ import type { AnnualTarget, BudgetTarget, RosterUser, SalesPlan } from '@/lib/ty
 import { SeTargetSection, buildAllocations } from '../forecast/SeTargetSection';
 import { seTargetOf } from '@/lib/se-target';
 import { yearMonthTarget } from '@/lib/kpi';
+import { useCan } from '@/hooks/useCan';
 
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const labelPeriode = (p: string) => `${BULAN[Number(p.slice(5, 7)) - 1] || ''} ${p.slice(0, 4)}`;
@@ -105,8 +106,11 @@ export function ForecastModal() {
     return m;
   }, [records]);
 
+  const permE = useCan('forecast', 'e');
+  const permRencanaE = useCan('rencana', 'e');
+  const permRencanaD = useCan('rencana', 'd');
   const canEdit = (cabang: string) => {
-    if (!currentUser) return false;
+    if (!currentUser || !permE) return false;
     if (currentUser.role === 'admin' || currentUser.role === 'gm') return true;
     if (currentUser.role === 'rm') return cabangReg[cabang.toUpperCase()] === currentUser.reg;
     if (currentUser.role === 'bm') return (currentUser.cabang || '').toUpperCase() === cabang.toUpperCase();
@@ -409,7 +413,7 @@ export function ForecastModal() {
               {seList.map((r) => {
                 const rencana = seRencana.get(r.se) || 0;
                 const rasio = rencana > 0 ? Math.round((r.won / rencana) * 100) : null;
-                const bolehEdit = canEditSalesPlanFor(currentUser, r.se, r.cabang);
+                const bolehEdit = permRencanaE && canEditSalesPlanFor(currentUser, r.se, r.cabang);
                 const seT = seTargetOf(seTargets, r.se, periode);
                 return (
                   <tr key={r.se}>
@@ -486,7 +490,7 @@ export function ForecastModal() {
                       <td colSpan={2}></td>
                     </tr>
                     {g.ses.map((x) => {
-                      const bolehHapus = canEditSalesPlanFor(currentUser, x.se, x.cabang);
+                      const bolehHapus = permRencanaD && canEditSalesPlanFor(currentUser, x.se, x.cabang);
                       return (
                         <Fragment key={x.planId}>
                           {x.items.map((it, i) => (

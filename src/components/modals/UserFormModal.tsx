@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { CABANG_LIST } from '@/lib/constants';
 import { api } from '@/lib/api-client';
+import { validEmail } from '@/lib/notif-prefs';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { SafeUser } from '@/lib/types';
@@ -29,6 +30,7 @@ export function UserFormModal() {
   const [se, setSe] = useState('');
   const [cabang, setCabang] = useState('');
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   // Role tambahan dari Kelola Role (nilai "custom:<key>").
   const [customRoles, setCustomRoles] = useState<{ key: string; label: string; base: string }[]>([]);
@@ -54,6 +56,7 @@ export function UserFormModal() {
       setReg(editing.reg ? String(editing.reg) : '');
       setSe(editing.se || '');
       setCabang(editing.cabang || '');
+      setEmail(editing.email || '');
     } else {
       setUsername('');
       setName('');
@@ -61,6 +64,7 @@ export function UserFormModal() {
       setReg('');
       setSe('');
       setCabang('');
+      setEmail('');
     }
     setPassword('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -77,7 +81,8 @@ export function UserFormModal() {
     if (baseOf(role) === 'salesadmin' && !cabang.trim()) return toast('Admin Sales wajib diisi Cabang', 'error');
 
     setBusy(true);
-    const payload = { username: uname, name: nm, role, reg: reg || null, se: se.trim().toUpperCase(), cabang: cabang.trim().toUpperCase(), password: password || undefined };
+    if (email.trim() && !validEmail(email.trim())) return toast('Format email tidak valid', 'error');
+    const payload = { username: uname, name: nm, role, reg: reg || null, se: se.trim().toUpperCase(), cabang: cabang.trim().toUpperCase(), email: email.trim().toLowerCase(), password: password || undefined };
     try {
       const { user } = userEditId ? await api.put<{ user: SafeUser }>(`/api/users/${userEditId}`, payload) : await api.post<{ user: SafeUser }>('/api/users', payload);
       upsertUser(user);
@@ -176,6 +181,13 @@ export function UserFormModal() {
             Password <span style={{ textTransform: 'none', fontWeight: 400 }}>{userEditId ? '(kosongkan jika tidak diubah)' : ''}</span>
           </label>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimal 4 karakter" />
+        </div>
+        <div className="full">
+          <label>
+            Email <span style={{ textTransform: 'none', fontWeight: 400 }}>(untuk notifikasi — opsional)</span>
+          </label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@perusahaan.co.id" />
+          <div className="field-note">Kosongkan bila user tidak ingin menerima email. User juga bisa mengisi email sendiri di Notifikasi › Pengaturan.</div>
         </div>
       </div>
       <div className="import-summary" style={{ marginTop: 14 }}>

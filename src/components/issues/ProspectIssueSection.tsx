@@ -6,6 +6,7 @@ import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { IssueForm, issueAgeText, nameOf, useRoster } from './shared';
+import { useCan } from '@/hooks/useCan';
 
 const up = (s: string | null | undefined) => (s || '').trim().toUpperCase();
 
@@ -20,12 +21,14 @@ export function ProspectIssueSection({ prospect }: { prospect: Prospect }) {
   const issue = useDataStore((s) => s.issues.find((i) => i.prospectId === prospect.id && isActiveIssue(i))) || null;
   const roster = useRoster();
   const [form, setForm] = useState<'lapor' | 'usulan' | 'terima' | null>(null);
-  if (!me) return null;
+  const canV = useCan('masalah', 'v');
+  const canE = useCan('masalah', 'e');
+  if (!me || !canV) return null;
   const isBm = me.role === 'admin' || (me.role === 'bm' && up(me.cabang) === up(prospect.cabang));
   const isOwner = me.role === 'sales' && up(me.se) === up(prospect.se);
   const running = Number(prospect.status) >= 1 && Number(prospect.status) <= 5;
   if (!issue && !running) return null;
-  if (!issue && !isBm && !isOwner) return null;
+  if (!issue && (!canE || (!isBm && !isOwner))) return null;
 
   const openBoard = () => {
     useUiStore.setState({ issueFocus: { id: issue!.id } });
@@ -48,7 +51,7 @@ export function ProspectIssueSection({ prospect }: { prospect: Prospect }) {
           </div>
           <div style={{ marginTop: 3 }}>{issue.keterangan}</div>
           <div className="issue-row" style={{ marginTop: 6 }}>
-            {issue.status === 'usulan' && isBm && (
+            {issue.status === 'usulan' && isBm && canE && (
               <button type="button" className="btn btn-primary btn-sm" onClick={() => setForm('terima')}>
                 Proses usulan (tentukan PJ / tolak)
               </button>

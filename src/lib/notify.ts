@@ -2,6 +2,7 @@ import type { Role } from '@prisma/client';
 import { itemsHaveLine } from './doc-lines';
 import { prisma } from './prisma';
 import { emitCrmEvent } from './socket';
+import { emailNewNotifications } from './email-notify';
 
 /**
  * One entry per notification KIND the app raises, so the client can render an
@@ -58,6 +59,8 @@ export async function notify({ userIds, type, entity, entityId, title, message }
     uniq.map((userId) => prisma.notification.create({ data: { userId, type, entity, entityId, title, message } })),
   );
   rows.forEach((n) => emitCrmEvent('notification:new', n));
+  // Email (bila server email diatur): dikirim di belakang layar, tidak menahan respons.
+  void emailNewNotifications(rows).catch((err) => console.error('[email] notifikasi:', err));
 }
 
 /**

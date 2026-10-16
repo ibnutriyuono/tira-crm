@@ -51,11 +51,13 @@ import { ActivityLogModal } from './modals/ActivityLogModal';
 import { SalesActivityModal } from './modals/SalesActivityModal';
 import { ActivityKpiModal } from './modals/ActivityKpiModal';
 import { VisitTripModal } from './modals/VisitTripModal';
+import { AccountModal } from './modals/AccountModal';
 import { RunningText } from './RunningText';
 import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { useCrmSocket } from '@/hooks/useCrmSocket';
+import { useNotifDeepLink } from '@/hooks/useNotifDeepLink';
 
 export function CrmApp() {
   const loaded = useDataStore((s) => s.loaded);
@@ -67,6 +69,7 @@ export function CrmApp() {
   const hydrateViewState = useUiStore((s) => s.hydrateViewState);
 
   useCrmSocket();
+  useNotifDeepLink(!isPurchasingRoleClient(currentUser?.role));
 
   useEffect(() => {
     hydrateViewState();
@@ -79,7 +82,7 @@ export function CrmApp() {
   useEffect(() => {
     // Gate on `loaded` so the redirect can never fire on a role left over from
     // a previous session before bootstrap() has replaced it.
-    if (loaded && isPurchasingRoleClient(currentUser?.role)) router.replace('/purchasing');
+    if (loaded && isPurchasingRoleClient(currentUser?.role)) router.replace('/purchasing' + window.location.search);
   }, [loaded, currentUser?.role, router]);
 
   // Deliberately depends on the individual filter/sort fields rather than `ui`
@@ -165,6 +168,7 @@ export function CrmApp() {
       <QcdModal />
       <QuotationModal />
       <ActivityLogModal />
+      <AccountModal />
       <ToastHost />
       <TeamChatWidget />
     </>

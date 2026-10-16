@@ -15,6 +15,7 @@ import { emptyRow, isFabRow, materialToRow, rowToMaterial, type SpecRow } from '
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { EMPTY_QCD, useUiStore } from '@/store/useUiStore';
+import { useCan } from '@/hooks/useCan';
 import { qcdMissing, qcdRequiredOnMove } from '@/lib/qcd';
 import { QcdFields } from '../QcdFields';
 import type { Prospect } from '@/lib/types';
@@ -23,6 +24,8 @@ import { canSetFaktur } from '@/lib/roles';
 export function ProspectFormModal() {
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'prospectForm';
+  // Kelola Role: tanpa hak Tambah/Ubah, form dibuka hanya-baca.
+  const readOnly = !useCan('prospek', 'e');
   const editId = useUiStore((s) => s.editProspectId);
   const closeModal = useUiStore((s) => s.closeModal);
   const openModal = useUiStore((s) => s.openModal);
@@ -167,6 +170,7 @@ export function ProspectFormModal() {
 
 
   async function onSubmit() {
+    if (readOnly) return;
     const trimmedCustomer = customer.trim();
     if (!trimmedCustomer) {
       toast('Nama customer wajib diisi', 'error');
@@ -249,19 +253,23 @@ export function ProspectFormModal() {
     <Modal
       show={show} wide2
       onClose={closeModal}
-      title={editId ? 'Edit Prospek' : 'Tambah Prospek Baru'}
+      title={readOnly ? 'Lihat Prospek' : editId ? 'Edit Prospek' : 'Tambah Prospek Baru'}
       onSubmit={onSubmit}
       footer={
         <>
+          {readOnly && <span className="field-note" style={{ margin: '0 auto 0 0' }}>Hanya-baca — role Anda tidak memiliki hak mengubah prospek.</span>}
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Batal
+            {readOnly ? 'Tutup' : 'Batal'}
           </button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>
-            Simpan Prospek
-          </button>
+          {!readOnly && (
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              Simpan Prospek
+            </button>
+          )}
         </>
       }
     >
+      <fieldset disabled={readOnly} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="form-grid">
         <div>
           <label>Regional</label>
@@ -398,6 +406,7 @@ export function ProspectFormModal() {
           </div>
         )}
       </div>
+      </fieldset>
       {editing && <ProspectIssueSection prospect={editing} />}
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>Diskusi</label>

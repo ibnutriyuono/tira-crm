@@ -18,6 +18,22 @@ const port = Number(process.env.PORT) || 3000;
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
+// Notifikasi email: tiap 5 menit minta server sendiri menjalankan pengecekan
+// follow-up/eskalasi dan mengirim ringkasan harian yang jatuh tempo (lihat
+// src/app/api/notifications/digest). Hanya aktif bila SMTP_HOST diisi.
+function startEmailScheduler() {
+  const key = process.env.CRON_SECRET || process.env.JWT_SECRET;
+  if (!process.env.SMTP_HOST || !key) return;
+  const host = hostname === '0.0.0.0' || hostname === '::' ? '127.0.0.1' : hostname;
+  const tick = () =>
+    fetch(`http://${host}:${port}/api/notifications/digest`, { method: 'POST', headers: { 'x-cron-key': key } })
+      .then((r) => (r.ok ? null : console.error('[email] penjadwal:', r.status)))
+      .catch((err) => console.error('[email] penjadwal:', err.message));
+  setTimeout(tick, 60 * 1000);
+  setInterval(tick, 5 * 60 * 1000);
+  console.log('> Notifikasi email aktif (' + process.env.SMTP_HOST + ')');
+}
+
 app.prepare().then(() => {
   const httpServer = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
@@ -38,5 +54,6 @@ app.prepare().then(() => {
 
   httpServer.listen(port, () => {
     console.log(`> CRM TIRA ready on http://${hostname}:${port} (${dev ? 'dev' : 'production'})`);
+    startEmailScheduler();
   });
 });

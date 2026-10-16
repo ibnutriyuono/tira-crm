@@ -54,7 +54,7 @@ export function normalizeActivityPics(raw: unknown): { pics: ActivityPic[] } | {
     const o = (r || {}) as { nama?: unknown; jabatan?: unknown; phone?: unknown; email?: unknown; dihubungi?: unknown };
     const nama = String(o.nama ?? '').trim().slice(0, 100);
     const jabatan = String(o.jabatan ?? '').trim().slice(0, 100);
-    const phone = normalizePhone(String(o.phone ?? '')).slice(0, 15);
+    const phone = normalizePhone(String(o.phone ?? '')).slice(0, 30);
     const email = String(o.email ?? '').trim().toLowerCase().slice(0, 120);
     if (!nama && !jabatan && !phone && !email) continue;
     if (!nama || !jabatan) return { error: 'Setiap PIC wajib diisi nama dan jabatannya.' };

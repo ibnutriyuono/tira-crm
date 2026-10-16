@@ -26,7 +26,9 @@ export default function LoginPage() {
         setBusy(false);
         return;
       }
-      router.replace('/');
+      // Dari link email "Buka di CRM" (/login?n=<id>): lanjut ke notifikasinya.
+      const n = new URLSearchParams(window.location.search).get('n');
+      router.replace(n ? `/?n=${encodeURIComponent(n)}` : '/');
       router.refresh();
     } catch {
       setError('Gagal terhubung ke server. Coba lagi.');

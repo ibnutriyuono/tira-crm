@@ -10,6 +10,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { planItemStatus } from '@/lib/sales-plan-view';
 import type { SalesPlan, SalesPlanItem } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 
 const CELL_INPUT = { width: '100%', minWidth: 0, boxSizing: 'border-box' as const };
 
@@ -242,7 +243,7 @@ export function SalesPlanModal() {
       xwide
       footer={
         <>
-          {savedPlan && (
+          {savedPlan && canNow('rencana', 'd') && (
             <button type="button" className="btn btn-outline" style={{ marginRight: 'auto', color: 'var(--rust-500)' }} onClick={onDeletePlan} disabled={busy}>
               <IconTrash /> Hapus Rencana
             </button>
@@ -250,9 +251,11 @@ export function SalesPlanModal() {
           <button type="button" className="btn btn-outline" onClick={closeModal}>
             Tutup
           </button>
-          <button type="button" className="btn btn-primary" onClick={onSave} disabled={busy}>
-            Simpan Rencana
-          </button>
+          {canNow('rencana', 'e') && (
+            <button type="button" className="btn btn-primary" onClick={onSave} disabled={busy}>
+              Simpan Rencana
+            </button>
+          )}
         </>
       }
     >

@@ -14,7 +14,7 @@ import { qcdMissing } from '@/lib/qcd';
 import { QcdFields, qcdPayload } from '../QcdFields';
 import { appendSheet, buildSalesActivitySheet } from '@/lib/exports';
 import type { ActivityPic, Prospect, SalesActivity } from '@/lib/types';
-import { canNow } from '@/hooks/useCan';
+import { canNow, useCan } from '@/hooks/useCan';
 import { HASIL_KEYS, HASIL_LABEL, KANAL_BY_TIPE, KANAL_LABEL, contactErrors, emailError, kanalNeeds, needsHasil, normalizePhone, phoneError, waLink, type Hasil, type Kanal } from '@/lib/activity-contact';
 
 const plusDays = (ymd: string, n: number) => {
@@ -68,7 +68,12 @@ export function SalesActivityModal() {
   const toast = useDataStore((s) => s.toast);
 
   const owner = currentUser ? activityOwner(currentUser) : null;
-  const canWrite = owner !== null;
+  // Kelola Role: input butuh hak Tambah/Ubah Aktivitas Harian; hapus butuh hak Hapus;
+  // "→ Permintaan/Penawaran/PO" juga membuat prospek, jadi butuh Tambah/Ubah Prospek.
+  const permE = useCan('aktivitas', 'e');
+  const permD = useCan('aktivitas', 'd');
+  const permProspek = useCan('prospek', 'e');
+  const canWrite = owner !== null && permE;
 
   const [tanggal, setTanggal] = useState(localToday());
   const [activities, setActivities] = useState<SalesActivity[]>([]);
@@ -166,7 +171,27 @@ export function SalesActivityModal() {
     setTried(false);
   }
 
-  const mine = useMemo(() => activities.filter((a) => (owner ? a.se.toLowerCase() === owner.toLowerCase() : true)), [activities, owner]);
+  // BM (punya Aktivitas Harian sendiri) juga memantau Sales di cabangnya: pilih
+  // "Saya", "Semua Sales cabang", atau satu Sales. API sudah mengirim seluruh
+  // aktivitas cabang (salesActivityScopeWhere); di sini hanya penyaringannya.
+  const multi = !!owner && currentUser?.role !== 'sales';
+  const [lihat, setLihat] = useState<string>('semua');
+  const seOptions = useMemo(() => {
+    const set = new Set(activities.map((a) => a.se.toUpperCase()));
+    if (owner) set.delete(owner.toUpperCase());
+    return [...set].sort();
+  }, [activities, owner]);
+  const viewAll = !owner || (multi && lihat !== 'saya');
+  const mine = useMemo(
+    () =>
+      activities.filter((a) => {
+        if (!owner) return true;
+        if (!multi || lihat === 'saya') return a.se.toLowerCase() === owner.toLowerCase();
+        if (lihat === 'semua') return true;
+        return a.se.toUpperCase() === lihat;
+      }),
+    [activities, owner, multi, lihat],
+  );
   const dayList = useMemo(() => {
     const own = mine.filter((a) => a.tanggal === tanggal);
     const f = focusId ? activities.find((a) => a.id === focusId && a.tanggal === tanggal) : null;
@@ -380,7 +405,9 @@ export function SalesActivityModal() {
     >
       {!canWrite && (
         <div className="import-summary" style={{ marginTop: 0, marginBottom: 12 }}>
-          Pengisian aktivitas dilakukan oleh akun <b>Sales</b> (yang memiliki Kode SE) dan <b>Branch Manager</b>. Akun Anda dapat melihat rekap di <b>KPI Aktivitas</b>.
+          {owner !== null
+            ? <>Role Anda hanya dapat <b>melihat</b> Aktivitas Harian (Kelola Role). Hubungi Administrator bila perlu hak mengisi.</>
+            : <>Pengisian aktivitas dilakukan oleh akun <b>Sales</b> (yang memiliki Kode SE) dan <b>Branch Manager</b>. Akun Anda dapat melihat rekap di <b>KPI Aktivitas</b>.</>}
         </div>
       )}
 
@@ -388,10 +415,24 @@ export function SalesActivityModal() {
         <label style={{ margin: 0 }}>Tanggal</label>
         <input type="date" value={tanggal} max={localToday()} onChange={(e) => e.target.value && setTanggal(e.target.value)} style={{ width: 160 }} />
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>{formatDateID(tanggal)}</span>
+        {multi && (
+          <>
+            <label style={{ margin: '0 0 0 12px' }}>Tampilkan</label>
+            <select value={lihat} onChange={(e) => setLihat(e.target.value)} style={{ width: 'auto' }}>
+              <option value="semua">Semua Sales cabang</option>
+              <option value="saya">Aktivitas saya ({owner})</option>
+              {seOptions.map((se) => (
+                <option key={se} value={se}>
+                  Sales {se}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
       </div>
 
       <div className="import-summary" style={{ marginTop: 8, marginBottom: 12 }}>
-        <b>Bulan ini ({periode}):</b>{' '}
+        <b>Bulan ini ({periode}){multi ? (lihat === 'saya' ? ' — aktivitas saya' : lihat === 'semua' ? ' — semua Sales cabang' : ` — Sales ${lihat}`) : ''}:</b>{' '}
         {ACTIVITY_TYPES.map((t) => `${t.short} ${monthCount[t.key] || 0}`).join(' · ')}
       </div>
 
@@ -448,7 +489,7 @@ export function SalesActivityModal() {
               <label>
                 PIC customer <span style={{ color: 'var(--rust-600)' }}>*</span>{' '}
                 <span className="field-note" style={{ display: 'inline', textTransform: 'none' }}>
-                  — centang yang dihubungi{need === 'phone' ? '; No. HP/WA wajib untuk PIC yang dicentang' : need === 'email' ? '; Email wajib untuk PIC yang dicentang' : ''}
+                  — centang yang dihubungi{need === 'phone' ? (kanal === 'wa' ? '; No. HP (WhatsApp) wajib untuk PIC yang dicentang' : '; No. HP atau telepon kantor (boleh ext.) wajib untuk PIC yang dicentang') : need === 'email' ? '; Email wajib untuk PIC yang dicentang' : ''}
                 </span>
               </label>
               <datalist id="salesActPics">
@@ -460,7 +501,7 @@ export function SalesActivityModal() {
               </datalist>
               {pics.map((p, i) => {
                 const must = !!p.dihubungi && need;
-                const pe = must === 'phone' || (p.phone || '').trim() ? phoneError(p.phone) : '';
+                const pe = must === 'phone' || (p.phone || '').trim() ? phoneError(p.phone, { mobileOnly: !!p.dihubungi && kanal === 'wa' }) : '';
                 const ee = must === 'email' || (p.email || '').trim() ? emailError(p.email) : '';
                 const showErr = tried || (p.phone || p.email);
                 return (
@@ -471,7 +512,7 @@ export function SalesActivityModal() {
                     <input type="text" list="salesActPics" value={p.nama} onChange={(e) => setPic(i, 'nama', e.target.value)} placeholder="Nama PIC" />
                     <input type="text" value={p.jabatan} onChange={(e) => setPic(i, 'jabatan', e.target.value)} placeholder="Jabatan" />
                     <div>
-                      <input type="text" inputMode="tel" value={p.phone || ''} onChange={(e) => setPic(i, 'phone', e.target.value)} placeholder={must === 'phone' ? 'No. HP/WA *' : 'No. HP/WA'} className={must === 'phone' ? 'req' : ''} style={{ fontFamily: 'var(--font-ibm-plex-mono), monospace', borderColor: pe && showErr ? 'var(--rust-500)' : undefined }} />
+                      <input type="text" inputMode="tel" value={p.phone || ''} onChange={(e) => setPic(i, 'phone', e.target.value)} placeholder={must === 'phone' ? (kanal === 'wa' ? 'No. HP/WA *' : 'No. HP / telp kantor + ext *') : 'No. HP / telp kantor'} className={must === 'phone' ? 'req' : ''} style={{ fontFamily: 'var(--font-ibm-plex-mono), monospace', borderColor: pe && showErr ? 'var(--rust-500)' : undefined }} />
                       {pe && showErr ? <small className="bad">{pe}</small> : must === 'phone' && p.phone ? <small className="ok">✓ {normalizePhone(p.phone)}</small> : null}
                     </div>
                     <div>
@@ -631,7 +672,7 @@ export function SalesActivityModal() {
             <thead>
               <tr>
                 <th>Jenis</th>
-                {!canWrite && <th>SE</th>}
+                {(!canWrite || viewAll) && <th>SE</th>}
                 <th>Customer</th>
                 <th>PIC</th>
                 <th>Keterangan</th>
@@ -666,7 +707,7 @@ export function SalesActivityModal() {
                         </div>
                       ) : null}
                     </td>
-                    {!canWrite && <td>{a.se}</td>}
+                    {(!canWrite || viewAll) && <td>{a.se}</td>}
                     <td style={{ fontWeight: 600 }}>{a.customer}</td>
                     <td>
                       {a.pics?.length
@@ -703,7 +744,7 @@ export function SalesActivityModal() {
                           {a.sumber === 'followup' ? 'Follow-up prospek' : 'Di pipeline'}
                           {p ? ` · ${STATUS_META[Number(p.status)]?.label ?? ''}` : ''}
                         </span>
-                      ) : canWrite ? (
+                      ) : canWrite && permProspek && (!owner || a.se.toLowerCase() === owner.toLowerCase()) ? (
                         <div className="row-actions" style={{ flexWrap: 'wrap', gap: 4 }}>
                           {ACTIVITY_CONVERT_STATUSES.map((st) => (
                             <button key={st} type="button" className="btn btn-outline btn-sm" style={{ padding: '3px 8px', whiteSpace: 'nowrap' }} title={`Masukkan ke pipeline sebagai ${CONVERT_LABEL[st]}`} onClick={() => startConvert(a, st)}>
@@ -743,7 +784,7 @@ export function SalesActivityModal() {
                               <IconEdit />
                             </button>
                           )}
-                          {(!a.prospectId || (!!a.sumber && a.status !== 'rencana')) && (
+                          {permD && (!a.prospectId || (!!a.sumber && a.status !== 'rencana')) && (
                             <button type="button" className="icon-btn danger" title="Hapus" onClick={() => onDelete(a)}>
                               <IconTrash />
                             </button>

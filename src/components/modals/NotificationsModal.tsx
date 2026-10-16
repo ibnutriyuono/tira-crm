@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
+import { NotifSettingsPanel } from '../NotifSettingsPanel';
 import { IconBag, IconCalendar, IconChat, IconCheck, IconFlag, IconRfq, IconTarget, IconTrash } from '../icons';
 import { api } from '@/lib/api-client';
 import { openPurchDoc } from '@/hooks/useCrmSocket';
@@ -53,6 +54,49 @@ function timeAgo(iso: string): string {
 }
 
 /**
+ * Buka dokumen sebuah notifikasi (dipakai daftar Notifikasi dan link
+ * "Buka di CRM" dari email, lihat useNotifDeepLink) — tandai dibaca dulu.
+ */
+export function openNotification(n: AppNotification) {
+  if (!n.readAt) {
+    useDataStore.getState().markNotificationRead(n.id);
+    api.patch(`/api/notifications/${n.id}`, {}).catch(() => {});
+  }
+  if (n.entity === 'prospect') {
+    useUiStore.setState({ editProspectId: n.entityId });
+    useUiStore.getState().openModal('prospectForm');
+    return;
+  }
+  if (n.entity === 'issue') {
+    // Masalah pipeline: Purchasing membuka tab ⚑ Masalah di halamannya, role lain papan Masalah Pipeline.
+    useUiStore.setState({ issueFocus: { id: n.entityId } });
+    const role = useDataStore.getState().currentUser?.role;
+    if (role !== 'purchasing' && role !== 'purchasing05') useUiStore.getState().openModal('pipelineIssues');
+    return;
+  }
+  if (n.entity === 'activity') {
+    // Rencana follow-up: buka Aktivitas Harian di tanggal rencana itu.
+    useUiStore.setState({ activityFocus: { id: n.entityId } });
+    useUiStore.getState().openModal('salesActivity');
+    return;
+  }
+  if (n.entity === 'target') {
+    useUiStore.getState().openModal('forecast');
+    return;
+  }
+  if (n.entity === 'visitTrip') {
+    useUiStore.setState({ visitTripOpenId: n.entityId });
+    useUiStore.getState().openModal('visitTrip');
+    return;
+  }
+  // openPurchDoc already branches per role: purchasing goes straight to
+  // their dedicated page's inline detail, everyone else gets the
+  // Purchasing modal opened for them — same helper the toast onClick
+  // handlers use, so this must not duplicate that logic here.
+  openPurchDoc(n.entity === 'rfq' ? 'RFQ' : 'FUPA', n.entityId);
+}
+
+/**
  * The persistent counterpart to the toasts fired in useCrmSocket.ts — those
  * disappear after a few seconds and only reach someone who's online at that
  * exact moment. Every notification row created server-side (see
@@ -66,53 +110,18 @@ export function NotificationsModal() {
   const toast = useDataStore((s) => s.toast);
 
   const notifications = useDataStore((s) => s.notifications);
-  const markNotificationRead = useDataStore((s) => s.markNotificationRead);
   const markAllNotificationsRead = useDataStore((s) => s.markAllNotificationsRead);
 
   const [filter, setFilter] = useState<'semua' | 'belum'>('semua');
+  const [pengaturan, setPengaturan] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const list = useMemo(() => (filter === 'belum' ? notifications.filter((n) => !n.readAt) : notifications), [notifications, filter]);
   const unreadCount = useMemo(() => notifications.filter((n) => !n.readAt).length, [notifications]);
 
   function onRowClick(n: AppNotification) {
-    if (!n.readAt) {
-      markNotificationRead(n.id);
-      api.patch(`/api/notifications/${n.id}`, {}).catch(() => {});
-    }
     closeModal();
-    if (n.entity === 'prospect') {
-      useUiStore.setState({ editProspectId: n.entityId });
-      useUiStore.getState().openModal('prospectForm');
-      return;
-    }
-    if (n.entity === 'issue') {
-      // Masalah pipeline: Purchasing membuka tab ⚑ Masalah di halamannya, role lain papan Masalah Pipeline.
-      useUiStore.setState({ issueFocus: { id: n.entityId } });
-      const role = useDataStore.getState().currentUser?.role;
-      if (role !== 'purchasing' && role !== 'purchasing05') useUiStore.getState().openModal('pipelineIssues');
-      return;
-    }
-    if (n.entity === 'activity') {
-      // Rencana follow-up: buka Aktivitas Harian di tanggal rencana itu.
-      useUiStore.setState({ activityFocus: { id: n.entityId } });
-      useUiStore.getState().openModal('salesActivity');
-      return;
-    }
-    if (n.entity === 'target') {
-      useUiStore.getState().openModal('forecast');
-      return;
-    }
-    if (n.entity === 'visitTrip') {
-      useUiStore.setState({ visitTripOpenId: n.entityId });
-      useUiStore.getState().openModal('visitTrip');
-      return;
-    }
-    // openPurchDoc already branches per role: purchasing goes straight to
-    // their dedicated page's inline detail, everyone else gets the
-    // Purchasing modal opened for them — same helper the toast onClick
-    // handlers use, so this must not duplicate that logic here.
-    openPurchDoc(n.entity === 'rfq' ? 'RFQ' : 'FUPA', n.entityId);
+    openNotification(n);
   }
 
   async function onMarkAllRead() {
@@ -132,7 +141,7 @@ export function NotificationsModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="Notifikasi"
+      title={pengaturan ? 'Pengaturan Notifikasi' : 'Notifikasi'}
       wide2
       footer={
         <button type="button" className="btn btn-outline" onClick={closeModal}>
@@ -140,6 +149,15 @@ export function NotificationsModal() {
         </button>
       }
     >
+      {pengaturan ? (
+        <>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => setPengaturan(false)} style={{ marginBottom: 10 }}>
+            ← Kembali ke daftar
+          </button>
+          <NotifSettingsPanel />
+        </>
+      ) : (
+      <>
       <div className="toolbar-row" style={{ marginBottom: 10 }}>
         <div className="view-toggle">
           <button type="button" className={filter === 'semua' ? 'active' : ''} onClick={() => setFilter('semua')}>
@@ -151,6 +169,9 @@ export function NotificationsModal() {
         </div>
         <button type="button" className="btn btn-outline btn-sm" disabled={busy || unreadCount === 0} onClick={onMarkAllRead} style={{ marginLeft: 'auto' }}>
           Tandai Semua Dibaca
+        </button>
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => setPengaturan(true)} title="Atur notifikasi email">
+          ⚙ Pengaturan email
         </button>
       </div>
 
@@ -180,6 +201,8 @@ export function NotificationsModal() {
             );
           })}
         </div>
+      )}
+      </>
       )}
     </Modal>
   );
