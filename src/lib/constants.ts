@@ -135,6 +135,19 @@ export const ACTIVITY_TYPES: { key: ActivityTipe; label: string; short: string; 
 ];
 
 /**
+ * Pekerjaan internal Purchasing yang tercatat otomatis di Aktivitas Harian
+ * (bukan kontak customer): tidak bisa dipilih di form, tidak masuk KPI
+ * Aktivitas, dan tidak dihitung sebagai kontak customer (Reaktivasi).
+ */
+export const INTERNAL_ACTIVITY_TYPES: { key: string; label: string; short: string }[] = [
+  { key: 'jawab_rfq', label: 'Jawab RFQ / FUP A', short: 'Jawab RFQ/FUP A' },
+  { key: 'diskusi', label: 'Diskusi / koordinasi', short: 'Diskusi' },
+];
+
+/** Label semua jenis aktivitas (customer + internal). */
+export const ACTIVITY_LABEL: Record<string, string> = Object.fromEntries([...ACTIVITY_TYPES, ...INTERNAL_ACTIVITY_TYPES].map((t) => [t.key, t.label]));
+
+/**
  * Target bulanan per jenis aktivitas bila atasan belum menetapkannya untuk SE
  * itu. Angka awal ini hanya titik mulai (BELUM ditetapkan oleh manajemen) --
  * UI menandainya "default" dan atasan menggantinya per SE per bulan.

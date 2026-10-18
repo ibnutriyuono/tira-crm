@@ -1,6 +1,6 @@
 import { classify, formatDateID, formatRupiah, materialUnitPrice, num } from './format';
 import { WORKFLOW_META, fupaAsWorkflowDoc, rfqAsWorkflowDoc, workflowStage } from './purchasing-workflow';
-import { ACTIVITY_TYPES, STATUS_META } from './constants';
+import { ACTIVITY_LABEL, STATUS_META } from './constants';
 import type { BudgetTarget, Customer, Fupa, Prospect, Rfq, RfqItem, SalesActivity, SalesPlan, Vendor } from './types';
 
 /** What every builder below returns — enough for xlsx.utils.aoa_to_sheet plus column widths, and a sheet name that stays under Excel's 31-char sheet-name limit. */
@@ -166,7 +166,7 @@ export function buildBudgetTargetSheet(list: BudgetTarget[]): SheetSpec {
   return { sheetName: 'Target Bulanan', header, rows, colWidths };
 }
 
-const ACT_LABEL: Record<string, string> = Object.fromEntries(ACTIVITY_TYPES.map((t) => [t.key, t.label]));
+const ACT_LABEL: Record<string, string> = ACTIVITY_LABEL;
 
 /**
  * Aktivitas Harian, one row per activity, oldest first. PIC list is joined

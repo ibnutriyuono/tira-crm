@@ -14,22 +14,39 @@ export function validTanggal(v: unknown): string | null {
   return s <= limit ? s : null;
 }
 
+/** Awalan identitas aktivitas untuk role non-lapangan (tanpa Kode SE). */
+const STAFF_PREFIX: Record<string, string> = { gm: 'GM', rm: 'RM', admin: 'ADMIN', salesadmin: 'ADS', purchasing: 'PURCH', purchasing05: 'PURCH' };
+
 /**
- * The identity an account's activities are recorded under, or null when the
- * account may not log any. A sales account uses its Kode SE. A branch manager
- * (BM) also handles customers of their own: they use their Kode SE if they
- * have one, otherwise "BM-<CABANG>" so their activity shows as its own row in
- * the KPI instead of inflating a salesperson's numbers. Other roles read only.
- * Pure (no server imports) so the modal and the API share one definition.
+ * The identity an account's activities are recorded under. Every role logs
+ * its own Aktivitas Harian:
+ * - Sales: Kode SE ("SALES-<USERNAME>" bila belum punya Kode SE);
+ * - BM: Kode SE, else "BM-<CABANG>" -- its own KPI row, not a salesperson's;
+ * - GM / RM / Admin / Admin Sales / Purchasing: Kode SE bila ada, else
+ *   "<ROLE>-<USERNAME>" (mis. "GM-GM", "RM-RM1", "ADS-NINA").
+ * Null only when nothing identifies the account. Pure (no server imports) so
+ * the modal and the API share one definition.
  */
-export function activityOwner(user: { role: string; se: string | null; cabang: string | null }): string | null {
+export function activityOwner(user: { role: string; se: string | null; cabang: string | null; username?: string | null }): string | null {
   const se = (user.se || '').trim().toUpperCase();
-  if (user.role === 'sales') return se || null;
+  if (se) return se;
+  const un = (user.username || '').trim().toUpperCase();
   if (user.role === 'bm') {
     const cabang = (user.cabang || '').trim().toUpperCase();
-    return se || (cabang ? `BM-${cabang}` : null);
+    return cabang ? `BM-${cabang}` : un ? `BM-${un}` : null;
   }
-  return null;
+  if (!un) return null;
+  return `${STAFF_PREFIX[user.role] || (user.role === 'sales' ? 'SALES' : user.role.toUpperCase())}-${un}`;
+}
+
+/**
+ * Identitas aktivitas milik role non-lapangan (GM, RM, Admin, Admin Sales,
+ * Purchasing). Tampil di Aktivitas Harian, tetapi tidak dihitung di KPI
+ * Aktivitas Sales.
+ */
+export function isStaffActivityKey(se: string | null | undefined): boolean {
+  const s = (se || '').trim().toUpperCase();
+  return Object.values(STAFF_PREFIX).some((p) => s.startsWith(`${p}-`));
 }
 
 /**

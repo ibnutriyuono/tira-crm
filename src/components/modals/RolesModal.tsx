@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { api } from '@/lib/api-client';
-import { ACT_LABEL, BASE_ROLES, PERM_MODULES, normalizePerms, permDiff, viewOnlyPerms, type PermAct, type Perms } from '@/lib/permissions';
+import { ACT_LABEL, BASE_ROLES, PERM_MODULES, clampPerms, limitReason, normalizePerms, permDiff, viewOnlyPerms, type PermAct, type Perms } from '@/lib/permissions';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
@@ -76,6 +76,8 @@ export function RolesModal() {
     if (role.builtin) return role.perms;
     return roles.find((r) => r.builtin && r.key === base)?.perms || null;
   }, [role, roles, base]);
+  // Tipe dasar yang menentukan batas hak: key role bawaan, atau pilihan tipe dasar role tambahan.
+  const limitBase = role ? (role.builtin ? role.key : base) : '';
   const dirty = !!role && !!draft && (permDiff(draft, role.perms) > 0 || (!role.builtin && (label !== role.label || base !== role.base)));
   const diffFromBase = role && draft && !role.builtin && reference ? permDiff(draft, reference) : 0;
 
@@ -98,7 +100,7 @@ export function RolesModal() {
     const next = { ...cur, [act]: val };
     if (act === 'v' && !val) Object.assign(next, { e: false, d: false, x: false });
     if (act !== 'v' && val) next.v = true;
-    setDraft({ ...draft, [mod]: next });
+    setDraft(clampPerms({ ...draft, [mod]: next }, limitBase));
   }
 
   async function save() {
@@ -118,7 +120,7 @@ export function RolesModal() {
   async function resetOrDelete() {
     if (!role) return;
     const msg = role.builtin
-      ? `Kembalikan hak role "${role.label}" ke bawaan (semua dicentang, mengikuti aturan tipe dasarnya)?`
+      ? `Kembalikan hak role "${role.label}" ke bawaan (semua hak yang tersedia untuk tipe dasarnya)?`
       : `Hapus role "${role.label}"?`;
     if (!window.confirm(msg)) return;
     setBusy(true);
@@ -225,7 +227,7 @@ export function RolesModal() {
                 {role.builtin ? (
                   <b>{role.key === 'admin' ? 'Admin' : baseMeta(role.base)?.label}</b>
                 ) : (
-                  <select value={base} onChange={(e) => setBase(e.target.value)}>
+                  <select value={base} onChange={(e) => { setBase(e.target.value); setDraft(clampPerms(draft, e.target.value)); }}>
                     {BASE_ROLES.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
                   </select>
                 )}
@@ -240,14 +242,14 @@ export function RolesModal() {
               <div className="import-summary" style={{ marginTop: 0 }}><b>Role Admin terkunci</b> — selalu memiliki semua hak, termasuk Kelola User, Kelola Role dan Database.</div>
             ) : (
               <div className="field-note" style={{ marginTop: 0 }}>
-                {baseMeta(role.builtin ? role.base : base)?.note} Centang = diizinkan sejauh tipe dasarnya memang bisa (mis. Sales tetap tidak bisa menghapus prospek walau dicentang).
+                {baseMeta(role.builtin ? role.base : base)?.note} Centang = menu & tombol tampil dan berfungsi untuk role ini. Sel <span className="rl-x">✕</span> = tidak tersedia untuk tipe dasarnya (alasan di bawah nama modul).
               </div>
             )}
 
             {!role.locked && (
               <div className="toolbar-row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                <button type="button" className="btn btn-outline btn-sm" onClick={() => setDraft(viewOnlyPerms(draft))}>Jadikan hanya-lihat</button>
-                <select value="" onChange={(e) => { const r = roles.find((x) => x.key === e.target.value); if (r) setDraft(normalizePerms(r.perms)); }} style={{ maxWidth: 220 }} aria-label="Salin hak dari role lain">
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setDraft(clampPerms(viewOnlyPerms(draft), limitBase))}>Jadikan hanya-lihat</button>
+                <select value="" onChange={(e) => { const r = roles.find((x) => x.key === e.target.value); if (r) setDraft(clampPerms(normalizePerms(r.perms), limitBase)); }} style={{ maxWidth: 220 }} aria-label="Salin hak dari role lain">
                   <option value="">Salin hak dari…</option>
                   {roles.filter((r) => r.key !== role.key).map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
                 </select>
@@ -262,7 +264,7 @@ export function RolesModal() {
                 </thead>
                 <tbody>
                   {GROUPS.map((g) => (
-                    <FragmentRows key={g} group={g} draft={draft} saved={role.perms} locked={role.locked} toggle={toggle} />
+                    <FragmentRows key={g} group={g} base={role.locked ? '' : limitBase} draft={draft} saved={role.perms} locked={role.locked} toggle={toggle} />
                   ))}
                   <tr className="rl-group"><td colSpan={5}>SISTEM</td></tr>
                   <tr><td><b>Kelola User · Kelola Role · Database</b><small>selalu khusus Admin</small></td>{ACTS.map((a) => <td key={a} className="c"><span className="rl-lock">Admin</span></td>)}</tr>
@@ -293,24 +295,29 @@ export function RolesModal() {
   );
 }
 
-function FragmentRows({ group, draft, saved, locked, toggle }: { group: string; draft: Perms; saved: Perms; locked: boolean; toggle: (m: string, a: PermAct) => void }) {
+function FragmentRows({ group, base, draft, saved, locked, toggle }: { group: string; base: string; draft: Perms; saved: Perms; locked: boolean; toggle: (m: string, a: PermAct) => void }) {
   return (
     <>
       <tr className="rl-group"><td colSpan={5}>{group}</td></tr>
-      {PERM_MODULES.filter((m) => m.group === group).map((m) => (
+      {PERM_MODULES.filter((m) => m.group === group).map((m) => {
+        const why = Array.from(new Set(m.acts.map((a) => limitReason(base, m.key, a)).filter(Boolean)));
+        return (
         <tr key={m.key} className={draft[m.key]?.v ? '' : 'rl-off'}>
-          <td><b>{m.label}</b><small>{m.hint}</small></td>
+          <td><b>{m.label}</b><small>{m.hint}</small>{why.map((w) => <small key={w} className="rl-why">✕ {w}</small>)}</td>
           {ACTS.map((a) => (
             <td key={a} className={`c${!locked && m.acts.includes(a) && draft[m.key]?.[a] !== saved[m.key]?.[a] ? ' rl-changed' : ''}`}>
               {!m.acts.includes(a) ? (
                 <span className="rl-na">–</span>
+              ) : limitReason(base, m.key, a) ? (
+                <span className="rl-x" title={limitReason(base, m.key, a) || ''} aria-label={`${m.label} — ${ACT_LABEL[a]}: tidak tersedia`}>✕</span>
               ) : (
                 <input type="checkbox" checked={!!draft[m.key]?.[a]} disabled={locked} onChange={() => toggle(m.key, a)} aria-label={`${m.label} — ${ACT_LABEL[a]}`} />
               )}
             </td>
           ))}
         </tr>
-      ))}
+        );
+      })}
     </>
   );
 }

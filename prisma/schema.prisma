@@ -76,8 +76,18 @@ model User {
   notifPrefs   Json     @default("{}")
   /// true setelah Admin mereset password: user wajib membuat password baru saat login.
   mustChangePassword Boolean @default(false)
+  /// Waktu tanda tangan terakhir disimpan (null = belum punya). Gambarnya di UserSignature.
+  signatureAt  DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+/// Tanda tangan user (PNG transparan) untuk surat penawaran. Tabel terpisah
+/// supaya baris User yang dibaca di setiap request tetap kecil.
+model UserSignature {
+  userId    String   @id
+  png       Bytes
+  updatedAt DateTime @updatedAt
 }
 
 model Customer {
@@ -192,8 +202,10 @@ model SalesActivity {
   status     String   @default("selesai")
   /// Asal baris: null = diisi manual; "followup" = otomatis dari jadwal /
   /// realisasi Follow-up WhatsApp; "aktivitas" = rencana dari hasil kontak;
-  /// "perjalanan" = realisasi Perjalanan Dinas.
+  /// "perjalanan" = realisasi Perjalanan Dinas; "penawaran" = Surat Penawaran.
   sumber     String?
+  /// Nomor dokumen asal (sumber "penawaran": nomor surat) — satu surat = satu baris.
+  refNo      String?
   /// Saluran: telepon | wa | email | kurir (tipe telepon & dokumen).
   kanal      String?
   /// Hasil kontak: tersambung | tidak_diangkat | belum_dibalas | minta_lagi.
@@ -217,6 +229,7 @@ model SalesActivity {
   @@index([prospectId])
   @@index([prospectId, status])
   @@index([tripId])
+  @@index([sumber, refNo])
 }
 
 /// Target aktivitas per SE per bulan, diisi atasan (BM/RM/GM/Admin). `targets`

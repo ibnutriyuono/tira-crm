@@ -1,3 +1,4 @@
+import { logDiscussion } from '@/lib/purchasing-activity';
 import { NextResponse } from 'next/server';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
@@ -99,6 +100,8 @@ export async function POST(req: Request) {
   });
 
   emitCrmEvent('itemchat:message', message);
+  // Balasan Purchasing di diskusi kartu -> Aktivitas Harian (dirangkum per dokumen per hari).
+  await logDiscussion(user, entity, entityId, text);
 
   // RFQ/FUP A: semua staf Purchasing + pengaju dokumen, dikurangi siapapun
   // yang justru sedang mengirim pesan ini.

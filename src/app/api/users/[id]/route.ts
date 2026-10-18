@@ -96,6 +96,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (adminCount <= 1) return NextResponse.json({ error: 'Tidak dapat menghapus admin terakhir.' }, { status: 400 });
   }
 
+  await prisma.userSignature.deleteMany({ where: { userId: id } });
   await prisma.user.delete({ where: { id } });
   emitCrmEvent('user:deleted', { id });
   await logActivity({

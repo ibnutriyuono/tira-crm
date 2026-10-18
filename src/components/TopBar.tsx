@@ -2,7 +2,6 @@
 
 import { isPurchasingRoleClient } from '@/lib/doc-lines';
 import { isOpenIssue } from '@/lib/issues';
-import { canSeeAdminQueue } from '@/lib/roles';
 import { can, type PermAct } from '@/lib/permissions';
 import { adminTaskCount } from './modals/AdminQueueModal';
 import { useRouter } from 'next/navigation';
@@ -188,7 +187,7 @@ export function TopBar() {
               Kelola Role
             </button>
           )}
-          {canSeeAdminQueue(currentUser.role) && c('faktur') && (
+          {c('faktur') && (
             <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('adminQueue')}>
               <IconCheckSquare />
               Antrian Admin
@@ -247,7 +246,10 @@ export function TopBar() {
               KPI Aktivitas
             </button>
           )}
-          {['admin', 'gm', 'rm', 'bm'].includes(currentUser.role) && c('trip') && (
+          {/* Kelola Role menentukan: hak yang dicentang = tombol tampil. Batas
+              tipe dasar (mis. Antrian Admin tidak untuk Sales) sudah dipotong
+              di hak efektif (ROLE_LIMITS), jadi tidak perlu cek role di sini. */}
+          {c('trip') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('visitTrip')}>
               <IconCalendar />
               Perjalanan Dinas

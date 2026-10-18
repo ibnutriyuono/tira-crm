@@ -6,7 +6,7 @@ import { isResponse, requireUser } from '@/lib/api-helpers';
 import { cabangRegMap, visitTripScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { parsePicText, syncCustomerPics } from '@/lib/customer-sync';
-import { TRIP_ROLES, normalizePlanVisits, validateTripHeader } from '@/lib/visit-trip';
+import { TRIP_ROLES, normalizePlanVisits, tripCabangLocked, validateTripHeader } from '@/lib/visit-trip';
 import { guard } from '@/lib/permissions-server';
 import { cleanPeserta } from '@/lib/trip-activity-server';
 
@@ -25,16 +25,17 @@ export async function GET(req: Request) {
   return NextResponse.json({ trips });
 }
 
-/** Create a draft trip. Only GM / RM / BM plan trips; a BM's destination is locked to their own branch. */
+/** Create a draft trip. Sales / BM / RM / GM plan trips; a Sales' or BM's destination is locked to their own branch. */
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
   const denied = await guard(user, 'trip', 'e');
   if (denied) return denied;
-  if (!TRIP_ROLES.includes(user.role)) return NextResponse.json({ error: 'Hanya GM, RM, dan BM yang membuat rencana perjalanan.' }, { status: 403 });
+  if (!TRIP_ROLES.includes(user.role)) return NextResponse.json({ error: 'Hanya Sales, BM, RM, dan GM yang membuat rencana perjalanan.' }, { status: 403 });
+  if (tripCabangLocked(user.role) && !user.cabang) return NextResponse.json({ error: 'Akun Anda belum memiliki cabang. Minta Admin mengisi cabang di Kelola User.' }, { status: 400 });
 
   const body = await req.json().catch(() => null);
-  const cabang = (user.role === 'bm' ? user.cabang || '' : String(body?.cabang || '')).trim().toUpperCase();
+  const cabang = (tripCabangLocked(user.role) ? user.cabang || '' : String(body?.cabang || '')).trim().toUpperCase();
   const tglBerangkat = String(body?.tglBerangkat || '').trim();
   const tglPulang = String(body?.tglPulang || '').trim();
   const headerErr = validateTripHeader({ cabang, tglBerangkat, tglPulang });

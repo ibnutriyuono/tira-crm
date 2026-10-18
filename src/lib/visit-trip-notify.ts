@@ -1,8 +1,8 @@
 import { notify, tripApproverIds, tripHostIds } from './notify';
 
-export type TripRow = { id: string; ownerId: string; ownerName: string; ownerRole: string; ownerReg: number | null; cabang: string; reg: number | null; tglBerangkat: string; tglPulang: string; visits: unknown; status: string; pesertaIds?: unknown };
+export type TripRow = { id: string; ownerId: string; ownerName: string; ownerRole: string; ownerReg: number | null; ownerCabang?: string | null; cabang: string; reg: number | null; tglBerangkat: string; tglPulang: string; visits: unknown; status: string; pesertaIds?: unknown };
 
-const ROLE_SHORT: Record<string, string> = { gm: 'GM', rm: 'RM', bm: 'BM' };
+const ROLE_SHORT: Record<string, string> = { gm: 'GM', rm: 'RM', bm: 'BM', sales: 'Sales' };
 
 function fmt(d: string): string {
   const t = new Date(`${d}T00:00:00`);
@@ -30,7 +30,7 @@ export async function notifyTripChange(prev: TripRow, newStatus: string, actorId
   if (newStatus === 'diajukan') {
     await notify({
       ...base,
-      userIds: notMe(await tripApproverIds(prev.ownerRole, prev.ownerReg)),
+      userIds: notMe(await tripApproverIds(prev.ownerRole, prev.ownerReg, prev.ownerCabang)),
       type: 'trip_submitted',
       title: `Rencana perjalanan menunggu persetujuan`,
       message: `${who} mengajukan perjalanan ke ${prev.cabang}, ${range} (${n} kunjungan customer).`,
@@ -62,7 +62,7 @@ export async function notifyTripChange(prev: TripRow, newStatus: string, actorId
     return;
   }
   if (newStatus === 'batal') {
-    const ids = prev.status === 'disetujui' ? await tripHostIds(prev.cabang, prev.reg) : prev.status === 'diajukan' ? await tripApproverIds(prev.ownerRole, prev.ownerReg) : [];
+    const ids = prev.status === 'disetujui' ? await tripHostIds(prev.cabang, prev.reg) : prev.status === 'diajukan' ? await tripApproverIds(prev.ownerRole, prev.ownerReg, prev.ownerCabang) : [];
     await notify({
       ...base,
       userIds: notMe([...ids, ...peserta]).filter((x, i, a) => x !== prev.ownerId && a.indexOf(x) === i),

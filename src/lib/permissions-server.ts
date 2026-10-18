@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from './prisma';
-import { DENIED_MSG, fullPerms, normalizePerms, type PermAct, type Perms } from './permissions';
+import { DENIED_MSG, clampPerms, fullPerms, limitReason, normalizePerms, type PermAct, type Perms } from './permissions';
 import type { SafeUser } from './types';
 
 interface RoleRow {
@@ -27,12 +27,16 @@ export async function roleDefs(): Promise<Map<string, RoleRow>> {
   return cache.map;
 }
 
-/** Hak efektif user: Admin selalu penuh; lalu role tambahan, lalu role bawaan; tanpa pengaturan = penuh. */
+/**
+ * Hak efektif user: Admin selalu penuh; lalu role tambahan, lalu role bawaan;
+ * tanpa pengaturan = semua yang tersedia. Selalu dipotong ke batas tipe dasar
+ * (user.role), jadi UI dan server memakai satu sumber yang sama.
+ */
 export async function effectivePerms(user: Pick<SafeUser, 'role' | 'customRole'>): Promise<Perms> {
   if (user.role === 'admin') return fullPerms();
   const defs = await roleDefs();
   const row = (user.customRole && defs.get(user.customRole)) || defs.get(user.role);
-  return row ? normalizePerms(row.perms) : fullPerms();
+  return clampPerms(row ? normalizePerms(row.perms) : fullPerms(), user.role);
 }
 
 /**
@@ -43,7 +47,7 @@ export async function guard(user: SafeUser, mod: string, act: PermAct): Promise<
   if (user.role === 'admin') return null;
   const m = mod === 'rfq' && (user.role === 'purchasing' || user.role === 'purchasing05') ? 'purch' : mod;
   const perms = await effectivePerms(user);
-  if (perms[m] && !perms[m][act]) return NextResponse.json({ error: DENIED_MSG[act] }, { status: 403 });
+  if (perms[m] && !perms[m][act]) return NextResponse.json({ error: limitReason(user.role, m, act) ? `${DENIED_MSG[act]} (${limitReason(user.role, m, act)})` : DENIED_MSG[act] }, { status: 403 });
   return null;
 }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
-import { BASE_ROLES, BUILTIN_ROLE_LABEL, fullPerms, normalizePerms, roleKeyFromLabel } from '@/lib/permissions';
+import { BASE_ROLES, BUILTIN_ROLE_LABEL, basePerms, clampPerms, fullPerms, normalizePerms, roleKeyFromLabel } from '@/lib/permissions';
 import { effectivePerms, invalidateRoleCache } from '@/lib/permissions-server';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -33,7 +33,7 @@ export async function GET() {
       builtin: true,
       locked: key === 'admin',
       customized: !!r && key !== 'admin',
-      perms: key === 'admin' || !r ? fullPerms() : normalizePerms(r.perms),
+      perms: key === 'admin' ? fullPerms() : !r ? basePerms(key) : clampPerms(normalizePerms(r.perms), key),
       users: usersOf(key, true),
       updatedBy: r?.updatedBy ?? null,
     };
@@ -41,7 +41,7 @@ export async function GET() {
   const custom = rows
     .filter((r) => !r.builtin)
     .sort((a, b) => a.label.localeCompare(b.label))
-    .map((r) => ({ key: r.key, label: r.label, base: r.base, builtin: false, locked: false, customized: true, perms: normalizePerms(r.perms), users: usersOf(r.key, false), updatedBy: r.updatedBy }));
+    .map((r) => ({ key: r.key, label: r.label, base: r.base, builtin: false, locked: false, customized: true, perms: clampPerms(normalizePerms(r.perms), r.base), users: usersOf(r.key, false), updatedBy: r.updatedBy }));
   return NextResponse.json({ perms, roles: [...builtin, ...custom] });
 }
 
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
   if (key.length < 3 || BUILTIN_ROLE_LABEL[key]) return NextResponse.json({ error: 'Nama role tidak valid' }, { status: 400 });
   if (await prisma.roleDef.findUnique({ where: { key } })) return NextResponse.json({ error: `Role "${label}" sudah ada` }, { status: 409 });
 
-  const role = await prisma.roleDef.create({ data: { key, label, base, perms: normalizePerms(body?.perms), builtin: false, updatedBy: user.name } });
+  const role = await prisma.roleDef.create({ data: { key, label, base, perms: clampPerms(normalizePerms(body?.perms), base), builtin: false, updatedBy: user.name } });
   invalidateRoleCache();
   emitCrmEvent('roles:updated', { key });
   await logActivity({ user, action: 'create', entity: 'setting', entityId: key, summary: `Membuat role "${label}" (tipe dasar ${base})` });

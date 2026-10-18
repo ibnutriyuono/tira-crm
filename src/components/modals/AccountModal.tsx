@@ -8,9 +8,11 @@ import { validEmail } from '@/lib/notif-prefs';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { SafeUser } from '@/lib/types';
+import { SignatureSection } from '../SignatureSection';
 
 /**
- * Akun Saya — tersedia untuk semua role: ganti username, password, email.
+ * Akun Saya — tersedia untuk semua role: ganti username, password, email,
+ * dan tanda tangan untuk surat penawaran (disimpan terpisah, tanpa password).
  * Nama/role/cabang diatur Admin. Setelah Admin mereset password
  * (mustChangePassword) modal ini terbuka paksa dan hanya meminta password baru.
  */
@@ -127,6 +129,7 @@ export function AccountModal() {
           </div>
         )}
       </div>
+      {!forced && <SignatureSection />}
     </Modal>
   );
 }

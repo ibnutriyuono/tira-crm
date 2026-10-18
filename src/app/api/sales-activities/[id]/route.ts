@@ -94,7 +94,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (own.error) return own.error;
   // A converted activity is the origin of a pipeline record; deleting it would
   // orphan that link and silently lower the KPI the deal already earned.
-  if (own.existing.prospectId) {
+  // Baris otomatis Surat Penawaran / Purchasing hanya menautkan prospek (bukan asal pipeline).
+  if (own.existing.prospectId && own.existing.sumber !== 'penawaran' && own.existing.sumber !== 'purchasing') {
     return NextResponse.json({ error: 'Aktivitas ini sudah masuk pipeline dan tidak dapat dihapus.' }, { status: 409 });
   }
   await prisma.salesActivity.delete({ where: { id } });

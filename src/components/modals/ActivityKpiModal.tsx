@@ -5,7 +5,7 @@ import { Modal } from '../Modal';
 import { ACTIVITY_TYPES, type ActivityTipe } from '@/lib/constants';
 import { buildActivityKpi, paceFor, prevPeriode, type ActivityKpiRow, type PaceSignal } from '@/lib/activity-kpi';
 import { formatDateID, formatRupiah } from '@/lib/format';
-import { localToday } from '@/lib/sales-activity';
+import { isStaffActivityKey, localToday } from '@/lib/sales-activity';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -104,7 +104,10 @@ export function ActivityKpiModal() {
         }
       });
     }
-    return buildActivityKpi(activities, Array.from(known.values()), prospects, { periode, today, prevActivities });
+    // Aktivitas GM / RM / Admin / Admin Sales / Purchasing tampil di Aktivitas
+    // Harian masing-masing, tetapi tidak dihitung sebagai baris KPI Sales.
+    const field = (list: typeof activities) => list.filter((a) => !isStaffActivityKey(a.se));
+    return buildActivityKpi(field(activities), Array.from(known.values()).filter((t) => !isStaffActivityKey(t.se)), prospects, { periode, today, prevActivities: field(prevActivities) });
   }, [activities, prevActivities, targets, prospects, periode, today, canSetTarget]);
 
   const isDefault = (r: ActivityKpiRow) => r.types.every((t) => !t.targetSet);

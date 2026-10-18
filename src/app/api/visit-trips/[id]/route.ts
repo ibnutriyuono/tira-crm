@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { parsePicText, syncCustomerPics } from '@/lib/customer-sync';
 import { deleteObject } from '@/lib/s3';
 import type { TripVisit } from '@/lib/types';
-import { canEditPlan, canEditRealisasi, mergeRealisasi, normalizePlanVisits, validateTripHeader } from '@/lib/visit-trip';
+import { canEditPlan, canEditRealisasi, mergeRealisasi, normalizePlanVisits, tripCabangLocked, validateTripHeader } from '@/lib/visit-trip';
 import { guard } from '@/lib/permissions-server';
 import { cleanPeserta, syncTripActivitiesSafe } from '@/lib/trip-activity-server';
 
@@ -41,7 +41,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const body = await req.json().catch(() => null);
 
   if (canEditPlan(user, existing)) {
-    const cabang = (user.role === 'bm' ? existing.cabang : String(body?.cabang || '')).trim().toUpperCase();
+    const cabang = (tripCabangLocked(user.role) ? existing.cabang : String(body?.cabang || '')).trim().toUpperCase();
     const tglBerangkat = String(body?.tglBerangkat || '').trim();
     const tglPulang = String(body?.tglPulang || '').trim();
     const headerErr = validateTripHeader({ cabang, tglBerangkat, tglPulang });

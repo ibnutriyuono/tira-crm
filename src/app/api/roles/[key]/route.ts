@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, requireAdmin, requireUser } from '@/lib/api-helpers';
-import { ACT_LABEL, BASE_ROLES, BUILTIN_ROLE_LABEL, PERM_MODULES, fullPerms, normalizePerms, type Perms } from '@/lib/permissions';
+import { ACT_LABEL, BASE_ROLES, BUILTIN_ROLE_LABEL, PERM_MODULES, basePerms, clampPerms, normalizePerms, type Perms } from '@/lib/permissions';
 import { invalidateRoleCache } from '@/lib/permissions-server';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -31,7 +31,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ key: str
   const { key } = await params;
   if (key === 'admin') return NextResponse.json({ error: 'Role Admin terkunci' }, { status: 400 });
   const body = await req.json().catch(() => null);
-  const perms = normalizePerms(body?.perms);
+  const raw = normalizePerms(body?.perms);
   const isBuiltin = !!BUILTIN_BASE[key];
   const existing = (await prisma.roleDef.findUnique({ where: { key } })) as { label: string; base: string; perms: unknown } | null;
   if (!isBuiltin && !existing) return NextResponse.json({ error: 'Role tidak ditemukan' }, { status: 404 });
@@ -45,7 +45,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ key: str
       base = body.base;
     }
   }
-  const before = existing ? normalizePerms(existing.perms) : fullPerms();
+  // Disimpan sudah dipotong ke batas tipe dasar, supaya yang tersimpan = yang berlaku.
+  const perms = clampPerms(raw, isBuiltin ? key : base);
+  const before = existing ? clampPerms(normalizePerms(existing.perms), existing.base || base) : basePerms(isBuiltin ? key : base);
   const prevBase = existing?.base;
   const role = await prisma.roleDef.upsert({
     where: { key },

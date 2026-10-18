@@ -7,12 +7,13 @@ import { IconPlus, IconTrash } from '../icons';
 import { CABANG_LIST } from '@/lib/constants';
 import { formatDateID } from '@/lib/format';
 import { api } from '@/lib/api-client';
-import { localToday } from '@/lib/sales-activity';
+import { activityOwner, localToday } from '@/lib/sales-activity';
 import {
   TRIP_HASIL,
   TRIP_PHOTO_MAX_PER_VISIT,
   TRIP_HASIL_LABEL,
   TRIP_ROLES,
+  tripCabangLocked,
   TRIP_STATUS_META,
   approverLabel,
   buildTripPrintHtml,
@@ -30,7 +31,7 @@ import { UserPicker } from '../UserPicker';
 import { useRoster, type RosterUser } from '../issues/shared';
 import { canNow, useCan } from '@/hooks/useCan';
 
-const ROLE_SHORT: Record<string, string> = { gm: 'GM', rm: 'RM', bm: 'BM' };
+const ROLE_SHORT: Record<string, string> = { gm: 'GM', rm: 'RM', bm: 'BM', sales: 'Sales' };
 const blankVisit = (): TripVisit => ({ id: '', customer: '', pic: '', tanggal: '', tujuan: '', realisasi: '', uraian: '', hasil: '', tambahan: false });
 let tmpSeq = 0;
 const tmpId = () => `new-${++tmpSeq}`;
@@ -82,8 +83,9 @@ async function shrinkPhoto(file: File): Promise<File> {
 }
 
 /**
- * Perjalanan dinas GM / RM / BM: plan a trip to a branch (customers +
- * purpose of each visit), get it approved (BM by their RM, RM by the GM),
+ * Perjalanan dinas Sales / BM / RM / GM: plan a trip to a branch (customers +
+ * purpose of each visit), get it approved (Sales by their BM, BM by their RM,
+ * RM by the GM),
  * then record what actually happened. Every trip prints as one form.
  */
 export function VisitTripModal() {
@@ -177,7 +179,7 @@ export function VisitTripModal() {
 
   function openNew() {
     setCurrentId(null);
-    setCabang(currentUser?.role === 'bm' ? (currentUser.cabang || '').toUpperCase() : '');
+    setCabang(tripCabangLocked(currentUser?.role) ? (currentUser?.cabang || '').toUpperCase() : '');
     const today = localToday();
     setTglBerangkat(today);
     setTglPulang(today);
@@ -445,7 +447,7 @@ export function VisitTripModal() {
       <div className="form-grid">
         <div>
           <label>Cabang tujuan *</label>
-          <select value={cabang} onChange={(e) => setCabang(e.target.value)} disabled={currentUser?.role === 'bm'}>
+          <select value={cabang} onChange={(e) => setCabang(e.target.value)} disabled={tripCabangLocked(currentUser?.role)}>
             <option value="">— pilih cabang —</option>
             {CABANG_LIST.map((c) => (
               <option key={c} value={c}>
@@ -826,8 +828,9 @@ export function VisitTripModal() {
 }
 
 const up = (x: string | null | undefined) => (x || '').trim().toUpperCase();
-/** Punya Aktivitas Harian sendiri (sama dengan activityOwner di server): Sales ber-SE, atau BM. */
-const ownsActivity = (u: RosterUser) => (u.role === 'sales' && !!u.se) || u.role === 'bm';
+/** Punya identitas Aktivitas Harian (semua role, lihat activityOwner). */
+const ownsActivity = (u: RosterUser) => !!activityOwner(u);
+const isField = (u: RosterUser) => u.role === 'sales' || u.role === 'bm';
 
 /**
  * Personil yang ikut ke satu customer (pemilik + peserta + Sales/BM cabang
@@ -863,9 +866,10 @@ function PersonilCell({ trip, v, roster, edit, onChange }: { trip: VisitTrip; v:
       <div className="field-note" style={{ margin: '3px 0 0' }}>
         {!counts
           ? v.hasil === 'batal' ? 'Tidak dicatat (tidak jadi dikunjungi).' : 'Tercatat setelah realisasi diisi.'
-          : owners.length
-            ? `→ ${owners.map((u) => `${u.name}${others(u.id).length ? ` (didampingi ${others(u.id).join(', ')})` : ''}`).join('; ')}`
-            : `→ Sales pemilik customer di ${trip.cabang}${users.length ? ` (didampingi ${users.map((u) => u.name).join(', ')})` : ''}`}
+          : `→ ${[
+              ...owners.map((u) => `${u.name}${others(u.id).length ? ` (didampingi ${others(u.id).join(', ')})` : ''}`),
+              ...(users.some(isField) ? [] : [`Sales pemilik customer di ${trip.cabang}${users.length ? ` (didampingi ${users.map((u) => u.name).join(', ')})` : ''}`]),
+            ].join('; ')}`}
       </div>
     </div>
   );

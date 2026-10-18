@@ -20,6 +20,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1116.0",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "3.0.3",
+    "docx": "9.7.1",
     "jose": "6.2.9",
     "next": "16.3.1",
     "nodemailer": "7.0.12",

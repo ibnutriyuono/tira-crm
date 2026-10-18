@@ -1,7 +1,7 @@
 import type { Role, TripHasil, TripStatus, TripVisit, VisitTrip } from './types';
 
 /**
- * Perjalanan dinas GM / RM / BM -- rules shared by the API and the modal.
+ * Perjalanan dinas Sales / BM / RM / GM -- rules shared by the API and the modal.
  * Pure (no server imports) so both sides enforce the same thing.
  */
 
@@ -9,7 +9,10 @@ import type { Role, TripHasil, TripStatus, TripVisit, VisitTrip } from './types'
 export const TRIP_PHOTO_MAX_PER_VISIT = 10;
 export const TRIP_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-export const TRIP_ROLES: Role[] = ['gm', 'rm', 'bm'];
+export const TRIP_ROLES: Role[] = ['gm', 'rm', 'bm', 'sales'];
+
+/** Sales dan BM merencanakan perjalanan di cabangnya sendiri (cabang tujuan terkunci). */
+export const tripCabangLocked = (role: string | null | undefined) => role === 'bm' || role === 'sales';
 
 export const TRIP_STATUS_META: Record<TripStatus, { label: string; badge: string }> = {
   draft: { label: 'Draft', badge: 'slate' },
@@ -28,10 +31,15 @@ export const TRIP_HASIL: { key: Exclude<TripHasil, ''>; label: string }[] = [
 ];
 export const TRIP_HASIL_LABEL: Record<string, string> = Object.fromEntries(TRIP_HASIL.map((h) => [h.key, h.label]));
 
-type Actor = { id: string; role: Role | string; reg: number | null };
+type Actor = { id: string; role: Role | string; reg: number | null; cabang?: string | null };
 
-/** Who approves a trip by its owner's role: BM -> RM of the BM's region (or GM), RM -> GM, GM -> nobody. */
+/**
+ * Who approves a trip by its owner's role: Sales -> BM of the Sales' branch
+ * (or the RM of its region / GM), BM -> RM of the BM's region (or GM),
+ * RM -> GM, GM -> nobody.
+ */
 export function approverLabel(ownerRole: string): string {
+  if (ownerRole === 'sales') return 'BM cabang (atau RM / GM)';
   if (ownerRole === 'bm') return 'RM regional / GM';
   if (ownerRole === 'rm') return 'GM';
   return '-';
@@ -49,13 +57,18 @@ export interface TripAuthRow {
   ownerId: string;
   ownerRole: string;
   ownerReg: number | null;
+  ownerCabang?: string | null;
   status: string;
 }
 
 export function canApproveTrip(user: Actor, trip: TripAuthRow): boolean {
   if (trip.status !== 'diajukan' || trip.ownerId === user.id) return false;
-  if (user.role === 'gm' || user.role === 'admin') return trip.ownerRole === 'bm' || trip.ownerRole === 'rm';
-  if (user.role === 'rm') return trip.ownerRole === 'bm' && user.reg != null && trip.ownerReg === user.reg;
+  if (user.role === 'gm' || user.role === 'admin') return trip.ownerRole === 'bm' || trip.ownerRole === 'rm' || trip.ownerRole === 'sales';
+  if (user.role === 'rm') return (trip.ownerRole === 'bm' || trip.ownerRole === 'sales') && user.reg != null && trip.ownerReg === user.reg;
+  if (user.role === 'bm') {
+    const c = (user.cabang || '').trim().toUpperCase();
+    return trip.ownerRole === 'sales' && !!c && (trip.ownerCabang || '').trim().toUpperCase() === c;
+  }
   return false;
 }
 

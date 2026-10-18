@@ -34,8 +34,8 @@ async function verifySessionToken(token: string): Promise<string | null> {
   }
 }
 
-export function toSafeUser(u: { id: string; username: string; name: string; role: string; customRole?: string | null; se: string | null; cabang: string | null; reg: number | null; email?: string | null; mustChangePassword?: boolean }): SafeUser {
-  return { id: u.id, username: u.username, name: u.name, role: u.role as SafeUser['role'], customRole: u.customRole ?? null, se: u.se, cabang: u.cabang, reg: u.reg, email: u.email ?? null, mustChangePassword: !!u.mustChangePassword };
+export function toSafeUser(u: { id: string; username: string; name: string; role: string; customRole?: string | null; se: string | null; cabang: string | null; reg: number | null; email?: string | null; mustChangePassword?: boolean; signatureAt?: Date | null }): SafeUser {
+  return { id: u.id, username: u.username, name: u.name, role: u.role as SafeUser['role'], customRole: u.customRole ?? null, se: u.se, cabang: u.cabang, reg: u.reg, email: u.email ?? null, mustChangePassword: !!u.mustChangePassword, signatureAt: u.signatureAt ? u.signatureAt.toISOString() : null };
 }
 
 /** Server Component / Route Handler helper: reads the session cookie via next/headers. */
@@ -351,16 +351,20 @@ export async function canEditBudgetTarget(user: SafeUser, cabang: string): Promi
  * Read scope for SalesActivity / ActivityTarget. Both carry the same se /
  * cabang / reg columns as SalesPlan, so the hierarchy is identical: sales sees
  * their own SE, bm their branch, rm their region, gm/admin everything, and
- * every other role (purchasing) nothing.
+ * every other role (purchasing) only its own rows (activityOwner).
  */
-export const salesActivityScopeWhere = salesPlanScopeWhere;
+export async function salesActivityScopeWhere(user: SafeUser) {
+  const base = await salesPlanScopeWhere(user);
+  const own = activityOwner(user);
+  // Admin / GM melihat semua; role lain: cakupannya + aktivitasnya sendiri.
+  if (!own || Object.keys(base).length === 0) return base;
+  return { OR: [base, { se: { equals: own, mode: 'insensitive' as const } }] };
+}
 
 /**
- * Sales accounts (with a Kode SE) and branch managers (BM, who also hold their
- * own customers) log activities, always under their own identity (see
- * activityOwner). RM / GM / admin read and set targets but do not log on
- * anyone's behalf -- an entry typed in for an SE would count toward that SE's
- * KPI without the SE having done it.
+ * Every role logs its own activities, always under its own identity (see
+ * activityOwner) -- never on someone else's behalf: an entry typed in for an
+ * SE would count toward that SE's KPI without the SE having done it.
  */
 export function canWriteSalesActivity(user: SafeUser): boolean {
   return activityOwner(user) !== null;
@@ -370,7 +374,7 @@ export function canWriteSalesActivity(user: SafeUser): boolean {
  * Perjalanan dinas: GM/admin see every trip; an RM sees their own plus the
  * trips of BMs in their region and any trip into a branch of their region;
  * a BM sees their own plus trips into their branch (e.g. the RM visiting).
- * Sales/purchasing see none.
+ * Sales see their own trips; everyone also sees the trips they join as peserta.
  */
 export function visitTripScopeWhere(user: SafeUser) {
   if (user.role === 'admin' || user.role === 'gm') return {};
@@ -383,5 +387,7 @@ export function visitTripScopeWhere(user: SafeUser) {
   if (user.role === 'bm') {
     return { OR: [{ ownerId: user.id }, { cabang: { equals: user.cabang || '__none__', mode: 'insensitive' as const } }, peserta] };
   }
+  // Sales: perjalanan miliknya sendiri + yang diikutinya sebagai peserta.
+  if (user.role === 'sales') return { OR: [{ ownerId: user.id }, peserta] };
   return peserta;
 }

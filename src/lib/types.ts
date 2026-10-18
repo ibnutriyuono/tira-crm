@@ -16,6 +16,8 @@ export interface SafeUser {
   email?: string | null;
   /** Password baru direset Admin — wajib diganti sebelum memakai aplikasi. */
   mustChangePassword?: boolean;
+  /** Waktu tanda tangan disimpan (ISO) — null = belum punya tanda tangan. */
+  signatureAt?: string | null;
 }
 
 export interface Material {
@@ -362,8 +364,10 @@ export interface SalesActivity {
   prospectId: string | null;
   /** "selesai" = sudah dilakukan; "rencana" = jadwal follow-up (tidak dihitung KPI). Baris lama tanpa kolom ini = selesai. */
   status?: 'selesai' | 'rencana';
-  /** null = isian manual; "followup" = otomatis dari Follow-up WhatsApp; "aktivitas" = rencana dari hasil kontak. */
+  /** null = isian manual; "followup" = otomatis dari Follow-up WhatsApp; "aktivitas" = rencana dari hasil kontak; "perjalanan" = Perjalanan Dinas; "penawaran" = Surat Penawaran. */
   sumber?: string | null;
+  /** sumber "penawaran": nomor surat penawaran. */
+  refNo?: string | null;
   kanal?: string | null;
   hasil?: string | null;
   langkah?: string | null;

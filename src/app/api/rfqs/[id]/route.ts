@@ -1,4 +1,5 @@
 import { normalizeItemLines } from '@/lib/format';
+import { logRfqAnswer } from '@/lib/purchasing-activity';
 import { NextResponse } from 'next/server';
 import { diffFields, logActivity, RFQ_FIELD_LABELS } from '@/lib/activity';
 import { isResponse, mergeRfqItemsPreservingAnswer, requireUser } from '@/lib/api-helpers';
@@ -178,6 +179,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           : `Mengisi jawaban Purchasing pada RFQ ${rfq.noRfq || '(tanpa nomor)'}`,
     });
     if (body.action === 'send-jawaban') {
+      await logRfqAnswer(user, rfq);
       await notify({
         userIds: await requesterUserIds(rfq.requestedBy),
         type: 'rfq_answered',

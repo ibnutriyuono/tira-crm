@@ -101,9 +101,20 @@ export async function requesterUserIds(requestedBy: string | null): Promise<stri
  * BM's region AND the GM(s) -- either may approve (canApproveTrip), and the
  * GM wants sight of every BM trip. For an RM's trip, the GM(s).
  */
-export async function tripApproverIds(ownerRole: string, ownerReg: number | null): Promise<string[]> {
+export async function tripApproverIds(ownerRole: string, ownerReg: number | null, ownerCabang?: string | null): Promise<string[]> {
   const or: Record<string, unknown>[] = [];
-  if (ownerRole === 'bm') {
+  if (ownerRole === 'sales') {
+    // BM cabang Sales yang menyetujui; RM regional & GM boleh juga, tapi
+    // yang diberi tahu cukup BM-nya (bila cabang tanpa BM: RM, lalu GM).
+    const c = (ownerCabang || '').trim();
+    const bm = c ? await prisma.user.findMany({ where: { role: 'bm', cabang: { equals: c, mode: 'insensitive' } }, select: { id: true } }) : [];
+    if (bm.length) return bm.map((r) => r.id);
+    if (ownerReg != null) {
+      const rm = await prisma.user.findMany({ where: { role: 'rm', reg: ownerReg }, select: { id: true } });
+      if (rm.length) return rm.map((r) => r.id);
+    }
+    or.push({ role: 'gm' });
+  } else if (ownerRole === 'bm') {
     or.push({ role: 'gm' });
     if (ownerReg != null) or.push({ role: 'rm', reg: ownerReg });
   } else if (ownerRole === 'rm') {

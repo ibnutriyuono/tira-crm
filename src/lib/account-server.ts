@@ -1,5 +1,6 @@
 import { randomInt } from 'crypto';
 import { prisma } from './prisma';
+import { activityOwner } from './sales-activity';
 
 /** Username: 3–30 karakter huruf kecil, angka, titik, garis bawah, tanda hubung. */
 export function usernameError(u: string): string | null {
@@ -28,7 +29,13 @@ export function tempPassword(): string {
  * Log Aktivitas sengaja tidak diubah (jejak historis).
  */
 export async function renameUsernameEverywhere(oldU: string, newU: string, userId: string) {
+  // Identitas Aktivitas Harian role tanpa Kode SE memakai username (activityOwner).
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, se: true, cabang: true } });
+  const oldKey = u ? activityOwner({ ...u, username: oldU }) : null;
+  const newKey = u ? activityOwner({ ...u, username: newU }) : null;
+  const moveActivities = oldKey && newKey && oldKey !== newKey ? [prisma.salesActivity.updateMany({ where: { se: oldKey }, data: { se: newKey } })] : [];
   await prisma.$transaction([
+    ...moveActivities,
     prisma.user.update({ where: { id: userId }, data: { username: newU } }),
     prisma.$executeRaw`UPDATE "Conversation" SET "members" = array_replace("members", ${oldU}, ${newU}) WHERE ${oldU} = ANY("members")`,
     prisma.conversation.updateMany({ where: { createdBy: oldU }, data: { createdBy: newU } }),

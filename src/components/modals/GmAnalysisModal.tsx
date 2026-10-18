@@ -5,7 +5,12 @@ import type PptxGenJS from 'pptxgenjs';
 import { Modal } from '../Modal';
 import { IconDownload } from '../icons';
 import { STATUS_META } from '@/lib/constants';
-import { formatDateID, formatRupiah, todayStr } from '@/lib/format';
+import { api } from '@/lib/api-client';
+import { buildDeck } from '@/lib/exec-deck';
+import type { PptImage } from '@/lib/exec-ppt';
+import { BUILTIN_ROLE_LABEL } from '@/lib/permissions';
+import type { ActivityTarget, SalesActivity, VisitTrip } from '@/lib/types';
+import { formatRupiah } from '@/lib/format';
 import { buildExecAnalysis, execScopeFor, inScope, localPeriode, type ExecAnalysis } from '@/lib/exec-analysis';
 import { PipelineTab } from '../analisa/PipelineTab';
 import { ProductTab } from '../analisa/ProductTab';
@@ -14,20 +19,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
 
-const GRAPHITE = '1A2A3D';
-const STEEL = '2E5C7E';
-const AMBER = 'D9822B';
-const GREEN = '2F8F5B';
-const RUST = 'B94A3D';
-const CHART_COLORS = [STEEL, AMBER, GREEN, RUST, '6B7684'];
 
-/**
- * Header rows are styled cells, body rows are plain strings. pptxgenjs accepts
- * both at runtime, but its v4 typings declare a row as TableCell[] only.
- */
-function tableRows(rows: (string | PptxGenJS.TableCell)[][]): PptxGenJS.TableCell[][] {
-  return rows.map((row) => row.map((cell) => (typeof cell === 'string' ? { text: cell } : cell)));
-}
 
 /** Compact Rupiah for KPI tiles ("Rp 3,00 M", "Rp 820 jt") -- the full figure sits in the tile's tooltip. */
 function rpShort(n: number): string {
@@ -85,114 +77,66 @@ export function GmAnalysisModal() {
 
   const scopedProspects = useMemo(() => (!scope ? [] : scope.kind === 'se' ? prospects : prospects.filter(inScope(scope))), [scope, prospects]);
 
+  // Data tambahan yang tidak disimpan di store; gagal dimuat = bagiannya dilewati.
+  async function loadExtras() {
+    const get = async <T,>(url: string, key: string): Promise<T | null> => {
+      try {
+        return ((await api.get<Record<string, T>>(url)) as Record<string, T>)[key] ?? null;
+      } catch {
+        return null;
+      }
+    };
+    const [activities, activityTargets, trips] = await Promise.all([
+      canNow('aktivitas', 'v') ? get<SalesActivity[]>('/api/sales-activities?all=1', 'activities') : Promise.resolve(null),
+      canNow('kpi', 'v') && scope?.kind !== 'se' ? get<ActivityTarget[]>(`/api/activity-targets?periode=${periodeTo}`, 'targets') : Promise.resolve(null),
+      canNow('trip', 'v') ? get<VisitTrip[]>('/api/visit-trips', 'trips') : Promise.resolve(null),
+    ]);
+    return { activities, activityTargets, trips };
+  }
+
+  async function loadLogoImage(): Promise<PptImage | null> {
+    try {
+      const blob = await (await fetch('/logo.png')).blob();
+      const bmp = await createImageBitmap(blob);
+      const dim = { w: bmp.width, h: bmp.height };
+      bmp.close();
+      const dataUrl = await new Promise<string>((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(String(fr.result));
+        fr.onerror = rej;
+        fr.readAsDataURL(blob);
+      });
+      return { data: dataUrl.replace(/^data:/, ''), ...dim };
+    } catch {
+      return null;
+    }
+  }
+
   async function onGeneratePpt() {
-    if (!a) return;
+    if (!a || !currentUser) return;
     setBusy(true);
     try {
-      const { default: PptxGen } = await import('pptxgenjs');
-      const pres = new PptxGen();
-      pres.layout = 'LAYOUT_WIDE';
-      const chartOpts = { chartColors: CHART_COLORS };
-      const H = (t: string) => ({ text: t, options: { bold: true, fill: { color: GRAPHITE }, color: 'FFFFFF' } });
-      const title = (s: PptxGenJS.Slide, t: string) => s.addText(t, { x: 0.5, y: 0.4, w: 12, h: 0.6, fontSize: 24, bold: true, color: GRAPHITE, fontFace: 'Cambria' });
-      const tbl = { border: { type: 'solid' as const, color: 'DDDDDD', pt: 0.5 } };
-
-      // 1. Sampul
-      const s1 = pres.addSlide();
-      s1.background = { color: GRAPHITE };
-      s1.addText('Laporan Analisa Eksekutif', { x: 0.8, y: 2.1, w: 11, h: 1, fontSize: 36, bold: true, color: 'FFFFFF', fontFace: 'Cambria' });
-      s1.addText(`${a.scope.label} · Periode ${a.periodLabel}`, { x: 0.8, y: 3.1, w: 11, h: 0.5, fontSize: 18, color: 'D7E3EC' });
-      s1.addText('PT. TIRA AUSTENITE, Tbk — Steel Division', { x: 0.8, y: 3.9, w: 8, h: 0.4, fontSize: 12, bold: true, color: 'FFFFFF' });
-      s1.addText(`Dibuat otomatis ${formatDateID(todayStr())} oleh ${currentUser?.name || '-'} — internal & rahasia`, { x: 0.8, y: 6.9, w: 11, h: 0.3, fontSize: 10, color: 'A9B8C6' });
-
-      // 2. Ringkasan
-      const s2 = pres.addSlide();
-      title(s2, 'Ringkasan Eksekutif');
-      const kpi = [
-        [H('Indikator'), H('Nilai')],
-        [a.scope.kind === 'se' ? 'Target Cabang (acuan)' : 'Target', formatRupiah(a.target)],
-        ['Rencana Penjualan', formatRupiah(a.rencana)],
-        ['Realisasi (Won)', `${formatRupiah(a.won)} · ${a.wonCount} deal`],
-        ['  PO/Kontrak · DO GIT · DO Omzet', `${formatRupiah(a.wonPo)} · ${formatRupiah(a.wonDoGit)} · ${formatRupiah(a.wonDoOmzet)}`],
-        ['Achievement vs Target', `${a.achievement}%`],
-        [`vs ${a.compareLabel.replace(/^./, (c) => c.toUpperCase())}`, a.momPct == null ? '-' : `${a.momPct >= 0 ? '+' : ''}${a.momPct}% (${formatRupiah(a.prevWon)})`],
-        ['Sisa Gap', formatRupiah(a.gap) + (a.requiredPerDay ? ` · perlu ${formatRupiah(a.requiredPerDay)}/hari kerja` : '')],
-        ['Weighted Pipeline · Coverage', `${formatRupiah(a.weighted)} · ${a.coverage == null ? '-' : `${Math.round(a.coverage * 100)}%`}`],
-        ['Win Rate', a.winRate == null ? '-' : `${a.winRate}% (${a.wonCount} menang / ${a.lostCount} kalah)`],
-        ['Rata-rata Nilai Deal', formatRupiah(a.avgDeal)],
-      ];
-      s2.addTable(tableRows(kpi), { x: 0.5, y: 1.2, w: 12, fontSize: 12.5, ...tbl, autoPage: false });
-
-      // 3. Per regional / cabang
-      if (a.scope.kind === 'nasional' && a.regRows.length > 0) {
-        const s3 = pres.addSlide();
-        title(s3, 'Performa per Regional (Rp juta)');
-        const labels = a.regRows.map((r) => (r.reg != null ? `Regional ${r.reg}` : 'Belum Diketahui'));
-        s3.addChart(
-          pres.ChartType.bar,
-          [
-            { name: 'Target', labels, values: a.regRows.map((r) => Math.round(r.totals.target / 1e6)) },
-            { name: 'Rencana', labels, values: a.regRows.map((r) => Math.round(r.totals.rencana / 1e6)) },
-            { name: 'Realisasi', labels, values: a.regRows.map((r) => Math.round(r.totals.won / 1e6)) },
-          ],
-          { x: 0.5, y: 1.2, w: 12, h: 5.6, barGrouping: 'clustered', showLegend: true, valAxisTitle: 'Rp Juta', showValAxisTitle: true, ...chartOpts },
-        );
-      }
-      if (a.scope.kind !== 'se' && a.rows.length > 0) {
-        const s4 = pres.addSlide();
-        title(s4, 'Performa per Cabang');
-        const body = a.rows.filter((r) => r.target > 0 || r.won > 0 || r.openCount > 0 || r.rencana > 0).map((r) => [r.cabang, formatRupiah(r.target), formatRupiah(r.rencana), formatRupiah(r.won), `${r.achievement}%`, formatRupiah(r.weighted), String(r.agingCount)]);
-        s4.addTable(tableRows([['Cabang', 'Target', 'Rencana', 'Realisasi', 'Ach.', 'Weighted Pipeline', 'Mangkrak'].map(H), ...body]), { x: 0.4, y: 1.15, w: 12.5, fontSize: 10.5, ...tbl, autoPage: true, autoPageCharWeight: -1 });
-      }
-
-      // 4. SE & customer
-      const s5 = pres.addSlide();
-      title(s5, a.scope.kind === 'se' ? 'Customer Terbesar Periode Ini' : 'Peringkat SE & Customer Terbesar');
-      if (a.scope.kind !== 'se') {
-        const seBody = a.seRows.slice(0, 12).map((r) => [r.se, r.cabang, formatRupiah(r.won), String(r.wonCount), formatRupiah(r.weighted)]);
-        s5.addTable(tableRows([['SE', 'Cabang', 'Realisasi', 'Deal', 'Weighted'].map(H), ...(seBody.length ? seBody : [['Belum ada data', '', '', '', '']])]), { x: 0.4, y: 1.15, w: 6.3, fontSize: 9.5, ...tbl });
-      }
-      const cBody = a.topCustomers.map((c) => [c.name, c.cabang, formatRupiah(c.value), String(c.count)]);
-      s5.addTable(tableRows([['Customer', 'Cabang', 'Realisasi', 'Deal'].map(H), ...(cBody.length ? cBody : [['Belum ada realisasi', '', '', '']])]), {
-        x: a.scope.kind === 'se' ? 0.4 : 6.9, y: 1.15, w: a.scope.kind === 'se' ? 12.5 : 6.0, fontSize: 9.5, ...tbl,
+      const st = useDataStore.getState();
+      const extras = await loadExtras();
+      const deck = buildDeck({
+        a,
+        prospects,
+        budgetTargets,
+        seTargets: st.seTargets,
+        salesPlans,
+        rfqs: st.rfqs,
+        fupas: st.fupas,
+        issues: st.issues,
+        customerGroups: st.customerGroups,
+        ...extras,
+        can: (m) => canNow(m, 'v'),
+        user: { name: currentUser.name, role: currentUser.role, se: currentUser.se },
+        roleLabel: currentUser.customRoleLabel || BUILTIN_ROLE_LABEL[currentUser.role] || currentUser.role,
       });
-
-      // 5. Pipeline
-      const s6 = pres.addSlide();
-      title(s6, 'Kesehatan Pipeline');
-      s6.addChart(pres.ChartType.bar, [{ name: 'Nilai (Rp juta)', labels: a.funnel.map((f) => STATUS_META[f.stage]?.label ?? String(f.stage)), values: a.funnel.map((f) => Math.round(f.value / 1e6)) }], {
-        x: 0.5, y: 1.1, w: 6.2, h: 4.3, showLegend: false, valAxisTitle: 'Rp Juta', showValAxisTitle: true, ...chartOpts,
-      });
-      s6.addText(`${a.aging.length} deal mangkrak · ${formatRupiah(a.agingValue)}`, { x: 7.0, y: 1.1, w: 5.8, h: 0.4, fontSize: 14, bold: true, color: RUST });
-      const agingLines = a.aging.slice(0, 8).map((x) => `${x.record.customer} (${x.record.cabang || '-'}) — ${x.days} hari, ${formatRupiah(x.record.value)}`);
-      s6.addText(agingLines.length ? agingLines.join('\n') : 'Tidak ada deal yang mangkrak.', { x: 7.0, y: 1.55, w: 5.8, h: 2.6, fontSize: 10.5, color: GRAPHITE, valign: 'top' });
-      s6.addText(`${a.gitOld.length} DO belum terfaktur >30 hari`, { x: 7.0, y: 4.3, w: 5.8, h: 0.4, fontSize: 14, bold: true, color: AMBER });
-      s6.addText(a.gitOld.slice(0, 5).map((g) => `${g.customer} (${g.cabang}) — ${g.days} hari, ${formatRupiah(g.value)}`).join('\n') || '-', { x: 7.0, y: 4.75, w: 5.8, h: 2, fontSize: 10.5, color: GRAPHITE, valign: 'top' });
-
-      // 6. Customer
-      const s7 = pres.addSlide();
-      title(s7, 'Kesehatan Customer');
-      s7.addChart(pres.ChartType.pie, [{ name: 'Customer', labels: Object.keys(a.health), values: Object.values(a.health) }], { x: 0.5, y: 1.1, w: 5.8, h: 4.6, showLegend: true, showPercent: true, ...chartOpts });
-      const dBody = a.topDingin.map((c) => [c.name, c.cabang, `${c.daysSinceOrder ?? '-'} hari`, formatRupiah(c.wonValue)]);
-      s7.addText('Customer Dingin Bernilai Terbesar', { x: 6.7, y: 1.1, w: 6.1, h: 0.4, fontSize: 14, bold: true, color: RUST });
-      s7.addTable(tableRows([['Customer', 'Cabang', 'Tidak Order', 'Nilai Historis'].map(H), ...(dBody.length ? dBody : [['Tidak ada', '', '', '']])]), { x: 6.7, y: 1.55, w: 6.1, fontSize: 9.5, ...tbl });
-
-      // 7. Kualitas data
-      const s8 = pres.addSlide();
-      title(s8, 'Kualitas Data');
-      const qBody = a.dataIssues.map((d) => [d.label, String(d.count), d.hint]);
-      s8.addTable(tableRows([['Masalah', 'Jumlah', 'Dampak'].map(H), ...(qBody.length ? qBody : [['Tidak ada masalah data terdeteksi', '', '']])]), { x: 0.4, y: 1.15, w: 12.5, fontSize: 11, ...tbl });
-
-      // 8. Catatan
-      const s9 = pres.addSlide();
-      s9.background = { color: GRAPHITE };
-      s9.addText('Catatan & Rekomendasi', { x: 0.8, y: 0.5, w: 11, h: 0.7, fontSize: 26, bold: true, color: 'FFFFFF', fontFace: 'Cambria' });
-      s9.addText((a.insights.length ? a.insights : ['Tidak ada catatan khusus periode ini.']).map((t) => ({ text: t, options: { bullet: true, breakLine: true } })), {
-        x: 0.8, y: 1.4, w: 11.8, h: 5.6, fontSize: 13, color: 'D7E3EC', valign: 'top', paraSpaceAfter: 6,
-      });
-
-      await pres.writeFile({ fileName: `Analisa-Eksekutif-${a.scope.label.replace(/[^\w-]+/g, '_')}-${a.periode}${a.periodeTo !== a.periode ? `_sd_${a.periodeTo}` : ''}.pptx` });
-      toast('PPT analisa berhasil dibuat', 'success');
+      const [{ default: PptxGen }, { renderExecDeck }, logo] = await Promise.all([import('pptxgenjs'), import('@/lib/exec-ppt'), loadLogoImage()]);
+      const pres = await renderExecDeck(PptxGen as unknown as new () => PptxGenJS, deck, logo);
+      await pres.writeFile({ fileName: `Analisa-${a.scope.label.replace(/[^\w-]+/g, '_')}-${a.periode}${a.periodeTo !== a.periode ? `_sd_${a.periodeTo}` : ''}.pptx` });
+      toast(`PPT analisa berhasil dibuat (${deck.slides.length + 3} slide)`, 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal membuat PPT', 'error');
     } finally {

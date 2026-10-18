@@ -1,4 +1,4 @@
-import { ACTIVITY_TYPES } from './constants';
+import { ACTIVITY_LABEL, ACTIVITY_TYPES } from './constants';
 import { nameParts } from './customer-names';
 import type { SalesActivity } from './types';
 
@@ -17,8 +17,10 @@ export interface ContactIndex {
 
 export function buildContactIndex(activities: SalesActivity[]): ContactIndex {
   const byCore = new Map<string, SalesActivity[]>();
+  const customerTipe = new Set<string>(ACTIVITY_TYPES.map((t) => t.key));
   activities
-    .filter((a) => a.status !== 'rencana')
+    // Pekerjaan internal (jawab RFQ, diskusi) bukan kontak dengan customer.
+    .filter((a) => a.status !== 'rencana' && customerTipe.has(a.tipe))
     .forEach((a) => {
       const c = coreKey(a.customer);
       if (c) byCore.set(c, [...(byCore.get(c) || []), a]);
@@ -42,5 +44,4 @@ export function lastContactAfter(index: ContactIndex, customer: string, lastOrde
   return list.find((a) => !after || a.tanggal > after) || null;
 }
 
-const LABEL: Record<string, string> = Object.fromEntries(ACTIVITY_TYPES.map((t) => [t.key, t.label]));
-export const activityLabel = (tipe: string) => LABEL[tipe] || tipe;
+export const activityLabel = (tipe: string) => ACTIVITY_LABEL[tipe] || tipe;

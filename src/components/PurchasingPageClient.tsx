@@ -5,13 +5,15 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PurchasingBoard } from './PurchasingBoard';
-import { IconBag, IconBell } from './icons';
+import { IconBag, IconBell, IconCalendar } from './icons';
 import { ROLE_LABELS } from '@/lib/constants';
 import { api } from '@/lib/api-client';
 import { ToastHost } from './ToastHost';
 import { CancelDocModal } from './modals/CancelDocModal';
 import { NotificationsModal } from './modals/NotificationsModal';
 import { AccountModal } from './modals/AccountModal';
+import { SalesActivityModal } from './modals/SalesActivityModal';
+import { useCan } from '@/hooks/useCan';
 import { TeamChatWidget } from './TeamChatWidget';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -26,6 +28,8 @@ export function PurchasingPageClient() {
   const loaded = useDataStore((s) => s.loaded);
   const bootstrap = useDataStore((s) => s.bootstrap);
   const currentUser = useDataStore((s) => s.currentUser);
+  // Semua role punya Aktivitas Harian (Kelola Role menentukan tampil / tidak).
+  const canAktivitas = useCan('aktivitas', 'v');
   const notifications = useDataStore((s) => s.notifications);
   const unreadNotifCount = notifications.filter((n) => !n.readAt).length;
   const openModal = useUiStore((s) => s.openModal);
@@ -84,6 +88,12 @@ export function PurchasingPageClient() {
             {!isPurchasingRoleClient(currentUser?.role) && (
               <Link className="btn btn-ghost-dark btn-sm" href="/">← Kembali ke CRM</Link>
             )}
+            {canAktivitas && (
+              <button type="button" className="btn btn-ghost-dark btn-sm" onClick={() => openModal('salesActivity')}>
+                <IconCalendar />
+                Aktivitas Harian
+              </button>
+            )}
             <button type="button" className="btn btn-outline-dark btn-sm" onClick={() => openModal('account')}>Akun Saya</button>
             <button type="button" className="btn btn-outline-dark btn-sm" onClick={logout}>Keluar</button>
             <span style={{ fontSize: 11, color: 'var(--slate-300)', fontFamily: 'var(--font-ibm-plex-mono), monospace' }}>
@@ -97,6 +107,7 @@ export function PurchasingPageClient() {
       <CancelDocModal />
       <NotificationsModal />
       <AccountModal />
+      <SalesActivityModal />
       <ToastHost />
       <TeamChatWidget />
     </>

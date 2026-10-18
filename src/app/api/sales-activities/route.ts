@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   const denied = await guard(user, 'aktivitas', 'e');
   if (denied) return denied;
   if (!canWriteSalesActivity(user)) {
-    return NextResponse.json({ error: 'Hanya akun Sales (dengan Kode SE) atau Branch Manager yang dapat mengisi aktivitas.' }, { status: 403 });
+    return NextResponse.json({ error: 'Akun ini belum memiliki identitas aktivitas (username / Kode SE).' }, { status: 403 });
   }
 
   const body = await req.json().catch(() => null);

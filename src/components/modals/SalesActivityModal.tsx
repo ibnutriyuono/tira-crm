@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { CustomerNameInput } from '../CustomerNameInput';
 import { IconEdit, IconPlus, IconTrash } from '../icons';
-import { ACTIVITY_CONVERT_STATUSES, ACTIVITY_TYPES, STATUS_META, type ActivityTipe } from '@/lib/constants';
+import { ACTIVITY_CONVERT_STATUSES, ACTIVITY_LABEL, ACTIVITY_TYPES, INTERNAL_ACTIVITY_TYPES, STATUS_META, type ActivityTipe } from '@/lib/constants';
 import { formatDateID, formatRupiah } from '@/lib/format';
 import { api } from '@/lib/api-client';
-import { activityOwner, localToday } from '@/lib/sales-activity';
+import { activityOwner, isStaffActivityKey, localToday } from '@/lib/sales-activity';
 import { useDataStore } from '@/store/useDataStore';
 import { EMPTY_QCD, useUiStore, type ModalKey, type PendingQcd } from '@/store/useUiStore';
 import { qcdMissing } from '@/lib/qcd';
@@ -36,7 +36,9 @@ function getLocation(): Promise<{ lat: number; lng: number; akurasi: number } | 
   });
 }
 
-const TIPE_LABEL: Record<string, string> = Object.fromEntries(ACTIVITY_TYPES.map((t) => [t.key, t.label]));
+const TIPE_LABEL: Record<string, string> = ACTIVITY_LABEL;
+/** Baris otomatis yang tidak diedit lewat form ini (diubah di sumbernya). */
+const AUTO_LOCKED = new Set(['perjalanan', 'purchasing']);
 const TIPE_COLOR: Record<string, string> = { kunjungan: 'green', telepon: 'steel', meeting: 'amber', dokumen: 'slate' };
 // Button wording per target status — the sales vocabulary, not the status labels.
 const CONVERT_LABEL: Record<number, string> = { 1: 'Permintaan', 2: 'Penawaran', 4: 'PO' };
@@ -175,6 +177,9 @@ export function SalesActivityModal() {
   // "Saya", "Semua Sales cabang", atau satu Sales. API sudah mengirim seluruh
   // aktivitas cabang (salesActivityScopeWhere); di sini hanya penyaringannya.
   const multi = !!owner && currentUser?.role !== 'sales';
+  // Label "semua" sesuai cakupan role (API sudah membatasi datanya).
+  const semuaLabel =
+    currentUser?.role === 'gm' || currentUser?.role === 'admin' ? 'Semua aktivitas' : currentUser?.role === 'rm' ? 'Semua di regional' : currentUser?.role === 'bm' || currentUser?.role === 'salesadmin' ? 'Semua Sales cabang' : 'Semua yang terlihat';
   const [lihat, setLihat] = useState<string>('semua');
   const seOptions = useMemo(() => {
     const set = new Set(activities.map((a) => a.se.toUpperCase()));
@@ -419,11 +424,11 @@ export function SalesActivityModal() {
           <>
             <label style={{ margin: '0 0 0 12px' }}>Tampilkan</label>
             <select value={lihat} onChange={(e) => setLihat(e.target.value)} style={{ width: 'auto' }}>
-              <option value="semua">Semua Sales cabang</option>
+              <option value="semua">{semuaLabel}</option>
               <option value="saya">Aktivitas saya ({owner})</option>
               {seOptions.map((se) => (
                 <option key={se} value={se}>
-                  Sales {se}
+                  {isStaffActivityKey(se) ? se : `Sales ${se}`}
                 </option>
               ))}
             </select>
@@ -432,8 +437,8 @@ export function SalesActivityModal() {
       </div>
 
       <div className="import-summary" style={{ marginTop: 8, marginBottom: 12 }}>
-        <b>Bulan ini ({periode}){multi ? (lihat === 'saya' ? ' — aktivitas saya' : lihat === 'semua' ? ' — semua Sales cabang' : ` — Sales ${lihat}`) : ''}:</b>{' '}
-        {ACTIVITY_TYPES.map((t) => `${t.short} ${monthCount[t.key] || 0}`).join(' · ')}
+        <b>Bulan ini ({periode}){multi ? (lihat === 'saya' ? ' — aktivitas saya' : lihat === 'semua' ? ` — ${semuaLabel.toLowerCase()}` : ` — ${lihat}`) : ''}:</b>{' '}
+        {[...ACTIVITY_TYPES.map((t) => `${t.short} ${monthCount[t.key] || 0}`), ...INTERNAL_ACTIVITY_TYPES.filter((t) => monthCount[t.key]).map((t) => `${t.short} ${monthCount[t.key]}`)].join(' · ')}
       </div>
 
       {canWrite && (
@@ -705,6 +710,14 @@ export function SalesActivityModal() {
                         <div style={{ marginTop: 4 }}>
                           <span className="badge steel" title="Dari realisasi Perjalanan Dinas — diubah lewat perjalanannya">✈ Perjalanan Dinas</span>
                         </div>
+                      ) : a.sumber === 'purchasing' ? (
+                        <div style={{ marginTop: 4 }}>
+                          <span className="badge slate" title="Tercatat otomatis dari pekerjaan Purchasing (jawab RFQ / FUP A, diskusi kartu)">Otomatis · Purchasing</span>
+                        </div>
+                      ) : a.sumber === 'penawaran' ? (
+                        <div style={{ marginTop: 4 }}>
+                          <span className="badge steel" title={`Tercatat otomatis dari Surat Penawaran${a.refNo ? ` No. ${a.refNo}` : ''}`}>Surat penawaran</span>
+                        </div>
                       ) : null}
                     </td>
                     {(!canWrite || viewAll) && <td>{a.se}</td>}
@@ -744,7 +757,7 @@ export function SalesActivityModal() {
                           {a.sumber === 'followup' ? 'Follow-up prospek' : 'Di pipeline'}
                           {p ? ` · ${STATUS_META[Number(p.status)]?.label ?? ''}` : ''}
                         </span>
-                      ) : canWrite && permProspek && (!owner || a.se.toLowerCase() === owner.toLowerCase()) ? (
+                      ) : canWrite && permProspek && a.sumber !== 'purchasing' && (!owner || a.se.toLowerCase() === owner.toLowerCase()) ? (
                         <div className="row-actions" style={{ flexWrap: 'wrap', gap: 4 }}>
                           {ACTIVITY_CONVERT_STATUSES.map((st) => (
                             <button key={st} type="button" className="btn btn-outline btn-sm" style={{ padding: '3px 8px', whiteSpace: 'nowrap' }} title={`Masukkan ke pipeline sebagai ${CONVERT_LABEL[st]}`} onClick={() => startConvert(a, st)}>
@@ -768,7 +781,18 @@ export function SalesActivityModal() {
                         </button>
                       </td>
                     )}
-                    {canWrite && (!owner || a.se.toLowerCase() === owner.toLowerCase()) && a.sumber !== 'perjalanan' && (
+                    {canWrite && (!owner || a.se.toLowerCase() === owner.toLowerCase()) && a.sumber === 'purchasing' && (
+                      <td>
+                        {permD && (
+                          <div className="row-actions">
+                            <button type="button" className="icon-btn danger" title="Hapus" onClick={() => onDelete(a)}>
+                              <IconTrash />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    )}
+                    {canWrite && (!owner || a.se.toLowerCase() === owner.toLowerCase()) && !AUTO_LOCKED.has(a.sumber || '') && (
                       <td>
                         <div className="row-actions">
                           {a.status === 'rencana' && a.sumber === 'aktivitas' ? (

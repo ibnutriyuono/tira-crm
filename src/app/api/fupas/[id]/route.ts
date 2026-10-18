@@ -1,5 +1,6 @@
 import { normalizeItemLines } from '@/lib/format';
 import type { Prisma } from '@prisma/client';
+import { logFupaAnswer } from '@/lib/purchasing-activity';
 import { NextResponse } from 'next/server';
 import { diffFields, FUPA_FIELD_LABELS, logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
@@ -140,6 +141,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       entityId: id,
       summary: `Mengisi catatan/jawaban Purchasing pada FUP A ${fupa.noFupa || '(tanpa nomor)'}`,
     });
+    // Jawaban (bukan sekadar catatan internal) masuk Aktivitas Harian Purchasing.
+    if (typeof body.purchJawaban === 'string' && body.purchJawaban.trim() && body.purchJawaban.trim() !== (existing.purchJawaban || '').trim()) {
+      await logFupaAnswer(user, fupa);
+    }
     if (answering) {
       await notify({
         userIds: await requesterUserIds(fupa.requestedBy),
