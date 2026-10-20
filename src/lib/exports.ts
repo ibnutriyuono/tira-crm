@@ -1,6 +1,6 @@
 import { classify, formatDateID, formatRupiah, materialUnitPrice, num } from './format';
 import { WORKFLOW_META, fupaAsWorkflowDoc, rfqAsWorkflowDoc, workflowStage } from './purchasing-workflow';
-import { ACTIVITY_LABEL, STATUS_META } from './constants';
+import { ACTIVITY_LABEL, CUSTOMER_APLIKASI_LABEL, PIC_PERAN_LABEL, STATUS_META } from './constants';
 import type { BudgetTarget, Customer, Fupa, Prospect, Rfq, RfqItem, SalesActivity, SalesPlan, Vendor } from './types';
 
 /** What every builder below returns — enough for xlsx.utils.aoa_to_sheet plus column widths, and a sheet name that stays under Excel's 31-char sheet-name limit. */
@@ -125,13 +125,17 @@ export function buildCustomerSheet(list: Customer[]): SheetSpec {
   // One row per PIC (a customer with three PICs becomes three rows, the
   // company columns repeated) so every contact survives the export; a
   // customer with no PIC at all still gets a single row.
-  const header = ['NAMA CUSTOMER', 'CABANG', 'PIC', 'JABATAN', 'NO TELP', 'EMAIL', 'ALAMAT', 'CATATAN'];
+  const header = ['NAMA CUSTOMER', 'CABANG', 'PIC', 'JABATAN', 'PERAN PIC', 'NO TELP', 'EMAIL', 'ALAMAT', 'CATATAN', 'SEGMEN', 'APLIKASI', 'POTENSI / TAHUN', 'KOMPETITOR'];
   const rows: unknown[][] = [];
   list.forEach((c) => {
-    const pics = Array.isArray(c.pics) && c.pics.length > 0 ? c.pics : [{ nama: c.pic || '', jabatan: null, phone: c.phone, email: c.email }];
-    pics.forEach((p) => rows.push([c.name || '', c.cabang || '', p.nama || '', p.jabatan || '', p.phone || '', p.email || '', c.address || '', c.catatan || '']));
+    const pics: { nama: string; jabatan: string | null; phone: string | null; email: string | null; peran?: string | null }[] =
+      Array.isArray(c.pics) && c.pics.length > 0 ? c.pics : [{ nama: c.pic || '', jabatan: null, phone: c.phone, email: c.email }];
+    const apl = (Array.isArray(c.aplikasi) ? c.aplikasi : []).map((k) => CUSTOMER_APLIKASI_LABEL[k] || k).join(', ');
+    pics.forEach((p) =>
+      rows.push([c.name || '', c.cabang || '', p.nama || '', p.jabatan || '', PIC_PERAN_LABEL[p.peran || ''] || '', p.phone || '', p.email || '', c.address || '', c.catatan || '', c.segmen || '', apl, c.potensi || '', c.kompetitor || '']),
+    );
   });
-  const colWidths = [{ wch: 28 }, { wch: 8 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 24 }, { wch: 36 }, { wch: 26 }];
+  const colWidths = [{ wch: 28 }, { wch: 8 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 16 }, { wch: 24 }, { wch: 36 }, { wch: 26 }, { wch: 18 }, { wch: 28 }, { wch: 16 }, { wch: 24 }];
   return { sheetName: 'Customer', header, rows, colWidths };
 }
 

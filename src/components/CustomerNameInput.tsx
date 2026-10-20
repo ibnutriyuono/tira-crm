@@ -4,6 +4,7 @@ import { useId, useMemo, useState, type CSSProperties } from 'react';
 import { buildNameIndex, suggestName, type NameSource } from '@/lib/customer-names';
 import { useDataStore } from '@/store/useDataStore';
 
+import { useT } from '@/store/useLangStore';
 /**
  * Standard-name index of every customer this user can see: Kelola Customer
  * names are the reference spelling, prospect/RFQ/FUP A spellings are counted
@@ -51,6 +52,7 @@ export function CustomerNameInput({
   /** A name to not warn about (the customer being edited). */
   ignore?: string;
 }) {
+  const tr = useT();
   const listId = useId();
   const index = useCustomerNameIndex();
   const [fixedFrom, setFixedFrom] = useState('');
@@ -80,7 +82,7 @@ export function CustomerNameInput({
           onChange(e.target.value);
         }}
         onBlur={onBlur}
-        placeholder={placeholder}
+        placeholder={tr(placeholder)}
         style={{ width: '100%' }}
       />
       <datalist id={listId}>
@@ -90,18 +92,18 @@ export function CustomerNameInput({
       </datalist>
       {fixedFrom && !sugg && (
         <div className="field-note" style={{ marginTop: 3 }}>
-          Disesuaikan ke nama baku (sebelumnya &quot;{fixedFrom}&quot;).
+          {tr("Disesuaikan ke nama baku (sebelumnya \"")}{fixedFrom}{tr("\").")}
         </div>
       )}
       {sugg && mode === 'warn' && (
         <div className="field-note" style={{ marginTop: 3, color: 'var(--rust-500)' }}>
-          {sugg.type === 'exact' ? 'Customer ini sudah ada' : 'Mirip customer yang sudah ada'}: <b>{sugg.name}</b>. Pastikan bukan data ganda.
+          {sugg.type === 'exact' ? tr("Customer ini sudah ada") : tr("Mirip customer yang sudah ada")}: <b>{sugg.name}</b>{tr(". Pastikan bukan data ganda.")}
         </div>
       )}
       {sugg && mode === 'fix' && (
         <div className="field-note" style={{ marginTop: 3, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <span>
-            {sugg.type === 'exact' ? 'Nama baku' : 'Maksud Anda'}: <b>{sugg.name}</b>
+            {sugg.type === 'exact' ? tr("Nama baku") : tr("Maksud Anda")}: <b>{sugg.name}</b>
             {sugg.type === 'similar' ? '?' : ''}
           </span>
           <button
@@ -114,7 +116,7 @@ export function CustomerNameInput({
               onChange(sugg.name);
             }}
           >
-            Pakai nama ini
+            {tr("Pakai nama ini")}
           </button>
         </div>
       )}

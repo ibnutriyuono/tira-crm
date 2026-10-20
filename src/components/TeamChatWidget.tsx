@@ -8,6 +8,7 @@ import { BROADCAST_ROLE_OPTIONS, ROLE_LABELS } from '@/lib/constants';
 import { useDataStore } from '@/store/useDataStore';
 import type { ChatConversation, ChatMessage, RosterUser, SafeUser } from '@/lib/types';
 
+import { useT } from '@/store/useLangStore';
 type Picker = 'dm' | 'group' | 'broadcast' | null;
 
 function initials(name: string) {
@@ -41,6 +42,7 @@ function timeLabel(iso?: string | null) {
  * connection rather than the prototype's 8-second poll.
  */
 export function TeamChatWidget() {
+  const tr = useT();
   const currentUser = useDataStore((s) => s.currentUser);
   const toast = useDataStore((s) => s.toast);
 
@@ -255,7 +257,7 @@ export function TeamChatWidget() {
 
   return (
     <>
-      <button type="button" className="chat-fab" onClick={() => setOpen((v) => !v)} title="Chat">
+      <button type="button" className="chat-fab" onClick={() => setOpen((v) => !v)} title={tr("Chat")}>
         <IconChat />
         {totalUnread > 0 && <span className="chat-badge">{totalUnread > 99 ? '99+' : totalUnread}</span>}
       </button>
@@ -264,25 +266,25 @@ export function TeamChatWidget() {
         <div className="tc-panel">
           <div className="tc-head">
             {activeId && (
-              <button type="button" className="tc-back" onClick={() => setActiveId(null)} aria-label="Kembali">←</button>
+              <button type="button" className="tc-back" onClick={() => setActiveId(null)} aria-label={tr("Kembali")}>←</button>
             )}
             <div className="tc-title-wrap">
-              <div className="tc-title">{active ? displayName(active) : 'Chat'}</div>
-              <div className="tc-sub">{active ? subLabel(active) : 'Steel Division'}</div>
+              <div className="tc-title">{active ? displayName(active) : tr("Chat")}</div>
+              <div className="tc-sub">{active ? subLabel(active) : tr("Steel Division")}</div>
             </div>
-            <button type="button" className="tc-close" onClick={() => setOpen(false)} aria-label="Tutup">×</button>
+            <button type="button" className="tc-close" onClick={() => setOpen(false)} aria-label={tr("Tutup")}>×</button>
           </div>
 
           {!activeId ? (
             <div className="tc-list-pane">
               <div className="tc-list-actions">
-                <button type="button" onClick={() => openPicker('dm')}>+ Chat</button>
-                <button type="button" onClick={() => openPicker('group')}>+ Grup</button>
-                <button type="button" onClick={() => openPicker('broadcast')}>+ Broadcast</button>
+                <button type="button" onClick={() => openPicker('dm')}>{tr("+ Chat")}</button>
+                <button type="button" onClick={() => openPicker('group')}>{tr("+ Grup")}</button>
+                <button type="button" onClick={() => openPicker('broadcast')}>{tr("+ Broadcast")}</button>
               </div>
               <div className="tc-conv-list">
                 {convs.length === 0 ? (
-                  <div className="tc-empty">Belum ada percakapan. Mulai dengan tombol di atas.</div>
+                  <div className="tc-empty">{tr("Belum ada percakapan. Mulai dengan tombol di atas.")}</div>
                 ) : (
                   convs.map((c) => (
                     <button key={c.id} type="button" className="tc-conv-row" onClick={() => openThread(c.id)}>
@@ -292,7 +294,7 @@ export function TeamChatWidget() {
                       <div className="tc-conv-main">
                         <div className="tc-conv-name">{displayName(c)}</div>
                         <div className="tc-conv-preview">
-                          {c.lastMessage ? `${c.lastMessage.author}: ${c.lastMessage.text}` : 'Belum ada pesan'}
+                          {c.lastMessage ? `${c.lastMessage.author}: ${c.lastMessage.text}` : tr("Belum ada pesan")}
                         </div>
                       </div>
                       <div className="tc-conv-meta">
@@ -308,7 +310,7 @@ export function TeamChatWidget() {
             <div className="tc-thread-pane">
               <div className="tc-body" ref={bodyRef}>
                 {messages.length === 0 ? (
-                  <div className="tc-empty">Belum ada pesan.</div>
+                  <div className="tc-empty">{tr("Belum ada pesan.")}</div>
                 ) : (
                   messages.map((m) => {
                     const mine = m.authorUsername === currentUser.username;
@@ -334,7 +336,7 @@ export function TeamChatWidget() {
                 <input
                   type="text"
                   value={draft}
-                  placeholder="Tulis pesan..."
+                  placeholder={tr("Tulis pesan...")}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -343,7 +345,7 @@ export function TeamChatWidget() {
                     }
                   }}
                 />
-                <button type="button" className="btn btn-primary btn-sm" onClick={send}>Kirim</button>
+                <button type="button" className="btn btn-primary btn-sm" onClick={send}>{tr("Kirim")}</button>
               </div>
             </div>
           )}
@@ -356,15 +358,15 @@ export function TeamChatWidget() {
             {picker === 'dm' && (
               <>
                 <div className="tc-modal-head">
-                  <h3>Mulai Chat Baru</h3>
+                  <h3>{tr("Mulai Chat Baru")}</h3>
                   <button type="button" className="close-x" onClick={() => setPicker(null)}>×</button>
                 </div>
                 <div className="tc-picker-search">
-                  <input type="search" placeholder="Cari nama anggota..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} />
+                  <input type="search" placeholder={tr("Cari nama anggota...")} value={userSearch} onChange={(e) => setUserSearch(e.target.value)} />
                 </div>
                 <div className="tc-user-scroll">
                   {others.length === 0 ? (
-                    <div className="tc-empty">Tidak ada anggota ditemukan.</div>
+                    <div className="tc-empty">{tr("Tidak ada anggota ditemukan.")}</div>
                   ) : (
                     others.map((u) => (
                       <button key={u.id} type="button" className="tc-user-row" disabled={busy} onClick={() => startDm(u.username)}>
@@ -378,7 +380,7 @@ export function TeamChatWidget() {
                   )}
                 </div>
                 <div className="tc-modal-foot">
-                  <button type="button" className="btn btn-outline" onClick={() => setPicker(null)}>Tutup</button>
+                  <button type="button" className="btn btn-outline" onClick={() => setPicker(null)}>{tr("Tutup")}</button>
                 </div>
               </>
             )}
@@ -386,17 +388,17 @@ export function TeamChatWidget() {
             {picker === 'group' && (
               <>
                 <div className="tc-modal-head">
-                  <h3>Buat Grup Baru</h3>
+                  <h3>{tr("Buat Grup Baru")}</h3>
                   <button type="button" className="close-x" onClick={() => setPicker(null)}>×</button>
                 </div>
                 <div className="tc-modal-body">
-                  <label className="tc-field-label">Nama Grup</label>
-                  <input type="text" placeholder="cth. Tim Regional 2" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
-                  <label className="tc-field-label" style={{ marginTop: 12 }}>Pilih Anggota</label>
-                  <input type="search" placeholder="Cari nama anggota..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} />
+                  <label className="tc-field-label">{tr("Nama Grup")}</label>
+                  <input type="text" placeholder={tr("cth. Tim Regional 2")} value={groupName} onChange={(e) => setGroupName(e.target.value)} />
+                  <label className="tc-field-label" style={{ marginTop: 12 }}>{tr("Pilih Anggota")}</label>
+                  <input type="search" placeholder={tr("Cari nama anggota...")} value={userSearch} onChange={(e) => setUserSearch(e.target.value)} />
                   <div className="tc-user-scroll bordered">
                     {others.length === 0 ? (
-                      <div className="tc-empty">Tidak ada anggota ditemukan.</div>
+                      <div className="tc-empty">{tr("Tidak ada anggota ditemukan.")}</div>
                     ) : (
                       others.map((u) => (
                         <label key={u.id} className="tc-user-row">
@@ -417,8 +419,8 @@ export function TeamChatWidget() {
                   </div>
                 </div>
                 <div className="tc-modal-foot">
-                  <button type="button" className="btn btn-outline" onClick={() => setPicker(null)}>Batal</button>
-                  <button type="button" className="btn btn-primary" disabled={busy} onClick={createGroup}>Buat Grup</button>
+                  <button type="button" className="btn btn-outline" onClick={() => setPicker(null)}>{tr("Batal")}</button>
+                  <button type="button" className="btn btn-primary" disabled={busy} onClick={createGroup}>{tr("Buat Grup")}</button>
                 </div>
               </>
             )}
@@ -426,25 +428,25 @@ export function TeamChatWidget() {
             {picker === 'broadcast' && (
               <>
                 <div className="tc-modal-head">
-                  <h3>Broadcast Pesan</h3>
+                  <h3>{tr("Broadcast Pesan")}</h3>
                   <button type="button" className="close-x" onClick={() => setPicker(null)}>×</button>
                 </div>
                 <div className="tc-modal-body">
                   <div className="import-summary" style={{ marginTop: 0, marginBottom: 14 }}>
-                    Pesan akan dikirim ke <b>semua anggota dengan role terpilih</b> sebagai kanal broadcast tersendiri. Anda juga otomatis menjadi anggota kanal ini.
+                    {tr("Pesan akan dikirim ke")} <b>{tr("semua anggota dengan role terpilih")}</b> {tr("sebagai kanal broadcast tersendiri. Anda juga otomatis menjadi anggota kanal ini.")}
                   </div>
-                  <label className="tc-field-label">Kirim ke Role</label>
+                  <label className="tc-field-label">{tr("Kirim ke Role")}</label>
                   <select value={broadcastRole} onChange={(e) => setBroadcastRole(e.target.value)}>
                     {BROADCAST_ROLE_OPTIONS.map((o) => (
                       <option key={o.v} value={o.v}>{o.l}</option>
                     ))}
                   </select>
-                  <label className="tc-field-label" style={{ marginTop: 12 }}>Pesan</label>
-                  <textarea placeholder="Tulis pengumuman..." value={broadcastText} onChange={(e) => setBroadcastText(e.target.value)} />
+                  <label className="tc-field-label" style={{ marginTop: 12 }}>{tr("Pesan")}</label>
+                  <textarea placeholder={tr("Tulis pengumuman...")} value={broadcastText} onChange={(e) => setBroadcastText(e.target.value)} />
                 </div>
                 <div className="tc-modal-foot">
-                  <button type="button" className="btn btn-outline" onClick={() => setPicker(null)}>Batal</button>
-                  <button type="button" className="btn btn-primary" disabled={busy} onClick={sendBroadcast}>Kirim Broadcast</button>
+                  <button type="button" className="btn btn-outline" onClick={() => setPicker(null)}>{tr("Batal")}</button>
+                  <button type="button" className="btn btn-primary" disabled={busy} onClick={sendBroadcast}>{tr("Kirim Broadcast")}</button>
                 </div>
               </>
             )}

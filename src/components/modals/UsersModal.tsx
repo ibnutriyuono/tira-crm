@@ -7,6 +7,7 @@ import { IconEdit, IconTrash } from '../icons';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
+import { useT } from '@/store/useLangStore';
 const ROLE_META: Record<string, (u: { reg: number | null; cabang: string | null; se: string | null }) => { label: string; color: string }> = {
   admin: () => ({ label: 'Admin', color: 'amber' }),
   gm: () => ({ label: 'GM', color: 'rust' }),
@@ -17,6 +18,7 @@ const ROLE_META: Record<string, (u: { reg: number | null; cabang: string | null;
 };
 
 export function UsersModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'users';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -76,15 +78,15 @@ export function UsersModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="Kelola User"
+      title={tr("Kelola User")}
       xwide stickyHead
       footer={
         <>
         <button type="button" className="btn btn-outline" style={{ marginRight: 'auto' }} onClick={() => openModal('roles')}>
-          Kelola Role
+          {tr("Kelola Role")}
         </button>
         <button type="button" className="btn btn-outline" onClick={closeModal}>
-          Tutup
+          {tr("Tutup")}
         </button>
         </>
       }
@@ -97,31 +99,31 @@ export function UsersModal() {
           openModal('userForm');
         }}
       >
-        + Tambah User
+        {tr("+ Tambah User")}
       </button>
       {resetInfo && (
         <div className="import-summary if-warn" style={{ marginTop: 0, marginBottom: 14 }}>
-          <b>Password sementara untuk {resetInfo.name} ({resetInfo.username}):</b>{' '}
+          <b>{tr("Password sementara untuk")} {resetInfo.name} ({resetInfo.username}):</b>{' '}
           <span className="mono" style={{ fontSize: 16, letterSpacing: 1.5, padding: '2px 10px', border: '1px dashed currentColor', borderRadius: 5, marginLeft: 6 }}>{resetInfo.password}</span>{' '}
           <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: 6 }} onClick={() => navigator.clipboard?.writeText(resetInfo.password).then(() => useDataStore.getState().toast('Password disalin', 'success'))}>
-            Salin
+            {tr("Salin")}
           </button>{' '}
           <button type="button" className="btn btn-outline btn-sm" onClick={() => setResetInfo(null)}>
-            Tutup
+            {tr("Tutup")}
           </button>
-          <div className="field-note" style={{ margin: '4px 0 0' }}>Hanya tampil sekali. Sampaikan ke user — saat login user wajib membuat password baru. Password user tidak bisa dilihat siapa pun, termasuk Admin.</div>
+          <div className="field-note" style={{ margin: '4px 0 0' }}>{tr("Hanya tampil sekali. Sampaikan ke user — saat login user wajib membuat password baru. Password user tidak bisa dilihat siapa pun, termasuk Admin.")}</div>
         </div>
       )}
       <table className="simple-table">
         <thead>
           <tr>
-            <th>Username</th>
-            <th>Nama</th>
-            <th>Role</th>
-            <th>Regional</th>
+            <th>{tr("Username")}</th>
+            <th>{tr("Nama")}</th>
+            <th>{tr("Role")}</th>
+            <th>{tr("Regional")}</th>
             <th>SE</th>
-            <th>Cabang</th>
-            <th>Aksi</th>
+            <th>{tr("Cabang")}</th>
+            <th>{tr("Aksi")}</th>
           </tr>
         </thead>
         <tbody>
@@ -152,8 +154,8 @@ export function UsersModal() {
                     >
                       <IconEdit />
                     </button>
-                    <button type="button" className="btn btn-outline btn-sm" disabled={busyReset === u.id} onClick={() => resetPassword(u)} title="Buat password sementara untuk user ini">
-                      Reset password
+                    <button type="button" className="btn btn-outline btn-sm" disabled={busyReset === u.id} onClick={() => resetPassword(u)} title={tr("Buat password sementara untuk user ini")}>
+                      {tr("Reset password")}
                     </button>
                     <button
                       className="icon-btn danger"
@@ -179,20 +181,20 @@ export function UsersModal() {
           })}
         </tbody>
       </table>
-      <h4 style={{ margin: '18px 0 6px' }}>Riwayat perubahan akun &amp; user</h4>
-      <div className="field-note" style={{ marginTop: 0 }}>Termasuk perubahan username/password/email yang dilakukan user sendiri lewat Akun Saya. Riwayat lengkap di Log Aktivitas.</div>
+      <h4 style={{ margin: '18px 0 6px' }}>{tr("Riwayat perubahan akun & user")}</h4>
+      <div className="field-note" style={{ marginTop: 0 }}>{tr("Termasuk perubahan username/password/email yang dilakukan user sendiri lewat Akun Saya. Riwayat lengkap di Log Aktivitas.")}</div>
       <table className="simple-table">
         <thead>
           <tr>
-            <th style={{ width: 160 }}>Waktu</th>
-            <th style={{ width: 200 }}>Oleh</th>
-            <th>Perubahan</th>
+            <th style={{ width: 160 }}>{tr("Waktu")}</th>
+            <th style={{ width: 200 }}>{tr("Oleh")}</th>
+            <th>{tr("Perubahan")}</th>
           </tr>
         </thead>
         <tbody>
           {history.length === 0 && (
             <tr>
-              <td colSpan={3} className="field-note">Belum ada riwayat.</td>
+              <td colSpan={3} className="field-note">{tr("Belum ada riwayat.")}</td>
             </tr>
           )}
           {history.map((h) => (

@@ -8,6 +8,7 @@ import { ALLOC_META, allocStatus, seKey, splitEven, userTargetKey } from '@/lib/
 import type { RosterUser, SafeUser, SeTarget } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 
+import { useT } from '@/store/useLangStore';
 const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const label = (p: string) => `${BLN[Number(p.slice(5, 7)) - 1] || ''} ${p.slice(0, 4)}`;
 const dots = (n: number) => (n ? Math.round(n).toLocaleString('id-ID') : '');
@@ -62,6 +63,7 @@ export function SeTargetSection({
   currentUser: SafeUser | null;
   roster: RosterUser[];
 }) {
+  const tr = useT();
   const seTargets = useDataStore((s) => s.seTargets);
   const upsertSeTargets = useDataStore((s) => s.upsertSeTargets);
   const removeSeTargets = useDataStore((s) => s.removeSeTargets);
@@ -101,9 +103,9 @@ export function SeTargetSection({
     const won = seWon.get(me) || 0;
     return (
       <div className="kpi-grid" style={{ marginTop: 4 }}>
-        <div className="kpi"><div className="label">Target Anda {label(periode)}</div><div className="value">{t ? formatRupiah(t) : '-'}</div><div className="foot">{t ? 'ditetapkan BM cabang' : 'belum dibagi oleh BM cabang'}</div></div>
-        <div className="kpi won"><div className="label">Realisasi (Won)</div><div className="value">{formatRupiah(won)}</div><div className="foot">bulan ini</div></div>
-        <div className="kpi rate"><div className="label">Achievement</div><div className="value">{pct(won, t)}</div><div className="foot">realisasi / target Anda</div></div>
+        <div className="kpi"><div className="label">{tr("Target Anda")} {label(periode)}</div><div className="value">{t ? formatRupiah(t) : '-'}</div><div className="foot">{t ? tr("ditetapkan BM cabang") : tr("belum dibagi oleh BM cabang")}</div></div>
+        <div className="kpi won"><div className="label">{tr("Realisasi (Won)")}</div><div className="value">{formatRupiah(won)}</div><div className="foot">{tr("bulan ini")}</div></div>
+        <div className="kpi rate"><div className="label">{tr("Achievement")}</div><div className="value">{pct(won, t)}</div><div className="foot">{tr("realisasi / target Anda")}</div></div>
       </div>
     );
   }
@@ -156,16 +158,16 @@ export function SeTargetSection({
         <>
           {incomplete.length > 0 && (
             <div className="import-summary if-warn" style={{ marginTop: 0, marginBottom: 8 }}>
-              <b>{incomplete.length} cabang belum selesai membagi target {label(periode)} ke Sales:</b> {incomplete.map((a) => a.cabang).join(', ')}
+              <b>{incomplete.length} {tr("cabang belum selesai membagi target")} {label(periode)} {tr("ke Sales:")}</b> {incomplete.map((a) => a.cabang).join(', ')}
             </div>
           )}
           <div className="table-wrap" style={{ borderTop: 'none' }}>
             <table className="simple-table">
               <thead>
-                <tr><th>Cabang</th><th>Target cabang</th><th>Dibagi ke Sales</th><th>Selisih</th><th>Sales bertarget</th><th>Status</th><th></th></tr>
+                <tr><th>{tr("Cabang")}</th><th>{tr("Target cabang")}</th><th>{tr("Dibagi ke Sales")}</th><th>{tr("Selisih")}</th><th>{tr("Sales bertarget")}</th><th>{tr("Status")}</th><th></th></tr>
               </thead>
               <tbody>
-                {visible.length === 0 && <tr><td colSpan={7} className="field-note">Belum ada target cabang pada periode ini.</td></tr>}
+                {visible.length === 0 && <tr><td colSpan={7} className="field-note">{tr("Belum ada target cabang pada periode ini.")}</td></tr>}
                 {visible.map((a) => (
                   <tr key={a.cabang} style={sel === a.cabang ? { background: 'var(--steel-100)' } : undefined}>
                     <td style={{ fontWeight: 600 }}>{a.cabang}</td>
@@ -176,7 +178,7 @@ export function SeTargetSection({
                     <td><span className={`badge ${ALLOC_META[a.status].badge}`}>{ALLOC_META[a.status].label}</span></td>
                     <td>
                       <button type="button" className="btn btn-outline btn-sm" onClick={() => setSel(sel === a.cabang ? '' : a.cabang)}>
-                        {sel === a.cabang ? 'Tutup' : canEdit(a.cabang) ? 'Bagi target' : 'Lihat'}
+                        {sel === a.cabang ? tr("Tutup") : canEdit(a.cabang) ? tr("Bagi target") : tr("Lihat")}
                       </button>
                     </td>
                   </tr>
@@ -190,21 +192,21 @@ export function SeTargetSection({
       {cur && (
         <div className="se-alloc">
           <div className="se-alloc-head">
-            <b>Pembagian target {cur.cabang} · {label(periode)}</b>
-            <span>Target cabang <b className="mono">{formatRupiah(cur.target)}</b></span>
+            <b>{tr("Pembagian target")} {cur.cabang} · {label(periode)}</b>
+            <span>{tr("Target cabang")} <b className="mono">{formatRupiah(cur.target)}</b></span>
             <span className={`badge ${ALLOC_META[draftStatus].badge}`}>{ALLOC_META[draftStatus].label}</span>
           </div>
           {!(cur.target > 0) ? (
-            <div className="field-note">Target cabang {label(periode)} belum ditetapkan pusat. Pembagian ke Sales bisa dilakukan setelah target cabang ada.</div>
+            <div className="field-note">{tr("Target cabang")} {label(periode)} {tr("belum ditetapkan pusat. Pembagian ke Sales bisa dilakukan setelah target cabang ada.")}</div>
           ) : (
             <>
               <div className="table-wrap" style={{ borderTop: 'none' }}>
                 <table className="simple-table">
                   <thead>
-                    <tr><th>SE</th><th>Nama</th><th>Target {label(periode)}</th><th>Porsi</th><th>Realisasi (Won)</th><th>Ach.</th>{editable && <th aria-label="Hapus" />}</tr>
+                    <tr><th>SE</th><th>{tr("Nama")}</th><th>{tr("Target")} {label(periode)}</th><th>{tr("Porsi")}</th><th>{tr("Realisasi (Won)")}</th><th>{tr("Ach.")}</th>{editable && <th aria-label={tr("Hapus")} />}</tr>
                   </thead>
                   <tbody>
-                    {ses.length === 0 && <tr><td colSpan={6} className="field-note">Belum ada user Sales terdaftar di cabang {cur.cabang}. Tambahkan Sales di bawah.</td></tr>}
+                    {ses.length === 0 && <tr><td colSpan={6} className="field-note">{tr("Belum ada user Sales terdaftar di cabang")} {cur.cabang}{tr(". Tambahkan Sales di bawah.")}</td></tr>}
                     {ses.map((se) => {
                       const v = val(se);
                       const won = seWon.get(se) || 0;
@@ -212,7 +214,7 @@ export function SeTargetSection({
                         <tr key={se}>
                           <td style={{ fontWeight: 600 }}>{se}</td>
                           <td>
-                            {nameOf(se) || <span className="field-note" style={{ margin: 0 }}>(user tidak ditemukan)</span>}
+                            {nameOf(se) || <span className="field-note" style={{ margin: 0 }}>{tr("(user tidak ditemukan)")}</span>}
                             {userOf(se) && (userOf(se)!.role !== 'sales' || (userOf(se)!.cabang || '').toUpperCase() !== cur.cabang) && (
                               <span className="field-note" style={{ margin: 0, display: 'block' }}>
                                 {ROLE_SHORT[userOf(se)!.role] || userOf(se)!.role}{userOf(se)!.cabang ? ` ${userOf(se)!.cabang}` : ''}
@@ -253,10 +255,10 @@ export function SeTargetSection({
                   </tbody>
                   <tfoot>
                     <tr style={{ fontWeight: 700, background: 'var(--steel-100)' }}>
-                      <td colSpan={2}>Total dibagi</td>
+                      <td colSpan={2}>{tr("Total dibagi")}</td>
                       <td className="mono">{formatRupiah(total)}</td>
                       <td className="mono">{pct(total, cur.target)}</td>
-                      <td colSpan={editable ? 3 : 2} className="mono">{total === cur.target ? 'Pas dengan target cabang' : total < cur.target ? `Kurang ${formatRupiah(cur.target - total)}` : `Lebih ${formatRupiah(total - cur.target)}`}</td>
+                      <td colSpan={editable ? 3 : 2} className="mono">{total === cur.target ? tr("Pas dengan target cabang") : total < cur.target ? `Kurang ${formatRupiah(cur.target - total)}` : `Lebih ${formatRupiah(total - cur.target)}`}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -269,7 +271,7 @@ export function SeTargetSection({
                     ses.forEach((se, i) => (d[se] = dots(parts[i])));
                     setDraft(d);
                   }}>
-                    Bagi rata
+                    {tr("Bagi rata")}
                   </button>
                   {addable.length > 0 && (
                     <select
@@ -281,9 +283,9 @@ export function SeTargetSection({
                         else setExtra([...extra, k]);
                       }}
                       style={{ maxWidth: 300 }}
-                      aria-label="Tambah user"
+                      aria-label={tr("Tambah user")}
                     >
-                      <option value="">+ Tambah user…</option>
+                      <option value="">{tr("+ Tambah user…")}</option>
                       {addable.map((u) => (
                         <option key={u.id} value={userTargetKey(u)}>
                           {userTargetKey(u)} · {u.name} — {ROLE_SHORT[u.role] || u.role}{u.cabang ? ` ${u.cabang}` : ''}
@@ -292,17 +294,16 @@ export function SeTargetSection({
                     </select>
                   )}
                   <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                    <input type="checkbox" checked={applyRest} onChange={(e) => setApplyRest(e.target.checked)} /> Terapkan porsi yang sama s.d. Desember
+                    <input type="checkbox" checked={applyRest} onChange={(e) => setApplyRest(e.target.checked)} /> {tr("Terapkan porsi yang sama s.d. Desember")}
                   </label>
                   <button type="button" className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }} disabled={busy || !ses.length} onClick={save}>
-                    {busy ? 'Menyimpan…' : 'Simpan target Sales'}
+                    {busy ? tr("Menyimpan…") : tr("Simpan target Sales")}
                   </button>
                 </div>
               )}
               <div className="field-note" style={{ marginTop: 6 }}>
-                {cur.excluded.length > 0 && <>Dikeluarkan dari pembagian bulan ini: <b>{cur.excluded.join(', ')}</b> (tambahkan lagi lewat &quot;+ Tambah user&quot;). </>}
-                Wajib: jumlah target = target cabang, dan setiap Sales di cabang punya target kecuali yang dihapus (🗑 = dikeluarkan dari pembagian). Semua user bisa ditambahkan; user tanpa Kode SE memakai username. &quot;Terapkan porsi
-                yang sama&quot; mengisi bulan berikutnya s.d. Desember dengan persentase yang sama dari target cabang bulan itu. Sales menerima notifikasi targetnya.
+                {cur.excluded.length > 0 && <>{tr("Dikeluarkan dari pembagian bulan ini:")} <b>{cur.excluded.join(', ')}</b> {tr("(tambahkan lagi lewat \"+ Tambah user\").")} </>}
+                {tr("Wajib: jumlah target = target cabang, dan setiap Sales di cabang punya target kecuali yang dihapus (🗑 = dikeluarkan dari pembagian). Semua user bisa ditambahkan; user tanpa Kode SE memakai username. \"Terapkan porsi yang sama\" mengisi bulan berikutnya s.d. Desember dengan persentase yang sama dari target cabang bulan itu. Sales menerima notifikasi targetnya.")}
               </div>
             </>
           )}

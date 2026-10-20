@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { useT } from '@/store/useLangStore';
 const cache = new Map<string, number>();
 
 /**
@@ -11,6 +12,7 @@ const cache = new Map<string, number>();
  * per row on every re-render.
  */
 export function AttachNoteBadges({ rfqId, fupaId, catatan }: { rfqId?: string | null; fupaId?: string | null; catatan?: string | null }) {
+  const tr = useT();
   const key = rfqId ? `rfq:${rfqId}` : fupaId ? `fupa:${fupaId}` : '';
   const [count, setCount] = useState<number>(() => cache.get(key) ?? 0);
 
@@ -47,7 +49,7 @@ export function AttachNoteBadges({ rfqId, fupaId, catatan }: { rfqId?: string | 
       )}
       {catatan && (
         <span className="badge slate" title={catatan} style={{ marginLeft: count ? 4 : 0 }}>
-          Catatan
+          {tr("Catatan")}
         </span>
       )}
     </>

@@ -12,6 +12,7 @@ import { useUiStore } from '@/store/useUiStore';
 import type { ActivityLog } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 interface Actor {
   userId: string;
   username: string;
@@ -50,6 +51,7 @@ function formatValue(entity: string, field: string, v: unknown): string {
 }
 
 export function ActivityLogModal() {
+  const tr = useT();
   const show = useUiStore((s) => s.modal === 'activity');
   const closeModal = useUiStore((s) => s.closeModal);
   const toast = useDataStore((s) => s.toast);
@@ -148,34 +150,34 @@ export function ActivityLogModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="Log Aktivitas"
+      title={tr("Log Aktivitas")}
       xwide stickyHead
       footer={
         <>
           <div className="pg-info" style={{ marginRight: 'auto' }}>
-            Halaman {page} dari {totalPages} · {total} aktivitas
+            {tr("Halaman")} {page} {tr("dari")} {totalPages} · {total} {tr("aktivitas")}
           </div>
           <button type="button" className="btn btn-outline btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-            &laquo; Prev
+            {tr("« Prev")}
           </button>
           <button type="button" className="btn btn-outline btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-            Next &raquo;
+            {tr("Next »")}
           </button>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Tutup
+            {tr("Tutup")}
           </button>
         </>
       }
     >
       <div className="activity-filters">
         <div className="field search-field">
-          <label htmlFor="act-q">Cari</label>
-          <input id="act-q" type="search" placeholder="Cari aktivitas atau nama user…" value={filters.q} onChange={(e) => patchFilters({ q: e.target.value })} />
+          <label htmlFor="act-q">{tr("Cari")}</label>
+          <input id="act-q" type="search" placeholder={tr("Cari aktivitas atau nama user…")} value={filters.q} onChange={(e) => patchFilters({ q: e.target.value })} />
         </div>
         <div className="field">
-          <label htmlFor="act-user">User</label>
+          <label htmlFor="act-user">{tr("User")}</label>
           <select id="act-user" value={filters.userId} onChange={(e) => patchFilters({ userId: e.target.value })}>
-            <option value="">Semua user</option>
+            <option value="">{tr("Semua user")}</option>
             {(data?.actors || []).map((a) => (
               <option key={a.userId} value={a.userId}>
                 {a.name} ({a.username})
@@ -184,9 +186,9 @@ export function ActivityLogModal() {
           </select>
         </div>
         <div className="field">
-          <label htmlFor="act-action">Aksi</label>
+          <label htmlFor="act-action">{tr("Aksi")}</label>
           <select id="act-action" value={filters.action} onChange={(e) => patchFilters({ action: e.target.value })}>
-            <option value="">Semua aksi</option>
+            <option value="">{tr("Semua aksi")}</option>
             {Object.entries(ACTIVITY_ACTION_META).map(([v, m]) => (
               <option key={v} value={v}>
                 {m.label}
@@ -195,9 +197,9 @@ export function ActivityLogModal() {
           </select>
         </div>
         <div className="field">
-          <label htmlFor="act-entity">Entitas</label>
+          <label htmlFor="act-entity">{tr("Entitas")}</label>
           <select id="act-entity" value={filters.entity} onChange={(e) => patchFilters({ entity: e.target.value })}>
-            <option value="">Semua entitas</option>
+            <option value="">{tr("Semua entitas")}</option>
             {Object.entries(ACTIVITY_ENTITY_LABEL).map(([v, l]) => (
               <option key={v} value={v}>
                 {l}
@@ -206,15 +208,15 @@ export function ActivityLogModal() {
           </select>
         </div>
         <div className="field">
-          <label htmlFor="act-from">Dari</label>
+          <label htmlFor="act-from">{tr("Dari")}</label>
           <input id="act-from" type="date" value={filters.from} onChange={(e) => patchFilters({ from: e.target.value })} />
         </div>
         <div className="field">
-          <label htmlFor="act-to">Sampai</label>
+          <label htmlFor="act-to">{tr("Sampai")}</label>
           <input id="act-to" type="date" value={filters.to} onChange={(e) => patchFilters({ to: e.target.value })} />
         </div>
         <div className="field">
-          <label>&nbsp;</label>
+          <label>{tr(" ")}</label>
           <div style={{ display: 'flex', gap: 6 }}>
             <button
               type="button"
@@ -224,12 +226,12 @@ export function ActivityLogModal() {
                 setPage(1);
               }}
             >
-              Reset
+              {tr("Reset")}
             </button>
             {canNow('log', 'x') && (
               <button type="button" className="btn btn-outline btn-sm" onClick={exportExcel}>
                 <IconDownload />
-                Export
+                {tr("Export")}
               </button>
             )}
           </div>
@@ -237,18 +239,18 @@ export function ActivityLogModal() {
       </div>
 
       <div className="hint" style={{ marginBottom: 10 }}>
-        Menampilkan {scopeHint}. Log diperbarui realtime dan tidak dapat diubah atau dihapus dari aplikasi.
+        {tr("Menampilkan")} {scopeHint}{tr(". Log diperbarui realtime dan tidak dapat diubah atau dihapus dari aplikasi.")}
       </div>
 
       <div className="activity-table-wrap">
         <table className="simple-table activity-table">
           <thead>
             <tr>
-              <th style={{ width: 168 }}>Waktu</th>
-              <th style={{ width: 150 }}>User</th>
-              <th style={{ width: 108 }}>Aksi</th>
-              <th style={{ width: 92 }}>Entitas</th>
-              <th>Aktivitas</th>
+              <th style={{ width: 168 }}>{tr("Waktu")}</th>
+              <th style={{ width: 150 }}>{tr("User")}</th>
+              <th style={{ width: 108 }}>{tr("Aksi")}</th>
+              <th style={{ width: 92 }}>{tr("Entitas")}</th>
+              <th>{tr("Aktivitas")}</th>
               <th style={{ width: 116 }}>IP</th>
             </tr>
           </thead>
@@ -256,13 +258,13 @@ export function ActivityLogModal() {
             {loading && !data ? (
               <tr>
                 <td colSpan={6} className="activity-empty">
-                  Memuat log…
+                  {tr("Memuat log…")}
                 </td>
               </tr>
             ) : (data?.logs.length ?? 0) === 0 ? (
               <tr>
                 <td colSpan={6} className="activity-empty">
-                  Belum ada aktivitas yang cocok dengan filter ini.
+                  {tr("Belum ada aktivitas yang cocok dengan filter ini.")}
                 </td>
               </tr>
             ) : (
@@ -297,7 +299,7 @@ export function ActivityLogModal() {
                               })
                             }
                           >
-                            {isOpen ? '− Sembunyikan' : `+ ${changeKeys.length} perubahan`}
+                            {isOpen ? tr("− Sembunyikan") : `+ ${changeKeys.length} perubahan`}
                           </button>
                           {isOpen && (
                             <ul className="activity-changes">

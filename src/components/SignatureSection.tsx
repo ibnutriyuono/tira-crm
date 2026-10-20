@@ -6,11 +6,13 @@ import { signatureFromCanvas, signatureFromFile } from '@/lib/signature-image';
 import { useDataStore } from '@/store/useDataStore';
 import type { SafeUser } from '@/lib/types';
 
+import { useT } from '@/store/useLangStore';
 /** URL gambar tanda tangan user yang login (versi ikut signatureAt supaya tidak memakai cache lama). */
 export const signatureUrl = (at: string | null | undefined) => (at ? `/api/account/signature?v=${encodeURIComponent(at)}` : '');
 
 /** Kanvas untuk menandatangani dengan mouse / jari / stylus. */
 function SignaturePad({ onChange, clearKey }: { onChange: (hasInk: boolean) => void; clearKey: number }) {
+  const tr = useT();
   const ref = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -42,7 +44,7 @@ function SignaturePad({ onChange, clearKey }: { onChange: (hasInk: boolean) => v
     <canvas
       ref={ref}
       className="sig-pad"
-      aria-label="Area tanda tangan — gambar dengan mouse, jari, atau stylus"
+      aria-label={tr("Area tanda tangan — gambar dengan mouse, jari, atau stylus")}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
         drawing.current = true;
@@ -89,6 +91,7 @@ function SignaturePad({ onChange, clearKey }: { onChange: (hasInk: boolean) => v
  * per user dan otomatis dipasang di surat penawaran yang dibuat user ini.
  */
 export function SignatureSection() {
+  const tr = useT();
   const me = useDataStore((s) => s.currentUser);
   const toast = useDataStore((s) => s.toast);
   const [mode, setMode] = useState<'lihat' | 'gambar' | 'unggah'>('lihat');
@@ -152,15 +155,15 @@ export function SignatureSection() {
     <div className="sig-section">
       <div className="sig-head">
         <div>
-          <b>Tanda tangan</b>
-          <div className="field-note" style={{ margin: 0 }}>Dipasang otomatis di atas nama Anda pada surat penawaran (.docx).</div>
+          <b>{tr("Tanda tangan")}</b>
+          <div className="field-note" style={{ margin: 0 }}>{tr("Dipasang otomatis di atas nama Anda pada surat penawaran (.docx).")}</div>
         </div>
-        <div className="sa-pills" role="group" aria-label="Cara mengisi tanda tangan">
+        <div className="sa-pills" role="group" aria-label={tr("Cara mengisi tanda tangan")}>
           <button type="button" className={mode === 'gambar' ? 'on' : ''} onClick={() => { setMode('gambar'); setClearKey((k) => k + 1); }}>
-            Gambar langsung
+            {tr("Gambar langsung")}
           </button>
           <button type="button" className={mode === 'unggah' ? 'on' : ''} onClick={() => { setMode('unggah'); setUploaded(null); }}>
-            Unggah foto / scan
+            {tr("Unggah foto / scan")}
           </button>
         </div>
       </div>
@@ -169,22 +172,22 @@ export function SignatureSection() {
         (has ? (
           <div className="sig-current">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={signatureUrl(me.signatureAt)} alt="Tanda tangan Anda" />
+            <img src={signatureUrl(me.signatureAt)} alt={tr("Tanda tangan Anda")} />
             <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={remove}>
-              Hapus
+              {tr("Hapus")}
             </button>
           </div>
         ) : (
-          <div className="sig-empty">Belum ada tanda tangan. Pilih &quot;Gambar langsung&quot; atau &quot;Unggah foto / scan&quot;.</div>
+          <div className="sig-empty">{tr("Belum ada tanda tangan. Pilih \"Gambar langsung\" atau \"Unggah foto / scan\".")}</div>
         ))}
 
       {mode === 'gambar' && (
         <div ref={padWrap}>
           <SignaturePad clearKey={clearKey} onChange={setHasInk} />
           <div className="sig-actions">
-            <span className="field-note" style={{ margin: 0 }}>Tanda tangani di kotak dengan mouse, jari, atau stylus.</span>
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => setClearKey((k) => k + 1)}>Ulangi</button>
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => setMode('lihat')}>Batal</button>
+            <span className="field-note" style={{ margin: 0 }}>{tr("Tanda tangani di kotak dengan mouse, jari, atau stylus.")}</span>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setClearKey((k) => k + 1)}>{tr("Ulangi")}</button>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setMode('lihat')}>{tr("Batal")}</button>
             <button
               type="button"
               className="btn btn-primary btn-sm"
@@ -194,7 +197,7 @@ export function SignatureSection() {
                 void save(c ? signatureFromCanvas(c) : null);
               }}
             >
-              Simpan tanda tangan
+              {tr("Simpan tanda tangan")}
             </button>
           </div>
         </div>
@@ -203,17 +206,17 @@ export function SignatureSection() {
       {mode === 'unggah' && (
         <div>
           <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => void onFile(e.target.files?.[0])} />
-          <div className="field-note">Foto tanda tangan di kertas putih yang terang; latar dibuat transparan dan gambar dipangkas otomatis.</div>
+          <div className="field-note">{tr("Foto tanda tangan di kertas putih yang terang; latar dibuat transparan dan gambar dipangkas otomatis.")}</div>
           {uploaded && (
             <div className="sig-current">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={uploaded} alt="Hasil olahan tanda tangan" />
+              <img src={uploaded} alt={tr("Hasil olahan tanda tangan")} />
             </div>
           )}
           <div className="sig-actions">
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => setMode('lihat')}>Batal</button>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setMode('lihat')}>{tr("Batal")}</button>
             <button type="button" className="btn btn-primary btn-sm" disabled={busy || !uploaded} onClick={() => void save(uploaded)}>
-              Simpan tanda tangan
+              {tr("Simpan tanda tangan")}
             </button>
           </div>
         </div>

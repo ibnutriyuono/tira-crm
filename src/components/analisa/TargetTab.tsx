@@ -10,6 +10,7 @@ import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 const BLN3 = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
 /** Rp ringkas: 6,22 M / 850 jt. */
@@ -27,7 +28,8 @@ const ratio = (a: number, b: number) => (b > 0 ? a / b : null);
 const SIG_LABEL = { ok: 'Sesuai / di atas laju', warn: 'Sedikit tertinggal', bad: 'Jauh tertinggal' } as const;
 
 function Chip({ sig, done, ach }: { sig: 'ok' | 'warn' | 'bad' | null; done?: boolean; ach?: number | null }) {
-  if (!sig) return <span className="tg-chip none">Target belum ada</span>;
+  const tr = useT();
+  if (!sig) return <span className="tg-chip none">{tr("Target belum ada")}</span>;
   const text = done ? ((ach ?? 0) >= 1 ? 'Tercapai' : 'Tidak tercapai') : SIG_LABEL[sig];
   return <span className={`tg-chip ${sig}`}>{text}</span>;
 }
@@ -49,6 +51,7 @@ function Bar({ ach, git, pace, sig, small }: { ach: number | null; git: number; 
  * dengan GIT sebagai potensi dan rincian per cabang.
  */
 export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects: Prospect[]; scopeLabel: string; cabangs: string[]; isSe: boolean }) {
+  const tr = useT();
   const budgetTargets = useDataStore((s) => s.budgetTargets);
   const toast = useDataStore((s) => s.toast);
   const today = localToday();
@@ -126,12 +129,12 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
     <>
       <div className="toolbar-row" style={{ alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         {!isSe && cabangs.length > 1 && (
-          <select value={cabang} onChange={(e) => setCabang(e.target.value)} style={{ maxWidth: 170 }} aria-label="Cabang">
-            <option value="">Semua cabang</option>
+          <select value={cabang} onChange={(e) => setCabang(e.target.value)} style={{ maxWidth: 170 }} aria-label={tr("Cabang")}>
+            <option value="">{tr("Semua cabang")}</option>
             {cabangs.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
-        <select value={month} onChange={(e) => setMonth(Number(e.target.value))} style={{ maxWidth: 150 }} aria-label="Bulan">
+        <select value={month} onChange={(e) => setMonth(Number(e.target.value))} style={{ maxWidth: 150 }} aria-label={tr("Bulan")}>
           {BULAN_LIST.slice(0, maxMonth).map((b, i) => <option key={b.v} value={i + 1}>{b.l}</option>)}
         </select>
         <select
@@ -141,25 +144,25 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
             if (e.target.value === curYear) setMonth((m) => Math.min(m, Number(today.slice(5, 7))));
           }}
           style={{ maxWidth: 100 }}
-          aria-label="Tahun"
+          aria-label={tr("Tahun")}
         >
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-          <input type="checkbox" checked={showGit} onChange={(e) => setShowGit(e.target.checked)} /> Tampilkan GIT sebagai potensi
+          <input type="checkbox" checked={showGit} onChange={(e) => setShowGit(e.target.checked)} /> {tr("Tampilkan GIT sebagai potensi")}
         </label>
         {canNow('analisa', 'x') && (
           <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: 'auto' }} onClick={exportExcel}>
-            <IconDownload /> Export Excel
+            <IconDownload /> {tr("Export Excel")}
           </button>
         )}
       </div>
-      {isSe && <div className="field-note" style={{ marginTop: -4, marginBottom: 10 }}>Target yang ditampilkan adalah target cabang sebagai acuan; pencapaian = DO terfaktur milik Anda.</div>}
+      {isSe && <div className="field-note" style={{ marginTop: -4, marginBottom: 10 }}>{tr("Target yang ditampilkan adalah target cabang sebagai acuan; pencapaian = DO terfaktur milik Anda.")}</div>}
 
       <div className="tg-grid">
         <div className="tg-card">
           <div className="tg-card-head">
-            <span>Target bulan ini · {monthName}</span>
+            <span>{tr("Target bulan ini ·")} {monthName}</span>
             <Chip sig={mSig} done={!t.isCurrent} ach={ach} />
           </div>
           {t.target > 0 ? (
@@ -167,51 +170,51 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
               <div className="tg-big">
                 <span className={`num ${mSig || ''}`}>{pct(ach)}</span>
                 <span>
-                  <b>{rpShort(t.real)}</b> terfaktur dari target <b>{rpShort(t.target)}</b>
+                  <b>{rpShort(t.real)}</b> {tr("terfaktur dari target")} <b>{rpShort(t.target)}</b>
                 </span>
               </div>
               <Bar ach={ach} git={showGit ? t.git / t.target : 0} pace={t.isCurrent ? t.pace : null} sig={mSig} />
               {t.isCurrent && (
                 <div className="tg-pace" style={{ paddingLeft: `${Math.min(80, t.pace * 100)}%` }}>
-                  seharusnya {pct(t.pace)} · hari kerja ke-{t.elapsed}/{t.workdays}
+                  {tr("seharusnya")} {pct(t.pace)} {tr("· hari kerja ke-")}{t.elapsed}/{t.workdays}
                 </div>
               )}
               <div className="tg-facts">
                 {t.isCurrent ? (
                   <>
-                    <Fact label={sisa > 0 ? 'Sisa target' : 'Melebihi target'} value={rpShort(Math.abs(sisa))} sub={sisa > 0 ? `${left} hari kerja lagi` : 'sudah tercapai'} tone={sisa > 0 ? '' : 'ok'} />
-                    <Fact label="Perlu per hari kerja" value={need == null ? '–' : rpShort(need)} sub={`rata-rata sejauh ini ${rpShort(perDay)}`} tone={need != null && need > perDay * 1.5 ? 'bad' : ''} />
+                    <Fact label={sisa > 0 ? tr("Sisa target") : tr("Melebihi target")} value={rpShort(Math.abs(sisa))} sub={sisa > 0 ? `${left} hari kerja lagi` : 'sudah tercapai'} tone={sisa > 0 ? '' : 'ok'} />
+                    <Fact label={tr("Perlu per hari kerja")} value={need == null ? '–' : rpShort(need)} sub={`rata-rata sejauh ini ${rpShort(perDay)}`} tone={need != null && need > perDay * 1.5 ? 'bad' : ''} />
                   </>
                 ) : (
                   <>
-                    <Fact label={sisa > 0 ? 'Kurang dari target' : 'Lebih dari target'} value={rpShort(Math.abs(sisa))} sub="bulan sudah selesai" tone={sisa > 0 ? 'bad' : 'ok'} />
-                    <Fact label="Rata-rata per hari kerja" value={rpShort(t.workdays ? t.real / t.workdays : 0)} sub={`${t.workdays} hari kerja`} />
+                    <Fact label={sisa > 0 ? tr("Kurang dari target") : tr("Lebih dari target")} value={rpShort(Math.abs(sisa))} sub={tr("bulan sudah selesai")} tone={sisa > 0 ? 'bad' : 'ok'} />
+                    <Fact label={tr("Rata-rata per hari kerja")} value={rpShort(t.workdays ? t.real / t.workdays : 0)} sub={`${t.workdays} hari kerja`} />
                   </>
                 )}
-                <Fact label="GIT belum faktur" value={rpShort(t.git)} sub={t.git ? `bila terfaktur → ${pct(ratio(t.real + t.git, t.target))}` : 'tidak ada DO belum faktur'} tone="git" />
+                <Fact label={tr("GIT belum faktur")} value={rpShort(t.git)} sub={t.git ? `bila terfaktur → ${pct(ratio(t.real + t.git, t.target))}` : 'tidak ada DO belum faktur'} tone="git" />
               </div>
             </>
           ) : (
             <div className="tg-empty">
-              Target {monthName} untuk <b>{scopeText}</b> belum diisi (KPI › Atur target). Omzet terfaktur bulan ini <b>{rpShort(t.real)}</b>
-              {t.git ? <>, GIT <b>{rpShort(t.git)}</b></> : null}.
+              {tr("Target")} {monthName} {tr("untuk")} <b>{scopeText}</b> {tr("belum diisi (KPI › Atur target). Omzet terfaktur bulan ini")} <b>{rpShort(t.real)}</b>
+              {t.git ? <>{tr(", GIT")} <b>{rpShort(t.git)}</b></> : null}.
             </div>
           )}
         </div>
 
         <div className="tg-card">
           <div className="tg-card-head">
-            <span>YTD · Januari – {monthName}</span>
+            <span>{tr("YTD · Januari –")} {monthName}</span>
             <Chip sig={ySig} />
           </div>
           <div className="tg-big">
             <span className={`num ${ySig || ''}`}>{pct(yAch)}</span>
             <span>
-              <b>{rpShort(t.ytdReal)}</b> dari target <b>{rpShort(t.ytdTarget)}</b>
-              {t.isCurrent && t.ytdTargetFull !== t.ytdTarget && <small> (s.d. hari ini; penuh s.d. {BLN3[month - 1]} {rpShort(t.ytdTargetFull)})</small>}
+              <b>{rpShort(t.ytdReal)}</b> {tr("dari target")} <b>{rpShort(t.ytdTarget)}</b>
+              {t.isCurrent && t.ytdTargetFull !== t.ytdTarget && <small> {tr("(s.d. hari ini; penuh s.d.")} {BLN3[month - 1]} {rpShort(t.ytdTargetFull)})</small>}
             </span>
           </div>
-          <div className="tg-chart" role="group" aria-label="Target dan terfaktur per bulan">
+          <div className="tg-chart" role="group" aria-label={tr("Target dan terfaktur per bulan")}>
             {shown.map((m) => {
               const a = ratio(m.real, m.target);
               const live = t.isCurrent && m.month === month;
@@ -233,42 +236,42 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
           </div>
           <div className="tg-facts">
             <Fact
-              label={t.ytdReal >= t.ytdTarget ? 'Lebih dari target YTD' : 'Kurang dari target YTD'}
+              label={t.ytdReal >= t.ytdTarget ? tr("Lebih dari target YTD") : tr("Kurang dari target YTD")}
               value={rpShort(Math.abs(t.ytdTarget - t.ytdReal))}
               sub={`bulan tercapai ${hitMonths} dari ${closedMonths.length}`}
               tone={t.ytdReal >= t.ytdTarget ? 'ok' : 'bad'}
             />
-            <Fact label="Proyeksi akhir tahun" value={rpShort(t.runRate)} sub={`run-rate · ${pct(proj)} target ${year}`} tone={achSignal(proj) || ''} />
+            <Fact label={tr("Proyeksi akhir tahun")} value={rpShort(t.runRate)} sub={`run-rate · ${pct(proj)} target ${year}`} tone={achSignal(proj) || ''} />
             <Fact label={`Target ${year}`} value={rpShort(t.yearTarget)} sub={`sisa ${rpShort(Math.max(0, t.yearTarget - t.ytdReal))} · ${12 - month + (t.isCurrent ? 1 : 0)} bln`} />
           </div>
         </div>
       </div>
 
       <div className="tg-legend">
-        <span><i className="sw ok" />Terfaktur (DO sudah faktur)</span>
-        {showGit && <span><i className="sw git" />GIT (DO belum faktur) — potensi</span>}
-        <span><i className="sw tgt" />Target</span>
-        <span><i className="sw mark" />Seharusnya s.d. hari ini (hari kerja Senin–Jumat)</span>
+        <span><i className="sw ok" />{tr("Terfaktur (DO sudah faktur)")}</span>
+        {showGit && <span><i className="sw git" />{tr("GIT (DO belum faktur) — potensi")}</span>}
+        <span><i className="sw tgt" />{tr("Target")}</span>
+        <span><i className="sw mark" />{tr("Seharusnya s.d. hari ini (hari kerja Senin–Jumat)")}</span>
       </div>
 
       {rows.length > 0 && (
         <>
           <div className="tg-sec-head">
-            <b>Rincian per cabang · {monthName}</b>
-            <span className="field-note" style={{ margin: 0 }}>Urut dari capaian terendah · klik baris untuk melihat cabang itu</span>
+            <b>{tr("Rincian per cabang ·")} {monthName}</b>
+            <span className="field-note" style={{ margin: 0 }}>{tr("Urut dari capaian terendah · klik baris untuk melihat cabang itu")}</span>
           </div>
           <div className="table-wrap" style={{ borderTop: 'none' }}>
             <table className="simple-table tg-table">
               <thead>
                 <tr>
-                  <th>Cabang</th>
-                  <th className="r">Target</th>
-                  <th className="r">Terfaktur</th>
+                  <th>{tr("Cabang")}</th>
+                  <th className="r">{tr("Target")}</th>
+                  <th className="r">{tr("Terfaktur")}</th>
                   <th className="r">GIT</th>
-                  <th style={{ minWidth: 220 }}>Capaian {t.isCurrent ? 'vs laju' : ''}</th>
-                  <th className="r">Target YTD</th>
-                  <th className="r">Terfaktur YTD</th>
-                  <th style={{ minWidth: 170 }}>Capaian YTD</th>
+                  <th style={{ minWidth: 220 }}>{tr("Capaian")} {t.isCurrent ? tr("vs laju") : ''}</th>
+                  <th className="r">{tr("Target YTD")}</th>
+                  <th className="r">{tr("Terfaktur YTD")}</th>
+                  <th style={{ minWidth: 170 }}>{tr("Capaian YTD")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -285,7 +288,7 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
                           <span className={`mono ${achSignal(r.vp) || ''}`}>{pct(r.a)}</span>
                         </div>
                       ) : (
-                        <span className="badge rust">Target belum diisi</span>
+                        <span className="badge rust">{tr("Target belum diisi")}</span>
                       )}
                     </td>
                     <td className="r mono">{r.ytdTarget ? rpShort(r.ytdTarget) : '–'}</td>
@@ -300,7 +303,7 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
                 ))}
                 {all && (
                   <tr className="total">
-                    <td>Total</td>
+                    <td>{tr("Total")}</td>
                     <td className="r mono">{rpShort(all.target)}</td>
                     <td className="r mono">{rpShort(all.real)}</td>
                     <td className="r mono tg-gitc">{rpShort(all.git)}</td>
@@ -316,8 +319,7 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
         </>
       )}
       <div className="field-note" style={{ marginTop: 10 }}>
-        Target = budget per cabang per bulan (KPI › Atur target; bulan tanpa target memakai target terakhir, sama dengan KPI Scorecard). Pencapaian = DO terfaktur, dibukukan
-        pada bulan tanggal delivery (tanggal PO bila delivery kosong). Target YTD bulan berjalan dihitung proporsional hari kerja.
+        {tr("Target = budget per cabang per bulan (KPI › Atur target; bulan tanpa target memakai target terakhir, sama dengan KPI Scorecard). Pencapaian = DO terfaktur, dibukukan pada bulan tanggal delivery (tanggal PO bila delivery kosong). Target YTD bulan berjalan dihitung proporsional hari kerja.")}
       </div>
     </>
   );

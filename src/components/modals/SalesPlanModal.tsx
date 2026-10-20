@@ -12,6 +12,7 @@ import { planItemStatus } from '@/lib/sales-plan-view';
 import type { SalesPlan, SalesPlanItem } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 const CELL_INPUT = { width: '100%', minWidth: 0, boxSizing: 'border-box' as const };
 
 const emptyItem = (): SalesPlanItem => ({ line: '', uraian: '', qty: 1, harga: '' });
@@ -33,6 +34,7 @@ function currentPeriode(): string {
  * individually run (see canEditSalesPlan in lib/auth.ts).
  */
 export function SalesPlanModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'salesPlan';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -239,40 +241,38 @@ export function SalesPlanModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="Rencana Penjualan"
+      title={tr("Rencana Penjualan")}
       xwide
       footer={
         <>
           {savedPlan && canNow('rencana', 'd') && (
             <button type="button" className="btn btn-outline" style={{ marginRight: 'auto', color: 'var(--rust-500)' }} onClick={onDeletePlan} disabled={busy}>
-              <IconTrash /> Hapus Rencana
+              <IconTrash /> {tr("Hapus Rencana")}
             </button>
           )}
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Tutup
+            {tr("Tutup")}
           </button>
           {canNow('rencana', 'e') && (
             <button type="button" className="btn btn-primary" onClick={onSave} disabled={busy}>
-              Simpan Rencana
+              {tr("Simpan Rencana")}
             </button>
           )}
         </>
       }
     >
       <div className="import-summary" style={{ marginBottom: 14 }}>
-        Rencana bulanan per material — totalnya (jumlah qty x harga tiap baris) yang dibandingkan dengan Target dan
-        Realisasi di tab Forecast. Mengisi ulang bulan yang sama akan menimpa rencana sebelumnya, bukan menambah baris
-        baru — jadi ini selalu versi terakhir, bukan riwayat revisi.
+        {tr("Rencana bulanan per material — totalnya (jumlah qty x harga tiap baris) yang dibandingkan dengan Target dan Realisasi di tab Forecast. Mengisi ulang bulan yang sama akan menimpa rencana sebelumnya, bukan menambah baris baru — jadi ini selalu versi terakhir, bukan riwayat revisi.")}
       </div>
 
       <div className="form-grid">
         <div>
-          <label>Periode</label>
+          <label>{tr("Periode")}</label>
           <input type="month" value={periode} onChange={(e) => setPeriode(e.target.value)} />
         </div>
         <div>
-          <label>Sales Engineer (SE)</label>
-          <input type="text" list="salesPlanSeList" value={se} readOnly={locks.se} onChange={(e) => setSe(e.target.value)} placeholder="Inisial SE" />
+          <label>{tr("Sales Engineer (SE)")}</label>
+          <input type="text" list="salesPlanSeList" value={se} readOnly={locks.se} onChange={(e) => setSe(e.target.value)} placeholder={tr("Inisial SE")} />
           {!locks.se && (
             <datalist id="salesPlanSeList">
               {seSuggestions.map((x) => (
@@ -280,15 +280,15 @@ export function SalesPlanModal() {
               ))}
             </datalist>
           )}
-          {locks.se && <div className="field-note">Terkunci sesuai akun Anda</div>}
+          {locks.se && <div className="field-note">{tr("Terkunci sesuai akun Anda")}</div>}
         </div>
         <div>
-          <label>Cabang</label>
+          <label>{tr("Cabang")}</label>
           {locks.cabang ? (
             <input type="text" value={cabang} readOnly />
           ) : (
             <select value={cabang} onChange={(e) => setCabang(e.target.value)}>
-              <option value="">Pilih cabang</option>
+              <option value="">{tr("Pilih cabang")}</option>
               {CABANG_LIST.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -296,17 +296,17 @@ export function SalesPlanModal() {
               ))}
             </select>
           )}
-          {locks.cabang && <div className="field-note">Terkunci sesuai akun Anda</div>}
+          {locks.cabang && <div className="field-note">{tr("Terkunci sesuai akun Anda")}</div>}
         </div>
         <div>
-          <label>Total Rencana</label>
+          <label>{tr("Total Rencana")}</label>
           <input type="text" readOnly value={formatRupiah(total)} style={{ background: 'var(--steel-100)', fontWeight: 700 }} />
         </div>
       </div>
 
       {!locks.se && savedThisPeriode.length > 0 && (
         <>
-          <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>Rencana tersimpan periode ini</div>
+          <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>{tr("Rencana tersimpan periode ini")}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {savedThisPeriode.map((pl) => {
               const active = pl.se.toLowerCase() === se.trim().toLowerCase();
@@ -320,63 +320,60 @@ export function SalesPlanModal() {
                     if (!locks.cabang && pl.cabang) setCabang(pl.cabang);
                   }}
                 >
-                  {pl.se} · {pl.cabang || '-'} · {pl.items.length} material · {formatRupiah(num(pl.value))}
+                  {pl.se} · {pl.cabang || '-'} · {pl.items.length} {tr("material ·")} {formatRupiah(num(pl.value))}
                 </button>
               );
             })}
           </div>
-          <div className="field-note" style={{ marginTop: 4 }}>Klik untuk membuka rencana SE tersebut.</div>
+          <div className="field-note" style={{ marginTop: 4 }}>{tr("Klik untuk membuka rencana SE tersebut.")}</div>
         </>
       )}
 
-      <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>Ambil dari Prospek (opsional)</div>
+      <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>{tr("Ambil dari Prospek (opsional)")}</div>
       {!se.trim() ? (
-        <div className="field-note">Isi Sales Engineer (SE) dulu untuk melihat daftar prospeknya.</div>
+        <div className="field-note">{tr("Isi Sales Engineer (SE) dulu untuk melihat daftar prospeknya.")}</div>
       ) : sePipeline.length === 0 ? (
-        <div className="field-note">Tidak ada prospek yang bisa ditarik untuk SE ini — isi material secara manual di bawah.</div>
+        <div className="field-note">{tr("Tidak ada prospek yang bisa ditarik untuk SE ini — isi material secara manual di bawah.")}</div>
       ) : (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <select value={pickedProspectId} onChange={(e) => setPickedProspectId(e.target.value)} style={{ maxWidth: 420 }}>
-            <option value="">Pilih prospek milik {se}…</option>
+            <option value="">{tr("Pilih prospek milik")} {se}…</option>
             {sePipeline.map((p) => (
               <option key={p.id} value={p.id}>
                 {planMarks.stars.get(p.id) ? `${'★'.repeat(Math.min(planMarks.stars.get(p.id) as number, 5))} ` : ''}
                 {p.customer} — {formatRupiah(p.value)} ({p.cabang || '-'}) · {STATUS_META[p.status]?.label ?? '-'}
-                {planMarks.inThisPlan.has(p.id) ? ' · sudah di rencana ini' : planMarks.stars.get(p.id) ? ` · sudah di ${planMarks.stars.get(p.id)} rencana` : ''}
+                {planMarks.inThisPlan.has(p.id) ? tr(" · sudah di rencana ini") : planMarks.stars.get(p.id) ? ` · sudah di ${planMarks.stars.get(p.id)} rencana` : ''}
               </option>
             ))}
           </select>
           <button type="button" className="btn btn-outline btn-sm" disabled={!pickedProspectId} onClick={onAddFromProspect}>
-            <IconPlus /> Tambahkan Material
+            <IconPlus /> {tr("Tambahkan Material")}
           </button>
         </div>
       )}
       <div className="field-note" style={{ marginTop: 4 }}>
-        Menarik baris material dari prospek yang dipilih (harga per unit dihitung dari Berat/pc × Harga/Kg bila terisi,
-        kalau tidak dari Harga langsung) — baris hasil tarikan tetap bisa diedit atau dihapus seperti biasa. Prospek DO yang
-        sudah terfaktur tidak ditampilkan. Tanda ★ = prospek sudah pernah masuk rencana penjualan (jumlah bintang = jumlah
-        periode rencana).
+        {tr("Menarik baris material dari prospek yang dipilih (harga per unit dihitung dari Berat/pc × Harga/Kg bila terisi, kalau tidak dari Harga langsung) — baris hasil tarikan tetap bisa diedit atau dihapus seperti biasa. Prospek DO yang sudah terfaktur tidak ditampilkan. Tanda ★ = prospek sudah pernah masuk rencana penjualan (jumlah bintang = jumlah periode rencana).")}
       </div>
 
       <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>
-        Material yang Direncanakan
+        {tr("Material yang Direncanakan")}
         {savedPlan ? (
           <span className="badge green" style={{ marginLeft: 8 }}>
-            Tersimpan · {savedPlan.items.length} material · {formatRupiah(num(savedPlan.value))}
+            {tr("Tersimpan ·")} {savedPlan.items.length} {tr("material ·")} {formatRupiah(num(savedPlan.value))}
           </span>
         ) : se.trim() ? (
-          <span className="badge slate" style={{ marginLeft: 8 }}>Belum ada rencana tersimpan</span>
+          <span className="badge slate" style={{ marginLeft: 8 }}>{tr("Belum ada rencana tersimpan")}</span>
         ) : null}
       </div>
       <div className="table-wrap" style={{ borderTop: 'none' }}>
         <table className="simple-table" style={{ minWidth: 0, tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th style={{ width: 60 }}>Line</th>
-              <th>Uraian Material</th>
-              <th style={{ width: 70 }}>Qty</th>
-              <th style={{ width: 120 }}>Estimasi Harga</th>
-              <th style={{ width: 140, textAlign: 'right' }}>Value</th>
+              <th style={{ width: 60 }}>{tr("Line")}</th>
+              <th>{tr("Uraian Material")}</th>
+              <th style={{ width: 70 }}>{tr("Qty")}</th>
+              <th style={{ width: 120 }}>{tr("Estimasi Harga")}</th>
+              <th style={{ width: 140, textAlign: 'right' }}>{tr("Value")}</th>
               <th style={{ width: 40 }}></th>
             </tr>
           </thead>
@@ -384,10 +381,10 @@ export function SalesPlanModal() {
             {items.map((it, idx) => (
               <tr key={idx}>
                 <td>
-                  <input type="text" value={it.line} onChange={(e) => updateItem(idx, { line: e.target.value })} onBlur={(e) => updateItem(idx, { line: normalizeLine(e.target.value) })} placeholder="cth. 02" style={CELL_INPUT} />
+                  <input type="text" value={it.line} onChange={(e) => updateItem(idx, { line: e.target.value })} onBlur={(e) => updateItem(idx, { line: normalizeLine(e.target.value) })} placeholder={tr("cth. 02")} style={CELL_INPUT} />
                 </td>
                 <td>
-                  <input type="text" value={it.uraian} onChange={(e) => updateItem(idx, { uraian: e.target.value })} placeholder="cth. Plate ASTM A36 Tbl 12mm" style={CELL_INPUT} />
+                  <input type="text" value={it.uraian} onChange={(e) => updateItem(idx, { uraian: e.target.value })} placeholder={tr("cth. Plate ASTM A36 Tbl 12mm")} style={CELL_INPUT} />
                   {it.sourceProspectId &&
                     (() => {
                       const st = planItemStatus(it, prospectById);
@@ -403,11 +400,11 @@ export function SalesPlanModal() {
                   <input type="number" min={0} value={it.qty} onChange={(e) => updateItem(idx, { qty: e.target.value })} style={CELL_INPUT} />
                 </td>
                 <td>
-                  <input type="number" min={0} value={it.harga} onChange={(e) => updateItem(idx, { harga: e.target.value })} placeholder="per unit" style={CELL_INPUT} />
+                  <input type="number" min={0} value={it.harga} onChange={(e) => updateItem(idx, { harga: e.target.value })} placeholder={tr("per unit")} style={CELL_INPUT} />
                 </td>
                 <td className="mono" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{formatRupiah(num(it.qty) * num(it.harga))}</td>
                 <td>
-                  <button type="button" className="icon-btn danger" title="Hapus material" onClick={() => removeRow(idx)}>
+                  <button type="button" className="icon-btn danger" title={tr("Hapus material")} onClick={() => removeRow(idx)}>
                     <IconTrash />
                   </button>
                 </td>
@@ -417,11 +414,11 @@ export function SalesPlanModal() {
         </table>
       </div>
       <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 8 }} onClick={() => setItems((prev) => [...prev, emptyItem()])}>
-        <IconPlus /> Tambah Material
+        <IconPlus /> {tr("Tambah Material")}
       </button>
       {savedPlan && (
         <div className="field-note" style={{ marginTop: 6 }}>
-          Hapus baris lalu klik <b>Simpan Rencana</b> untuk menyimpan perubahan. Bila semua baris dihapus, rencana periode ini ikut dihapus.
+          {tr("Hapus baris lalu klik")} <b>{tr("Simpan Rencana")}</b> {tr("untuk menyimpan perubahan. Bila semua baris dihapus, rencana periode ini ikut dihapus.")}
         </div>
       )}
     </Modal>

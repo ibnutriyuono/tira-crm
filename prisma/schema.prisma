@@ -108,8 +108,17 @@ model Customer {
   // email, isPrimary}], see CustomerPic in lib/types.ts. Nullable/empty for
   // customers that only ever had the legacy single pic/phone/email filled in.
   pics      Json?
+  /// Profil customer (diisi Sales): industri/segmen, aplikasi pemakaian
+  /// material (JSON array kunci CUSTOMER_APLIKASI), estimasi potensi
+  /// pembelian per tahun (Rupiah), dan kompetitor yang memasok saat ini.
+  segmen     String?
+  aplikasi   Json     @default("[]")
+  potensi    Float?
+  kompetitor String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([segmen])
 }
 
 /// Foto kunjungan pada sebuah perjalanan dinas (lihat VisitTrip). File-nya di

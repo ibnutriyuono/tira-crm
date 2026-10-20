@@ -17,6 +17,7 @@ import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { canNow } from '@/hooks/useCan';
 
+import { tNow, useT } from '@/store/useLangStore';
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const mLabel = (m: string) => `${BULAN[Number(m.slice(5, 7)) - 1]} ${m.slice(2, 4)}`;
 const pct = (v: number | null) => (v == null ? '-' : `${Math.round(v * 100)}%`);
@@ -28,11 +29,11 @@ function rpShort(n: number): string {
 }
 
 function trendBadge(v: number | null) {
-  if (v == null) return <span className="badge slate">Baru</span>;
+  if (v == null) return <span className="badge slate">{tNow("Baru")}</span>;
   const s = `${v >= 0 ? '+' : ''}${Math.round(v * 100)}%`;
-  if (v > TREND_THRESHOLD) return <span className="badge green">Naik {s}</span>;
-  if (v < -TREND_THRESHOLD) return <span className="badge rust">Turun {s}</span>;
-  return <span className="badge slate">Stabil {s}</span>;
+  if (v > TREND_THRESHOLD) return <span className="badge green">{tNow("Naik")} {s}</span>;
+  if (v < -TREND_THRESHOLD) return <span className="badge rust">{tNow("Turun")} {s}</span>;
+  return <span className="badge slate">{tNow("Stabil")} {s}</span>;
 }
 
 const BASIS_LABEL: Record<Basis, string> = { minta: 'permintaan', off: 'ditawarkan', po: 'PO', kirim: 'terkirim' };
@@ -43,6 +44,7 @@ const MEASURE_LABEL: Record<Measure, string> = { kg: 'Tonase', pcs: 'Pcs', nilai
  * penawaran (lib/material-trend.ts), dalam cakupan role yang membukanya.
  */
 export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { prospects: Prospect[]; scopeLabel: string; cabangs: string[] | null; thisMonth: string }) {
+  const tr = useT();
   const toast = useDataStore((s) => s.toast);
   const [cabang, setCabang] = useState('');
   const [period, setPeriod] = useState(12);
@@ -112,22 +114,22 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
     <>
       <div className="toolbar-row" style={{ alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         {cabangs && cabangs.length > 1 && (
-          <select value={cabang} onChange={(e) => setCabang(e.target.value)} style={{ maxWidth: 170 }} aria-label="Cabang">
-            <option value="">Semua cabang</option>
+          <select value={cabang} onChange={(e) => setCabang(e.target.value)} style={{ maxWidth: 170 }} aria-label={tr("Cabang")}>
+            <option value="">{tr("Semua cabang")}</option>
             {cabangs.map((c) => (
-              <option key={c} value={c}>Cabang {c}</option>
+              <option key={c} value={c}>{tr("Cabang")} {c}</option>
             ))}
           </select>
         )}
-        <select value={period} onChange={(e) => setPeriod(Number(e.target.value))} style={{ maxWidth: 160 }} aria-label="Periode">
-          <option value={3}>3 bulan</option>
-          <option value={6}>6 bulan</option>
-          <option value={12}>12 bulan</option>
+        <select value={period} onChange={(e) => setPeriod(Number(e.target.value))} style={{ maxWidth: 160 }} aria-label={tr("Periode")}>
+          <option value={3}>{tr("3 bulan")}</option>
+          <option value={6}>{tr("6 bulan")}</option>
+          <option value={12}>{tr("12 bulan")}</option>
         </select>
-        <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>s/d</span>
-        <input type="month" value={end} onChange={(e) => setEnd(e.target.value || thisMonth)} style={{ maxWidth: 160 }} aria-label="Sampai bulan" />
-        <select value={group} onChange={(e) => setGroup(e.target.value)} style={{ maxWidth: 230 }} aria-label="Bentuk">
-          <option value="">Bentuk: otomatis (terbesar)</option>
+        <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>{tr("s/d")}</span>
+        <input type="month" value={end} onChange={(e) => setEnd(e.target.value || thisMonth)} style={{ maxWidth: 160 }} aria-label={tr("Sampai bulan")} />
+        <select value={group} onChange={(e) => setGroup(e.target.value)} style={{ maxWidth: 230 }} aria-label={tr("Bentuk")}>
+          <option value="">{tr("Bentuk: otomatis (terbesar)")}</option>
           {SHAPE_GROUPS.map((g) => (
             <option key={g.key} value={g.key}>{g.label}{t.groupTotals[g.key] ? ` · ${formatTon(t.groupTotals[g.key], 1)}` : ''}</option>
           ))}
@@ -145,58 +147,58 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
         </span>
         {canNow('analisa', 'x') && (
           <button type="button" className="btn btn-outline btn-sm" onClick={exportExcel}>
-            <IconDownload /> Excel
+            <IconDownload /> {tr("Excel")}
           </button>
         )}
       </div>
       <div className="field-note" style={{ marginTop: -6, marginBottom: 12 }}>
-        <b>{t.group.label}</b> · {periodText} · {scopeText}. Permintaan = prospek berstatus Permintaan (belum ditawarkan) · Ditawarkan = mulai status Penawaran Harga, bulan tgl penawaran · PO = qty PO per item, bulan tgl PO · Terkirim = qty terkirim, bulan tgl delivery.
+        <b>{t.group.label}</b> · {periodText} · {scopeText}{tr(". Permintaan = prospek berstatus Permintaan (belum ditawarkan) · Ditawarkan = mulai status Penawaran Harga, bulan tgl penawaran · PO = qty PO per item, bulan tgl PO · Terkirim = qty terkirim, bulan tgl delivery.")}
       </div>
 
       <div className="kpi-grid">
         <div className="kpi">
-          <div className="label">Tonase Permintaan</div>
+          <div className="label">{tr("Tonase Permintaan")}</div>
           <div className="value">{formatTon(t.kpi.reqKg, 1)}</div>
-          <div className="foot">Belum ditawarkan</div>
+          <div className="foot">{tr("Belum ditawarkan")}</div>
         </div>
         <div className="kpi">
-          <div className="label">Tonase Ditawarkan</div>
+          <div className="label">{tr("Tonase Ditawarkan")}</div>
           <div className="value">{formatTon(t.kpi.offKg, 1)}</div>
           <div className="foot">{t.group.label}</div>
         </div>
         <div className="kpi won">
-          <div className="label">Tonase PO</div>
+          <div className="label">{tr("Tonase PO")}</div>
           <div className="value">{formatTon(t.kpi.poKg, 1)}</div>
-          <div className="foot">Terkirim {formatTon(t.kpi.sentKg, 1)}</div>
+          <div className="foot">{tr("Terkirim")} {formatTon(t.kpi.sentKg, 1)}</div>
         </div>
         <div className="kpi">
-          <div className="label">Konversi Tonase</div>
+          <div className="label">{tr("Konversi Tonase")}</div>
           <div className="value">{pct(t.kpi.conv)}</div>
-          <div className="foot">PO ÷ ditawarkan</div>
+          <div className="foot">{tr("PO ÷ ditawarkan")}</div>
         </div>
         <div className="kpi aktif">
-          <div className="label">Nilai PO</div>
+          <div className="label">{tr("Nilai PO")}</div>
           <div className="value" title={formatRupiah(t.kpi.nilaiPo)}>{rpShort(t.kpi.nilaiPo)}</div>
-          <div className="foot">Rata-rata {t.kpi.rpKg ? `${formatRupiah(Math.round(t.kpi.rpKg))}/kg` : '-'}</div>
+          <div className="foot">{tr("Rata-rata")} {t.kpi.rpKg ? `${formatRupiah(Math.round(t.kpi.rpKg))}/kg` : '-'}</div>
         </div>
         <div className="kpi">
-          <div className="label">Grade Aktif</div>
+          <div className="label">{tr("Grade Aktif")}</div>
           <div className="value">{t.kpi.grades}</div>
-          <div className="foot">Top: {t.grades[0]?.grade || '-'}</div>
+          <div className="foot">{tr("Top:")} {t.grades[0]?.grade || '-'}</div>
         </div>
       </div>
 
-      <Sec title={`Top Grade — urut ${label}`} note="Klik baris untuk grafik bulanan grade tersebut.">
+      <Sec title={`Top Grade — urut ${label}`} note={tr("Klik baris untuk grafik bulanan grade tersebut.")}>
         {t.grades.length === 0 ? (
-          <div className="field-note">Belum ada material {t.group.label} pada periode ini.</div>
+          <div className="field-note">{tr("Belum ada material")} {t.group.label} {tr("pada periode ini.")}</div>
         ) : (
           <div className="table-wrap" style={{ borderTop: 'none' }}>
             <table className="simple-table" style={{ minWidth: 960 }}>
               <thead>
                 <tr>
-                  <th>#</th><th>Grade</th><th style={{ textAlign: 'right' }}>Penawaran</th><th style={{ textAlign: 'right' }}>Customer</th><th style={{ textAlign: 'right' }}>Pcs</th>
-                  <th style={{ textAlign: 'right' }}>Permintaan</th><th style={{ textAlign: 'right' }}>Ditawarkan</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>Terkirim</th><th style={{ textAlign: 'right' }}>Rp/kg PO</th>
-                  <th>Konversi</th><th>Tren 3 bln</th><th>12 bulan</th>
+                  <th>#</th><th>{tr("Grade")}</th><th style={{ textAlign: 'right' }}>{tr("Penawaran")}</th><th style={{ textAlign: 'right' }}>{tr("Customer")}</th><th style={{ textAlign: 'right' }}>{tr("Pcs")}</th>
+                  <th style={{ textAlign: 'right' }}>{tr("Permintaan")}</th><th style={{ textAlign: 'right' }}>{tr("Ditawarkan")}</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>{tr("Terkirim")}</th><th style={{ textAlign: 'right' }}>{tr("Rp/kg PO")}</th>
+                  <th>{tr("Konversi")}</th><th>{tr("Tren 3 bln")}</th><th>{tr("12 bulan")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -238,17 +240,17 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16 }}>
         <Sec title={`Peta Grade × ${t.group.dimLabel}`} note={`${label} · ${periodText}. Makin gelap makin besar.`}>
           {t.heat.length === 0 ? (
-            <div className="field-note">Tidak ada data.</div>
+            <div className="field-note">{tr("Tidak ada data.")}</div>
           ) : (
             <div className="table-wrap" style={{ borderTop: 'none' }}>
               <table className="simple-table tm-heat" style={{ minWidth: 0 }}>
                 <thead>
                   <tr>
-                    <th>Grade</th>
+                    <th>{tr("Grade")}</th>
                     {t.buckets.map((b) => (
                       <th key={b} style={{ textAlign: 'center' }}>{b}</th>
                     ))}
-                    <th style={{ textAlign: 'right' }}>Total</th>
+                    <th style={{ textAlign: 'right' }}>{tr("Total")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -274,8 +276,8 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
 
         <Sec title={`Bulanan — ${selGrade?.grade || '-'}`} note={`${MEASURE_LABEL[measure]} permintaan, ditawarkan & PO, 12 bulan s/d ${mLabel(t.series12[11])}.`}>
           <div className="if-legend" style={{ marginBottom: 6 }}>
-            <span><i style={{ background: '#D6DEE6', border: '1px solid #9FB7CC' }} />Permintaan</span>
-            <span><i style={{ background: '#9FB7CC' }} />Ditawarkan</span>
+            <span><i style={{ background: '#D6DEE6', border: '1px solid #9FB7CC' }} />{tr("Permintaan")}</span>
+            <span><i style={{ background: '#9FB7CC' }} />{tr("Ditawarkan")}</span>
             <span><i style={{ background: '#A8701F' }} />PO</span>
           </div>
           <div className="tm-chart">
@@ -294,7 +296,7 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
           </div>
           {selGrade && (
             <div className="import-summary">
-              Tren 3 bulan {trendBadge(selGrade.trend)} · Ukuran terbanyak <b>{selGrade.topBucket}</b> · Konversi <b>{pct(selGrade.conv)}</b>
+              {tr("Tren 3 bulan")} {trendBadge(selGrade.trend)} {tr("· Ukuran terbanyak")} <b>{selGrade.topBucket}</b> {tr("· Konversi")} <b>{pct(selGrade.conv)}</b>
             </div>
           )}
         </Sec>
@@ -309,18 +311,18 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
         ).map(([title, list]) => (
           <Sec key={title} title={title} note={`Grade + ukuran, 3 bulan terakhir vs 3 bulan sebelumnya (${label}). Volume minimal agar 1 order besar tidak terbaca sebagai tren.`}>
             {list.length === 0 ? (
-              <div className="field-note">Belum ada kombinasi yang memenuhi syarat.</div>
+              <div className="field-note">{tr("Belum ada kombinasi yang memenuhi syarat.")}</div>
             ) : (
               <div className="table-wrap" style={{ borderTop: 'none' }}>
                 <table className="simple-table" style={{ minWidth: 0 }}>
                   <thead>
-                    <tr><th>Grade</th><th>Ukuran</th><th style={{ textAlign: 'right' }}>3 bln sebelumnya</th><th style={{ textAlign: 'right' }}>3 bln terakhir</th><th>Perubahan</th></tr>
+                    <tr><th>{tr("Grade")}</th><th>{tr("Ukuran")}</th><th style={{ textAlign: 'right' }}>{tr("3 bln sebelumnya")}</th><th style={{ textAlign: 'right' }}>{tr("3 bln terakhir")}</th><th>{tr("Perubahan")}</th></tr>
                   </thead>
                   <tbody>
                     {list.map((m) => (
                       <tr key={`${m.grade}|${m.bucket}`}>
                         <td><b>{m.grade}</b></td>
-                        <td>{m.bucket}{m.bucket.match(/\d/) ? ' mm' : ''}</td>
+                        <td>{m.bucket}{m.bucket.match(/\d/) ? tr(" mm") : ''}</td>
                         <td className="mono" style={{ textAlign: 'right' }}>{fmt(m.prev)}</td>
                         <td className="mono" style={{ textAlign: 'right' }}>{fmt(m.last)}</td>
                         <td>{trendBadge(m.change)}</td>
@@ -335,14 +337,14 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16 }}>
-        <Sec title="Line 05 · Fabrikasi" note={`Per qty & satuan, tidak dicampur ke tonase. ${periodText}.`}>
+        <Sec title={tr("Line 05 · Fabrikasi")} note={`Per qty & satuan, tidak dicampur ke tonase. ${periodText}.`}>
           {t.fab.length === 0 ? (
-            <div className="field-note">Tidak ada penawaran Line 05 pada periode ini.</div>
+            <div className="field-note">{tr("Tidak ada penawaran Line 05 pada periode ini.")}</div>
           ) : (
             <div className="table-wrap" style={{ borderTop: 'none' }}>
               <table className="simple-table" style={{ minWidth: 0 }}>
                 <thead>
-                  <tr><th>Pekerjaan</th><th style={{ textAlign: 'right' }}>Penawaran</th><th style={{ textAlign: 'right' }}>Permintaan</th><th style={{ textAlign: 'right' }}>Ditawarkan</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>Konversi</th></tr>
+                  <tr><th>{tr("Pekerjaan")}</th><th style={{ textAlign: 'right' }}>{tr("Penawaran")}</th><th style={{ textAlign: 'right' }}>{tr("Permintaan")}</th><th style={{ textAlign: 'right' }}>{tr("Ditawarkan")}</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>{tr("Konversi")}</th></tr>
                 </thead>
                 <tbody>
                   {t.fab.map((f) => (
@@ -360,9 +362,9 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
             </div>
           )}
         </Sec>
-        <Sec title="Kualitas Data Material" note={`${t.quality.total} baris material permintaan & penawaran pada periode ini (semua bentuk).`}>
+        <Sec title={tr("Kualitas Data Material")} note={`${t.quality.total} baris material permintaan & penawaran pada periode ini (semua bentuk).`}>
           {t.quality.total === 0 ? (
-            <div className="field-note">Tidak ada data.</div>
+            <div className="field-note">{tr("Tidak ada data.")}</div>
           ) : (
             <>
               <span className="if-bar" style={{ height: 10 }} aria-hidden="true">
@@ -370,17 +372,17 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
                 <span style={{ width: `${(t.quality.teks / t.quality.total) * 100}%`, background: '#8FB59C' }} />
               </span>
               <div className="if-legend" style={{ margin: '6px 0 8px' }}>
-                <span><i className="sent" />Form seragam {Math.round((t.quality.form / t.quality.total) * 100)}%</span>
-                <span><i style={{ background: '#8FB59C' }} />Dibaca dari uraian {Math.round((t.quality.teks / t.quality.total) * 100)}%</span>
-                <span><i style={{ background: '#E3E9EF' }} />Tidak terbaca {t.quality.gagal} baris</span>
+                <span><i className="sent" />{tr("Form seragam")} {Math.round((t.quality.form / t.quality.total) * 100)}%</span>
+                <span><i style={{ background: '#8FB59C' }} />{tr("Dibaca dari uraian")} {Math.round((t.quality.teks / t.quality.total) * 100)}%</span>
+                <span><i style={{ background: '#E3E9EF' }} />{tr("Tidak terbaca")} {t.quality.gagal} {tr("baris")}</span>
               </div>
               {t.quality.examples.length > 0 && (
                 <div className="field-note" style={{ fontSize: 12 }}>
-                  Contoh tidak terbaca: {t.quality.examples.join('; ')}. Rapikan lewat Edit Prospek → <i>Tempel dari teks</i>.
+                  {tr("Contoh tidak terbaca:")} {t.quality.examples.join('; ')}{tr(". Rapikan lewat Edit Prospek →")} <i>{tr("Tempel dari teks")}</i>.
                 </div>
               )}
               <div className="field-note" style={{ fontSize: 12 }}>
-                PO &amp; terkirim memakai qty per item bila sudah dikonfirmasi; prospek lama dihitung penuh (perkiraan) — lihat tab Pipeline.
+                {tr("PO & terkirim memakai qty per item bila sudah dikonfirmasi; prospek lama dihitung penuh (perkiraan) — lihat tab Pipeline.")}
               </div>
             </>
           )}

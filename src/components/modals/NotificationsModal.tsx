@@ -10,6 +10,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { AppNotification, NotificationType } from '@/lib/types';
 
+import { useT } from '@/store/useLangStore';
 const NOTIF_META: Record<NotificationType, { icon: () => React.JSX.Element; color: string }> = {
   rfq_new: { icon: IconRfq, color: 'steel' },
   fupa_new: { icon: IconBag, color: 'steel' },
@@ -105,6 +106,7 @@ export function openNotification(n: AppNotification) {
  * so both paths always land on the same screen.
  */
 export function NotificationsModal() {
+  const tr = useT();
   const show = useUiStore((s) => s.modal === 'notifications');
   const closeModal = useUiStore((s) => s.closeModal);
   const toast = useDataStore((s) => s.toast);
@@ -141,18 +143,18 @@ export function NotificationsModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title={pengaturan ? 'Pengaturan Notifikasi' : 'Notifikasi'}
+      title={pengaturan ? tr("Pengaturan Notifikasi") : tr("Notifikasi")}
       wide2
       footer={
         <button type="button" className="btn btn-outline" onClick={closeModal}>
-          Tutup
+          {tr("Tutup")}
         </button>
       }
     >
       {pengaturan ? (
         <>
           <button type="button" className="btn btn-outline btn-sm" onClick={() => setPengaturan(false)} style={{ marginBottom: 10 }}>
-            ← Kembali ke daftar
+            {tr("← Kembali ke daftar")}
           </button>
           <NotifSettingsPanel />
         </>
@@ -161,24 +163,24 @@ export function NotificationsModal() {
       <div className="toolbar-row" style={{ marginBottom: 10 }}>
         <div className="view-toggle">
           <button type="button" className={filter === 'semua' ? 'active' : ''} onClick={() => setFilter('semua')}>
-            Semua
+            {tr("Semua")}
           </button>
           <button type="button" className={filter === 'belum' ? 'active' : ''} onClick={() => setFilter('belum')}>
-            Belum Dibaca {unreadCount > 0 && `(${unreadCount})`}
+            {tr("Belum Dibaca")} {unreadCount > 0 && `(${unreadCount})`}
           </button>
         </div>
         <button type="button" className="btn btn-outline btn-sm" disabled={busy || unreadCount === 0} onClick={onMarkAllRead} style={{ marginLeft: 'auto' }}>
-          Tandai Semua Dibaca
+          {tr("Tandai Semua Dibaca")}
         </button>
-        <button type="button" className="btn btn-outline btn-sm" onClick={() => setPengaturan(true)} title="Atur notifikasi email">
-          ⚙ Pengaturan email
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => setPengaturan(true)} title={tr("Atur notifikasi email")}>
+          {tr("⚙ Pengaturan email")}
         </button>
       </div>
 
       {list.length === 0 ? (
         <div className="empty-state">
-          <h3>{filter === 'belum' ? 'Tidak ada notifikasi belum dibaca' : 'Belum ada notifikasi'}</h3>
-          <p>Notifikasi RFQ/FUP A baru, jawaban Purchasing, diskusi, pembatalan, dan Perjalanan Dinas akan muncul di sini.</p>
+          <h3>{filter === 'belum' ? tr("Tidak ada notifikasi belum dibaca") : tr("Belum ada notifikasi")}</h3>
+          <p>{tr("Notifikasi RFQ/FUP A baru, jawaban Purchasing, diskusi, pembatalan, dan Perjalanan Dinas akan muncul di sini.")}</p>
         </div>
       ) : (
         <div className="notif-list">
@@ -196,7 +198,7 @@ export function NotificationsModal() {
                   <div className="notif-message">{n.message}</div>
                   <div className="notif-time">{timeAgo(n.createdAt)}</div>
                 </div>
-                {unread && <span className="notif-dot" title="Belum dibaca" />}
+                {unread && <span className="notif-dot" title={tr("Belum dibaca")} />}
               </div>
             );
           })}

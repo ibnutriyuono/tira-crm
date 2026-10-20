@@ -7,6 +7,7 @@ import { findNameGroups, type NameGroup, type NameSource } from '@/lib/customer-
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
+import { useT } from '@/store/useLangStore';
 const PAGE = 30;
 
 /**
@@ -16,6 +17,7 @@ const PAGE = 30;
  * look similar (possible typos) are listed but left for the user to tick.
  */
 export function CustomerUnifyModal() {
+  const tr = useT();
   const show = useUiStore((s) => s.modal === 'customerUnify');
   const openModal = useUiStore((s) => s.openModal);
   const close = () => openModal('customers');
@@ -69,21 +71,19 @@ export function CustomerUnifyModal() {
   }
 
   return (
-    <Modal show={show} onClose={close} title="Satukan Nama Customer" xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={close}>Kembali ke Kelola Customer</button>}>
+    <Modal show={show} onClose={close} title={tr("Satukan Nama Customer")} xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={close}>{tr("Kembali ke Kelola Customer")}</button>}>
       <div className="import-summary" style={{ marginTop: 0 }}>
-        Daftar customer yang ditulis dengan ejaan berbeda. Pilih <b>nama baku</b>, centang ejaan yang mau disatukan, lalu klik
-        <b> Satukan</b> — semua prospek, aktivitas harian, RFQ, FUP A, perjalanan dinas dan data Kelola Customer ikut diganti, dan
-        customer ganda digabung (PIC dijadikan satu). Ejaan yang sama persis selain huruf besar/kecil, titik dan posisi &quot;PT&quot;
-        sudah dicentang; ejaan yang hanya <i>mirip</i> (kemungkinan salah ketik) tidak dicentang — cek dulu sebelum menyatukan.
+        {tr("Daftar customer yang ditulis dengan ejaan berbeda. Pilih")} <b>{tr("nama baku")}</b>{tr(", centang ejaan yang mau disatukan, lalu klik")}
+        <b> {tr("Satukan")}</b> {tr("— semua prospek, aktivitas harian, RFQ, FUP A, perjalanan dinas dan data Kelola Customer ikut diganti, dan customer ganda digabung (PIC dijadikan satu). Ejaan yang sama persis selain huruf besar/kecil, titik dan posisi \"PT\" sudah dicentang; ejaan yang hanya")} <i>{tr("mirip")}</i> {tr("(kemungkinan salah ketik) tidak dicentang — cek dulu sebelum menyatukan.")}
       </div>
       <div className="toolbar-row" style={{ marginTop: 10 }}>
-        <input type="search" className="search-grow" placeholder="Cari nama customer..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <span className="field-note">{shown.length} kelompok nama</span>
+        <input type="search" className="search-grow" placeholder={tr("Cari nama customer...")} value={search} onChange={(e) => setSearch(e.target.value)} />
+        <span className="field-note">{shown.length} {tr("kelompok nama")}</span>
       </div>
       {shown.length === 0 ? (
         <div className="empty-state" style={{ padding: '34px 10px' }}>
-          <h3>Tidak ada nama ganda</h3>
-          <p>{groups.length === 0 ? 'Semua customer sudah ditulis seragam.' : 'Coba kata kunci lain.'}</p>
+          <h3>{tr("Tidak ada nama ganda")}</h3>
+          <p>{groups.length === 0 ? tr("Semua customer sudah ditulis seragam.") : tr("Coba kata kunci lain.")}</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
@@ -93,11 +93,11 @@ export function CustomerUnifyModal() {
             return (
               <div key={g.key} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, background: 'var(--surface)' }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
-                  <label style={{ margin: 0, fontSize: 11 }}>Nama baku</label>
+                  <label style={{ margin: 0, fontSize: 11 }}>{tr("Nama baku")}</label>
                   <input type="text" value={to} onChange={(e) => setTarget((t) => ({ ...t, [g.key]: e.target.value }))} style={{ flex: '1 1 260px', fontWeight: 600 }} />
-                  <span className="field-note">{g.total} data</span>
+                  <span className="field-note">{g.total} {tr("data")}</span>
                   <button type="button" className="btn btn-primary btn-sm" disabled={busyKey === g.key || n === 0} onClick={() => unify(g)}>
-                    {busyKey === g.key ? 'Menyatukan…' : `Satukan ${n} ejaan`}
+                    {busyKey === g.key ? tr("Menyatukan…") : `Satukan ${n} ejaan`}
                   </button>
                 </div>
                 <table className="simple-table" style={{ minWidth: 0 }}>
@@ -114,15 +114,15 @@ export function CustomerUnifyModal() {
                         </td>
                         <td>
                           {v.name}
-                          {v.master && <span className="badge slate" style={{ marginLeft: 6 }}>Kelola Customer</span>}
-                          {v.similarOnly && <span className="badge amber" style={{ marginLeft: 6 }}>Mirip — cek dulu</span>}
-                          {v.name === to.trim() && <span className="badge green" style={{ marginLeft: 6 }}>Nama baku</span>}
+                          {v.master && <span className="badge slate" style={{ marginLeft: 6 }}>{tr("Kelola Customer")}</span>}
+                          {v.similarOnly && <span className="badge amber" style={{ marginLeft: 6 }}>{tr("Mirip — cek dulu")}</span>}
+                          {v.name === to.trim() && <span className="badge green" style={{ marginLeft: 6 }}>{tr("Nama baku")}</span>}
                         </td>
-                        <td className="mono" style={{ width: 90, textAlign: 'right' }}>{v.count} data</td>
+                        <td className="mono" style={{ width: 90, textAlign: 'right' }}>{v.count} {tr("data")}</td>
                         <td style={{ width: 120, textAlign: 'right' }}>
                           {v.name !== to.trim() && (
                             <button type="button" className="btn btn-outline btn-sm" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => setTarget((t) => ({ ...t, [g.key]: v.name }))}>
-                              Jadikan baku
+                              {tr("Jadikan baku")}
                             </button>
                           )}
                         </td>
@@ -135,7 +135,7 @@ export function CustomerUnifyModal() {
           })}
           {shown.length > limit && (
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setLimit((l) => l + PAGE)}>
-              Tampilkan {Math.min(PAGE, shown.length - limit)} kelompok lagi
+              {tr("Tampilkan")} {Math.min(PAGE, shown.length - limit)} {tr("kelompok lagi")}
             </button>
           )}
         </div>

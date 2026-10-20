@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { CUSTOMER_FIELD_LABELS, diffFields, logActivity } from '@/lib/activity';
-import { isResponse, normalizeCustomerPics, requireAdmin, requireUser } from '@/lib/api-helpers';
+import { customerProfileFields, isResponse, normalizeCustomerPics, requireAdmin, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { CustomerPic } from '@/lib/types';
@@ -25,6 +25,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   // legacy columns just follow the primary entry.
   const pics = normalizeCustomerPics(body?.pics);
   const primary = pics.find((p) => p.isPrimary);
+  const profile = customerProfileFields(body);
 
   const customer = await prisma.customer.update({
     where: { id },
@@ -37,6 +38,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       address: String(body?.address || '').trim(),
       catatan: String(body?.catatan || '').trim(),
       pics: pics as unknown as Prisma.InputJsonValue,
+      ...profile,
     },
   });
 

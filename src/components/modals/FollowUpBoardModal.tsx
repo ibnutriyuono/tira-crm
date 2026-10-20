@@ -11,6 +11,7 @@ import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 const SOURCE_META: Record<FollowUpSource, { label: string; color: string }> = {
   terjadwal: { label: 'Terjadwal', color: 'steel' },
   aging: { label: 'Pipeline Mangkrak', color: 'amber' },
@@ -32,6 +33,7 @@ const SOURCE_META: Record<FollowUpSource, { label: string; color: string }> = {
  * that, due dates are evaluated fresh every time this dashboard opens.
  */
 export function FollowUpBoardModal() {
+  const tr = useT();
   const show = useUiStore((s) => s.modal === 'followUpBoard');
   const closeModal = useUiStore((s) => s.closeModal);
   const openModal = useUiStore((s) => s.openModal);
@@ -98,8 +100,8 @@ export function FollowUpBoardModal() {
         <div className="followup-actions">
           {canNow('prospek', 'e') && (
             <>
-              <button type="button" className="btn btn-wa btn-sm" onClick={() => openFollowUp(r.prospect)} title="Follow Up via WhatsApp">
-                <IconWa /> Follow Up
+              <button type="button" className="btn btn-wa btn-sm" onClick={() => openFollowUp(r.prospect)} title={tr("Follow Up via WhatsApp")}>
+                <IconWa /> {tr("Follow Up")}
               </button>
               <input
                 type="date"
@@ -110,7 +112,7 @@ export function FollowUpBoardModal() {
               <button
                 type="button"
                 className="icon-btn"
-                title="Jadwalkan follow-up berikutnya"
+                title={tr("Jadwalkan follow-up berikutnya")}
                 disabled={savingId === r.prospect.id || !draftDate[r.prospect.id]}
                 onClick={() => saveSchedule(r.prospect)}
               >
@@ -118,7 +120,7 @@ export function FollowUpBoardModal() {
               </button>
             </>
           )}
-          <button type="button" className="icon-btn" title="Buka prospek" onClick={() => openProspect(r.prospect)}>
+          <button type="button" className="icon-btn" title={tr("Buka prospek")} onClick={() => openProspect(r.prospect)}>
             <IconEdit />
           </button>
         </div>
@@ -130,26 +132,26 @@ export function FollowUpBoardModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="Follow-up"
+      title={tr("Follow-up")}
       xwide
       footer={
         <button type="button" className="btn btn-outline" onClick={closeModal}>
-          Tutup
+          {tr("Tutup")}
         </button>
       }
     >
       <div className="import-summary" style={{ marginBottom: 14 }}>
-        Menyatukan tiga sinyal: <b>terjadwal manual</b>, <b>pipeline yang mangkrak</b> (dari Forecast), dan{' '}
-        <b>customer yang mulai/sudah dingin</b> (dari Marketing) — satu tempat untuk tahu siapa yang perlu dihubungi hari ini.
+        {tr("Menyatukan tiga sinyal:")} <b>{tr("terjadwal manual")}</b>, <b>{tr("pipeline yang mangkrak")}</b> {tr("(dari Forecast), dan")}{' '}
+        <b>{tr("customer yang mulai/sudah dingin")}</b> {tr("(dari Marketing) — satu tempat untuk tahu siapa yang perlu dihubungi hari ini.")}
       </div>
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <div className="kpi rust">
-          <div className="label">Perlu Segera</div>
+          <div className="label">{tr("Perlu Segera")}</div>
           <div className="value">{segera.length}</div>
         </div>
         <div className="kpi amber">
-          <div className="label">Minggu Ini</div>
+          <div className="label">{tr("Minggu Ini")}</div>
           <div className="value">{mingguIni.length}</div>
         </div>
       </div>
@@ -157,32 +159,32 @@ export function FollowUpBoardModal() {
       <div className="toolbar-row" style={{ marginBottom: 6 }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
           <input type="checkbox" style={{ width: 'auto' }} checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
-          Tampilkan juga jadwal yang masih jauh ({nantiCount})
+          {tr("Tampilkan juga jadwal yang masih jauh (")}{nantiCount})
         </label>
       </div>
 
       {rows.length === 0 ? (
         <div className="empty-state">
-          <h3>Tidak ada yang perlu di-follow-up</h3>
-          <p>Semua pipeline bergerak dan tidak ada customer yang mulai dingin. Kerja bagus!</p>
+          <h3>{tr("Tidak ada yang perlu di-follow-up")}</h3>
+          <p>{tr("Semua pipeline bergerak dan tidak ada customer yang mulai dingin. Kerja bagus!")}</p>
         </div>
       ) : (
         <>
           {segera.length > 0 && (
             <>
-              <div style={{ fontWeight: 600, fontSize: 12.5, margin: '14px 0 6px' }}>Perlu Segera</div>
+              <div style={{ fontWeight: 600, fontSize: 12.5, margin: '14px 0 6px' }}>{tr("Perlu Segera")}</div>
               <div className="followup-list">{segera.map(renderRow)}</div>
             </>
           )}
           {mingguIni.length > 0 && (
             <>
-              <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 6px' }}>Jatuh Tempo Minggu Ini</div>
+              <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 6px' }}>{tr("Jatuh Tempo Minggu Ini")}</div>
               <div className="followup-list">{mingguIni.map(renderRow)}</div>
             </>
           )}
           {showAll && nanti.length > 0 && (
             <>
-              <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 6px' }}>Terjadwal — Masih Jauh</div>
+              <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 6px' }}>{tr("Terjadwal — Masih Jauh")}</div>
               <div className="followup-list">{nanti.map(renderRow)}</div>
             </>
           )}

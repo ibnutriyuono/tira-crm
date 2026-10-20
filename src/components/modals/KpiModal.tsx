@@ -11,6 +11,7 @@ import { useUiStore } from '@/store/useUiStore';
 import type { BudgetTarget } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 function thisYear(): string {
   return String(new Date().getFullYear());
 }
@@ -39,6 +40,7 @@ function fmtCell(v: number | null, unit: string): string {
  * integration, per explicit instruction.
  */
 export function KpiModal() {
+  const tr = useT();
   const show = useUiStore((s) => s.modal === 'kpi');
   const closeModal = useUiStore((s) => s.closeModal);
   const currentUser = useDataStore((s) => s.currentUser);
@@ -153,8 +155,8 @@ export function KpiModal() {
       <div key={item.key} style={{ marginBottom: 18 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 4 }}>
           <span style={{ fontWeight: 700, fontSize: 13 }}>{item.label}</span>
-          <span className="badge slate">Bobot {item.bobot}</span>
-          {!item.auto && <span className="badge amber">Manual — menunggu integrasi Sage 300</span>}
+          <span className="badge slate">{tr("Bobot")} {item.bobot}</span>
+          {!item.auto && <span className="badge amber">{tr("Manual — menunggu integrasi Sage 300")}</span>}
         </div>
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table kpi-scorecard-table">
@@ -170,7 +172,7 @@ export function KpiModal() {
             </thead>
             <tbody>
               <tr>
-                <td style={{ fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>Budget</td>
+                <td style={{ fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>{tr("Budget")}</td>
                 {item.months.map((c) => (
                   <td key={c.month} className="center mono" style={{ fontSize: 11 }}>
                     {fmtCell(c.budget, item.unit)}
@@ -178,7 +180,7 @@ export function KpiModal() {
                 ))}
               </tr>
               <tr>
-                <td style={{ fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>Result</td>
+                <td style={{ fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>{tr("Result")}</td>
                 {item.months.map((c) => (
                   <td key={c.month} className="center mono" style={{ fontSize: 11 }}>
                     {fmtCell(c.result, item.unit)}
@@ -186,7 +188,7 @@ export function KpiModal() {
                 ))}
               </tr>
               <tr>
-                <td style={{ fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>Achieve</td>
+                <td style={{ fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>{tr("Achieve")}</td>
                 {item.months.map((c) => (
                   <td key={c.month} className="center mono" style={{ fontSize: 11 }}>
                     {fmtAchieve(c.achieve)}
@@ -194,7 +196,7 @@ export function KpiModal() {
                 ))}
               </tr>
               <tr>
-                <td style={{ fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>Score</td>
+                <td style={{ fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>{tr("Score")}</td>
                 {item.months.map((c) => (
                   <td key={c.month} className="center mono" style={{ fontSize: 11 }}>
                     {fmtScore(c.score)}
@@ -202,12 +204,12 @@ export function KpiModal() {
                 ))}
               </tr>
               <tr>
-                <td style={{ fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>Signal</td>
+                <td style={{ fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>{tr("Signal")}</td>
                 {item.months.map((c) => (
                   <td key={c.month} className="center">
                     {c.signal && (
                       <span className={`badge ${SIGNAL_BADGE[c.signal]}`} title={SIGNAL_LABEL[c.signal]}>
-                        &nbsp;
+                        {tr(" ")}
                       </span>
                     )}
                   </td>
@@ -224,33 +226,31 @@ export function KpiModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="KPI Scorecard"
+      title={tr("KPI Scorecard")}
       xwide
       footer={
         <button type="button" className="btn btn-outline" onClick={closeModal}>
-          Tutup
+          {tr("Tutup")}
         </button>
       }
     >
       <div className="import-summary" style={{ marginBottom: 14 }}>
-        Sales Order, Invoice, dan Prospect/Opportunity dihitung otomatis dari data CRM, berjalan kumulatif dari Januari
-        (year-to-date) — sama seperti pola budget pada template KPI resmi. Gross Margin masih diisi manual sampai
-        terhubung dengan Sage 300.
+        {tr("Sales Order, Invoice, dan Prospect/Opportunity dihitung otomatis dari data CRM, berjalan kumulatif dari Januari (year-to-date) — sama seperti pola budget pada template KPI resmi. Gross Margin masih diisi manual sampai terhubung dengan Sage 300.")}
       </div>
 
       <div className="form-grid" style={{ marginBottom: 10 }}>
         <div>
-          <label>Tahun</label>
+          <label>{tr("Tahun")}</label>
           <input type="number" value={year} onChange={(e) => setYear(e.target.value)} style={{ maxWidth: 110 }} />
         </div>
         {scopeIsPicker ? (
           <div>
-            <label>Lingkup</label>
+            <label>{tr("Lingkup")}</label>
             <select value={scopeKey} onChange={(e) => setScopeKey(e.target.value)}>
-              <option value="nasional">Nasional (semua cabang)</option>
+              <option value="nasional">{tr("Nasional (semua cabang)")}</option>
               {regionList.map((r) => (
                 <option key={r} value={`reg-${r}`}>
-                  Regional {r} (rollup)
+                  {tr("Regional")} {r} {tr("(rollup)")}
                 </option>
               ))}
               {CABANG_LIST.map((c) => (
@@ -262,7 +262,7 @@ export function KpiModal() {
           </div>
         ) : (
           <div>
-            <label>Lingkup</label>
+            <label>{tr("Lingkup")}</label>
             <input type="text" value={scopeLabel} readOnly />
           </div>
         )}
@@ -270,16 +270,16 @@ export function KpiModal() {
 
       <div className="kpi-grid" style={{ marginBottom: 18 }}>
         <div className="kpi">
-          <div className="label">Total Score ({MONTH_LABELS[snapshotIdx]})</div>
+          <div className="label">{tr("Total Score (")}{MONTH_LABELS[snapshotIdx]})</div>
           <div className="value">{fmtScore(scorecard.totalScore[snapshotIdx])}</div>
-          <div className="foot">dari 100</div>
+          <div className="foot">{tr("dari 100")}</div>
         </div>
         {scorecard.items.map((it) => (
           <div className="kpi" key={it.key}>
             <div className="label">{it.label.split('(')[0].trim()}</div>
             <div className="value">{fmtAchieve(it.months[snapshotIdx].achieve)}</div>
             <div className="foot">
-              Bobot {it.bobot} · Score {fmtScore(it.months[snapshotIdx].score)}
+              {tr("Bobot")} {it.bobot} {tr("· Score")} {fmtScore(it.months[snapshotIdx].score)}
             </div>
           </div>
         ))}
@@ -287,14 +287,14 @@ export function KpiModal() {
 
       {cabangList.length === 0 ? (
         <div className="empty-state">
-          <h3>Cabang belum diset di akun ini</h3>
-          <p>Hubungi Admin untuk melengkapi data cabang pada akun Anda.</p>
+          <h3>{tr("Cabang belum diset di akun ini")}</h3>
+          <p>{tr("Hubungi Admin untuk melengkapi data cabang pada akun Anda.")}</p>
         </div>
       ) : (
         <>
           {scorecard.items.map(renderItemBlock)}
 
-          <div style={{ fontWeight: 700, fontSize: 13, margin: '18px 0 4px' }}>TOTAL SCORE</div>
+          <div style={{ fontWeight: 700, fontSize: 13, margin: '18px 0 4px' }}>{tr("TOTAL SCORE")}</div>
           <div className="table-wrap" style={{ borderTop: 'none', marginBottom: 18 }}>
             <table className="simple-table kpi-scorecard-table">
               <thead>
@@ -309,7 +309,7 @@ export function KpiModal() {
               </thead>
               <tbody>
                 <tr>
-                  <td style={{ fontWeight: 700, position: 'sticky', left: 0, background: 'var(--surface)' }}>Score</td>
+                  <td style={{ fontWeight: 700, position: 'sticky', left: 0, background: 'var(--surface)' }}>{tr("Score")}</td>
                   {scorecard.totalScore.map((s, i) => (
                     <td key={i} className="center mono" style={{ fontWeight: 700 }}>
                       {fmtScore(s)}
@@ -317,12 +317,12 @@ export function KpiModal() {
                   ))}
                 </tr>
                 <tr>
-                  <td style={{ fontWeight: 700, position: 'sticky', left: 0, background: 'var(--surface)' }}>Signal</td>
+                  <td style={{ fontWeight: 700, position: 'sticky', left: 0, background: 'var(--surface)' }}>{tr("Signal")}</td>
                   {scorecard.totalSignal.map((sig, i) => (
                     <td key={i} className="center">
                       {sig && (
                         <span className={`badge ${SIGNAL_BADGE[sig]}`} title={SIGNAL_LABEL[sig]}>
-                          &nbsp;
+                          {tr(" ")}
                         </span>
                       )}
                     </td>
@@ -334,10 +334,10 @@ export function KpiModal() {
 
           {canEditGm && (
             <>
-              <div style={{ fontWeight: 600, fontSize: 12.5, margin: '4px 0 8px' }}>Isi Gross Margin — {cabangList[0]}</div>
+              <div style={{ fontWeight: 600, fontSize: 12.5, margin: '4px 0 8px' }}>{tr("Isi Gross Margin —")} {cabangList[0]}</div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <div>
-                  <label>Bulan</label>
+                  <label>{tr("Bulan")}</label>
                   <select value={gmMonth} onChange={(e) => setGmMonth(e.target.value)} style={{ maxWidth: 130 }}>
                     {MONTH_LABELS.map((m, i) => (
                       <option key={m} value={String(i + 1).padStart(2, '0')}>
@@ -347,16 +347,16 @@ export function KpiModal() {
                   </select>
                 </div>
                 <div>
-                  <label>Target (%)</label>
-                  <input type="number" step="0.1" value={gmTargetPct} onChange={(e) => setGmTargetPct(e.target.value)} placeholder="cth. 34" style={{ maxWidth: 110 }} />
+                  <label>{tr("Target (%)")}</label>
+                  <input type="number" step="0.1" value={gmTargetPct} onChange={(e) => setGmTargetPct(e.target.value)} placeholder={tr("cth. 34")} style={{ maxWidth: 110 }} />
                 </div>
                 <div>
-                  <label>Hasil Aktual (%)</label>
-                  <input type="number" step="0.1" value={gmResultPct} onChange={(e) => setGmResultPct(e.target.value)} placeholder="cth. 32" style={{ maxWidth: 110 }} />
+                  <label>{tr("Hasil Aktual (%)")}</label>
+                  <input type="number" step="0.1" value={gmResultPct} onChange={(e) => setGmResultPct(e.target.value)} placeholder={tr("cth. 32")} style={{ maxWidth: 110 }} />
                 </div>
                 {canNow('kpi', 'e') && (
                   <button type="button" className="btn btn-primary btn-sm" disabled={savingGm} onClick={onSaveGm}>
-                    Simpan
+                    {tr("Simpan")}
                   </button>
                 )}
               </div>

@@ -17,6 +17,7 @@ import type { ActivityPic, Prospect, SalesActivity } from '@/lib/types';
 import { canNow, useCan } from '@/hooks/useCan';
 import { HASIL_KEYS, HASIL_LABEL, KANAL_BY_TIPE, KANAL_LABEL, contactErrors, emailError, kanalNeeds, needsHasil, normalizePhone, phoneError, waLink, type Hasil, type Kanal } from '@/lib/activity-contact';
 
+import { useT } from '@/store/useLangStore';
 const plusDays = (ymd: string, n: number) => {
   const d = new Date(`${ymd}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
@@ -55,6 +56,7 @@ interface ConvertCtx {
  * Everyone else reads the same data through KPI Aktivitas.
  */
 export function SalesActivityModal() {
+  const tr = useT();
   const show = useUiStore((s) => s.modal === 'salesActivity');
   const closeModalRaw = useUiStore((s) => s.closeModal);
   const openModal = useUiStore((s) => s.openModal);
@@ -383,13 +385,13 @@ export function SalesActivityModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="Aktivitas Harian"
+      title={tr("Aktivitas Harian")}
       xwide
       footer={
         <>
           {canNow('aktivitas', 'x') && (
             <button type="button" className="btn btn-outline" style={{ marginRight: 'auto' }} onClick={exportExcel} disabled={loading}>
-              Export Excel ({periode})
+              {tr("Export Excel (")}{periode})
             </button>
           )}
           <button
@@ -400,10 +402,10 @@ export function SalesActivityModal() {
               openModal('activityKpi');
             }}
           >
-            Lihat KPI Aktivitas
+            {tr("Lihat KPI Aktivitas")}
           </button>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Tutup
+            {tr("Tutup")}
           </button>
         </>
       }
@@ -411,21 +413,21 @@ export function SalesActivityModal() {
       {!canWrite && (
         <div className="import-summary" style={{ marginTop: 0, marginBottom: 12 }}>
           {owner !== null
-            ? <>Role Anda hanya dapat <b>melihat</b> Aktivitas Harian (Kelola Role). Hubungi Administrator bila perlu hak mengisi.</>
-            : <>Pengisian aktivitas dilakukan oleh akun <b>Sales</b> (yang memiliki Kode SE) dan <b>Branch Manager</b>. Akun Anda dapat melihat rekap di <b>KPI Aktivitas</b>.</>}
+            ? <>{tr("Role Anda hanya dapat")} <b>{tr("melihat")}</b> {tr("Aktivitas Harian (Kelola Role). Hubungi Administrator bila perlu hak mengisi.")}</>
+            : <>{tr("Pengisian aktivitas dilakukan oleh akun")} <b>{tr("Sales")}</b> {tr("(yang memiliki Kode SE) dan")} <b>{tr("Branch Manager")}</b>{tr(". Akun Anda dapat melihat rekap di")} <b>{tr("KPI Aktivitas")}</b>.</>}
         </div>
       )}
 
       <div className="toolbar-row" style={{ alignItems: 'center' }}>
-        <label style={{ margin: 0 }}>Tanggal</label>
+        <label style={{ margin: 0 }}>{tr("Tanggal")}</label>
         <input type="date" value={tanggal} max={localToday()} onChange={(e) => e.target.value && setTanggal(e.target.value)} style={{ width: 160 }} />
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>{formatDateID(tanggal)}</span>
         {multi && (
           <>
-            <label style={{ margin: '0 0 0 12px' }}>Tampilkan</label>
+            <label style={{ margin: '0 0 0 12px' }}>{tr("Tampilkan")}</label>
             <select value={lihat} onChange={(e) => setLihat(e.target.value)} style={{ width: 'auto' }}>
               <option value="semua">{semuaLabel}</option>
-              <option value="saya">Aktivitas saya ({owner})</option>
+              <option value="saya">{tr("Aktivitas saya (")}{owner})</option>
               {seOptions.map((se) => (
                 <option key={se} value={se}>
                   {isStaffActivityKey(se) ? se : `Sales ${se}`}
@@ -437,23 +439,23 @@ export function SalesActivityModal() {
       </div>
 
       <div className="import-summary" style={{ marginTop: 8, marginBottom: 12 }}>
-        <b>Bulan ini ({periode}){multi ? (lihat === 'saya' ? ' — aktivitas saya' : lihat === 'semua' ? ` — ${semuaLabel.toLowerCase()}` : ` — ${lihat}`) : ''}:</b>{' '}
+        <b>{tr("Bulan ini (")}{periode}){multi ? (lihat === 'saya' ? tr(" — aktivitas saya") : lihat === 'semua' ? ` — ${semuaLabel.toLowerCase()}` : ` — ${lihat}`) : ''}:</b>{' '}
         {[...ACTIVITY_TYPES.map((t) => `${t.short} ${monthCount[t.key] || 0}`), ...INTERNAL_ACTIVITY_TYPES.filter((t) => monthCount[t.key]).map((t) => `${t.short} ${monthCount[t.key]}`)].join(' · ')}
       </div>
 
       {canWrite && (
         <div className="rfq-item-card">
           <div className="rfq-item-head">
-            <span>{editId ? 'Ubah Aktivitas' : 'Aktivitas Baru'}</span>
+            <span>{editId ? tr("Ubah Aktivitas") : tr("Aktivitas Baru")}</span>
             {editId && (
               <button type="button" className="btn btn-outline btn-sm" onClick={resetForm}>
-                Batal ubah
+                {tr("Batal ubah")}
               </button>
             )}
           </div>
           <div className="form-grid">
             <div>
-              <label>Jenis aktivitas</label>
+              <label>{tr("Jenis aktivitas")}</label>
               <select
                 value={tipe}
                 onChange={(e) => {
@@ -470,18 +472,18 @@ export function SalesActivityModal() {
               </select>
             </div>
             <div>
-              <label>Customer *</label>
+              <label>{tr("Customer *")}</label>
               <CustomerNameInput value={customer} onChange={setCustomer} />
             </div>
             {kanals && (
               <div className="full">
                 <label>
-                  Saluran <span style={{ color: 'var(--rust-600)' }}>*</span>{' '}
+                  {tr("Saluran")} <span style={{ color: 'var(--rust-600)' }}>*</span>{' '}
                   <span className="field-note" style={{ display: 'inline', textTransform: 'none' }}>
-                    — menentukan kontak yang wajib diisi
+                    {tr("— menentukan kontak yang wajib diisi")}
                   </span>
                 </label>
-                <div className="sa-pills" role="group" aria-label="Saluran">
+                <div className="sa-pills" role="group" aria-label={tr("Saluran")}>
                   {kanals.map((k) => (
                     <button key={k} type="button" className={kanal === k ? 'on' : ''} aria-pressed={kanal === k} onClick={() => setKanal(k)}>
                       {KANAL_LABEL[k]}
@@ -492,9 +494,9 @@ export function SalesActivityModal() {
             )}
             <div className="full">
               <label>
-                PIC customer <span style={{ color: 'var(--rust-600)' }}>*</span>{' '}
+                {tr("PIC customer")} <span style={{ color: 'var(--rust-600)' }}>*</span>{' '}
                 <span className="field-note" style={{ display: 'inline', textTransform: 'none' }}>
-                  — centang yang dihubungi{need === 'phone' ? (kanal === 'wa' ? '; No. HP (WhatsApp) wajib untuk PIC yang dicentang' : '; No. HP atau telepon kantor (boleh ext.) wajib untuk PIC yang dicentang') : need === 'email' ? '; Email wajib untuk PIC yang dicentang' : ''}
+                  {tr("— centang yang dihubungi")}{need === 'phone' ? (kanal === 'wa' ? tr("; No. HP (WhatsApp) wajib untuk PIC yang dicentang") : tr("; No. HP atau telepon kantor (boleh ext.) wajib untuk PIC yang dicentang")) : need === 'email' ? tr("; Email wajib untuk PIC yang dicentang") : ''}
                 </span>
               </label>
               <datalist id="salesActPics">
@@ -511,38 +513,38 @@ export function SalesActivityModal() {
                 const showErr = tried || (p.phone || p.email);
                 return (
                   <div key={i} className="sa-pic">
-                    <label className="sa-chk" title="PIC ini yang dihubungi">
+                    <label className="sa-chk" title={tr("PIC ini yang dihubungi")}>
                       <input type="checkbox" checked={!!p.dihubungi} onChange={(e) => setPics((list) => list.map((x, idx) => (idx === i ? { ...x, dihubungi: e.target.checked } : x)))} aria-label={`Dihubungi: ${p.nama || 'PIC ' + (i + 1)}`} />
                     </label>
-                    <input type="text" list="salesActPics" value={p.nama} onChange={(e) => setPic(i, 'nama', e.target.value)} placeholder="Nama PIC" />
-                    <input type="text" value={p.jabatan} onChange={(e) => setPic(i, 'jabatan', e.target.value)} placeholder="Jabatan" />
+                    <input type="text" list="salesActPics" value={p.nama} onChange={(e) => setPic(i, 'nama', e.target.value)} placeholder={tr("Nama PIC")} />
+                    <input type="text" value={p.jabatan} onChange={(e) => setPic(i, 'jabatan', e.target.value)} placeholder={tr("Jabatan")} />
                     <div>
-                      <input type="text" inputMode="tel" value={p.phone || ''} onChange={(e) => setPic(i, 'phone', e.target.value)} placeholder={must === 'phone' ? (kanal === 'wa' ? 'No. HP/WA *' : 'No. HP / telp kantor + ext *') : 'No. HP / telp kantor'} className={must === 'phone' ? 'req' : ''} style={{ fontFamily: 'var(--font-ibm-plex-mono), monospace', borderColor: pe && showErr ? 'var(--rust-500)' : undefined }} />
+                      <input type="text" inputMode="tel" value={p.phone || ''} onChange={(e) => setPic(i, 'phone', e.target.value)} placeholder={must === 'phone' ? (kanal === 'wa' ? tr("No. HP/WA *") : tr("No. HP / telp kantor + ext *")) : tr("No. HP / telp kantor")} className={must === 'phone' ? 'req' : ''} style={{ fontFamily: 'var(--font-ibm-plex-mono), monospace', borderColor: pe && showErr ? 'var(--rust-500)' : undefined }} />
                       {pe && showErr ? <small className="bad">{pe}</small> : must === 'phone' && p.phone ? <small className="ok">✓ {normalizePhone(p.phone)}</small> : null}
                     </div>
                     <div>
-                      <input type="text" inputMode="email" value={p.email || ''} onChange={(e) => setPic(i, 'email', e.target.value)} placeholder={must === 'email' ? 'Email *' : 'Email'} className={must === 'email' ? 'req' : ''} style={{ borderColor: ee && showErr ? 'var(--rust-500)' : undefined }} />
-                      {ee && showErr ? <small className="bad">{ee}</small> : must === 'email' && p.email ? <small className="ok">✓ valid</small> : null}
+                      <input type="text" inputMode="email" value={p.email || ''} onChange={(e) => setPic(i, 'email', e.target.value)} placeholder={must === 'email' ? tr("Email *") : tr("Email")} className={must === 'email' ? 'req' : ''} style={{ borderColor: ee && showErr ? 'var(--rust-500)' : undefined }} />
+                      {ee && showErr ? <small className="bad">{ee}</small> : must === 'email' && p.email ? <small className="ok">{tr("✓ valid")}</small> : null}
                     </div>
-                    <button type="button" className="icon-btn danger" title="Hapus PIC ini" disabled={pics.length === 1} onClick={() => setPics((list) => list.filter((_, idx) => idx !== i))}>
+                    <button type="button" className="icon-btn danger" title={tr("Hapus PIC ini")} disabled={pics.length === 1} onClick={() => setPics((list) => list.filter((_, idx) => idx !== i))}>
                       <IconTrash />
                     </button>
                   </div>
                 );
               })}
               <button type="button" className="btn btn-outline btn-sm" onClick={() => setPics((list) => [...list, { ...EMPTY_PIC, dihubungi: false }])}>
-                <IconPlus /> Tambah PIC
+                <IconPlus /> {tr("Tambah PIC")}
               </button>
               <div className="field-note" style={{ marginTop: 4 }}>
-                PIC & kontak terisi dari Kelola Customer; nomor/email yang diketik di sini ikut disimpan ke data customer. No. HP dirapikan otomatis ke format 08….
+                {tr("PIC & kontak terisi dari Kelola Customer; nomor/email yang diketik di sini ikut disimpan ke data customer. No. HP dirapikan otomatis ke format 08….")}
               </div>
             </div>
             {showHasil && (
               <div className="full">
                 <label>
-                  Hasil kontak <span style={{ color: 'var(--rust-600)' }}>*</span>
+                  {tr("Hasil kontak")} <span style={{ color: 'var(--rust-600)' }}>*</span>
                 </label>
-                <div className="sa-pills" role="group" aria-label="Hasil kontak">
+                <div className="sa-pills" role="group" aria-label={tr("Hasil kontak")}>
                   {HASIL_KEYS.map((h) => (
                     <button
                       key={h}
@@ -560,9 +562,9 @@ export function SalesActivityModal() {
                 </div>
                 {hasil && hasil !== 'tersambung' && (
                   <div className="sa-fu">
-                    <b>Jadwalkan follow-up</b>
-                    <input type="date" value={followUp} min={tanggal} onChange={(e) => setFollowUp(e.target.value)} aria-label="Tanggal follow-up" />
-                    <span>→ dibuat otomatis sebagai <b>rencana</b> di Aktivitas Harian (belum dihitung KPI sampai dilakukan).</span>
+                    <b>{tr("Jadwalkan follow-up")}</b>
+                    <input type="date" value={followUp} min={tanggal} onChange={(e) => setFollowUp(e.target.value)} aria-label={tr("Tanggal follow-up")} />
+                    <span>{tr("→ dibuat otomatis sebagai")} <b>{tr("rencana")}</b> {tr("di Aktivitas Harian (belum dihitung KPI sampai dilakukan).")}</span>
                   </div>
                 )}
               </div>
@@ -570,24 +572,24 @@ export function SalesActivityModal() {
             {tipe === 'meeting' && (
               <div className="full">
                 <label>
-                  Langkah berikutnya <span style={{ color: 'var(--rust-600)' }}>*</span>
+                  {tr("Langkah berikutnya")} <span style={{ color: 'var(--rust-600)' }}>*</span>
                 </label>
-                <input type="text" value={langkah} onChange={(e) => setLangkah(e.target.value)} placeholder="cth. kirim penawaran revisi SUS304 minggu depan" />
+                <input type="text" value={langkah} onChange={(e) => setLangkah(e.target.value)} placeholder={tr("cth. kirim penawaran revisi SUS304 minggu depan")} />
               </div>
             )}
             {tipe === 'kunjungan' && (
               <div className="full field-note" style={{ margin: 0 }}>
-                Lokasi GPS diambil otomatis saat Simpan (izinkan akses lokasi di browser/HP) dan tampil di daftar aktivitas sebagai bukti kunjungan.
+                {tr("Lokasi GPS diambil otomatis saat Simpan (izinkan akses lokasi di browser/HP) dan tampil di daftar aktivitas sebagai bukti kunjungan.")}
               </div>
             )}
             <div className="full">
-              <label>Hasil / keterangan</label>
-              <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="cth. Bertemu Pak Andi (Purchasing), minta penawaran plate SS304 12mm" />
+              <label>{tr("Hasil / keterangan")}</label>
+              <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder={tr("cth. Bertemu Pak Andi (Purchasing), minta penawaran plate SS304 12mm")} />
             </div>
           </div>
           {tried && ruleErrors.length > 0 && (
             <div className="sa-errs">
-              <b>Belum bisa disimpan:</b>
+              <b>{tr("Belum bisa disimpan:")}</b>
               {ruleErrors.map((e) => (
                 <span key={e}>• {e}</span>
               ))}
@@ -596,16 +598,16 @@ export function SalesActivityModal() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8, alignItems: 'center' }}>
             {(need === 'phone' || tipe === 'kunjungan' || tipe === 'meeting') && firstContacted && waLink(firstContacted.phone) && (
               <a className="btn btn-outline btn-sm sa-wa" href={waLink(firstContacted.phone) as string} target="_blank" rel="noreferrer">
-                Kirim WA ke {firstContacted.nama || 'PIC'}
+                {tr("Kirim WA ke")} {firstContacted.nama || 'PIC'}
               </a>
             )}
             {need === 'email' && firstContacted && !emailError(firstContacted.email) && (
               <a className="btn btn-outline btn-sm sa-wa" href={`mailto:${firstContacted.email}`}>
-                Kirim Email ke {firstContacted.nama || 'PIC'}
+                {tr("Kirim Email ke")} {firstContacted.nama || 'PIC'}
               </a>
             )}
             <button type="button" className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }} disabled={busy} onClick={onSave}>
-              <IconPlus /> {editId ? 'Simpan Perubahan' : 'Simpan Aktivitas'}
+              <IconPlus /> {editId ? tr("Simpan Perubahan") : tr("Simpan Aktivitas")}
             </button>
           </div>
         </div>
@@ -615,74 +617,74 @@ export function SalesActivityModal() {
         <div className="rfq-item-card" style={{ borderColor: 'var(--steel-600)' }}>
           <div className="rfq-item-head">
             <span>
-              Masukkan ke Pipeline · {CONVERT_LABEL[convert.status]} — {convert.activity.customer}
+              {tr("Masukkan ke Pipeline ·")} {CONVERT_LABEL[convert.status]} — {convert.activity.customer}
             </span>
           </div>
           <div className="form-grid">
             <div className="full">
-              <label>Uraian material / kebutuhan *</label>
-              <input type="text" value={uraian} onChange={(e) => setUraian(e.target.value)} placeholder="cth. Plate SS304 12 mm x 1250 x 2500" autoFocus />
-              <div className="field-note">Catatan aktivitas & PIC otomatis masuk ke <b>Keterangan</b> prospek — di sini cukup isi materialnya.</div>
+              <label>{tr("Uraian material / kebutuhan *")}</label>
+              <input type="text" value={uraian} onChange={(e) => setUraian(e.target.value)} placeholder={tr("cth. Plate SS304 12 mm x 1250 x 2500")} autoFocus />
+              <div className="field-note">{tr("Catatan aktivitas & PIC otomatis masuk ke")} <b>{tr("Keterangan")}</b> {tr("prospek — di sini cukup isi materialnya.")}</div>
             </div>
             <div>
-              <label>Qty (pcs)</label>
+              <label>{tr("Qty (pcs)")}</label>
               <input type="number" min={1} step="any" value={qty} onChange={(e) => setQty(e.target.value)} />
             </div>
             <div>
-              <label>Nilai total (Rp), bila sudah ada</label>
+              <label>{tr("Nilai total (Rp), bila sudah ada")}</label>
               <input type="number" min={0} step="any" value={nilai} onChange={(e) => setNilai(e.target.value)} />
             </div>
             {convert.status === 4 && (
               <div className="full">
                 <label>
-                  No. PO <span style={{ color: 'var(--rust-600)' }}>*</span>
+                  {tr("No. PO")} <span style={{ color: 'var(--rust-600)' }}>*</span>
                 </label>
-                <input type="text" value={noPo} onChange={(e) => setNoPo(e.target.value)} placeholder="Nomor PO/kontrak dari customer" />
+                <input type="text" value={noPo} onChange={(e) => setNoPo(e.target.value)} placeholder={tr("Nomor PO/kontrak dari customer")} />
               </div>
             )}
           </div>
           {convert.status === 4 && (
             <div style={{ marginTop: 10 }}>
-              <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 6 }}>Quality · Cost · Delivery (wajib — deal ditutup)</div>
+              <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 6 }}>{tr("Quality · Cost · Delivery (wajib — deal ditutup)")}</div>
               <QcdFields value={qcd} onChange={setQcd} statusVal={4} required />
             </div>
           )}
           <div className="field-note" style={{ marginTop: 6 }}>
-            Prospek dibuat dengan status {STATUS_META[convert.status]?.label}. Detail lain (material tambahan, harga) dapat dilengkapi dari Pipeline.
+            {tr("Prospek dibuat dengan status")} {STATUS_META[convert.status]?.label}{tr(". Detail lain (material tambahan, harga) dapat dilengkapi dari Pipeline.")}
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setConvert(null)}>
-              Batal
+              {tr("Batal")}
             </button>
             <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={onConvert}>
-              Masukkan ke Pipeline
+              {tr("Masukkan ke Pipeline")}
             </button>
           </div>
         </div>
       )}
 
       <div style={{ fontWeight: 700, fontSize: 13, margin: '12px 0 6px' }}>
-        Aktivitas {formatDateID(tanggal)} ({dayList.length})
+        {tr("Aktivitas")} {formatDateID(tanggal)} ({dayList.length})
       </div>
       {loading && dayList.length === 0 ? (
-        <div className="field-note">Memuat…</div>
+        <div className="field-note">{tr("Memuat…")}</div>
       ) : dayList.length === 0 ? (
         <div className="empty-state" style={{ padding: '22px 10px' }}>
-          <h3>Belum ada aktivitas pada tanggal ini</h3>
-          {canWrite && <p>Isi form di atas untuk mencatat kunjungan, telepon, meeting, atau dokumen yang dikirim.</p>}
+          <h3>{tr("Belum ada aktivitas pada tanggal ini")}</h3>
+          {canWrite && <p>{tr("Isi form di atas untuk mencatat kunjungan, telepon, meeting, atau dokumen yang dikirim.")}</p>}
         </div>
       ) : (
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table" style={{ minWidth: 760 }}>
             <thead>
               <tr>
-                <th>Jenis</th>
+                <th>{tr("Jenis")}</th>
                 {(!canWrite || viewAll) && <th>SE</th>}
-                <th>Customer</th>
+                <th>{tr("Customer")}</th>
                 <th>PIC</th>
-                <th>Keterangan</th>
-                <th>Pipeline</th>
-                {canWrite && <th>Aksi</th>}
+                <th>{tr("Keterangan")}</th>
+                <th>{tr("Pipeline")}</th>
+                {canWrite && <th>{tr("Aksi")}</th>}
               </tr>
             </thead>
             <tbody>
@@ -692,7 +694,7 @@ export function SalesActivityModal() {
                   <tr key={a.id} data-act-id={a.id} className={a.id === focusId ? 'sa-focus' : undefined}>
                     <td>
                       <span className={`badge ${TIPE_COLOR[a.tipe] || 'slate'}`}>{TIPE_LABEL[a.tipe] || a.tipe}</span>
-                      {a.kanal && <div className="field-note" style={{ margin: '3px 0 0' }}>via {KANAL_LABEL[a.kanal as Kanal] || a.kanal}</div>}
+                      {a.kanal && <div className="field-note" style={{ margin: '3px 0 0' }}>{tr("via")} {KANAL_LABEL[a.kanal as Kanal] || a.kanal}</div>}
                       {a.hasil && a.status !== 'rencana' && (
                         <div style={{ marginTop: 3 }}>
                           <span className={`badge ${a.hasil === 'tersambung' ? 'green' : 'amber'}`}>{HASIL_LABEL[a.hasil as Hasil] || a.hasil}</span>
@@ -700,23 +702,23 @@ export function SalesActivityModal() {
                       )}
                       {a.status === 'rencana' ? (
                         <div style={{ marginTop: 4 }}>
-                          <span className="badge amber" title="Jadwal follow-up — belum dihitung di KPI sampai dilakukan">Rencana</span>
+                          <span className="badge amber" title={tr("Jadwal follow-up — belum dihitung di KPI sampai dilakukan")}>{tr("Rencana")}</span>
                         </div>
                       ) : a.sumber === 'followup' ? (
                         <div style={{ marginTop: 4 }}>
-                          <span className="badge slate" title="Tercatat otomatis dari Follow-up WhatsApp">Otomatis</span>
+                          <span className="badge slate" title={tr("Tercatat otomatis dari Follow-up WhatsApp")}>{tr("Otomatis")}</span>
                         </div>
                       ) : a.sumber === 'perjalanan' ? (
                         <div style={{ marginTop: 4 }}>
-                          <span className="badge steel" title="Dari realisasi Perjalanan Dinas — diubah lewat perjalanannya">✈ Perjalanan Dinas</span>
+                          <span className="badge steel" title={tr("Dari realisasi Perjalanan Dinas — diubah lewat perjalanannya")}>{tr("✈ Perjalanan Dinas")}</span>
                         </div>
                       ) : a.sumber === 'purchasing' ? (
                         <div style={{ marginTop: 4 }}>
-                          <span className="badge slate" title="Tercatat otomatis dari pekerjaan Purchasing (jawab RFQ / FUP A, diskusi kartu)">Otomatis · Purchasing</span>
+                          <span className="badge slate" title={tr("Tercatat otomatis dari pekerjaan Purchasing (jawab RFQ / FUP A, diskusi kartu)")}>{tr("Otomatis · Purchasing")}</span>
                         </div>
                       ) : a.sumber === 'penawaran' ? (
                         <div style={{ marginTop: 4 }}>
-                          <span className="badge steel" title={`Tercatat otomatis dari Surat Penawaran${a.refNo ? ` No. ${a.refNo}` : ''}`}>Surat penawaran</span>
+                          <span className="badge steel" title={`Tercatat otomatis dari Surat Penawaran${a.refNo ? ` No. ${a.refNo}` : ''}`}>{tr("Surat penawaran")}</span>
                         </div>
                       ) : null}
                     </td>
@@ -728,7 +730,7 @@ export function SalesActivityModal() {
                             <div key={i} style={{ marginBottom: 4, minWidth: 140 }}>
                               <div>
                                 {p.nama}
-                                {p.dihubungi && <span className="badge steel" style={{ marginLeft: 4, fontSize: 10 }}>dihubungi</span>}
+                                {p.dihubungi && <span className="badge steel" style={{ marginLeft: 4, fontSize: 10 }}>{tr("dihubungi")}</span>}
                               </div>
                               <div className="field-note" style={{ margin: 0 }}>
                                 {p.jabatan}
@@ -741,12 +743,12 @@ export function SalesActivityModal() {
                     </td>
                     <td>
                       {a.keterangan || '-'}
-                      {a.langkah && <div className="field-note" style={{ margin: '3px 0 0' }}>Langkah berikutnya: {a.langkah}</div>}
-                      {a.pendamping && <div className="field-note" style={{ margin: '3px 0 0', color: 'var(--steel-600)' }}>Kunjungan bersama: didampingi {a.pendamping}</div>}
+                      {a.langkah && <div className="field-note" style={{ margin: '3px 0 0' }}>{tr("Langkah berikutnya:")} {a.langkah}</div>}
+                      {a.pendamping && <div className="field-note" style={{ margin: '3px 0 0', color: 'var(--steel-600)' }}>{tr("Kunjungan bersama: didampingi")} {a.pendamping}</div>}
                       {a.lat != null && a.lng != null && (
                         <div style={{ marginTop: 3 }}>
                           <a href={`https://www.google.com/maps?q=${a.lat},${a.lng}`} target="_blank" rel="noreferrer" className="field-note" style={{ margin: 0 }}>
-                            Lokasi kunjungan{a.akurasi ? ` (±${Math.round(a.akurasi)} m)` : ''}
+                            {tr("Lokasi kunjungan")}{a.akurasi ? ` (±${Math.round(a.akurasi)} m)` : ''}
                           </a>
                         </div>
                       )}
@@ -754,7 +756,7 @@ export function SalesActivityModal() {
                     <td style={{ minWidth: 250 }}>
                       {a.prospectId ? (
                         <span className="badge green" title={p ? `Nilai ${formatRupiah(p.value)}` : undefined}>
-                          {a.sumber === 'followup' ? 'Follow-up prospek' : 'Di pipeline'}
+                          {a.sumber === 'followup' ? tr("Follow-up prospek") : tr("Di pipeline")}
                           {p ? ` · ${STATUS_META[Number(p.status)]?.label ?? ''}` : ''}
                         </span>
                       ) : canWrite && permProspek && a.sumber !== 'purchasing' && (!owner || a.se.toLowerCase() === owner.toLowerCase()) ? (
@@ -771,13 +773,13 @@ export function SalesActivityModal() {
                     </td>
                     {canWrite && owner && a.se.toLowerCase() !== owner.toLowerCase() && (
                       <td>
-                        <span className="field-note" style={{ margin: 0 }}>Milik {a.se}</span>
+                        <span className="field-note" style={{ margin: 0 }}>{tr("Milik")} {a.se}</span>
                       </td>
                     )}
                     {canWrite && (!owner || a.se.toLowerCase() === owner.toLowerCase()) && a.sumber === 'perjalanan' && (
                       <td>
-                        <button type="button" className="btn btn-outline btn-sm" style={{ padding: '3px 8px', whiteSpace: 'nowrap' }} title="Kunjungan ini diubah lewat realisasi perjalanannya" onClick={() => { useUiStore.setState({ visitTripOpenId: a.tripId || null }); openModal('visitTrip'); }}>
-                          ✈ Buka perjalanan
+                        <button type="button" className="btn btn-outline btn-sm" style={{ padding: '3px 8px', whiteSpace: 'nowrap' }} title={tr("Kunjungan ini diubah lewat realisasi perjalanannya")} onClick={() => { useUiStore.setState({ visitTripOpenId: a.tripId || null }); openModal('visitTrip'); }}>
+                          {tr("✈ Buka perjalanan")}
                         </button>
                       </td>
                     )}
@@ -785,7 +787,7 @@ export function SalesActivityModal() {
                       <td>
                         {permD && (
                           <div className="row-actions">
-                            <button type="button" className="icon-btn danger" title="Hapus" onClick={() => onDelete(a)}>
+                            <button type="button" className="icon-btn danger" title={tr("Hapus")} onClick={() => onDelete(a)}>
                               <IconTrash />
                             </button>
                           </div>
@@ -796,20 +798,20 @@ export function SalesActivityModal() {
                       <td>
                         <div className="row-actions">
                           {a.status === 'rencana' && a.sumber === 'aktivitas' ? (
-                            <button type="button" className="btn btn-outline btn-sm" style={{ padding: '3px 8px', whiteSpace: 'nowrap' }} title="Isi hasil follow-up ini lalu simpan — tercatat hari ini" onClick={() => onEdit(a)}>
-                              ✓ Kerjakan
+                            <button type="button" className="btn btn-outline btn-sm" style={{ padding: '3px 8px', whiteSpace: 'nowrap' }} title={tr("Isi hasil follow-up ini lalu simpan — tercatat hari ini")} onClick={() => onEdit(a)}>
+                              {tr("✓ Kerjakan")}
                             </button>
                           ) : a.status === 'rencana' ? (
-                            <button type="button" className="btn btn-outline btn-sm" style={{ padding: '3px 8px', whiteSpace: 'nowrap' }} title="Tandai follow-up ini sudah dilakukan hari ini" onClick={() => onDonePlan(a)}>
-                              ✓ Selesai
+                            <button type="button" className="btn btn-outline btn-sm" style={{ padding: '3px 8px', whiteSpace: 'nowrap' }} title={tr("Tandai follow-up ini sudah dilakukan hari ini")} onClick={() => onDonePlan(a)}>
+                              {tr("✓ Selesai")}
                             </button>
                           ) : (
-                            <button type="button" className="icon-btn" title="Ubah" onClick={() => onEdit(a)}>
+                            <button type="button" className="icon-btn" title={tr("Ubah")} onClick={() => onEdit(a)}>
                               <IconEdit />
                             </button>
                           )}
                           {permD && (!a.prospectId || (!!a.sumber && a.status !== 'rencana')) && (
-                            <button type="button" className="icon-btn danger" title="Hapus" onClick={() => onDelete(a)}>
+                            <button type="button" className="icon-btn danger" title={tr("Hapus")} onClick={() => onDelete(a)}>
                               <IconTrash />
                             </button>
                           )}

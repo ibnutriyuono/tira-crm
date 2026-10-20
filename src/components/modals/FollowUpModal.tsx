@@ -10,6 +10,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Customer, Prospect } from '@/lib/types';
 
+import { useT } from '@/store/useLangStore';
 function buildProspectMessage(r: Prospect, senderName: string): string {
   const stMeta = STATUS_META[num(r.status)] || STATUS_META[0];
   return `Selamat siang Bapak/Ibu ${r.customer},\n\nKami dari PT. TIRA AUSTENITE, Tbk (Steel Division) ingin follow up terkait penawaran berikut:\n- Produk: ${r.uraian || '-'}\n- Qty: ${num(r.qty)} pcs\n- Status saat ini: ${stMeta.label}\n\nMohon info perkembangan / kepastian order dari Bapak/Ibu. Terima kasih.\n\nSalam,\n${senderName}`;
@@ -20,6 +21,7 @@ function buildCustomerMessage(c: Customer, senderName: string): string {
 }
 
 export function FollowUpModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'followUp';
   const ctx = useUiStore((s) => s.followUpCtx);
@@ -132,45 +134,44 @@ export function FollowUpModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="Follow Up via WhatsApp"
+      title={tr("Follow Up via WhatsApp")}
       wide
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Batal
+            {tr("Batal")}
           </button>
           <button type="button" className="btn btn-wa" onClick={onSend}>
-            <IconWa /> Buka WhatsApp
+            <IconWa /> {tr("Buka WhatsApp")}
           </button>
         </>
       }
     >
       <div className="form-grid">
         <div className="full">
-          <label>Nomor WhatsApp</label>
-          <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="cth. 08123456789" />
+          <label>{tr("Nomor WhatsApp")}</label>
+          <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={tr("cth. 08123456789")} />
         </div>
         <div className="full">
-          <label>Pesan</label>
+          <label>{tr("Pesan")}</label>
           <textarea style={{ minHeight: 170 }} value={message} onChange={(e) => setMessage(e.target.value)} />
         </div>
         {ctx.type === 'prospect' && (
           <>
             <div>
-              <label>Jadwalkan Follow-up Berikutnya</label>
+              <label>{tr("Jadwalkan Follow-up Berikutnya")}</label>
               <input type="date" value={nextDate} onChange={(e) => setNextDate(e.target.value)} />
             </div>
             <div>
-              <label>Catatan (opsional)</label>
-              <input type="text" value={nextNote} onChange={(e) => setNextNote(e.target.value)} placeholder="cth. Tanyakan kepastian PO" />
+              <label>{tr("Catatan (opsional)")}</label>
+              <input type="text" value={nextNote} onChange={(e) => setNextNote(e.target.value)} placeholder={tr("cth. Tanyakan kepastian PO")} />
             </div>
             <div className="full">
               <button type="button" className="btn btn-outline btn-sm" disabled={savingSchedule} onClick={onSaveSchedule}>
-                {nextDate ? 'Simpan Jadwal' : 'Hapus Jadwal'}
+                {nextDate ? tr("Simpan Jadwal") : tr("Hapus Jadwal")}
               </button>
               <div className="field-note" style={{ marginTop: 6 }}>
-                Terpisah dari tombol &quot;Buka WhatsApp&quot; di bawah — bisa menjadwalkan saja tanpa mengirim pesan sekarang, atau sebaliknya.
-                Jadwal otomatis masuk Aktivitas Harian sebagai <b>rencana</b>; saat &quot;Buka WhatsApp&quot; diklik, follow-up tercatat sebagai aktivitas Telepon/WA hari ini.
+                {tr("Terpisah dari tombol \"Buka WhatsApp\" di bawah — bisa menjadwalkan saja tanpa mengirim pesan sekarang, atau sebaliknya. Jadwal otomatis masuk Aktivitas Harian sebagai")} <b>{tr("rencana")}</b>{tr("; saat \"Buka WhatsApp\" diklik, follow-up tercatat sebagai aktivitas Telepon/WA hari ini.")}
               </div>
             </div>
           </>

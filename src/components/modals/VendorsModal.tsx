@@ -10,10 +10,12 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 const HEADER = ['NAMA VENDOR', 'PIC', 'NO WHATSAPP', 'EMAIL', 'KATEGORI', 'ALAMAT', 'CATATAN'];
 const COLS = [{ wch: 30 }, { wch: 18 }, { wch: 16 }, { wch: 26 }, { wch: 20 }, { wch: 36 }, { wch: 26 }];
 
 export function VendorsModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'vendors';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -58,7 +60,7 @@ export function VendorsModal() {
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title="Kelola Vendor" xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title={tr("Kelola Vendor")} xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr("Tutup")}</button>}>
       <div className="toolbar-row">
         {canEdit && (
           <>
@@ -69,7 +71,7 @@ export function VendorsModal() {
                 openModal('vendorForm');
               }}
             >
-              + Tambah Vendor
+              {tr("+ Tambah Vendor")}
             </button>
             <button
               className="btn btn-outline btn-sm"
@@ -78,26 +80,26 @@ export function VendorsModal() {
                 openModal('import');
               }}
             >
-              Import Excel
+              {tr("Import Excel")}
             </button>
           </>
         )}
         {canNow('purch', 'x') && (
-          <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+          <button className="btn btn-outline btn-sm" onClick={exportExcel}>{tr("Export Excel")}</button>
         )}
         {canNow('purch', 'x') && (
-          <button className="btn btn-outline btn-sm" onClick={downloadTemplate}>Template</button>
+          <button className="btn btn-outline btn-sm" onClick={downloadTemplate}>{tr("Template")}</button>
         )}
-        <input type="search" className="search-grow" placeholder="Cari nama vendor / PIC / kategori..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input type="search" className="search-grow" placeholder={tr("Cari nama vendor / PIC / kategori...")} value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       {list.length === 0 ? (
         <div className="empty-state" style={{ padding: '34px 10px' }}>
-          <h3>{vendors.length === 0 ? 'Belum ada data vendor' : 'Tidak ditemukan'}</h3>
+          <h3>{vendors.length === 0 ? tr("Belum ada data vendor") : tr("Tidak ditemukan")}</h3>
           <p>
             {vendors.length === 0
-              ? 'Tambah vendor baru atau import dari Excel agar Purchasing dapat mengirim permintaan penawaran.'
-              : 'Coba kata kunci pencarian lain.'}
+              ? tr("Tambah vendor baru atau import dari Excel agar Purchasing dapat mengirim permintaan penawaran.")
+              : tr("Coba kata kunci pencarian lain.")}
           </p>
         </div>
       ) : (
@@ -105,12 +107,12 @@ export function VendorsModal() {
           <table className="simple-table">
             <thead>
               <tr>
-                <th>Nama Vendor</th>
+                <th>{tr("Nama Vendor")}</th>
                 <th>PIC</th>
-                <th>Kategori</th>
-                <th>No. WhatsApp</th>
-                <th>Email</th>
-                <th>Aksi</th>
+                <th>{tr("Kategori")}</th>
+                <th>{tr("No. WhatsApp")}</th>
+                <th>{tr("Email")}</th>
+                <th>{tr("Aksi")}</th>
               </tr>
             </thead>
             <tbody>
@@ -126,7 +128,7 @@ export function VendorsModal() {
                       {v.wa && (
                         <a
                           className="icon-btn wa-btn"
-                          title="WhatsApp vendor"
+                          title={tr("WhatsApp vendor")}
                           href={`https://wa.me/${normalizePhone(v.wa)}`}
                           target="_blank"
                           rel="noreferrer"
@@ -138,7 +140,7 @@ export function VendorsModal() {
                         <>
                           <button
                             className="icon-btn"
-                            title="Edit"
+                            title={tr("Edit")}
                             onClick={() => {
                               useUiStore.setState({ vendorEditId: v.id });
                               openModal('vendorForm');
@@ -149,7 +151,7 @@ export function VendorsModal() {
                           {canNow('purch', 'd') && (
                           <button
                             className="icon-btn danger"
-                            title="Hapus"
+                            title={tr("Hapus")}
                             onClick={() => {
                               useUiStore.setState({ deleteCtx: { mode: 'vendor', id: v.id, title: 'Hapus Vendor', message: `Yakin ingin menghapus vendor "${v.nama}"?` } });
                               openModal('delete');

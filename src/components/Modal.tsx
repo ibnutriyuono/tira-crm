@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { useT } from '@/store/useLangStore';
 interface ModalProps {
   show: boolean;
   /** Kept for callers; popups now close only through their own footer button (Tutup / Batal). */
@@ -43,6 +44,7 @@ function readMax(stem: string): boolean {
  * choice is remembered per popup in this browser.
  */
 export function Modal({ show, title, wide, wide2, xwide, stickyHead, children, footer, onSubmit }: ModalProps) {
+  const tr = useT();
   const stem = stemOf(title);
   const [maxFor, setMaxFor] = useState<{ stem: string; on: boolean } | null>(null);
   if (show && maxFor?.stem !== stem) setMaxFor({ stem, on: readMax(stem) });
@@ -75,7 +77,7 @@ export function Modal({ show, title, wide, wide2, xwide, stickyHead, children, f
       <div className={cls}>
         <div className="modal-head">
           <h3>{title}</h3>
-          <button type="button" className="max-toggle" onClick={toggleMax} aria-label={maximized ? 'Perkecil' : 'Perbesar'} title={maximized ? 'Perkecil' : 'Perbesar (layar penuh)'}>
+          <button type="button" className="max-toggle" onClick={toggleMax} aria-label={maximized ? tr("Perkecil") : tr("Perbesar")} title={maximized ? tr("Perkecil") : tr("Perbesar (layar penuh)")}>
             {maximized ? (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />

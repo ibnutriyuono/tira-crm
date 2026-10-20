@@ -2,7 +2,9 @@
 
 import { useDataStore } from '@/store/useDataStore';
 
+import { useT } from '@/store/useLangStore';
 export function ToastHost() {
+  const tr = useT();
   const toasts = useDataStore((s) => s.toasts);
   const dismissToast = useDataStore((s) => s.dismissToast);
   return (
@@ -20,12 +22,12 @@ export function ToastHost() {
               dismissToast(t.id);
             }}
           >
-            <span>{t.message}</span>
-            <span className="toast-cta">Buka &rarr;</span>
+            <span>{tr(t.message)}</span>
+            <span className="toast-cta">{tr("Buka →")}</span>
           </button>
         ) : (
           <div key={t.id} className={`toast${t.type === 'info' ? '' : ' ' + t.type}`}>
-            {t.message}
+            {tr(t.message)}
           </div>
         ),
       )}

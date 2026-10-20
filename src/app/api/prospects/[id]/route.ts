@@ -16,6 +16,7 @@ import { resolveFaktur } from '@/lib/faktur';
 import { canSetFaktur } from '@/lib/roles';
 import { notifyAdminTask } from '@/lib/admin-sales-server';
 import { guard } from '@/lib/permissions-server';
+import { followUpDateProblem, followUpRequiredOnMove } from '@/lib/followup-rule';
 
 /** The record's QCD as it will be after this request: request values win, existing ones fill the gaps. */
 function mergeQcd(existing: Record<string, unknown> | null | undefined, body: Record<string, unknown> | null): QcdInput {
@@ -52,6 +53,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (poErr) return poErr;
   const qcdErr = requireQcdOnClose(Number(scoped.existing.status), status, mergeQcd(scoped.existing, body));
   if (qcdErr) return qcdErr;
+  // Pindah ke tahap pipeline aktif -> jadwal follow-up wajib (lib/followup-rule.ts).
+  const fuGiven = !!body && Object.prototype.hasOwnProperty.call(body, 'followUpAt');
+  if (followUpRequiredOnMove(Number(scoped.existing.status), status)) {
+    const fuErr = followUpDateProblem(body?.followUpAt);
+    if (fuErr) return NextResponse.json({ error: fuErr }, { status: 400 });
+  }
 
   // Locked scope fields come from the account, not the request — see
   // api-helpers.ts#prospectScopeLocks.
@@ -84,11 +91,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       qcdCostLevel: body?.qcdCostLevel !== undefined ? cleanLevel(body.qcdCostLevel) : undefined,
       qcdDeliveryLevel: body?.qcdDeliveryLevel !== undefined ? cleanLevel(body.qcdDeliveryLevel) : undefined,
       qcdFaktor: body?.qcdFaktor !== undefined ? cleanFaktor(body.qcdFaktor) : undefined,
+      ...(fuGiven ? { followUpAt: String(body.followUpAt || '').trim() || null, followUpNote: String(body?.followUpNote || '').trim() || null } : {}),
     },
   });
 
   emitCrmEvent('prospect:updated', prospect);
   if (Number(prospect.status) === 6 && Number(scoped.existing.status) !== 6) await closeIssuesOnLose(prospect as never, user);
+  if (fuGiven) {
+    try {
+      await syncFollowUpPlan(user, prospect);
+    } catch (err) {
+      console.error('[follow-up] gagal sinkron rencana aktivitas', err);
+    }
+  }
   // Riwayat item: penawaran baru dikirim, atau material diubah sesudahnya.
   if (!scoped.existing.penawaranTerkirim && prospect.penawaranTerkirim) {
     await logPenawaranSent(user, prospect.id, prospect.materials, prospect.tglPenawaran);
@@ -154,7 +169,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (poErr) return poErr;
     const qcdErr = requireQcdOnClose(Number(scoped.existing?.status), Number(data.status), mergeQcd(scoped.existing, data));
     if (qcdErr) return qcdErr;
+    if (followUpRequiredOnMove(Number(scoped.existing?.status), Number(data.status))) {
+      const fuErr = followUpDateProblem(data.followUpAt);
+      if (fuErr) return NextResponse.json({ error: fuErr }, { status: 400 });
+    }
   }
+  if (typeof data.followUpAt === 'string') data.followUpAt = data.followUpAt.trim() || null;
+  if (typeof data.followUpNote === 'string') data.followUpNote = data.followUpNote.trim() || null;
   for (const k of ['qcdQualityLevel', 'qcdCostLevel', 'qcdDeliveryLevel'] as const) if (k in data) data[k] = cleanLevel(data[k]);
   if ('qcdFaktor' in data) data.qcdFaktor = cleanFaktor(data.qcdFaktor);
   if (typeof data.noPo === 'string') data.noPo = data.noPo.trim() || null;
@@ -193,7 +214,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     entity: 'prospect',
     entityId: prospect.id,
     summary: movedStatus
-      ? `Memindahkan prospek "${prospect.customer}" dari "${statusLabel(movedStatus.from)}" ke "${statusLabel(movedStatus.to)}"`
+      ? `Memindahkan prospek "${prospect.customer}" dari "${statusLabel(movedStatus.from)}" ke "${statusLabel(movedStatus.to)}"${'followUpAt' in data && prospect.followUpAt ? ` · follow-up ${prospect.followUpAt}` : ''}`
       : changes?.penawaranTerkirim
         ? `Menandai penawaran prospek "${prospect.customer}" sebagai ${prospect.penawaranTerkirim ? 'Terkirim' : 'Pending'}`
         : changes?.followUpAt

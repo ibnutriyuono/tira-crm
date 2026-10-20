@@ -14,6 +14,7 @@ import { activityOwner } from '@/lib/sales-activity';
 import type { Prospect, SalesActivity } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 type Tab = 'tren' | 'hitrate' | 'aktivitas' | 'reaktivasi' | 'kekalahan' | 'crosssell' | 'konten' | 'corong';
 
 const TABS: { key: Tab; label: string }[] = [
@@ -63,6 +64,7 @@ function wonLines(records: Prospect[]): Set<string> {
 }
 
 export function MarketingModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'marketing';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -519,7 +521,7 @@ export function MarketingModal() {
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title="Marketing" xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title={tr("Marketing")} xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr("Tutup")}</button>}>
       <div className="view-toggle" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
         {TABS.map((t) => (
           <button key={t.key} type="button" className={tab === t.key ? 'active' : ''} onClick={() => setTab(t.key)}>
@@ -531,30 +533,30 @@ export function MarketingModal() {
       {tab === 'tren' && (
         <div>
           <div className="import-summary" style={{ marginBottom: 14 }}>
-            Arah pergerakan 12 bulan terakhir. Perbandingan memakai <b>rata-rata 3 bulan terakhir vs 3 bulan sebelumnya</b>, bukan bulan-ke-bulan — supaya satu deal besar tidak membuat kesimpulannya menyesatkan.
+            {tr("Arah pergerakan 12 bulan terakhir. Perbandingan memakai")} <b>{tr("rata-rata 3 bulan terakhir vs 3 bulan sebelumnya")}</b>{tr(", bukan bulan-ke-bulan — supaya satu deal besar tidak membuat kesimpulannya menyesatkan.")}
           </div>
 
           <div className="kpi-grid" style={{ marginBottom: 18 }}>
             <div className={`kpi ${tren.deltaNilai == null ? 'slate' : tren.deltaNilai >= 0 ? 'green' : 'rust'}`}>
-              <div className="label">Momentum Nilai Won</div>
+              <div className="label">{tr("Momentum Nilai Won")}</div>
               <div className="value" style={{ fontSize: 20 }}>
                 {tren.deltaNilai == null ? '—' : `${tren.deltaNilai >= 0 ? '▲' : '▼'} ${Math.abs(tren.deltaNilai).toFixed(0)}%`}
               </div>
-              <div className="foot">3 bulan terakhir vs sebelumnya</div>
+              <div className="foot">{tr("3 bulan terakhir vs sebelumnya")}</div>
             </div>
             <div className="kpi steel">
-              <div className="label">Rata-rata Won / Bulan</div>
+              <div className="label">{tr("Rata-rata Won / Bulan")}</div>
               <div className="value" style={{ fontSize: 16 }}>{formatRupiah(tren.nilaiAkhir)}</div>
-              <div className="foot">sebelumnya {formatRupiah(tren.nilaiSebelum)}</div>
+              <div className="foot">{tr("sebelumnya")} {formatRupiah(tren.nilaiSebelum)}</div>
             </div>
             <div className={`kpi ${tren.wrAkhir >= tren.wrSebelum ? 'green' : 'amber'}`}>
-              <div className="label">Win Rate</div>
+              <div className="label">{tr("Win Rate")}</div>
               <div className="value">{tren.wrAkhir.toFixed(0)}%</div>
-              <div className="foot">sebelumnya {tren.wrSebelum.toFixed(0)}%</div>
+              <div className="foot">{tr("sebelumnya")} {tren.wrSebelum.toFixed(0)}%</div>
             </div>
           </div>
 
-          <div style={{ fontWeight: 600, fontSize: '12.5px', margin: '18px 0 8px' }}>Nilai Won per Bulan</div>
+          <div style={{ fontWeight: 600, fontSize: '12.5px', margin: '18px 0 8px' }}>{tr("Nilai Won per Bulan")}</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 150, padding: '0 2px 4px', borderBottom: '1px solid var(--border)' }}>
             {tren.bulanan.map((b) => (
               <div key={b.bulan} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 0 }} title={`${b.label}: ${formatRupiah(b.wonValue)} · ${b.wonCount} Won, ${b.lostCount} Lost`}>
@@ -578,17 +580,17 @@ export function MarketingModal() {
             ))}
           </div>
 
-          <div style={{ fontWeight: 600, fontSize: '12.5px', margin: '22px 0 8px' }}>Rincian per Bulan</div>
+          <div style={{ fontWeight: 600, fontSize: '12.5px', margin: '22px 0 8px' }}>{tr("Rincian per Bulan")}</div>
           <div style={{ overflowX: 'auto' }}>
             <table className="simple-table">
               <thead>
                 <tr>
-                  <th>Bulan</th>
-                  <th>Prospek Masuk</th>
-                  <th>Won</th>
-                  <th>Lost</th>
-                  <th>Win Rate</th>
-                  <th>Nilai Won</th>
+                  <th>{tr("Bulan")}</th>
+                  <th>{tr("Prospek Masuk")}</th>
+                  <th>{tr("Won")}</th>
+                  <th>{tr("Lost")}</th>
+                  <th>{tr("Win Rate")}</th>
+                  <th>{tr("Nilai Won")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -606,18 +608,18 @@ export function MarketingModal() {
             </table>
           </div>
 
-          <div style={{ fontWeight: 600, fontSize: '12.5px', margin: '22px 0 8px' }}>Pergeseran per Line</div>
+          <div style={{ fontWeight: 600, fontSize: '12.5px', margin: '22px 0 8px' }}>{tr("Pergeseran per Line")}</div>
           {tren.perLine.length === 0 ? (
-            <div className="field-note">Belum cukup data penjualan dengan Line terisi.</div>
+            <div className="field-note">{tr("Belum cukup data penjualan dengan Line terisi.")}</div>
           ) : (
             <table className="simple-table">
               <thead>
                 <tr>
-                  <th>Line</th>
-                  <th>3 Bulan Terakhir</th>
-                  <th>3 Bulan Sebelumnya</th>
-                  <th>Perubahan</th>
-                  <th>Baca</th>
+                  <th>{tr("Line")}</th>
+                  <th>{tr("3 Bulan Terakhir")}</th>
+                  <th>{tr("3 Bulan Sebelumnya")}</th>
+                  <th>{tr("Perubahan")}</th>
+                  <th>{tr("Baca")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -631,7 +633,7 @@ export function MarketingModal() {
                       <td className="num">{formatRupiah(l.sebelum)}</td>
                       <td>
                         {l.delta == null ? (
-                          <span className="badge steel">Baru muncul</span>
+                          <span className="badge steel">{tr("Baru muncul")}</span>
                         ) : (
                           <span className={`badge ${naik ? 'green' : turun ? 'rust' : 'slate'}`}>
                             {l.delta >= 0 ? '▲' : '▼'} {Math.abs(l.delta).toFixed(0)}%
@@ -640,12 +642,12 @@ export function MarketingModal() {
                       </td>
                       <td style={{ whiteSpace: 'normal' }}>
                         {l.delta == null
-                          ? 'Line ini baru terjual di periode terakhir — layak dilihat apakah bisa didorong lebih jauh.'
+                          ? tr("Line ini baru terjual di periode terakhir — layak dilihat apakah bisa didorong lebih jauh.")
                           : naik
-                            ? 'Sedang tumbuh. Cocok jadi fokus cross-sell dan materi teknis.'
+                            ? tr("Sedang tumbuh. Cocok jadi fokus cross-sell dan materi teknis.")
                             : turun
-                              ? 'Menurun. Cek tab Analisa Kekalahan untuk line ini — apakah kalah harga atau delivery.'
-                              : 'Relatif stabil.'}
+                              ? tr("Menurun. Cek tab Analisa Kekalahan untuk line ini — apakah kalah harga atau delivery.")
+                              : tr("Relatif stabil.")}
                       </td>
                     </tr>
                   );
@@ -655,7 +657,7 @@ export function MarketingModal() {
           )}
 
           <div className="field-note" style={{ marginTop: 12 }}>
-            Bulan diambil dari Tgl PO / Tgl Delivery / Tgl Penawaran (urutan yang sama dipakai laporan lain), bukan dari tanggal input — jadi prospek yang dicatat mundur tetap masuk ke bulan yang benar.
+            {tr("Bulan diambil dari Tgl PO / Tgl Delivery / Tgl Penawaran (urutan yang sama dipakai laporan lain), bukan dari tanggal input — jadi prospek yang dicatat mundur tetap masuk ke bulan yang benar.")}
           </div>
         </div>
       )}
@@ -663,55 +665,55 @@ export function MarketingModal() {
       {tab === 'hitrate' && (
         <div>
           <div className="import-summary" style={{ marginBottom: 14 }}>
-            Perbandingan <b>penawaran yang keluar</b> dengan <b>PO yang benar-benar didapat</b>, dipecah per Line. Nilai dihitung per baris material, jadi prospek yang berisi beberapa line tidak dihitung penuh di masing-masing line. Hit rate dihitung dari penawaran yang <b>sudah ada hasilnya</b> (dapat PO atau kalah) — penawaran yang masih berjalan tidak ikut, supaya angkanya tidak terlihat buruk hanya karena banyak yang belum diputuskan.
+            {tr("Perbandingan")} <b>{tr("penawaran yang keluar")}</b> {tr("dengan")} <b>{tr("PO yang benar-benar didapat")}</b>{tr(", dipecah per Line. Nilai dihitung per baris material, jadi prospek yang berisi beberapa line tidak dihitung penuh di masing-masing line. Hit rate dihitung dari penawaran yang")} <b>{tr("sudah ada hasilnya")}</b> {tr("(dapat PO atau kalah) — penawaran yang masih berjalan tidak ikut, supaya angkanya tidak terlihat buruk hanya karena banyak yang belum diputuskan.")}
           </div>
 
           <div className="kpi-grid" style={{ marginBottom: 18 }}>
             <div className="kpi steel">
-              <div className="label">Total Nilai Penawaran</div>
+              <div className="label">{tr("Total Nilai Penawaran")}</div>
               <div className="value" style={{ fontSize: 16 }}>{formatRupiah(hitTotal.vPenawaran)}</div>
             </div>
             <div className="kpi green">
-              <div className="label">Nilai Jadi PO</div>
+              <div className="label">{tr("Nilai Jadi PO")}</div>
               <div className="value" style={{ fontSize: 16 }}>{formatRupiah(hitTotal.vPo)}</div>
             </div>
             <div className="kpi rust">
-              <div className="label">Nilai Kalah</div>
+              <div className="label">{tr("Nilai Kalah")}</div>
               <div className="value" style={{ fontSize: 16 }}>{formatRupiah(hitTotal.vLost)}</div>
             </div>
             <div className={`kpi ${hitTotal.hit == null ? 'slate' : hitTotal.hit >= 50 ? 'green' : hitTotal.hit >= 25 ? 'amber' : 'rust'}`}>
-              <div className="label">Hit Rate Keseluruhan</div>
+              <div className="label">{tr("Hit Rate Keseluruhan")}</div>
               <div className="value">{hitTotal.hit == null ? '—' : `${hitTotal.hit.toFixed(0)}%`}</div>
-              <div className="foot">berdasarkan nilai</div>
+              <div className="foot">{tr("berdasarkan nilai")}</div>
             </div>
           </div>
 
           <div className="toolbar-row">
             {canNow('marketing', 'x') && (
               <button className="btn btn-outline btn-sm" onClick={exportHitRate}>
-                <IconDownload /> Export Excel
+                <IconDownload /> {tr("Export Excel")}
               </button>
             )}
           </div>
 
           {hitRate.length === 0 ? (
             <div className="empty-state">
-              <h3>Belum ada penawaran tercatat</h3>
-              <p>Data muncul setelah ada prospek yang mencapai tahap Penawaran Harga.</p>
+              <h3>{tr("Belum ada penawaran tercatat")}</h3>
+              <p>{tr("Data muncul setelah ada prospek yang mencapai tahap Penawaran Harga.")}</p>
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table className="simple-table">
                 <thead>
                   <tr>
-                    <th>Line</th>
-                    <th>Nilai Penawaran</th>
-                    <th>Nilai Dapat PO</th>
-                    <th>Nilai Kalah</th>
-                    <th>Masih Berjalan</th>
-                    <th>Hit Rate (Nilai)</th>
-                    <th>Hit Rate (Jumlah)</th>
-                    <th>Baca</th>
+                    <th>{tr("Line")}</th>
+                    <th>{tr("Nilai Penawaran")}</th>
+                    <th>{tr("Nilai Dapat PO")}</th>
+                    <th>{tr("Nilai Kalah")}</th>
+                    <th>{tr("Masih Berjalan")}</th>
+                    <th>{tr("Hit Rate (Nilai)")}</th>
+                    <th>{tr("Hit Rate (Jumlah)")}</th>
+                    <th>{tr("Baca")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -731,15 +733,15 @@ export function MarketingModal() {
                         <td><b>{l.line}</b></td>
                         <td className="num">
                           {formatRupiah(l.vPenawaran)}
-                          <div className="field-note">{l.nPenawaran} item</div>
+                          <div className="field-note">{l.nPenawaran} {tr("item")}</div>
                         </td>
                         <td className="num">
                           {formatRupiah(l.vPo)}
-                          <div className="field-note">{l.nPo} item</div>
+                          <div className="field-note">{l.nPo} {tr("item")}</div>
                         </td>
                         <td className="num">
                           {formatRupiah(l.vLost)}
-                          <div className="field-note">{l.nLost} item</div>
+                          <div className="field-note">{l.nLost} {tr("item")}</div>
                         </td>
                         <td className="num">{l.berjalan || '-'}</td>
                         <td>{hv == null ? <span className="badge slate">—</span> : <span className={`badge ${warna}`}>{hv.toFixed(0)}%</span>}</td>
@@ -754,7 +756,7 @@ export function MarketingModal() {
           )}
 
           <div className="field-note" style={{ marginTop: 12 }}>
-            Yang dihitung sebagai &quot;penawaran&quot; adalah prospek yang sudah mencapai tahap Penawaran Harga ke atas, atau yang ditandai penawarannya sudah terkirim. Prospek yang masih di tahap Permintaan belum pernah ditawar, jadi tidak ikut dihitung.
+            {tr("Yang dihitung sebagai \"penawaran\" adalah prospek yang sudah mencapai tahap Penawaran Harga ke atas, atau yang ditandai penawarannya sudah terkirim. Prospek yang masih di tahap Permintaan belum pernah ditawar, jadi tidak ikut dihitung.")}
           </div>
         </div>
       )}
@@ -762,57 +764,57 @@ export function MarketingModal() {
       {tab === 'aktivitas' && (
         <div>
           <div className="import-summary" style={{ marginBottom: 14 }}>
-            Semua jejak aktivitas Sales, dikelompokkan per <b>hari / pekan / bulan / tahun</b>. Satu prospek bisa menghasilkan beberapa aktivitas di tanggal berbeda (dibuat, ditawar, dapat PO, dikirim) — semuanya dicatat terpisah supaya hitungan harian mencerminkan yang benar-benar dikerjakan hari itu, bukan sekadar jumlah prospek.
+            {tr("Semua jejak aktivitas Sales, dikelompokkan per")} <b>{tr("hari / pekan / bulan / tahun")}</b>{tr(". Satu prospek bisa menghasilkan beberapa aktivitas di tanggal berbeda (dibuat, ditawar, dapat PO, dikirim) — semuanya dicatat terpisah supaya hitungan harian mencerminkan yang benar-benar dikerjakan hari itu, bukan sekadar jumlah prospek.")}
           </div>
 
           <div className="toolbar-row">
             {canNow('marketing', 'x') && (
               <button className="btn btn-outline btn-sm" onClick={exportAktivitas}>
-                <IconDownload /> Export Excel
+                <IconDownload /> {tr("Export Excel")}
               </button>
             )}
             <select className="btn-sm" value={aktGran} onChange={(e) => { setAktGran(e.target.value as typeof aktGran); setAktPeriode(''); }}>
-              <option value="hari">Per Hari</option>
-              <option value="pekan">Per Pekan</option>
-              <option value="bulan">Per Bulan</option>
-              <option value="tahun">Per Tahun</option>
+              <option value="hari">{tr("Per Hari")}</option>
+              <option value="pekan">{tr("Per Pekan")}</option>
+              <option value="bulan">{tr("Per Bulan")}</option>
+              <option value="tahun">{tr("Per Tahun")}</option>
             </select>
             <select className="btn-sm" value={aktSe} onChange={(e) => setAktSe(e.target.value)}>
-              <option value="">Semua SE</option>
+              <option value="">{tr("Semua SE")}</option>
               {seOptions.map((se) => (
                 <option key={se} value={se}>{se}</option>
               ))}
             </select>
             <select className="btn-sm" value={aktJenis} onChange={(e) => setAktJenis(e.target.value)}>
-              <option value="">Semua Jenis</option>
+              <option value="">{tr("Semua Jenis")}</option>
               {jenisOptions.map((j) => (
                 <option key={j} value={j}>{j}</option>
               ))}
             </select>
-            <input type="search" className="search-grow" placeholder="Cari customer..." value={aktSearch} onChange={(e) => setAktSearch(e.target.value)} />
+            <input type="search" className="search-grow" placeholder={tr("Cari customer...")} value={aktSearch} onChange={(e) => setAktSearch(e.target.value)} />
           </div>
           <div className="count-line">
-            <b>{aktivitasFiltered.length}</b> aktivitas dalam <b>{aktivitasPeriode.length}</b> periode
+            <b>{aktivitasFiltered.length}</b> {tr("aktivitas dalam")} <b>{aktivitasPeriode.length}</b> {tr("periode")}
           </div>
 
           {aktivitasPeriode.length === 0 ? (
             <div className="empty-state">
-              <h3>Belum ada aktivitas</h3>
-              <p>Aktivitas terbentuk otomatis dari data prospek: dibuat, ditawar, dapat PO, dikirim, atau dicatat sebagai kunjungan.</p>
+              <h3>{tr("Belum ada aktivitas")}</h3>
+              <p>{tr("Aktivitas terbentuk otomatis dari data prospek: dibuat, ditawar, dapat PO, dikirim, atau dicatat sebagai kunjungan.")}</p>
             </div>
           ) : (
             <>
-              <div style={{ fontWeight: 600, fontSize: '12.5px', margin: '18px 0 8px' }}>Ringkasan per Periode</div>
+              <div style={{ fontWeight: 600, fontSize: '12.5px', margin: '18px 0 8px' }}>{tr("Ringkasan per Periode")}</div>
               <div style={{ maxHeight: 260, overflowY: 'auto' }}>
                 <table className="simple-table">
                   <thead>
                     <tr>
-                      <th>Periode</th>
-                      <th>Total Aktivitas</th>
-                      <th>Customer</th>
-                      <th>SE Aktif</th>
-                      <th>Rincian</th>
-                      <th>Nilai PO</th>
+                      <th>{tr("Periode")}</th>
+                      <th>{tr("Total Aktivitas")}</th>
+                      <th>{tr("Customer")}</th>
+                      <th>{tr("SE Aktif")}</th>
+                      <th>{tr("Rincian")}</th>
+                      <th>{tr("Nilai PO")}</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -831,7 +833,7 @@ export function MarketingModal() {
                         <td className="num">{g.nilaiPo > 0 ? formatRupiah(g.nilaiPo) : '-'}</td>
                         <td>
                           <button type="button" className="btn btn-outline btn-sm" onClick={() => setAktPeriode(g.key)}>
-                            Lihat
+                            {tr("Lihat")}
                           </button>
                         </td>
                       </tr>
@@ -841,25 +843,25 @@ export function MarketingModal() {
               </div>
 
               <div style={{ fontWeight: 600, fontSize: '12.5px', margin: '22px 0 8px' }}>
-                Rincian Aktivitas — {labelPeriode(periodeAktif)} <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}>({detailPeriode.length} aktivitas)</span>
+                {tr("Rincian Aktivitas —")} {labelPeriode(periodeAktif)} <span style={{ fontWeight: 400, color: 'var(--text-soft)' }}>({detailPeriode.length} {tr("aktivitas)")}</span>
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="simple-table">
                   <thead>
                     <tr>
-                      <th>Tanggal</th>
-                      <th>Jenis</th>
+                      <th>{tr("Tanggal")}</th>
+                      <th>{tr("Jenis")}</th>
                       <th>SE</th>
-                      <th>Cabang</th>
-                      <th>Customer</th>
-                      <th>Nilai</th>
-                      <th>Catatan</th>
+                      <th>{tr("Cabang")}</th>
+                      <th>{tr("Customer")}</th>
+                      <th>{tr("Nilai")}</th>
+                      <th>{tr("Catatan")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {detailPeriode.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="field-note">Tidak ada aktivitas pada periode ini.</td>
+                        <td colSpan={7} className="field-note">{tr("Tidak ada aktivitas pada periode ini.")}</td>
                       </tr>
                     ) : (
                       detailPeriode.map((e, i) => (
@@ -881,7 +883,7 @@ export function MarketingModal() {
           )}
 
           <div className="field-note" style={{ marginTop: 12 }}>
-            Tanggal tiap aktivitas diambil dari tanggal kejadiannya masing-masing (Tgl Penawaran untuk penawaran, Tgl PO untuk PO, dan seterusnya) — bukan dari tanggal input, supaya prospek yang dicatat mundur tetap jatuh di hari yang benar.
+            {tr("Tanggal tiap aktivitas diambil dari tanggal kejadiannya masing-masing (Tgl Penawaran untuk penawaran, Tgl PO untuk PO, dan seterusnya) — bukan dari tanggal input, supaya prospek yang dicatat mundur tetap jatuh di hari yang benar.")}
           </div>
         </div>
       )}
@@ -889,53 +891,52 @@ export function MarketingModal() {
       {tab === 'reaktivasi' && (
         <div>
           <div className="import-summary" style={{ marginBottom: 14 }}>
-            Customer yang sudah lama tidak order, diurutkan dari <b>nilai pembelian terbesar</b> — bukan dari yang paling lama diam. Mereka sudah pernah beli dan kenal kualitas kita, jadi peluang tutupnya lebih tinggi daripada prospek baru.
-            Status follow-up dibaca dari <b>Aktivitas Harian</b>: customer dianggap sudah dihubungi bila ada aktivitas (kunjungan, telepon/WA, meeting, dokumen) setelah order terakhirnya.
+            {tr("Customer yang sudah lama tidak order, diurutkan dari")} <b>{tr("nilai pembelian terbesar")}</b> {tr("— bukan dari yang paling lama diam. Mereka sudah pernah beli dan kenal kualitas kita, jadi peluang tutupnya lebih tinggi daripada prospek baru. Status follow-up dibaca dari")} <b>{tr("Aktivitas Harian")}</b>{tr(": customer dianggap sudah dihubungi bila ada aktivitas (kunjungan, telepon/WA, meeting, dokumen) setelah order terakhirnya.")}
           </div>
           <div className="kpi-grid" style={{ marginBottom: 18 }}>
             <div className="kpi rust">
-              <div className="label">Perlu Dihubungi</div>
+              <div className="label">{tr("Perlu Dihubungi")}</div>
               <div className="value">{belumDihubungi.length}</div>
-              <div className="foot">dari {targets.length} target</div>
+              <div className="foot">{tr("dari")} {targets.length} {tr("target")}</div>
             </div>
             <div className="kpi amber">
-              <div className="label">Nilai Historis Belum Digarap</div>
+              <div className="label">{tr("Nilai Historis Belum Digarap")}</div>
               <div className="value" style={{ fontSize: 16 }}>{formatRupiah(potensiValue)}</div>
             </div>
             <div className="kpi green">
-              <div className="label">Sudah Dihubungi</div>
+              <div className="label">{tr("Sudah Dihubungi")}</div>
               <div className="value">{targets.length - belumDihubungi.length}</div>
             </div>
           </div>
           <div className="toolbar-row">
             {canNow('marketing', 'x') && (
               <button className="btn btn-outline btn-sm" onClick={exportReaktivasi}>
-                <IconDownload /> Export Excel
+                <IconDownload /> {tr("Export Excel")}
               </button>
             )}
             <select className="btn-sm" value={scope} onChange={(e) => setScope(e.target.value as typeof scope)}>
-              <option value="dingin">Dingin saja (&gt;90 hari)</option>
-              <option value="semua">Dingin + Menghangat (&gt;45 hari)</option>
+              <option value="dingin">{tr("Dingin saja (>90 hari)")}</option>
+              <option value="semua">{tr("Dingin + Menghangat (>45 hari)")}</option>
             </select>
-            <input type="search" className="search-grow" placeholder="Cari nama customer..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input type="search" className="search-grow" placeholder={tr("Cari nama customer...")} value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           {targets.length === 0 ? (
             <div className="empty-state">
-              <h3>Tidak ada customer yang perlu direaktivasi</h3>
-              <p>Semua customer dalam cakupan Anda masih aktif order.</p>
+              <h3>{tr("Tidak ada customer yang perlu direaktivasi")}</h3>
+              <p>{tr("Semua customer dalam cakupan Anda masih aktif order.")}</p>
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table className="simple-table">
                 <thead>
                   <tr>
-                    <th>Customer</th>
-                    <th>Cabang</th>
-                    <th>Order Terakhir</th>
-                    <th>Total Pembelian</th>
-                    <th>Material Terakhir</th>
-                    <th>Status Follow-up</th>
-                    <th>Aksi</th>
+                    <th>{tr("Customer")}</th>
+                    <th>{tr("Cabang")}</th>
+                    <th>{tr("Order Terakhir")}</th>
+                    <th>{tr("Total Pembelian")}</th>
+                    <th>{tr("Material Terakhir")}</th>
+                    <th>{tr("Status Follow-up")}</th>
+                    <th>{tr("Aksi")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -946,45 +947,45 @@ export function MarketingModal() {
                       <tr key={c.name}>
                         <td>
                           <b>{c.name}</b>
-                          {!phone && <div className="field-note">Nomor WA belum ada</div>}
+                          {!phone && <div className="field-note">{tr("Nomor WA belum ada")}</div>}
                         </td>
                         <td>{c.cabang || '-'}</td>
                         <td>
                           {c.lastOrderDate ? formatDateID(c.lastOrderDate) : '-'}
-                          <div className="field-note">{c.daysSinceOrder} hari lalu</div>
+                          <div className="field-note">{c.daysSinceOrder} {tr("hari lalu")}</div>
                         </td>
                         <td className="num">{formatRupiah(c.wonValue)}</td>
                         <td style={{ maxWidth: 220, whiteSpace: 'normal' }}>{lastWonItem(c)?.uraian || '-'}</td>
                         <td style={{ maxWidth: 240, whiteSpace: 'normal' }}>
                           {k ? (
                             <>
-                              <span className="badge green">Sudah {formatDateID(k.tanggal)}</span>
+                              <span className="badge green">{tr("Sudah")} {formatDateID(k.tanggal)}</span>
                               {k.act ? (
                                 <div className="field-note" style={{ marginTop: 3 }}>
-                                  {activityLabel(k.act.tipe)} · SE {k.act.se}
+                                  {activityLabel(k.act.tipe)} {tr("· SE")} {k.act.se}
                                   {k.act.keterangan && <div title={k.act.keterangan}>{k.act.keterangan.length > 90 ? `${k.act.keterangan.slice(0, 90)}…` : k.act.keterangan}</div>}
                                 </div>
                               ) : (
-                                <div className="field-note" style={{ marginTop: 3 }}>catatan lama</div>
+                                <div className="field-note" style={{ marginTop: 3 }}>{tr("catatan lama")}</div>
                               )}
                             </>
                           ) : (
-                            <span className="badge slate">{actLoaded ? 'Belum' : '…'}</span>
+                            <span className="badge slate">{actLoaded ? tr("Belum") : '…'}</span>
                           )}
                         </td>
                         <td>
                           <div className="row-actions">
                             <button type="button" className="btn btn-wa btn-sm" disabled={!phone} onClick={() => openWa(c)}>
-                              <IconWa /> WhatsApp
+                              <IconWa /> {tr("WhatsApp")}
                             </button>
                             <button
                               type="button"
                               className="btn btn-outline btn-sm"
                               disabled={!canLogActivity}
-                              title={canLogActivity ? 'Catat kunjungan / telepon / meeting ke Aktivitas Harian' : 'Pencatatan aktivitas hanya untuk Sales dan BM'}
+                              title={canLogActivity ? tr("Catat kunjungan / telepon / meeting ke Aktivitas Harian") : tr("Pencatatan aktivitas hanya untuk Sales dan BM")}
                               onClick={() => logContact(c)}
                             >
-                              Catat
+                              {tr("Catat")}
                             </button>
                           </div>
                         </td>
@@ -1001,33 +1002,33 @@ export function MarketingModal() {
       {tab === 'kekalahan' && (
         <div>
           <div className="import-summary" style={{ marginBottom: 14 }}>
-            Kekalahan dipecah <b>per Line</b> beserta alasannya, supaya penanganannya bisa berbeda: line yang kalah karena harga perlu negosiasi ke prinsipal, sedangkan yang kalah karena delivery perlu stok buffer — bukan diskon.
+            {tr("Kekalahan dipecah")} <b>{tr("per Line")}</b> {tr("beserta alasannya, supaya penanganannya bisa berbeda: line yang kalah karena harga perlu negosiasi ke prinsipal, sedangkan yang kalah karena delivery perlu stok buffer — bukan diskon.")}
           </div>
           <div className="toolbar-row">
             {canNow('marketing', 'x') && (
               <button className="btn btn-outline btn-sm" onClick={exportKekalahan}>
-                <IconDownload /> Export Excel
+                <IconDownload /> {tr("Export Excel")}
               </button>
             )}
           </div>
           {kekalahan.length === 0 ? (
             <div className="empty-state">
-              <h3>Belum ada data kekalahan</h3>
-              <p>Data muncul setelah prospek Lose Order diisi formulir QCD-nya.</p>
+              <h3>{tr("Belum ada data kekalahan")}</h3>
+              <p>{tr("Data muncul setelah prospek Lose Order diisi formulir QCD-nya.")}</p>
             </div>
           ) : (
             <table className="simple-table">
               <thead>
                 <tr>
-                  <th>Line</th>
-                  <th>Kalah</th>
-                  <th>Nilai Hilang</th>
-                  <th>Harga</th>
-                  <th>Delivery</th>
-                  <th>Kualitas</th>
-                  <th>Lain</th>
-                  <th>Kompetitor Utama</th>
-                  <th>Saran</th>
+                  <th>{tr("Line")}</th>
+                  <th>{tr("Kalah")}</th>
+                  <th>{tr("Nilai Hilang")}</th>
+                  <th>{tr("Harga")}</th>
+                  <th>{tr("Delivery")}</th>
+                  <th>{tr("Kualitas")}</th>
+                  <th>{tr("Lain")}</th>
+                  <th>{tr("Kompetitor Utama")}</th>
+                  <th>{tr("Saran")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1057,30 +1058,30 @@ export function MarketingModal() {
       {tab === 'crosssell' && (
         <div>
           <div className="import-summary" style={{ marginBottom: 14 }}>
-            Customer yang sudah beli tapi <b>line-nya masih sedikit</b>, dibandingkan line yang paling banyak dibeli customer lain. Diurutkan dari yang belanjanya besar tapi cakupan line-nya sempit.
+            {tr("Customer yang sudah beli tapi")} <b>{tr("line-nya masih sedikit")}</b>{tr(", dibandingkan line yang paling banyak dibeli customer lain. Diurutkan dari yang belanjanya besar tapi cakupan line-nya sempit.")}
           </div>
           <div className="toolbar-row">
             {canNow('marketing', 'x') && (
               <button className="btn btn-outline btn-sm" onClick={exportCrossSell}>
-                <IconDownload /> Export Excel
+                <IconDownload /> {tr("Export Excel")}
               </button>
             )}
           </div>
           {crossSell.length === 0 ? (
             <div className="empty-state">
-              <h3>Belum ada peluang teridentifikasi</h3>
-              <p>Butuh data penjualan (Won) dengan Line terisi untuk bisa membandingkan.</p>
+              <h3>{tr("Belum ada peluang teridentifikasi")}</h3>
+              <p>{tr("Butuh data penjualan (Won) dengan Line terisi untuk bisa membandingkan.")}</p>
             </div>
           ) : (
             <table className="simple-table">
               <thead>
                 <tr>
-                  <th>Customer</th>
-                  <th>Cabang</th>
-                  <th>Status</th>
-                  <th>Total Pembelian</th>
-                  <th>Line Dibeli</th>
-                  <th>Peluang Cross-Sell</th>
+                  <th>{tr("Customer")}</th>
+                  <th>{tr("Cabang")}</th>
+                  <th>{tr("Status")}</th>
+                  <th>{tr("Total Pembelian")}</th>
+                  <th>{tr("Line Dibeli")}</th>
+                  <th>{tr("Peluang Cross-Sell")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1094,7 +1095,7 @@ export function MarketingModal() {
                     <td>
                       {c.missing.map(([ln, n]) => (
                         <span key={ln} className="badge steel" style={{ marginRight: 4 }} title={`${n} customer lain membeli line ini`}>
-                          Line {ln}
+                          {tr("Line")} {ln}
                         </span>
                       ))}
                     </td>
@@ -1109,20 +1110,20 @@ export function MarketingModal() {
       {tab === 'konten' && (
         <div>
           <div className="import-summary" style={{ marginBottom: 14 }}>
-            Ide materi teknis yang diturunkan dari data Anda sendiri — line apa yang paling laku, dan di mana kita paling sering kalah. Untuk baja spesial, yang menentukan pilihan supplier sering bukan harga tapi <b>kepercayaan teknis</b>.
+            {tr("Ide materi teknis yang diturunkan dari data Anda sendiri — line apa yang paling laku, dan di mana kita paling sering kalah. Untuk baja spesial, yang menentukan pilihan supplier sering bukan harga tapi")} <b>{tr("kepercayaan teknis")}</b>.
           </div>
           {kontenIdeas.length === 0 ? (
             <div className="empty-state">
-              <h3>Belum cukup data</h3>
-              <p>Ide konten diturunkan dari data penjualan dan QCD yang sudah terisi.</p>
+              <h3>{tr("Belum cukup data")}</h3>
+              <p>{tr("Ide konten diturunkan dari data penjualan dan QCD yang sudah terisi.")}</p>
             </div>
           ) : (
             <table className="simple-table">
               <thead>
                 <tr>
-                  <th style={{ width: '32%' }}>Usulan Materi</th>
-                  <th>Kenapa ini relevan</th>
-                  <th>Sumber Data</th>
+                  <th style={{ width: '32%' }}>{tr("Usulan Materi")}</th>
+                  <th>{tr("Kenapa ini relevan")}</th>
+                  <th>{tr("Sumber Data")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1142,16 +1143,16 @@ export function MarketingModal() {
       {tab === 'corong' && (
         <div>
           <div className="import-summary" style={{ marginBottom: 14 }}>
-            Berapa banyak prospek yang lolos dari satu tahap ke tahap berikutnya. Tahap dengan konversi terendah adalah titik bocor terbesar — di situ perbaikan paling berdampak, bukan di menambah prospek baru.
+            {tr("Berapa banyak prospek yang lolos dari satu tahap ke tahap berikutnya. Tahap dengan konversi terendah adalah titik bocor terbesar — di situ perbaikan paling berdampak, bukan di menambah prospek baru.")}
           </div>
           <table className="simple-table">
             <thead>
               <tr>
-                <th>Tahap</th>
-                <th>Mencapai Tahap Ini</th>
-                <th>Nilai</th>
-                <th>Konversi dari Tahap Sebelumnya</th>
-                <th>Bocor</th>
+                <th>{tr("Tahap")}</th>
+                <th>{tr("Mencapai Tahap Ini")}</th>
+                <th>{tr("Nilai")}</th>
+                <th>{tr("Konversi dari Tahap Sebelumnya")}</th>
+                <th>{tr("Bocor")}</th>
               </tr>
             </thead>
             <tbody>
@@ -1161,7 +1162,7 @@ export function MarketingModal() {
                   <tr key={r.stage}>
                     <td>
                       <b>{r.stage} · {r.label}</b>
-                      <div className="field-note">Bobot forecast {Math.round((STAGE_PROBABILITY[r.stage] || 0) * 100)}%</div>
+                      <div className="field-note">{tr("Bobot forecast")} {Math.round((STAGE_PROBABILITY[r.stage] || 0) * 100)}%</div>
                     </td>
                     <td className="num">{r.count}</td>
                     <td className="num">{formatRupiah(r.value)}</td>
@@ -1173,7 +1174,7 @@ export function MarketingModal() {
             </tbody>
           </table>
           <div className="field-note" style={{ marginTop: 10 }}>
-            Total <b>{corong.totalLost}</b> prospek berakhir Lose Order. Data status tidak merekam di tahap mana prospek berhenti, jadi angka bocor per tahap dihitung dari selisih jumlah yang mencapai tiap tahap — bukan dari catatan kekalahan langsung.
+            {tr("Total")} <b>{corong.totalLost}</b> {tr("prospek berakhir Lose Order. Data status tidak merekam di tahap mana prospek berhenti, jadi angka bocor per tahap dihitung dari selisih jumlah yang mencapai tiap tahap — bukan dari catatan kekalahan langsung.")}
           </div>
         </div>
       )}

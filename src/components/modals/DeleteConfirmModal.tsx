@@ -6,7 +6,9 @@ import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
+import { useT } from '@/store/useLangStore';
 export function DeleteConfirmModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'delete';
   const ctx = useUiStore((s) => s.deleteCtx);
@@ -61,10 +63,10 @@ export function DeleteConfirmModal() {
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Batal
+            {tr("Batal")}
           </button>
           <button type="button" className="btn btn-danger" onClick={onConfirm} disabled={busy}>
-            Hapus
+            {tr("Hapus")}
           </button>
         </>
       }

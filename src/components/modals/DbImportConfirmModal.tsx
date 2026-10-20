@@ -8,7 +8,9 @@ import { pendingDbImport } from '@/lib/pending-db-import';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
+import { useT } from '@/store/useLangStore';
 export function DbImportConfirmModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'dbImportConfirm';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -40,21 +42,21 @@ export function DbImportConfirmModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="Pulihkan Database dari Backup"
+      title={tr("Pulihkan Database dari Backup")}
       wide
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Batal
+            {tr("Batal")}
           </button>
           <button type="button" className="btn btn-danger" disabled={busy} onClick={onConfirm}>
-            Ya, Pulihkan Database
+            {tr("Ya, Pulihkan Database")}
           </button>
         </>
       }
     >
       <p style={{ color: 'var(--text-soft)', fontSize: 13 }}>{summary}</p>
-      <p style={{ color: 'var(--rust-600)', fontWeight: 600, fontSize: 13 }}>Tindakan ini akan mengganti seluruh data prospek, customer, dan user saat ini dengan isi file backup. Tindakan tidak dapat dibatalkan.</p>
+      <p style={{ color: 'var(--rust-600)', fontWeight: 600, fontSize: 13 }}>{tr("Tindakan ini akan mengganti seluruh data prospek, customer, dan user saat ini dengan isi file backup. Tindakan tidak dapat dibatalkan.")}</p>
     </Modal>
   );
 }

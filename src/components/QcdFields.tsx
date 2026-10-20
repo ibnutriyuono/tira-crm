@@ -6,6 +6,7 @@ import { customerKey } from '@/lib/reports';
 import { useDataStore } from '@/store/useDataStore';
 import type { PendingQcd } from '@/store/useUiStore';
 
+import { useT } from '@/store/useLangStore';
 /**
  * The structured QCD inputs, shared by the QCD modal (kanban / recap), the
  * prospect form and the activity "→ PO" conversion so all three ask the same
@@ -13,6 +14,7 @@ import type { PendingQcd } from '@/store/useUiStore';
  * text boxes beside them are optional detail.
  */
 export function QcdFields({ value, onChange, statusVal, required }: { value: PendingQcd; onChange: (v: PendingQcd) => void; statusVal: number; required: boolean }) {
+  const tr = useT();
   const prospects = useDataStore((s) => s.prospects);
   const lost = statusVal === 6;
   const star = required ? <span style={{ color: 'var(--rust-500)' }}> *</span> : null;
@@ -43,10 +45,10 @@ export function QcdFields({ value, onChange, statusVal, required }: { value: Pen
       {QCD_DIMS.map((d) => (
         <div key={d.key}>
           <label>
-            {d.label} dibanding kompetitor{star}
+            {d.label} {tr("dibanding kompetitor")}{star}
           </label>
           <select value={value[levelKey[d.key]]} onChange={(e) => set({ [levelKey[d.key]]: e.target.value } as Partial<PendingQcd>)}>
-            <option value="">— pilih —</option>
+            <option value="">{tr("— pilih —")}</option>
             {QCD_LEVELS.map((l) => (
               <option key={l} value={l}>
                 {d.options[l]}
@@ -57,18 +59,18 @@ export function QcdFields({ value, onChange, statusVal, required }: { value: Pen
             type="text"
             value={value[textKey[d.key]]}
             onChange={(e) => set({ [textKey[d.key]]: e.target.value } as Partial<PendingQcd>)}
-            placeholder={d.key === 'cost' ? 'Keterangan (opsional), cth. selisih 5%' : 'Keterangan (opsional)'}
+            placeholder={d.key === 'cost' ? tr("Keterangan (opsional), cth. selisih 5%") : tr("Keterangan (opsional)")}
             style={{ marginTop: 6 }}
           />
         </div>
       ))}
       <div>
         <label>
-          Faktor penentu {lost ? 'kekalahan' : 'kemenangan'}
+          {tr("Faktor penentu")} {lost ? 'kekalahan' : 'kemenangan'}
           {star}
         </label>
         <select value={value.faktor} onChange={(e) => set({ faktor: e.target.value })}>
-          <option value="">— pilih —</option>
+          <option value="">{tr("— pilih —")}</option>
           {QCD_FAKTOR.map((f) => (
             <option key={f.key} value={f.key}>
               {f.label}
@@ -78,9 +80,9 @@ export function QcdFields({ value, onChange, statusVal, required }: { value: Pen
       </div>
       <div className="full">
         <label>
-          Kompetitor{lost ? (required ? <span style={{ color: 'var(--rust-500)' }}> * (pemenang)</span> : ' (pemenang)') : ' (jika ada)'}
+          {tr("Kompetitor")}{lost ? (required ? <span style={{ color: 'var(--rust-500)' }}> {tr("* (pemenang)")}</span> : tr(" (pemenang)")) : tr(" (jika ada)")}
         </label>
-        <input type="text" list="qcdKompetitorList" value={value.kompetitor} onChange={(e) => set({ kompetitor: e.target.value })} onBlur={onKompetitorBlur} placeholder="Pilih / ketik nama kompetitor" />
+        <input type="text" list="qcdKompetitorList" value={value.kompetitor} onChange={(e) => set({ kompetitor: e.target.value })} onBlur={onKompetitorBlur} placeholder={tr("Pilih / ketik nama kompetitor")} />
         <datalist id="qcdKompetitorList">
           {kompetitorOptions.map((k) => (
             <option key={k} value={k} />
@@ -88,8 +90,8 @@ export function QcdFields({ value, onChange, statusVal, required }: { value: Pen
         </datalist>
       </div>
       <div className="full">
-        <label>Catatan</label>
-        <textarea value={value.catatan} onChange={(e) => set({ catatan: e.target.value })} placeholder="Catatan tambahan terkait keputusan customer" />
+        <label>{tr("Catatan")}</label>
+        <textarea value={value.catatan} onChange={(e) => set({ catatan: e.target.value })} placeholder={tr("Catatan tambahan terkait keputusan customer")} />
       </div>
     </div>
   );

@@ -128,6 +128,10 @@ export const CUSTOMER_FIELD_LABELS: Record<string, string> = {
   address: 'Alamat',
   catatan: 'Catatan',
   pics: 'Daftar PIC',
+  segmen: 'Segmen',
+  aplikasi: 'Aplikasi pemakaian',
+  potensi: 'Potensi / tahun',
+  kompetitor: 'Kompetitor',
 };
 
 export const FUPA_FIELD_LABELS: Record<string, string> = {

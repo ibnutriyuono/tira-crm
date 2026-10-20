@@ -13,6 +13,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 type Kondisi = '' | 'belum' | 'sisa' | 'lunas' | 'tidakpo';
 
 const KONDISI: { v: Kondisi; l: string }[] = [
@@ -33,6 +34,7 @@ interface FeedEvent extends ItemEvent {
  * Ditawarkan -> PO -> Terkirim (lib/item-flow.ts), plus the latest item events.
  */
 export function PipelineTab({ prospects, scopeLabel, cabangs, thisMonth }: { prospects: Prospect[]; scopeLabel: string; cabangs: string[] | null; thisMonth: string }) {
+  const tr = useT();
   const toast = useDataStore((s) => s.toast);
   const [cabang, setCabang] = useState('');
   const [period, setPeriod] = useState(6);
@@ -110,79 +112,79 @@ export function PipelineTab({ prospects, scopeLabel, cabangs, thisMonth }: { pro
     <>
       <div className="toolbar-row" style={{ alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         {cabangs && cabangs.length > 1 && (
-          <select value={cabang} onChange={(e) => setCabang(e.target.value)} style={{ maxWidth: 170 }} aria-label="Cabang">
-            <option value="">Semua cabang</option>
+          <select value={cabang} onChange={(e) => setCabang(e.target.value)} style={{ maxWidth: 170 }} aria-label={tr("Cabang")}>
+            <option value="">{tr("Semua cabang")}</option>
             {cabangs.map((c) => (
-              <option key={c} value={c}>Cabang {c}</option>
+              <option key={c} value={c}>{tr("Cabang")} {c}</option>
             ))}
           </select>
         )}
-        <select value={period} onChange={(e) => setPeriod(Number(e.target.value))} style={{ maxWidth: 170 }} aria-label="Periode PO">
-          <option value={3}>PO 3 bulan terakhir</option>
-          <option value={6}>PO 6 bulan terakhir</option>
-          <option value={12}>PO 12 bulan terakhir</option>
-          <option value={0}>Semua PO</option>
+        <select value={period} onChange={(e) => setPeriod(Number(e.target.value))} style={{ maxWidth: 170 }} aria-label={tr("Periode PO")}>
+          <option value={3}>{tr("PO 3 bulan terakhir")}</option>
+          <option value={6}>{tr("PO 6 bulan terakhir")}</option>
+          <option value={12}>{tr("PO 12 bulan terakhir")}</option>
+          <option value={0}>{tr("Semua PO")}</option>
         </select>
-        <select value={kondisi} onChange={(e) => setKondisi(e.target.value as Kondisi)} style={{ maxWidth: 230 }} aria-label="Kondisi">
+        <select value={kondisi} onChange={(e) => setKondisi(e.target.value as Kondisi)} style={{ maxWidth: 230 }} aria-label={tr("Kondisi")}>
           {KONDISI.map((k) => (
             <option key={k.v} value={k.v}>{k.l}</option>
           ))}
         </select>
-        <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari customer / No. PO" style={{ maxWidth: 220 }} />
+        <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("Cari customer / No. PO")} style={{ maxWidth: 220 }} />
         {canNow('analisa', 'x') && (
           <button type="button" className="btn btn-outline btn-sm" onClick={exportExcel}>
-            <IconDownload /> Excel
+            <IconDownload /> {tr("Excel")}
           </button>
         )}
       </div>
 
       <div className="kpi-grid">
         <div className="kpi">
-          <div className="label">Tonase PO</div>
+          <div className="label">{tr("Tonase PO")}</div>
           <div className="value">{formatTon(sum.po, 1)}</div>
-          <div className="foot">dari ditawarkan {formatTon(sum.off, 1)}</div>
+          <div className="foot">{tr("dari ditawarkan")} {formatTon(sum.off, 1)}</div>
         </div>
         <div className="kpi won">
-          <div className="label">Terkirim</div>
+          <div className="label">{tr("Terkirim")}</div>
           <div className="value">{formatTon(sum.sent, 1)}</div>
-          <div className="foot">{sum.po ? Math.round((sum.sent / sum.po) * 100) : 0}% dari PO</div>
+          <div className="foot">{sum.po ? Math.round((sum.sent / sum.po) * 100) : 0}{tr("% dari PO")}</div>
         </div>
         <div className="kpi aktif">
-          <div className="label">Sisa Belum Kirim</div>
+          <div className="label">{tr("Sisa Belum Kirim")}</div>
           <div className="value">{formatTon(sum.open, 1)}</div>
-          <div className="foot">{rows.filter((r) => r.kond === 'sisa').length} PO masih terbuka</div>
+          <div className="foot">{rows.filter((r) => r.kond === 'sisa').length} {tr("PO masih terbuka")}</div>
         </div>
         <div className="kpi lost">
-          <div className="label">Tidak di-PO</div>
+          <div className="label">{tr("Tidak di-PO")}</div>
           <div className="value">{formatTon(sum.lost, 1)}</div>
-          <div className="foot">Selisih penawaran vs PO</div>
+          <div className="foot">{tr("Selisih penawaran vs PO")}</div>
         </div>
         <div className="kpi">
-          <div className="label">Belum Dikonfirmasi</div>
+          <div className="label">{tr("Belum Dikonfirmasi")}</div>
           <div className="value">{sum.belum}</div>
-          <div className="foot">PO/DO masih perkiraan (dihitung penuh)</div>
+          <div className="foot">{tr("PO/DO masih perkiraan (dihitung penuh)")}</div>
         </div>
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, margin: '4px 0 6px' }}>
-        <span style={{ fontWeight: 700, fontSize: 13 }}>PO / Kontrak &amp; DO — {rows.length} prospek · {scopeText}</span>
+        <span style={{ fontWeight: 700, fontSize: 13 }}>{tr("PO / Kontrak & DO —")} {rows.length} {tr("prospek ·")} {scopeText}</span>
         <FlowLegend />
       </div>
       {rows.length === 0 ? (
-        <div className="field-note" style={{ marginBottom: 16 }}>Tidak ada PO/DO pada filter ini.</div>
+        <div className="field-note" style={{ marginBottom: 16 }}>{tr("Tidak ada PO/DO pada filter ini.")}</div>
       ) : (
         <div className="table-wrap" style={{ borderTop: 'none', marginBottom: 16 }}>
           <table className="simple-table if-nowrap" style={{ minWidth: 980 }}>
             <thead>
               <tr>
-                <th>Customer</th><th>Cabang</th><th>No. PO</th><th>Tgl PO</th><th style={{ textAlign: 'right' }}>Item</th>
-                <th style={{ textAlign: 'right' }}>Ditawarkan</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>Terkirim</th>
-                <th style={{ width: 120 }}>Alur</th><th>Kondisi</th><th />
+                <th>{tr("Customer")}</th><th>{tr("Cabang")}</th><th>{tr("No. PO")}</th><th>{tr("Tgl PO")}</th><th style={{ textAlign: 'right' }}>{tr("Item")}</th>
+                <th style={{ textAlign: 'right' }}>{tr("Ditawarkan")}</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>{tr("Terkirim")}</th>
+                <th style={{ width: 120 }}>{tr("Alur")}</th><th>{tr("Kondisi")}</th><th />
               </tr>
             </thead>
             <tbody>
               {rows.slice(0, 200).map((r) => (
-                <tr key={r.p.id} className="if-row" onClick={() => open(r.p.id)} title="Buka Status Item & Riwayat">
+                <tr key={r.p.id} className="if-row" onClick={() => open(r.p.id)} title={tr("Buka Status Item & Riwayat")}>
                   <td><b>{r.p.customer}</b><div className="field-note" style={{ margin: 0 }}>SE {r.p.se || '-'}</div></td>
                   <td>{r.p.cabang || '-'}</td>
                   <td className="mono" style={{ fontSize: 12 }}>{r.p.noPo || '-'}</td>
@@ -193,12 +195,12 @@ export function PipelineTab({ prospects, scopeLabel, cabangs, thisMonth }: { pro
                   <td className="mono" style={{ textAlign: 'right' }}>{r.t.offKg ? formatTon(r.t.sentKg) : formatQty(r.sent)}</td>
                   <td><FlowBar it={{ offered: r.off, po: r.po, sent: r.sent }} /></td>
                   <td>
-                    {r.kond === 'belum' ? <span className="badge amber">Belum dikonfirmasi</span> : r.kond === 'sisa' ? <span className="badge steel">Sisa {r.po ? Math.round(((r.po - r.sent) / r.po) * 100) : 0}%</span> : <span className="badge green">Lunas</span>}
-                    {r.lost && <span className="badge rust" style={{ marginLeft: 4 }}>Ada tidak di-PO</span>}
+                    {r.kond === 'belum' ? <span className="badge amber">{tr("Belum dikonfirmasi")}</span> : r.kond === 'sisa' ? <span className="badge steel">{tr("Sisa")} {r.po ? Math.round(((r.po - r.sent) / r.po) * 100) : 0}%</span> : <span className="badge green">{tr("Lunas")}</span>}
+                    {r.lost && <span className="badge rust" style={{ marginLeft: 4 }}>{tr("Ada tidak di-PO")}</span>}
                   </td>
                   <td>
                     <button type="button" className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); open(r.p.id); }}>
-                      {r.kond === 'belum' ? 'Konfirmasi' : 'Detail'}
+                      {r.kond === 'belum' ? tr("Konfirmasi") : tr("Detail")}
                     </button>
                   </td>
                 </tr>
@@ -208,11 +210,11 @@ export function PipelineTab({ prospects, scopeLabel, cabangs, thisMonth }: { pro
         </div>
       )}
 
-      <div style={{ fontWeight: 700, fontSize: 13, margin: '4px 0 6px' }}>Riwayat Item Terbaru</div>
+      <div style={{ fontWeight: 700, fontSize: 13, margin: '4px 0 6px' }}>{tr("Riwayat Item Terbaru")}</div>
       {feed === null ? (
-        <div className="field-note">Memuat…</div>
+        <div className="field-note">{tr("Memuat…")}</div>
       ) : feed.length === 0 ? (
-        <div className="field-note">Belum ada riwayat item. Riwayat tercatat saat penawaran ditandai terkirim, qty PO dikonfirmasi, atau pengiriman dicatat.</div>
+        <div className="field-note">{tr("Belum ada riwayat item. Riwayat tercatat saat penawaran ditandai terkirim, qty PO dikonfirmasi, atau pengiriman dicatat.")}</div>
       ) : (
         <ol className="if-timeline">
           {feed.filter((e) => !cabang || (e.cabang || '').trim().toUpperCase() === cabang).slice(0, 40).map((e) => {

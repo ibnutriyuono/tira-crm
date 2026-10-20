@@ -7,6 +7,7 @@ import { ROLE_LABELS } from '@/lib/constants';
 import { useDataStore } from '@/store/useDataStore';
 import type { ItemChatMessage, ItemEntity } from '@/lib/types';
 
+import { useT } from '@/store/useLangStore';
 const ENTITY_LABELS: Record<ItemEntity, string> = { prospect: 'prospek', rfq: 'RFQ', fupa: 'FUP A' };
 
 function timeLabel(iso: string) {
@@ -33,6 +34,7 @@ export function ItemChat({
    */
   onUnreadAtOpen?: (n: number) => void;
 }) {
+  const tr = useT();
   const currentUser = useDataStore((s) => s.currentUser);
   const toast = useDataStore((s) => s.toast);
   const allIssues = useDataStore((s) => s.issues);
@@ -113,7 +115,7 @@ export function ItemChat({
     <div>
       <div className="item-chat-body" ref={bodyRef}>
         {messages.length === 0 ? (
-          <div className="text-muted" style={{ fontSize: 12, padding: 8 }}>Belum ada diskusi pada dokumen ini.</div>
+          <div className="text-muted" style={{ fontSize: 12, padding: 8 }}>{tr("Belum ada diskusi pada dokumen ini.")}</div>
         ) : (
           messages.map((m) => {
             if (m.role === 'system') {
@@ -130,7 +132,7 @@ export function ItemChat({
                   <span className="tc-meta-name">{m.author}</span>
                   {m.role ? ` · ${ROLE_LABELS[m.role] || m.role}` : ''}
                   {` · ${timeLabel(m.createdAt)}`}
-                  {inIssue(m.createdAt) && <span className="badge rust tc-issue-tag">⚑ Masalah</span>}
+                  {inIssue(m.createdAt) && <span className="badge rust tc-issue-tag">{tr("⚑ Masalah")}</span>}
                 </div>
                 <div className="tc-bubble">{m.text}</div>
               </div>
@@ -142,7 +144,7 @@ export function ItemChat({
         <input
           type="text"
           value={draft}
-          placeholder="Tulis diskusi..."
+          placeholder={tr("Tulis diskusi...")}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -151,7 +153,7 @@ export function ItemChat({
             }
           }}
         />
-        <button type="button" className="btn btn-primary btn-sm" onClick={send}>Kirim</button>
+        <button type="button" className="btn btn-primary btn-sm" onClick={send}>{tr("Kirim")}</button>
       </div>
     </div>
   );

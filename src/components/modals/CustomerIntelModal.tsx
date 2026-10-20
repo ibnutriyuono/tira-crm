@@ -2,15 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
-import { STATUS_META } from '@/lib/constants';
-import { classify, formatDateID, formatRupiah } from '@/lib/format';
+import { formatDateID, formatRupiah } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { buildCustomerIntel, type CustomerIntelRow } from '@/lib/reports';
 import {
   AKTIF_NEGLECT_DAYS,
   activitiesFor,
   buildActivityIndex,
-  buildTimeline,
   localToday,
   matchContactFilter,
   summarizeContact,
@@ -25,6 +23,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 type Row = CustomerIntelRow & { contact: ContactSummary };
 const WRAP = { whiteSpace: 'normal', lineHeight: 1.35 } as const;
 type SortKey = 'won' | 'recent' | 'stale' | 'contact';
@@ -35,6 +34,7 @@ const short = (s: string | null | undefined, n = 60) => {
 };
 
 export function CustomerIntelModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'customerIntel';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -45,8 +45,6 @@ export function CustomerIntelModal() {
   const canLogActivity = !!currentUser && activityOwner(currentUser) !== null && canNow('aktivitas', 'e');
 
   const [search, setSearch] = useState('');
-  const [detail, setDetail] = useState<string | null>(null);
-  const [detailTab, setDetailTab] = useState<'timeline' | 'transaksi'>('timeline');
   const [healthFilter, setHealthFilter] = useState('');
   const [contactFilter, setContactFilter] = useState<ContactFilter>('');
   const [sortBy, setSortBy] = useState<SortKey>('won');
@@ -134,7 +132,7 @@ export function CustomerIntelModal() {
       type="button"
       className="btn btn-outline btn-sm"
       disabled={!canLogActivity}
-      title={canLogActivity ? 'Catat kunjungan / telepon / meeting ke Aktivitas Harian' : 'Pencatatan aktivitas hanya untuk Sales dan BM'}
+      title={canLogActivity ? tr("Catat kunjungan / telepon / meeting ke Aktivitas Harian") : tr("Pencatatan aktivitas hanya untuk Sales dan BM")}
       onClick={(e) => {
         e.stopPropagation();
         logContact(r);
@@ -176,142 +174,22 @@ export function CustomerIntelModal() {
     toast(`Export berhasil: ${list.length} customer`, 'success');
   }
 
-  const active = detail ? rows.find((r) => r.name === detail) : null;
-
-  if (active) {
-    const c = active.contact;
-    const acts = activitiesFor(index, active.name);
-    const timeline = buildTimeline(active.records, acts);
-    const history = active.records
-      .slice()
-      .sort((a, b) => (b.tglPO || b.tglPenawaran || '').localeCompare(a.tglPO || a.tglPenawaran || ''));
-    return (
-      <Modal
-        show={show}
-        onClose={() => { setDetail(null); closeModal(); }}
-        title={`Customer — ${active.name}`}
-        xwide
-        footer={
-          <>
-            {catatButton(active, 'Catat Aktivitas')}
-            <button type="button" className="btn btn-outline" onClick={() => setDetail(null)}>← Kembali</button>
-          </>
-        }
-      >
-        <div className="import-summary" style={{ marginTop: 0 }}>
-          Total Won <b>{formatRupiah(active.wonValue)}</b> dari <b>{active.won}</b> deal · Aktif <b>{active.aktif}</b> · Lost <b>{active.lost}</b> ·
-          Win rate <b>{active.winRate}%</b> · <span className={`badge ${active.healthColor}`}>{active.health}</span>
-          {active.daysSinceOrder != null ? ` · ${active.daysSinceOrder} hari sejak order terakhir` : ' · belum pernah order'}
-        </div>
-
-        <div className="kpi-grid" style={{ marginTop: 12 }}>
-          <div className="kpi">
-            <div className="label">Kontak Terakhir</div>
-            <div className="value" style={{ fontSize: 18 }}>{c.last ? formatDateID(c.last.tanggal) : '-'}</div>
-            <div className="foot">{c.last ? `${activityLabel(c.last.tipe)} · ${c.last.se} · ${c.daysSinceContact} hari lalu` : 'Belum ada di Aktivitas Harian'}</div>
-          </div>
-          <div className="kpi">
-            <div className="label">Kontak 30 / 90 Hari</div>
-            <div className="value">{c.count30} / {c.count90}</div>
-            <div className="foot">aktivitas selesai</div>
-          </div>
-          <div className="kpi">
-            <div className="label">Status Kontak</div>
-            <div className="value" style={{ fontSize: 14, lineHeight: 1.4 }}><span className={`badge ${c.statusColor}`} style={WRAP}>{c.status}</span></div>
-            <div className="foot">{c.plans[0] ? `Rencana: ${formatDateID(c.plans[0].tanggal)} · ${activityLabel(c.plans[0].tipe)} · ${c.plans[0].se}` : 'Belum ada rencana kontak'}</div>
-          </div>
-          <div className="kpi">
-            <div className="label">SE yang Menangani</div>
-            <div className="value" style={{ fontSize: 15, lineHeight: 1.4 }}>{c.ses.length ? c.ses.join(', ') : '-'}</div>
-            <div className="foot">dari Aktivitas Harian</div>
-          </div>
-          <div className="kpi">
-            <div className="label">PIC Dikenal</div>
-            <div className="value" style={{ fontSize: 13, lineHeight: 1.45, fontWeight: 600 }}>
-              {c.pics.length ? c.pics.map((p) => (p.jabatan ? `${p.nama} (${p.jabatan})` : p.nama)).join(', ') : '-'}
-            </div>
-            <div className="foot">yang pernah ditemui/dihubungi</div>
-          </div>
-        </div>
-
-        <div className="toolbar-row">
-          <div className="seg">
-            <button type="button" className={`btn btn-sm ${detailTab === 'timeline' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setDetailTab('timeline')}>
-              Timeline Interaksi ({timeline.length})
-            </button>
-            <button type="button" className={`btn btn-sm ${detailTab === 'transaksi' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setDetailTab('transaksi')}>
-              Riwayat Transaksi ({history.length})
-            </button>
-          </div>
-        </div>
-
-        {detailTab === 'timeline' ? (
-          timeline.length === 0 ? (
-            <div className="empty-state" style={{ padding: '24px 10px' }}><p>Belum ada interaksi tercatat.</p></div>
-          ) : (
-            <div className="table-wrap" style={{ borderTop: 'none' }}>
-              <table className="simple-table" style={{ minWidth: 960 }}>
-                <thead>
-                  <tr><th>Tanggal</th><th>Jenis</th><th>SE</th><th>Uraian / Keterangan</th><th>PIC</th><th>Nilai</th></tr>
-                </thead>
-                <tbody>
-                  {timeline.map((e, i) => (
-                    <tr key={`${e.tanggal}-${i}`}>
-                      <td style={{ whiteSpace: 'nowrap' }}>{formatDateID(e.tanggal)}</td>
-                      <td><span className={`badge ${e.color}`}>{e.jenis}</span></td>
-                      <td>{e.se || '-'}</td>
-                      <td style={{ whiteSpace: 'pre-wrap' }}>{e.uraian}</td>
-                      <td>{e.pic || '-'}</td>
-                      <td className="mono" style={{ whiteSpace: 'nowrap' }}>{e.nilai != null ? formatRupiah(e.nilai) : ''}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
-        ) : (
-          <div className="table-wrap" style={{ borderTop: 'none' }}>
-            <table className="simple-table" style={{ minWidth: 960 }}>
-              <thead>
-                <tr><th>Uraian</th><th>Cabang</th><th>SE</th><th>Tgl Penawaran</th><th>Tgl PO</th><th>Nilai</th><th>Status</th><th>Klasifikasi</th></tr>
-              </thead>
-              <tbody>
-                {history.map((r) => {
-                  const meta = STATUS_META[r.status];
-                  return (
-                    <tr key={r.id}>
-                      <td>{r.uraian || '-'}</td>
-                      <td>{r.cabang || '-'}</td>
-                      <td>{r.se || '-'}</td>
-                      <td>{formatDateID(r.tglPenawaran)}</td>
-                      <td>{formatDateID(r.tglPO)}</td>
-                      <td className="mono">{formatRupiah(r.value)}</td>
-                      <td><span className={`badge ${meta?.color || 'slate'}`}>{meta?.label || '-'}</span></td>
-                      <td>{classify(r)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Modal>
-    );
+  function openProfile(name: string) {
+    useUiStore.setState({ profileCustomer: name, profileReturnTo: 'customerIntel' });
+    openModal('customerProfile');
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title={`Customer Intelligence — ${scopeLabel}`} xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title={`Customer Intelligence — ${scopeLabel}`} xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr("Tutup")}</button>}>
       <div className="import-summary" style={{ marginTop: 0 }}>
-        Rekap otomatis dari histori transaksi dan Aktivitas Harian tiap customer. Aktif = order dalam 45 hari terakhir, Menghangat = 46–90
-        hari, Dingin = &gt;90 hari tanpa order. <b>Prioritas</b> = Dingin/Menghangat yang belum disentuh sejak order terakhir, atau Aktif yang
-        tidak dihubungi &gt;{AKTIF_NEGLECT_DAYS} hari (dan belum ada rencana kontak). Data mengikuti cakupan role Anda.
+        {tr("Rekap otomatis dari histori transaksi dan Aktivitas Harian tiap customer. Aktif = order dalam 45 hari terakhir, Menghangat = 46–90 hari, Dingin = >90 hari tanpa order.")} <b>{tr("Prioritas")}</b> {tr("= Dingin/Menghangat yang belum disentuh sejak order terakhir, atau Aktif yang tidak dihubungi >")}{AKTIF_NEGLECT_DAYS} {tr("hari (dan belum ada rencana kontak). Data mengikuti cakupan role Anda.")}
       </div>
 
       {groups.length > 0 && (
         <div className="toolbar-row" style={{ marginTop: 10 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
-            Cakupan
-            <select className="btn-sm" value={scopeAktif} onChange={(e) => setScope(e.target.value)} title="Persempit ke regional, cabang atau SE tertentu dalam cakupan role Anda">
+            {tr("Cakupan")}
+            <select className="btn-sm" value={scopeAktif} onChange={(e) => setScope(e.target.value)} title={tr("Persempit ke regional, cabang atau SE tertentu dalam cakupan role Anda")}>
               <option value="">{scopeAllLabel(currentUser)}</option>
               {groups.map((g) => (
                 <optgroup key={g.label} label={g.label}>
@@ -326,7 +204,7 @@ export function CustomerIntelModal() {
           </label>
           {scopeAktif && (
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setScope('')}>
-              Reset cakupan
+              {tr("Reset cakupan")}
             </button>
           )}
         </div>
@@ -334,91 +212,91 @@ export function CustomerIntelModal() {
 
       <div className="kpi-grid" style={{ marginTop: 12 }}>
         <div className="kpi">
-          <div className="label">Total Customer</div>
+          <div className="label">{tr("Total Customer")}</div>
           <div className="value">{rows.length}</div>
-          <div className="foot">Pernah tercatat bertransaksi/prospek</div>
+          <div className="foot">{tr("Pernah tercatat bertransaksi/prospek")}</div>
         </div>
         <div className="kpi won">
-          <div className="label">Aktif</div>
+          <div className="label">{tr("Aktif")}</div>
           <div className="value">{rows.filter((r) => r.health === 'Aktif').length}</div>
-          <div className="foot">Order ≤ 45 hari</div>
+          <div className="foot">{tr("Order ≤ 45 hari")}</div>
         </div>
         <div className="kpi pending">
-          <div className="label">Menghangat</div>
+          <div className="label">{tr("Menghangat")}</div>
           <div className="value">{rows.filter((r) => r.health === 'Menghangat').length}</div>
-          <div className="foot">46–90 hari</div>
+          <div className="foot">{tr("46–90 hari")}</div>
         </div>
         <div className="kpi lost">
-          <div className="label">Dingin (Follow-up)</div>
+          <div className="label">{tr("Dingin (Follow-up)")}</div>
           <div className="value">{rows.filter((r) => r.health === 'Dingin (Follow-up)').length}</div>
-          <div className="foot">&gt; 90 hari tanpa order</div>
+          <div className="foot">{tr("> 90 hari tanpa order")}</div>
         </div>
         <div className="kpi">
-          <div className="label">Rata-rata Hari Sejak Order</div>
+          <div className="label">{tr("Rata-rata Hari Sejak Order")}</div>
           <div className="value">{avgDays}</div>
-          <div className="foot">dari customer yang pernah order</div>
+          <div className="foot">{tr("dari customer yang pernah order")}</div>
         </div>
         <div
           className="kpi lost"
           style={{ cursor: 'pointer' }}
-          title="Tampilkan customer prioritas"
+          title={tr("Tampilkan customer prioritas")}
           onClick={() => { setContactFilter('prioritas'); setHealthFilter(''); setSortBy('won'); }}
         >
-          <div className="label">Prioritas Disentuh</div>
+          <div className="label">{tr("Prioritas Disentuh")}</div>
           <div className="value">{actLoaded ? prioritas.length : '…'}</div>
-          <div className="foot">{formatRupiah(prioritas.reduce((s, r) => s + r.wonValue, 0))} histori won</div>
+          <div className="foot">{formatRupiah(prioritas.reduce((s, r) => s + r.wonValue, 0))} {tr("histori won")}</div>
         </div>
         <div className="kpi">
-          <div className="label">Dihubungi 30 Hari</div>
+          <div className="label">{tr("Dihubungi 30 Hari")}</div>
           <div className="value">{actLoaded ? disentuh30 : '…'}</div>
-          <div className="foot">customer dengan ≥1 aktivitas</div>
+          <div className="foot">{tr("customer dengan ≥1 aktivitas")}</div>
         </div>
       </div>
 
       <div className="toolbar-row">
-        <input type="search" className="search-grow" placeholder="Cari customer, cabang, SE" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input type="search" className="search-grow" placeholder={tr("Cari customer, cabang, SE")} value={search} onChange={(e) => setSearch(e.target.value)} />
         <select className="btn-sm" value={healthFilter} onChange={(e) => setHealthFilter(e.target.value)}>
-          <option value="">Semua Status</option>
-          <option value="Aktif">Aktif</option>
-          <option value="Menghangat">Menghangat</option>
-          <option value="Dingin (Follow-up)">Dingin (perlu follow-up)</option>
-          <option value="Belum Pernah Order">Belum Pernah Order</option>
+          <option value="">{tr("Semua Status")}</option>
+          <option value="Aktif">{tr("Aktif")}</option>
+          <option value="Menghangat">{tr("Menghangat")}</option>
+          <option value="Dingin (Follow-up)">{tr("Dingin (perlu follow-up)")}</option>
+          <option value="Belum Pernah Order">{tr("Belum Pernah Order")}</option>
         </select>
         <select className="btn-sm" value={contactFilter} onChange={(e) => setContactFilter(e.target.value as ContactFilter)}>
-          <option value="">Semua Kontak</option>
-          <option value="prioritas">Prioritas disentuh</option>
-          <option value="gt30">Belum dihubungi &gt; 30 hari</option>
-          <option value="gt60">Belum dihubungi &gt; 60 hari</option>
-          <option value="gt90">Belum dihubungi &gt; 90 hari</option>
-          <option value="rencana">Ada rencana kontak</option>
+          <option value="">{tr("Semua Kontak")}</option>
+          <option value="prioritas">{tr("Prioritas disentuh")}</option>
+          <option value="gt30">{tr("Belum dihubungi > 30 hari")}</option>
+          <option value="gt60">{tr("Belum dihubungi > 60 hari")}</option>
+          <option value="gt90">{tr("Belum dihubungi > 90 hari")}</option>
+          <option value="rencana">{tr("Ada rencana kontak")}</option>
         </select>
         <select className="btn-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}>
-          <option value="won">Urutkan: Total Won Tertinggi</option>
-          <option value="recent">Urutkan: Order Terbaru</option>
-          <option value="stale">Urutkan: Paling Lama Tidak Order</option>
-          <option value="contact">Urutkan: Paling Lama Tidak Dihubungi</option>
+          <option value="won">{tr("Urutkan: Total Won Tertinggi")}</option>
+          <option value="recent">{tr("Urutkan: Order Terbaru")}</option>
+          <option value="stale">{tr("Urutkan: Paling Lama Tidak Order")}</option>
+          <option value="contact">{tr("Urutkan: Paling Lama Tidak Dihubungi")}</option>
         </select>
         {canNow('marketing', 'x') && (
-          <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+          <button className="btn btn-outline btn-sm" onClick={exportExcel}>{tr("Export Excel")}</button>
         )}
       </div>
-      <div className="import-summary">Menampilkan <b>{list.length}</b> dari <b>{rows.length}</b> customer</div>
+      <div className="import-summary">{tr("Menampilkan")} <b>{list.length}</b> {tr("dari")} <b>{rows.length}</b> {tr("customer")}</div>
       {list.length === 0 ? (
-        <div className="empty-state" style={{ padding: '34px 10px' }}><h3>Belum ada data</h3><p>Ringkasan ini dihitung otomatis dari daftar prospek.</p></div>
+        <div className="empty-state" style={{ padding: '34px 10px' }}><h3>{tr("Belum ada data")}</h3><p>{tr("Ringkasan ini dihitung otomatis dari daftar prospek.")}</p></div>
       ) : (
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table" style={{ minWidth: 960 }}>
             <thead>
               <tr>
-                <th>Customer</th><th>Cabang</th><th>Total Value Won</th><th>Order Terakhir</th><th>Status</th>
-                <th>Kontak Terakhir</th><th title="Aktivitas selesai 30 / 90 hari terakhir">30/90 H</th><th>Status Kontak</th><th></th>
+                <th>{tr("Customer")}</th><th>{tr("Cabang")}</th><th>{tr("Total Value Won")}</th><th>{tr("Order Terakhir")}</th><th>{tr("Status")}</th>
+                <th>{tr("Kontak Terakhir")}</th><th title={tr("Aktivitas selesai 30 / 90 hari terakhir")}>30/90 H</th><th>{tr("Status Kontak")}</th><th></th>
               </tr>
             </thead>
             <tbody>
               {list.map((r) => {
                 const c = r.contact;
                 return (
-                  <tr key={r.name} style={{ cursor: 'pointer' }} onClick={() => { setDetail(r.name); setDetailTab('timeline'); }} title="Lihat timeline & riwayat transaksi">
+                  <tr key={r.name} style={{ cursor: 'pointer' }} onClick={() => openProfile(r.name)} title={tr("Buka profil customer: ringkasan, pembelian, tender, kontak, pembanding & timeline")}>
                     <td style={{ fontWeight: 600, color: 'var(--steel-600)' }}>{r.name}</td>
                     <td>{r.cabang || '-'}</td>
                     <td className="mono" style={{ whiteSpace: 'nowrap' }}>{formatRupiah(r.wonValue)}</td>
@@ -433,13 +311,13 @@ export function CustomerIntelModal() {
                           </div>
                         </>
                       ) : (
-                        <span className="field-note" style={{ margin: 0 }}>{actLoaded ? 'Belum ada' : '…'}</span>
+                        <span className="field-note" style={{ margin: 0 }}>{actLoaded ? tr("Belum ada") : '…'}</span>
                       )}
                     </td>
                     <td className="center">{c.count30} / {c.count90}</td>
                     <td>
                       <span className={`badge ${c.statusColor}`} style={WRAP}>{c.status}</span>
-                      {c.plans[0] && <div className="field-note" style={{ margin: 0 }}>Rencana {formatDateID(c.plans[0].tanggal)}</div>}
+                      {c.plans[0] && <div className="field-note" style={{ margin: 0 }}>{tr("Rencana")} {formatDateID(c.plans[0].tanggal)}</div>}
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {catatButton(r)}

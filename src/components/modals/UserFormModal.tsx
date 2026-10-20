@@ -9,7 +9,9 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { SafeUser } from '@/lib/types';
 
+import { useT } from '@/store/useLangStore';
 export function UserFormModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'userForm';
   const userEditId = useUiStore((s) => s.userEditId);
@@ -103,7 +105,7 @@ export function UserFormModal() {
         closeModal();
         openModal('users');
       }}
-      title={userEditId ? 'Edit User' : 'Tambah User'}
+      title={userEditId ? tr("Edit User") : tr("Tambah User")}
       onSubmit={onSubmit}
       footer={
         <>
@@ -115,39 +117,39 @@ export function UserFormModal() {
               openModal('users');
             }}
           >
-            Batal
+            {tr("Batal")}
           </button>
           <button type="submit" className="btn btn-primary" disabled={busy}>
-            Simpan User
+            {tr("Simpan User")}
           </button>
         </>
       }
     >
       <div className="form-grid">
         <div>
-          <label>Username</label>
+          <label>{tr("Username")}</label>
           <input type="text" required readOnly={!!userEditId} value={username} onChange={(e) => setUsername(e.target.value)} />
         </div>
         <div>
-          <label>Nama Lengkap</label>
+          <label>{tr("Nama Lengkap")}</label>
           <input type="text" required value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div>
-          <label>Role</label>
+          <label>{tr("Role")}</label>
           <select value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="sales">Sales</option>
-            <option value="bm">BM (Branch Manager)</option>
-            <option value="salesadmin">Admin Sales (satu cabang)</option>
-            <option value="rm">RM (Regional Manager)</option>
-            <option value="gm">GM (General Manager)</option>
-            <option value="purchasing">Purchasing</option>
-            <option value="purchasing05">PIC Line 05 (Purchasing fabrikasi)</option>
-            <option value="admin">Admin</option>
+            <option value="sales">{tr("Sales")}</option>
+            <option value="bm">{tr("BM (Branch Manager)")}</option>
+            <option value="salesadmin">{tr("Admin Sales (satu cabang)")}</option>
+            <option value="rm">{tr("RM (Regional Manager)")}</option>
+            <option value="gm">{tr("GM (General Manager)")}</option>
+            <option value="purchasing">{tr("Purchasing")}</option>
+            <option value="purchasing05">{tr("PIC Line 05 (Purchasing fabrikasi)")}</option>
+            <option value="admin">{tr("Admin")}</option>
             {customRoles.length > 0 && (
-              <optgroup label="Role tambahan (Kelola Role)">
+              <optgroup label={tr("Role tambahan (Kelola Role)")}>
                 {customRoles.map((r) => (
                   <option key={r.key} value={`custom:${r.key}`}>
-                    {r.label} — tipe dasar {r.base}
+                    {r.label} {tr("— tipe dasar")} {r.base}
                   </option>
                 ))}
               </optgroup>
@@ -155,20 +157,20 @@ export function UserFormModal() {
           </select>
         </div>
         <div>
-          <label>Regional</label>
+          <label>{tr("Regional")}</label>
           <select value={reg} onChange={(e) => setReg(e.target.value)}>
-            <option value="">- (Tidak berlaku)</option>
-            <option value="1">Regional 1</option>
-            <option value="2">Regional 2</option>
-            <option value="3">Regional 3</option>
+            <option value="">{tr("- (Tidak berlaku)")}</option>
+            <option value="1">{tr("Regional 1")}</option>
+            <option value="2">{tr("Regional 2")}</option>
+            <option value="3">{tr("Regional 3")}</option>
           </select>
         </div>
         <div>
-          <label>Kode SE</label>
-          <input type="text" value={se} onChange={(e) => setSe(e.target.value)} placeholder="cth. TD (untuk role Sales)" />
+          <label>{tr("Kode SE")}</label>
+          <input type="text" value={se} onChange={(e) => setSe(e.target.value)} placeholder={tr("cth. TD (untuk role Sales)")} />
         </div>
         <div>
-          <label>Cabang</label>
+          <label>{tr("Cabang")}</label>
           <input list="cabangList2" value={cabang} onChange={(e) => setCabang(e.target.value)} />
           <datalist id="cabangList2">
             {cabangOptions.map((c) => (
@@ -178,20 +180,20 @@ export function UserFormModal() {
         </div>
         <div>
           <label>
-            Password <span style={{ textTransform: 'none', fontWeight: 400 }}>{userEditId ? '(kosongkan jika tidak diubah)' : ''}</span>
+            {tr("Password")} <span style={{ textTransform: 'none', fontWeight: 400 }}>{userEditId ? tr("(kosongkan jika tidak diubah)") : ''}</span>
           </label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimal 4 karakter" />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={tr("Minimal 4 karakter")} />
         </div>
         <div className="full">
           <label>
-            Email <span style={{ textTransform: 'none', fontWeight: 400 }}>(untuk notifikasi — opsional)</span>
+            {tr("Email")} <span style={{ textTransform: 'none', fontWeight: 400 }}>{tr("(untuk notifikasi — opsional)")}</span>
           </label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@perusahaan.co.id" />
-          <div className="field-note">Kosongkan bila user tidak ingin menerima email. User juga bisa mengisi email sendiri di Notifikasi › Pengaturan.</div>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={tr("nama@perusahaan.co.id")} />
+          <div className="field-note">{tr("Kosongkan bila user tidak ingin menerima email. User juga bisa mengisi email sendiri di Notifikasi › Pengaturan.")}</div>
         </div>
       </div>
       <div className="import-summary" style={{ marginTop: 14 }}>
-        Cakupan data per role: <b>Sales</b> — isi Kode SE (hanya melihat prospek miliknya). <b>BM</b> — isi Cabang (melihat semua sales di cabangnya). <b>Admin Sales</b> — wajib isi Cabang (satu cabang): melihat data cabangnya, mengisi prospek/PO/DO, RFQ/FUP A dan customer atas nama Sales, serta menandai DO terfaktur (tanggal & no faktur); tidak mengubah target, rencana, aktivitas, perjalanan dinas, maupun user. <b>RM</b> — isi Regional (melihat semua cabang di regionalnya). <b>Purchasing</b> — melihat seluruh prospek dan RFQ/FUP A, serta mengelola vendor dan penawaran. <b>PIC Line 05</b> — membuka UI Purchasing, tetapi hanya melihat dan mengerjakan RFQ/FUP A yang berisi material Line 05 (fabrikasi); tidak melihat prospek. <b>GM</b> &amp; <b>Admin</b> — melihat seluruh data, field lain tidak perlu diisi.
+        {tr("Cakupan data per role:")} <b>{tr("Sales")}</b> {tr("— isi Kode SE (hanya melihat prospek miliknya).")} <b>BM</b> {tr("— isi Cabang (melihat semua sales di cabangnya).")} <b>{tr("Admin Sales")}</b> {tr("— wajib isi Cabang (satu cabang): melihat data cabangnya, mengisi prospek/PO/DO, RFQ/FUP A dan customer atas nama Sales, serta menandai DO terfaktur (tanggal & no faktur); tidak mengubah target, rencana, aktivitas, perjalanan dinas, maupun user.")} <b>RM</b> {tr("— isi Regional (melihat semua cabang di regionalnya).")} <b>{tr("Purchasing")}</b> {tr("— melihat seluruh prospek dan RFQ/FUP A, serta mengelola vendor dan penawaran.")} <b>{tr("PIC Line 05")}</b> {tr("— membuka UI Purchasing, tetapi hanya melihat dan mengerjakan RFQ/FUP A yang berisi material Line 05 (fabrikasi); tidak melihat prospek.")} <b>GM</b> {tr("&")} <b>{tr("Admin")}</b> {tr("— melihat seluruh data, field lain tidak perlu diisi.")}
       </div>
     </Modal>
   );

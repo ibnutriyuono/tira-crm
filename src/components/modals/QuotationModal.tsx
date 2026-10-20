@@ -13,6 +13,7 @@ import { canNow } from '@/hooks/useCan';
 import { signatureUrl } from '../SignatureSection';
 import { activityOwner } from '@/lib/sales-activity';
 import {
+  QUOTE_DEFAULTS,
   QUOTE_OPT_GROUPS,
   defaultQuoteOpts,
   lineTotal,
@@ -23,10 +24,15 @@ import {
   unitPrice,
   type QuoteData,
   type QuoteItem,
+  type QuoteLang,
   type QuoteOptKey,
   type QuoteOpts,
 } from '@/lib/quotation-doc';
 
+import { useT } from '@/store/useLangStore';
+import { getLang } from '@/lib/i18n';
+import { defaultEmailMessage, defaultEmailSubject, quoteEmailHtml, quoteEmailSummary, quoteEmailText } from '@/lib/quotation-email';
+import { validEmail } from '@/lib/notif-prefs';
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 function generateDefaultNomor(r: Prospect): string {
   const now = new Date();
@@ -37,7 +43,7 @@ function generateDefaultNomor(r: Prospect): string {
 const JABATAN: Record<string, string> = { sales: 'Sales Engineer', bm: 'Branch Manager', rm: 'Regional Manager', gm: 'General Manager', salesadmin: 'Admin Sales' };
 
 // Pilihan tampilan, kop, kota & telepon penanda tangan diingat per browser.
-const LS = { opts: 'tira.quote.opts', kop: 'tira.quote.kop', kota: 'tira.quote.kota', telp: 'tira.quote.telp' };
+const LS = { opts: 'tira.quote.opts', kop: 'tira.quote.kop', kota: 'tira.quote.kota', telp: 'tira.quote.telp', lang: 'tira.quote.lang' };
 const lsGet = (k: string) => {
   try {
     return window.localStorage.getItem(k);
@@ -58,6 +64,7 @@ const blankItem = (): QuoteItem => ({ line: '', uraian: '', grade: '', satuan: '
 type Tab = 'isi' | 'tampilan' | 'pratinjau';
 
 export function QuotationModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'quotation';
   const prospectId = useUiStore((s) => s.quotationProspectId);
@@ -84,6 +91,11 @@ export function QuotationModal() {
   const [busy, setBusy] = useState(false);
   // Catat ke Aktivitas Harian pembuat surat ("Kirim penawaran / dokumen").
   const [logAkt, setLogAkt] = useState(true);
+  // Layar "Kirim via Email": email rapi + lampiran PDF (dan .docx bila dipilih).
+  const [mailMode, setMailMode] = useState(false);
+  const [mail, setMail] = useState({ to: '', cc: '', ccSelf: true, subject: '', message: '', docx: false });
+  const [mailServer, setMailServer] = useState<boolean | null>(null);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (!show || !record) return;
@@ -97,13 +109,19 @@ export function QuotationModal() {
     }
     setOpts(normalizeQuoteOpts(saved));
     setTab('isi');
+    setMailMode(false);
     const mats = getProspectMaterials(record) as (ReturnType<typeof getProspectMaterials>[number] & { grade?: string; satuan?: string; fabNama?: string })[];
+    // Bahasa surat terakhir dipakai; belum pernah memilih = ikut bahasa tampilan.
+    const savedLang = lsGet(LS.lang);
+    const lang: QuoteLang = savedLang === 'en' || savedLang === 'id' ? savedLang : getLang();
+    const def = QUOTE_DEFAULTS[lang];
     setD({
+      lang,
       nomor: generateDefaultNomor(record),
       tanggal: todayStr(),
       kota: lsGet(LS.kota) || '',
       lampiran: '-',
-      perihal: `Penawaran Harga ${record.uraian || ''}`.trim().slice(0, 120),
+      perihal: `${def.perihal} ${record.uraian || ''}`.trim().slice(0, 120),
       kepada: record.customer || '',
       pic: picLabel(primary),
       alamat: cust?.address || '',
@@ -120,9 +138,9 @@ export function QuotationModal() {
           }))
         : [blankItem()],
       ppnInclude: false,
-      pembayaran: '30 hari setelah invoice diterima',
-      pengiriman: '2-4 minggu setelah PO diterima / sesuai kondisi stock',
-      berlaku: '14 hari kerja sejak tanggal penawaran',
+      pembayaran: def.pembayaran,
+      pengiriman: def.pengiriman,
+      berlaku: def.berlaku,
       kondisiStock: record.kondisiStock || '',
       catatan: '',
       signer: { nama: currentUser?.name || '', jabatan: JABATAN[currentUser?.role || ''] || '', telp: lsGet(LS.telp) || '', email: currentUser?.email || '' },
@@ -148,6 +166,22 @@ export function QuotationModal() {
       lsSet(LS.opts, JSON.stringify(n));
       return n;
     });
+
+  /** Ganti bahasa surat; isian yang masih bawaan ikut diterjemahkan, isian yang sudah diubah dibiarkan. */
+  function switchLang(next: QuoteLang) {
+    if (!d || (d.lang || 'id') === next) return;
+    const from = QUOTE_DEFAULTS[d.lang || 'id'];
+    const to = QUOTE_DEFAULTS[next];
+    const swap = (v: string, a: string, b: string) => (v.trim() === a ? b : v);
+    set({
+      lang: next,
+      perihal: d.perihal.startsWith(from.perihal) ? to.perihal + d.perihal.slice(from.perihal.length) : d.perihal,
+      pembayaran: swap(d.pembayaran, from.pembayaran, to.pembayaran),
+      pengiriman: swap(d.pengiriman, from.pengiriman, to.pengiriman),
+      berlaku: swap(d.berlaku, from.berlaku, to.berlaku),
+    });
+    lsSet(LS.lang, next);
+  }
 
   function remember() {
     if (!d) return;
@@ -227,27 +261,103 @@ export function QuotationModal() {
     }
   }
 
+  const baseName = () => `Penawaran_${escapeForFilename(d?.kepada || 'Customer')}_${escapeForFilename(d?.nomor || '')}`.replace(/_+$/, '');
+
+  async function makePdf(): Promise<Blob> {
+    const { loadLogo } = await import('@/lib/quotation-docx');
+    const { buildQuotePdf } = await import('@/lib/quotation-pdf');
+    const [logo, sig] = await Promise.all([opts.kop ? loadLogo() : null, opts.ttdGambar && sigSrc ? loadLogo(sigSrc) : null]);
+    return buildQuotePdf(d!, opts, logo, sig);
+  }
+  async function makeDocx(): Promise<Blob> {
+    const { buildQuoteDocx, loadLogo } = await import('@/lib/quotation-docx');
+    const [logo, sig] = await Promise.all([opts.kop ? loadLogo() : null, opts.ttdGambar && sigSrc ? loadLogo(sigSrc) : null]);
+    return buildQuoteDocx(d!, opts, logo, sig);
+  }
+  function saveBlob(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+  const toBase64 = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(',')[1] || '');
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(blob);
+    });
+
+  async function onDownloadPdf() {
+    if (!d || !validate()) return;
+    setBusy(true);
+    try {
+      remember();
+      saveBlob(await makePdf(), `${baseName()}.pdf`);
+      toast('Surat penawaran (PDF) berhasil diunduh', 'success');
+      void markSent();
+      void logToActivity(null);
+    } catch (err) {
+      toast(err instanceof Error ? `Gagal membuat PDF: ${err.message}` : 'Gagal membuat PDF', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Buka layar email: isian bawaan disusun dari surat (bahasa ikut bahasa surat). */
   function onSendEmail() {
     if (!d || !validate()) return;
     remember();
-    const ringkas = d.items.filter((it) => it.uraian.trim()).map((it) => it.uraian.trim()).join(', ');
-    const subject = encodeURIComponent(`Penawaran Harga - ${d.perihal || ringkas}`);
-    const sapa = d.pic.replace(/\s*\(.*\)\s*$/, '').trim() || d.kepada;
-    const body = [
-      `Yth. Bapak/Ibu ${sapa},`,
-      '',
-      `Bersama email ini kami sampaikan penawaran harga untuk ${ringkas || 'material yang diminta'} (No. ${d.nomor}), total ${totals ? rupiah(totals.grand) : ''}.`,
-      'Mohon lampirkan file Word hasil unduhan (.docx) pada email ini sebelum dikirim.',
-      '',
-      'Terima kasih.',
-      '',
-      d.signer.nama,
-      d.signer.jabatan,
-      'PT. TIRA AUSTENITE, Tbk - Steel Division',
-    ].filter((x, i, a) => x !== '' || a[i - 1] !== '');
-    window.open(`mailto:${email}?subject=${subject}&body=${encodeURIComponent(body.join('\n'))}`, '_blank');
-    void markSent();
-    void logToActivity('email');
+    setMail({ to: email, cc: '', ccSelf: !!currentUser?.email, subject: defaultEmailSubject(d), message: defaultEmailMessage(d), docx: false });
+    setMailMode(true);
+    if (mailServer === null) {
+      api
+        .get<{ configured: boolean }>('/api/quotations/email')
+        .then((r) => setMailServer(!!r.configured))
+        .catch(() => setMailServer(false));
+    }
+  }
+
+  const mailList = (v: string) => v.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+
+  async function onMailSubmit() {
+    if (!d || !record) return;
+    const to = mailList(mail.to);
+    const cc = Array.from(new Set([...mailList(mail.cc), ...(mail.ccSelf && currentUser?.email ? [currentUser.email] : [])])).filter((x) => !to.includes(x));
+    if (mailServer && !to.length) return toast('Isi alamat email customer', 'error');
+    const bad = [...to, ...cc].find((x) => !validEmail(x));
+    if (bad) return toast(`Alamat email tidak valid: ${bad}`, 'error');
+    if (!mail.subject.trim() || !mail.message.trim()) return toast('Subjek dan isi pesan wajib diisi', 'error');
+    setSending(true);
+    try {
+      const pdf = await makePdf();
+      const pdfName = `${baseName()}.pdf`;
+      const summary = quoteEmailSummary(d, opts);
+      if (!mailServer) {
+        // Server belum punya SMTP: unduh PDF, buka aplikasi email dengan teks yang sudah rapi.
+        saveBlob(pdf, pdfName);
+        const text = quoteEmailText({ message: mail.message, summary, attachments: [pdfName], logoSrc: '' });
+        const q = [`subject=${encodeURIComponent(mail.subject)}`, cc.length ? `cc=${encodeURIComponent(cc.join(','))}` : '', `body=${encodeURIComponent(text.replace(/\r?\n/g, '\r\n'))}`].filter(Boolean).join('&');
+        window.open(`mailto:${to.join(',')}?${q}`, '_blank');
+        toast(`PDF diunduh (${pdfName}) — lampirkan di email yang terbuka`, 'success');
+      } else {
+        const attachments = [{ filename: pdfName, content: await toBase64(pdf) }];
+        if (mail.docx) attachments.push({ filename: `${baseName()}.docx`, content: await toBase64(await makeDocx()) });
+        await api.post('/api/quotations/email', { prospectId: record.id, to, cc, subject: mail.subject.trim(), message: mail.message, summary, attachments });
+        toast(`Penawaran terkirim ke ${to.join(', ')}`, 'success');
+        setMailMode(false);
+      }
+      void markSent();
+      void logToActivity('email');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mengirim email', 'error');
+    } finally {
+      setSending(false);
+    }
   }
 
   const anyPerKg = d.items.some((it) => it.beratPc > 0 && it.hargaKg > 0);
@@ -256,28 +366,95 @@ export function QuotationModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="Buat Surat Penawaran"
+      title={tr("Buat Surat Penawaran")}
       xwide
       footer={
-        <>
-          <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Tutup
-          </button>
-          <button type="button" className="btn btn-outline" onClick={onSendEmail}>
-            <IconMail /> Kirim via Email
-          </button>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={onDownload}>
-            <IconDownload /> {busy ? 'Menyiapkan…' : 'Unduh Word (.docx)'}
-          </button>
-        </>
+        mailMode ? (
+          <>
+            <button type="button" className="btn btn-outline" onClick={() => setMailMode(false)} disabled={sending}>
+              ← {tr("Kembali ke surat")}
+            </button>
+            <button type="button" className="btn btn-outline" disabled={busy || sending} onClick={onDownloadPdf}>
+              <IconDownload /> {tr("Unduh PDF")}
+            </button>
+            <button type="button" className="btn btn-primary" disabled={sending || mailServer === null} onClick={onMailSubmit}>
+              <IconMail /> {sending ? tr("Mengirim…") : mailServer === false ? tr("Unduh PDF & buka aplikasi email") : tr("Kirim Email")}
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="btn btn-outline" onClick={closeModal}>
+              {tr("Tutup")}
+            </button>
+            <button type="button" className="btn btn-outline" onClick={onSendEmail}>
+              <IconMail /> {tr("Kirim via Email")}
+            </button>
+            <button type="button" className="btn btn-outline" disabled={busy} onClick={onDownloadPdf}>
+              <IconDownload /> {tr("Unduh PDF")}
+            </button>
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={onDownload}>
+              <IconDownload /> {busy ? tr("Menyiapkan…") : tr("Unduh Word (.docx)")}
+            </button>
+          </>
+        )
       }
     >
-      <div className="sa-pills q-tabs" role="tablist" aria-label="Bagian surat penawaran">
+      {mailMode && (
+        <div className="qm">
+          <div className="qm-form">
+            <div className="qm-title">{tr("Kirim Penawaran via Email")}</div>
+            {mailServer === false && (
+              <div className="qm-warn">
+                {tr("Server email CRM belum diatur. Tombol di bawah akan mengunduh PDF lalu membuka aplikasi email Anda dengan isi yang sudah rapi — lampirkan PDF yang terunduh sebelum mengirim.")}
+              </div>
+            )}
+            <label>{tr("Kepada (email customer)")} *</label>
+            <input type="text" list="qm-pics" value={mail.to} onChange={(e) => setMail({ ...mail, to: e.target.value })} placeholder="nama@perusahaan.com" />
+            <datalist id="qm-pics">
+              {picOptions.filter((p) => p.email).map((p) => (
+                <option key={p.id} value={p.email || ''}>{p.nama}</option>
+              ))}
+            </datalist>
+            <div className="field-note">{tr("Pisahkan dengan koma bila lebih dari satu.")}</div>
+            <label>{tr("CC")}</label>
+            <input type="text" value={mail.cc} onChange={(e) => setMail({ ...mail, cc: e.target.value })} placeholder={tr("opsional, cth. atasan / admin sales")} />
+            {currentUser?.email && (
+              <label className="qm-check">
+                <input type="checkbox" checked={mail.ccSelf} onChange={(e) => setMail({ ...mail, ccSelf: e.target.checked })} /> {tr("Kirim salinan ke saya")} ({currentUser.email})
+              </label>
+            )}
+            <label>{tr("Subjek")}</label>
+            <input type="text" value={mail.subject} maxLength={200} onChange={(e) => setMail({ ...mail, subject: e.target.value })} />
+            <label>{tr("Pesan")}</label>
+            <textarea rows={11} value={mail.message} onChange={(e) => setMail({ ...mail, message: e.target.value })} />
+            <div className="field-note">{tr("Ringkasan penawaran, tanda tangan, dan lampiran ditambahkan otomatis — lihat pratinjau.")}</div>
+            <label>{tr("Lampiran")}</label>
+            <div className="qm-files">
+              <span className="qm-file"><b className="pdf">PDF</b>{baseName()}.pdf</span>
+              {mailServer !== false && (
+                <label className="qm-check">
+                  <input type="checkbox" checked={mail.docx} onChange={(e) => setMail({ ...mail, docx: e.target.checked })} /> {tr("Sertakan juga file Word (.docx)")}
+                </label>
+              )}
+            </div>
+          </div>
+          <div className="qm-preview">
+            <div className="qm-ptitle">{tr("Pratinjau email yang diterima customer")}</div>
+            <iframe
+              title={tr("Pratinjau email")}
+              sandbox=""
+              srcDoc={quoteEmailHtml({ message: mail.message, summary: quoteEmailSummary(d, opts), attachments: [`${baseName()}.pdf`, ...(mail.docx && mailServer !== false ? [`${baseName()}.docx`] : [])], logoSrc: '/logo.png' })}
+            />
+          </div>
+        </div>
+      )}
+      {!mailMode && (<>
+      <div className="sa-pills q-tabs" role="tablist" aria-label={tr("Bagian surat penawaran")}>
         {(
           [
-            ['isi', 'Isi surat'],
-            ['tampilan', 'Data yang ditampilkan'],
-            ['pratinjau', 'Pratinjau'],
+            ['isi', tr("Isi surat")],
+            ['tampilan', tr("Data yang ditampilkan")],
+            ['pratinjau', tr("Pratinjau")],
           ] as [Tab, string][]
         ).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
@@ -288,100 +465,108 @@ export function QuotationModal() {
 
       {tab === 'isi' && (
         <div className="form-grid">
+          <div className="full q-lang">
+            <label>{tr("Bahasa surat")}</label>
+            <div className="seg">
+              <button type="button" className={`btn btn-sm ${(d.lang || 'id') === 'id' ? 'btn-primary' : 'btn-outline'}`} onClick={() => switchLang('id')}>{tr("Indonesia")}</button>
+              <button type="button" className={`btn btn-sm ${d.lang === 'en' ? 'btn-primary' : 'btn-outline'}`} onClick={() => switchLang('en')}>{tr("English")}</button>
+            </div>
+            <span className="field-note" style={{ margin: 0 }}>{tr("Teks tetap surat, tanggal, terbilang, dan syarat bawaan ikut berganti. Uraian material tetap seperti diisi.")}</span>
+          </div>
           <div>
-            <label>Nomor Surat</label>
+            <label>{tr("Nomor Surat")}</label>
             <input type="text" value={d.nomor} onChange={(e) => set({ nomor: e.target.value })} />
           </div>
           <div className="q-2">
             <div>
-              <label>Kota</label>
-              <input type="text" value={d.kota} placeholder="cth. Jakarta" onChange={(e) => set({ kota: e.target.value })} />
+              <label>{tr("Kota")}</label>
+              <input type="text" value={d.kota} placeholder={tr("cth. Jakarta")} onChange={(e) => set({ kota: e.target.value })} />
             </div>
             <div>
-              <label>Tanggal</label>
+              <label>{tr("Tanggal")}</label>
               <input type="date" value={d.tanggal} onChange={(e) => set({ tanggal: e.target.value })} />
             </div>
           </div>
           <div>
-            <label>Kepada (Customer)</label>
+            <label>{tr("Kepada (Customer)")}</label>
             <input type="text" value={d.kepada} onChange={(e) => set({ kepada: e.target.value })} />
           </div>
           <div>
-            <label>PIC / Up.</label>
-            <input type="text" list="q-pic-list" value={d.pic} placeholder={picOptions.length ? 'pilih atau ketik' : 'nama PIC (jabatan)'} onChange={(e) => set({ pic: e.target.value })} />
+            <label>{tr("PIC / Up.")}</label>
+            <input type="text" list="q-pic-list" value={d.pic} placeholder={picOptions.length ? tr("pilih atau ketik") : tr("nama PIC (jabatan)")} onChange={(e) => set({ pic: e.target.value })} />
             <datalist id="q-pic-list">
               {picOptions.map((p) => (
                 <option key={p.id} value={`${p.nama}${p.jabatan ? ` (${p.jabatan})` : ''}`} />
               ))}
             </datalist>
-            {!cust && <div className="field-note">Customer belum ada di Kelola Customer — PIC & alamat diisi manual.</div>}
+            {!cust && <div className="field-note">{tr("Customer belum ada di Kelola Customer — PIC & alamat diisi manual.")}</div>}
           </div>
           <div className="full">
-            <label>Alamat</label>
+            <label>{tr("Alamat")}</label>
             <textarea style={{ minHeight: 44 }} value={d.alamat} onChange={(e) => set({ alamat: e.target.value })} />
           </div>
           <div className={opts.lampiran ? '' : 'full'}>
-            <label>Perihal</label>
+            <label>{tr("Perihal")}</label>
             <input type="text" value={d.perihal} onChange={(e) => set({ perihal: e.target.value })} />
           </div>
           {opts.lampiran && (
             <div>
-              <label>Lampiran</label>
+              <label>{tr("Lampiran")}</label>
               <input type="text" value={d.lampiran} onChange={(e) => set({ lampiran: e.target.value })} />
             </div>
           )}
 
           <div className="full">
-            <label>Daftar Material yang Ditawarkan</label>
+            <label>{tr("Daftar Material yang Ditawarkan")}</label>
             <div className="qitem-header">
-              <span>Line</span>
-              <span>Uraian Material</span>
-              <span>Qty</span>
-              <span>Satuan</span>
-              <span>Berat/pcs (kg)</span>
-              <span>Harga/kg</span>
-              <span>Harga Satuan</span>
-              <span style={{ textAlign: 'right' }}>Jumlah</span>
+              <span>{tr("Line")}</span>
+              <span>{tr("Uraian Material")}</span>
+              <span>{tr("Qty")}</span>
+              <span>{tr("Satuan")}</span>
+              <span>{tr("Berat/pcs (kg)")}</span>
+              <span>{tr("Harga/kg")}</span>
+              <span>{tr("Harga Satuan")}</span>
+              <span style={{ textAlign: 'right' }}>{tr("Jumlah")}</span>
               <span></span>
             </div>
             {d.items.map((it, idx) => {
               const perKg = it.beratPc > 0 && it.hargaKg > 0;
               return (
                 <div className="qitem-row" key={idx}>
-                  <input type="text" aria-label="Line" placeholder="Line" value={it.line} onChange={(e) => setItem(idx, { line: e.target.value })} />
-                  <input type="text" aria-label="Uraian material" placeholder="Uraian material" value={it.uraian} onChange={(e) => setItem(idx, { uraian: e.target.value })} />
-                  <input type="number" aria-label="Qty" min={0} step="any" value={it.qty} onChange={(e) => setItem(idx, { qty: num(e.target.value) })} />
-                  <input type="text" aria-label="Satuan" value={it.satuan} onChange={(e) => setItem(idx, { satuan: e.target.value })} />
-                  <input type="number" aria-label="Berat per pcs (kg)" min={0} step="any" value={it.beratPc || ''} placeholder="-" onChange={(e) => setItem(idx, { beratPc: num(e.target.value) })} />
-                  <input type="number" aria-label="Harga per kg" min={0} step="any" value={it.hargaKg || ''} placeholder="-" onChange={(e) => setItem(idx, { hargaKg: num(e.target.value) })} />
+                  <input type="text" aria-label={tr("Line")} placeholder={tr("Line")} value={it.line} onChange={(e) => setItem(idx, { line: e.target.value })} />
+                  <input type="text" aria-label={tr("Uraian material")} placeholder={tr("Uraian material")} value={it.uraian} onChange={(e) => setItem(idx, { uraian: e.target.value })} />
+                  <input type="number" aria-label={tr("Qty")} min={0} step="any" value={it.qty} onChange={(e) => setItem(idx, { qty: num(e.target.value) })} />
+                  <input type="text" aria-label={tr("Satuan")} value={it.satuan} onChange={(e) => setItem(idx, { satuan: e.target.value })} />
+                  <input type="number" aria-label={tr("Berat per pcs (kg)")} min={0} step="any" value={it.beratPc || ''} placeholder="-" onChange={(e) => setItem(idx, { beratPc: num(e.target.value) })} />
+                  <input type="number" aria-label={tr("Harga per kg")} min={0} step="any" value={it.hargaKg || ''} placeholder="-" onChange={(e) => setItem(idx, { hargaKg: num(e.target.value) })} />
                   <input
                     type="number"
-                    aria-label="Harga satuan"
+                    aria-label={tr("Harga satuan")}
                     min={0}
                     step="any"
                     value={perKg ? Math.round(unitPrice(it)) : it.harga}
                     readOnly={perKg}
-                    title={perKg ? 'Dihitung dari berat/pcs × harga/kg. Kosongkan harga/kg untuk mengisi harga satuan langsung.' : undefined}
+                    title={perKg ? tr("Dihitung dari berat/pcs × harga/kg. Kosongkan harga/kg untuk mengisi harga satuan langsung.") : undefined}
                     className={perKg ? 'q-calc' : undefined}
                     onChange={(e) => setItem(idx, { harga: num(e.target.value) })}
                   />
                   <div className="qi-total mono">{rupiah(lineTotal(it))}</div>
-                  <button type="button" className="icon-btn danger qi-remove" aria-label="Hapus material" disabled={d.items.length <= 1} onClick={() => removeItem(idx)}>
+                  <button type="button" className="icon-btn danger qi-remove" aria-label={tr("Hapus material")} disabled={d.items.length <= 1} onClick={() => removeItem(idx)}>
                     <IconTrash />
                   </button>
                 </div>
               );
             })}
             <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 6 }} onClick={() => set({ items: [...d.items, blankItem()] })}>
-              <IconPlus /> Tambah Material
+              <IconPlus /> {tr("Tambah Material")}
             </button>
-            {anyPerKg && <div className="field-note">Harga satuan = berat/pcs × harga/kg (abu-abu = dihitung otomatis).</div>}
+            {anyPerKg && <div className="field-note">{tr("Harga satuan = berat/pcs × harga/kg (abu-abu = dihitung otomatis).")}</div>}
           </div>
 
           <div className="full q-totals">
             <label className="q-ppn">
               <input type="checkbox" checked={d.ppnInclude} onChange={(e) => set({ ppnInclude: e.target.checked })} />
-              Harga yang diisi sudah termasuk PPN 11%
+              {tr("Harga yang diisi sudah termasuk PPN 11%")}
             </label>
             <div className="q-sum">
               {totals?.rows.map((r) => (
@@ -394,70 +579,70 @@ export function QuotationModal() {
           </div>
 
           <div>
-            <label>Syarat Pembayaran</label>
+            <label>{tr("Syarat Pembayaran")}</label>
             <input type="text" value={d.pembayaran} onChange={(e) => set({ pembayaran: e.target.value })} />
           </div>
           <div>
-            <label>Syarat Pengiriman</label>
+            <label>{tr("Syarat Pengiriman")}</label>
             <input type="text" value={d.pengiriman} onChange={(e) => set({ pengiriman: e.target.value })} />
           </div>
           <div>
-            <label>Masa Berlaku Penawaran</label>
+            <label>{tr("Masa Berlaku Penawaran")}</label>
             <input type="text" value={d.berlaku} onChange={(e) => set({ berlaku: e.target.value })} />
           </div>
           <div>
-            <label>Kondisi Stock</label>
+            <label>{tr("Kondisi Stock")}</label>
             <input type="text" value={d.kondisiStock} onChange={(e) => set({ kondisiStock: e.target.value })} />
           </div>
           <div className="full">
-            <label>Catatan Tambahan (opsional)</label>
+            <label>{tr("Catatan Tambahan (opsional)")}</label>
             <textarea value={d.catatan} onChange={(e) => set({ catatan: e.target.value })} />
           </div>
 
-          <div className="full q-section">Penanda tangan</div>
+          <div className="full q-section">{tr("Penanda tangan")}</div>
           <div className="full q-sigrow">
             {sigSrc ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={sigSrc} alt="Tanda tangan Anda" />
+                <img src={sigSrc} alt={tr("Tanda tangan Anda")} />
                 <span className="field-note" style={{ margin: 0 }}>
-                  {opts.ttdGambar ? 'Tanda tangan Anda dipasang otomatis di surat.' : 'Tanda tangan tidak dipasang (dimatikan di tab "Data yang ditampilkan").'}
+                  {opts.ttdGambar ? tr("Tanda tangan Anda dipasang otomatis di surat.") : tr("Tanda tangan tidak dipasang (dimatikan di tab \"Data yang ditampilkan\").")}
                 </span>
               </>
             ) : (
               <span className="field-note" style={{ margin: 0 }}>
-                Belum ada tanda tangan. Tambahkan lewat tombol <b>Akun Saya</b> di atas — selanjutnya otomatis terpasang di setiap surat penawaran Anda.
+                {tr("Belum ada tanda tangan. Tambahkan lewat tombol")} <b>{tr("Akun Saya")}</b> {tr("di atas — selanjutnya otomatis terpasang di setiap surat penawaran Anda.")}
               </span>
             )}
           </div>
           <div>
-            <label>Nama</label>
+            <label>{tr("Nama")}</label>
             <input type="text" value={d.signer.nama} onChange={(e) => setSigner({ nama: e.target.value })} />
           </div>
           <div>
-            <label>Jabatan</label>
+            <label>{tr("Jabatan")}</label>
             <input type="text" value={d.signer.jabatan} onChange={(e) => setSigner({ jabatan: e.target.value })} />
           </div>
           <div>
-            <label>Telepon / WA</label>
-            <input type="tel" value={d.signer.telp} placeholder="08xx…" onChange={(e) => setSigner({ telp: e.target.value })} />
+            <label>{tr("Telepon / WA")}</label>
+            <input type="tel" value={d.signer.telp} placeholder={tr("08xx…")} onChange={(e) => setSigner({ telp: e.target.value })} />
           </div>
           <div>
-            <label>Email</label>
+            <label>{tr("Email")}</label>
             <input type="email" value={d.signer.email} onChange={(e) => setSigner({ email: e.target.value })} />
           </div>
 
           <div className="full">
-            <label>Email Tujuan (untuk kirim email)</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@perusahaan.com" />
+            <label>{tr("Email Tujuan (untuk kirim email)")}</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={tr("nama@perusahaan.com")} />
           </div>
           {canLogAkt && (
             <div className="full">
               <label className="q-ppn">
                 <input type="checkbox" checked={logAkt} onChange={(e) => setLogAkt(e.target.checked)} />
-                Catat ke Aktivitas Harian saya sebagai &quot;Kirim penawaran / dokumen&quot; saat diunduh / dikirim
+                {tr("Catat ke Aktivitas Harian saya sebagai \"Kirim penawaran / dokumen\" saat diunduh / dikirim")}
               </label>
-              <div className="field-note">Satu nomor surat dicatat sekali — unduh ulang atau kirim email memperbarui catatan yang sama.</div>
+              <div className="field-note">{tr("Satu nomor surat dicatat sekali — unduh ulang atau kirim email memperbarui catatan yang sama.")}</div>
             </div>
           )}
         </div>
@@ -466,7 +651,7 @@ export function QuotationModal() {
       {tab === 'tampilan' && (
         <div>
           <div className="field-note" style={{ marginTop: 0 }}>
-            Centang data yang ingin muncul di surat. Pilihan ini diingat di browser ini untuk surat berikutnya.
+            {tr("Centang data yang ingin muncul di surat. Pilihan ini diingat di browser ini untuk surat berikutnya.")}
           </div>
           <div className="q-opts">
             {QUOTE_OPT_GROUPS.map((g) => (
@@ -486,14 +671,14 @@ export function QuotationModal() {
           </div>
           <div className="form-grid" style={{ marginTop: 12 }}>
             <div className="full">
-              <label>Alamat & telepon kantor di kop surat (opsional)</label>
+              <label>{tr("Alamat & telepon kantor di kop surat (opsional)")}</label>
               <textarea
                 value={d.kopText}
-                placeholder={'cth. Jl. … No. …, Jakarta 12345\nTelp. (021) … · www.…'}
+                placeholder={tr("cth. Jl. … No. …, Jakarta 12345\nTelp. (021) … · www.…")}
                 onChange={(e) => set({ kopText: e.target.value })}
                 style={{ minHeight: 56 }}
               />
-              <div className="field-note">Tampil di bawah nama perusahaan bila &quot;Logo &amp; kop perusahaan&quot; dicentang.</div>
+              <div className="field-note">{tr("Tampil di bawah nama perusahaan bila \"Logo & kop perusahaan\" dicentang.")}</div>
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
@@ -506,10 +691,10 @@ export function QuotationModal() {
                 lsSet(LS.opts, JSON.stringify(o));
               }}
             >
-              Kembalikan bawaan
+              {tr("Kembalikan bawaan")}
             </button>
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setTab('pratinjau')}>
-              Lihat pratinjau →
+              {tr("Lihat pratinjau →")}
             </button>
           </div>
         </div>
@@ -521,6 +706,7 @@ export function QuotationModal() {
           <div className="q-paper" dangerouslySetInnerHTML={{ __html: preview }} />
         </div>
       )}
+      </>)}
     </Modal>
   );
 }

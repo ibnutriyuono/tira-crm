@@ -1,4 +1,5 @@
 import { pickSpecExtra } from './material-extra';
+import { getLang, localeOf } from './i18n';
 import type { Customer, CustomerPic, Klasifikasi, Material, Prospect } from './types';
 
 export function num(v: unknown): number {
@@ -14,7 +15,7 @@ export function formatDateID(iso?: string | null): string {
   if (!iso) return '-';
   const d = new Date(iso + 'T00:00:00');
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString(localeOf(getLang()), { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 /**
@@ -26,12 +27,14 @@ export function formatDateTimeID(iso?: string | null): string {
   if (!iso) return '-';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString(localeOf(getLang()), { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export function formatDateLongID(iso?: string | null): string {
   if (!iso) return '';
-  const bulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const bulan = getLang() === 'en'
+    ? ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    : ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   const d = new Date(iso + 'T00:00:00');
   if (Number.isNaN(d.getTime())) return iso;
   return `${String(d.getDate()).padStart(2, '0')} ${bulan[d.getMonth()]} ${d.getFullYear()}`;

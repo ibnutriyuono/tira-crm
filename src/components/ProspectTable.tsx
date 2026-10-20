@@ -14,6 +14,7 @@ import { NewBadge } from './NewBadge';
 import { IssueBadge } from './issues/shared';
 import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './ProspectPurchasingBubble';
 
+import { useT } from '@/store/useLangStore';
 const COLS: { key: string; label: string; sortable?: boolean }[] = [
   { key: 'no', label: 'No' },
   { key: 'reg', label: 'Reg', sortable: true },
@@ -31,6 +32,7 @@ const COLS: { key: string; label: string; sortable?: boolean }[] = [
 ];
 
 export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total: number }) {
+  const tr = useT();
   const ui = useUiStore();
   const openModal = useUiStore((s) => s.openModal);
   // Kelola Role: tombol hanya tampil bila aksinya diizinkan (server tetap menjaga).
@@ -48,8 +50,8 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
     return (
       <div className="table-wrap">
         <div className="empty-state">
-          <h3>{total === 0 ? 'Belum ada data prospek' : 'Tidak ada data yang cocok dengan filter'}</h3>
-          <p>{total === 0 ? 'Mulai dengan menambah prospek baru, atau import file Excel prospect list yang sudah ada.' : 'Coba ubah atau reset filter pencarian.'}</p>
+          <h3>{total === 0 ? tr("Belum ada data prospek") : tr("Tidak ada data yang cocok dengan filter")}</h3>
+          <p>{total === 0 ? tr("Mulai dengan menambah prospek baru, atau import file Excel prospect list yang sudah ada.") : tr("Coba ubah atau reset filter pencarian.")}</p>
           {total === 0 && (
             <button
               className="btn btn-primary"
@@ -58,7 +60,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                 openModal('prospectForm');
               }}
             >
-              + Tambah Prospek Pertama
+              {tr("+ Tambah Prospek Pertama")}
             </button>
           )}
         </div>
@@ -130,7 +132,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                     <span className={`badge ${klasBadgeColor(klas)}`}>{klas}</span>
                   </td>
                   <td>
-                    <span className={`badge ${r.penawaranTerkirim ? 'green' : 'rust pending-dot'}`}>{r.penawaranTerkirim ? 'Terkirim' : 'Pending'}</span>
+                    <span className={`badge ${r.penawaranTerkirim ? 'green' : 'rust pending-dot'}`}>{r.penawaranTerkirim ? tr("Terkirim") : tr("Pending")}</span>
                   </td>
                   <td className="mono">{formatDateID(r.tglPenawaran)}</td>
                   <td>
@@ -138,7 +140,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                       {canE && (
                       <button
                         className="icon-btn wa-btn"
-                        title="Follow Up WhatsApp"
+                        title={tr("Follow Up WhatsApp")}
                         onClick={() => {
                           useUiStore.setState({ followUpCtx: { type: 'prospect', id: r.id } });
                           openModal('followUp');
@@ -150,7 +152,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                       {canX && (
                       <button
                         className="icon-btn doc-btn"
-                        title="Buat Surat Penawaran"
+                        title={tr("Buat Surat Penawaran")}
                         onClick={() => {
                           useUiStore.setState({ quotationProspectId: r.id });
                           openModal('quotation');
@@ -162,7 +164,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                       {canRfq && (
                       <button
                         className="icon-btn rfq-btn"
-                        title="Buat RFQ ke Purchasing"
+                        title={tr("Buat RFQ ke Purchasing")}
                         onClick={() => {
                           useUiStore.setState({ rfqCtx: { prospectId: r.id, rfqId: null } });
                           openModal('rfq');
@@ -173,7 +175,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                       )}
                       <button
                         className="icon-btn edit-btn"
-                        title={canE ? 'Edit' : 'Lihat (hanya-baca)'}
+                        title={canE ? tr("Edit") : tr("Lihat (hanya-baca)")}
                         onClick={() => {
                           useUiStore.setState({ editProspectId: r.id });
                           openModal('prospectForm');
@@ -184,7 +186,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                       {canD && (
                       <button
                         className="icon-btn danger del-btn"
-                        title="Hapus"
+                        title={tr("Hapus")}
                         onClick={() => {
                           useUiStore.setState({
                             deleteCtx: { mode: 'prospect', id: r.id, title: 'Hapus Prospek', message: `Yakin ingin menghapus prospek "${r.customer}"? Tindakan ini tidak dapat dibatalkan.` },

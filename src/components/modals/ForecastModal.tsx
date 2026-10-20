@@ -16,6 +16,7 @@ import { seTargetOf } from '@/lib/se-target';
 import { yearMonthTarget } from '@/lib/kpi';
 import { useCan } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const labelPeriode = (p: string) => `${BULAN[Number(p.slice(5, 7)) - 1] || ''} ${p.slice(0, 4)}`;
 /** 1165999999 -> "1.165.999.999" */
@@ -27,6 +28,7 @@ const dots = (n: number) => (n ? Math.round(n).toLocaleString('id-ID') : '');
  * different amount saves it for this month only.
  */
 function TargetInput({ value, from, note, onSave }: { value: number; from: string | null; note?: string; onSave: (v: number) => void }) {
+  const tr = useT();
   const [text, setText] = useState(dots(value));
   const [synced, setSynced] = useState(value);
   if (synced !== value) {
@@ -51,7 +53,7 @@ function TargetInput({ value, from, note, onSave }: { value: number; from: strin
         placeholder="0"
         style={{ maxWidth: 170, textAlign: 'right', fontFamily: 'var(--font-ibm-plex-mono), monospace', color: from ? 'var(--text-soft)' : undefined }}
       />
-      {from && <div className="field-note" style={{ marginTop: 2 }}>dari {labelPeriode(from)}</div>}
+      {from && <div className="field-note" style={{ marginTop: 2 }}>{tr("dari")} {labelPeriode(from)}</div>}
       {!from && note && <div className="field-note" style={{ marginTop: 2 }}>{note}</div>}
     </div>
   );
@@ -62,6 +64,7 @@ function currentPeriode(): string {
 }
 
 export function ForecastModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'forecast';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -208,89 +211,82 @@ export function ForecastModal() {
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title="Forecast & Pipeline" xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title={tr("Forecast & Pipeline")} xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr("Tutup")}</button>}>
       {/* Deliberate divergence from the single-file app, which has no period
           picker: it keys budget targets by cabang alone, while BudgetTarget
           here is unique on (cabang, periode). The picker is what makes
           per-month targets usable. Decided 2026-08-23 — keep it. */}
       <div className="toolbar-row">
-        <label style={{ fontSize: 12, textTransform: 'none' }}>Periode</label>
+        <label style={{ fontSize: 12, textTransform: 'none' }}>{tr("Periode")}</label>
         <input type="month" className="btn-sm" value={periode} onChange={(e) => setPeriode(e.target.value)} />
       </div>
 
       {ownAlloc && (ownAlloc.status === 'empty' || ownAlloc.status === 'short') && (
         <div className="import-summary if-warn" style={{ marginTop: 0, marginBottom: 10 }}>
-          <b>Wajib:</b> target cabang {ownAlloc.cabang} {labelPeriode(periode)} {formatRupiah(ownAlloc.target)} {ownAlloc.status === 'empty' ? 'belum dibagi ke Sales' : `baru dibagi ${formatRupiah(ownAlloc.allocated)}${ownAlloc.missing.length ? `; ${ownAlloc.missing.length} Sales belum punya target` : ''}`}.{' '}
-          Isi di bagian <b>Target per Sales</b> di bawah.
+          <b>{tr("Wajib:")}</b> {tr("target cabang")} {ownAlloc.cabang} {labelPeriode(periode)} {formatRupiah(ownAlloc.target)} {ownAlloc.status === 'empty' ? tr("belum dibagi ke Sales") : `baru dibagi ${formatRupiah(ownAlloc.allocated)}${ownAlloc.missing.length ? `; ${ownAlloc.missing.length} Sales belum punya target` : ''}`}.{' '}
+          {tr("Isi di bagian")} <b>{tr("Target per Sales")}</b> {tr("di bawah.")}
         </div>
       )}
       <div className="import-summary" style={{ marginTop: 0 }}>
-        Forecast dihitung dari pipeline aktif (status Permintaan/Penawaran Harga/Negosiasi) dikalikan probabilitas tiap
-        tahap: Permintaan 10%, Penawaran Harga 30%, Negosiasi 60%. Data mengikuti cakupan role Anda yang login. Target
-        bulanan default = <b>target tahunan ÷ 12</b> (isi kolom Target Tahunan, bulan yang kosong terisi otomatis); angka
-        bulanan yang diketik manual tetap dipakai dan tidak ikut berubah saat target tahunan diubah. Bulan tanpa target
-        memakai target bulan sebelumnya (ditandai &quot;dari …&quot;).
+        {tr("Forecast dihitung dari pipeline aktif (status Permintaan/Penawaran Harga/Negosiasi) dikalikan probabilitas tiap tahap: Permintaan 10%, Penawaran Harga 30%, Negosiasi 60%. Data mengikuti cakupan role Anda yang login. Target bulanan default =")} <b>{tr("target tahunan ÷ 12")}</b> {tr("(isi kolom Target Tahunan, bulan yang kosong terisi otomatis); angka bulanan yang diketik manual tetap dipakai dan tidak ikut berubah saat target tahunan diubah. Bulan tanpa target memakai target bulan sebelumnya (ditandai \"dari …\").")}
       </div>
 
       <div className="kpi-grid" style={{ marginTop: 12 }}>
         <div className="kpi">
-          <div className="label">Weighted Forecast</div>
+          <div className="label">{tr("Weighted Forecast")}</div>
           <div className="value">{formatRupiah(nasional.weighted)}</div>
-          <div className="foot">{rows.reduce((n, r) => n + r.openCount, 0)} deal aktif</div>
+          <div className="foot">{rows.reduce((n, r) => n + r.openCount, 0)} {tr("deal aktif")}</div>
         </div>
         <div className="kpi">
-          <div className="label">Target Bulan Ini</div>
+          <div className="label">{tr("Target Bulan Ini")}</div>
           <div className="value">{formatRupiah(nasional.target)}</div>
-          <div className="foot">{rows.length} cabang</div>
+          <div className="foot">{rows.length} {tr("cabang")}</div>
         </div>
         <div className="kpi">
-          <div className="label">Rencana Penjualan</div>
+          <div className="label">{tr("Rencana Penjualan")}</div>
           <div className="value">{formatRupiah(nasional.rencana)}</div>
-          <div className="foot">{nasional.rencanaVsTarget}% dari target</div>
+          <div className="foot">{nasional.rencanaVsTarget}{tr("% dari target")}</div>
         </div>
         <div className="kpi won">
-          <div className="label">Realisasi (Won) Bulan Ini</div>
+          <div className="label">{tr("Realisasi (Won) Bulan Ini")}</div>
           <div className="value">{formatRupiah(nasional.won)}</div>
-          <div className="foot">{rows.reduce((n, r) => n + (r.won > 0 ? 1 : 0), 0)} cabang closed</div>
+          <div className="foot">{rows.reduce((n, r) => n + (r.won > 0 ? 1 : 0), 0)} {tr("cabang closed")}</div>
         </div>
         <div className="kpi rate">
-          <div className="label">Achievement vs Target</div>
+          <div className="label">{tr("Achievement vs Target")}</div>
           <div className="value">{nasional.achievement}%</div>
-          <div className="foot">realisasi / target</div>
+          <div className="foot">{tr("realisasi / target")}</div>
         </div>
         <div className="kpi">
-          <div className="label">Realisasi vs Rencana</div>
+          <div className="label">{tr("Realisasi vs Rencana")}</div>
           <div className="value">{nasional.wonVsRencana}%</div>
-          <div className="foot">yang direncanakan Sales, berapa jadi</div>
+          <div className="foot">{tr("yang direncanakan Sales, berapa jadi")}</div>
         </div>
         <div className="kpi">
-          <div className="label">Gap ke Target</div>
+          <div className="label">{tr("Gap ke Target")}</div>
           <div className="value">{formatRupiah(Math.max(0, nasional.target - nasional.won))}</div>
-          <div className="foot">{nasional.won >= nasional.target ? 'Target tercapai' : 'sisa menuju target'}</div>
+          <div className="foot">{nasional.won >= nasional.target ? tr("Target tercapai") : tr("sisa menuju target")}</div>
         </div>
         <div className="kpi lost">
-          <div className="label">Pipeline Macet</div>
+          <div className="label">{tr("Pipeline Macet")}</div>
           <div className="value">{agingRows.length}</div>
-          <div className="foot">&gt; {AGING_THRESHOLD_DAYS} hari tanpa progres</div>
+          <div className="foot">{tr(">")} {AGING_THRESHOLD_DAYS} {tr("hari tanpa progres")}</div>
         </div>
       </div>
 
       <div className="import-summary" style={{ marginTop: 12 }}>
-        <b>Rencana Penjualan</b> adalah total yang Sales sendiri niatkan dijual bulan ini (diisi lewat tombol &quot;Rencana
-        Penjualan&quot;, per SE, dirinci per material) — berbeda dari <b>Target</b> yang ditetapkan perusahaan. &quot;Realisasi vs
-        Rencana&quot; rendah berarti banyak yang direncanakan tidak jadi terjual; &quot;Rencana vs Target&quot; rendah berarti
-        rencananya sendiri belum cukup untuk mengejar target, terlepas dari eksekusinya.
+        <b>{tr("Rencana Penjualan")}</b> {tr("adalah total yang Sales sendiri niatkan dijual bulan ini (diisi lewat tombol \"Rencana Penjualan\", per SE, dirinci per material) — berbeda dari")} <b>{tr("Target")}</b> {tr("yang ditetapkan perusahaan. \"Realisasi vs Rencana\" rendah berarti banyak yang direncanakan tidak jadi terjual; \"Rencana vs Target\" rendah berarti rencananya sendiri belum cukup untuk mengejar target, terlepas dari eksekusinya.")}
       </div>
 
-      <h4 style={{ marginTop: 18, marginBottom: 6 }}>Target vs Rencana vs Realisasi — per Cabang</h4>
+      <h4 style={{ marginTop: 18, marginBottom: 6 }}>{tr("Target vs Rencana vs Realisasi — per Cabang")}</h4>
 
       {rows.length === 0 ? (
-        <div className="empty-state" style={{ padding: '34px 10px' }}><h3>Belum ada data periode ini</h3><p>Pilih periode lain atau tetapkan target cabang.</p></div>
+        <div className="empty-state" style={{ padding: '34px 10px' }}><h3>{tr("Belum ada data periode ini")}</h3><p>{tr("Pilih periode lain atau tetapkan target cabang.")}</p></div>
       ) : (
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table">
             <thead>
-              <tr><th>Cabang</th><th>Target Tahunan {year}</th><th>Target {labelPeriode(periode)}</th><th>Rencana</th><th>Realisasi (Won)</th><th>Weighted</th><th>Ach. Target</th><th>Realisasi/Rencana</th></tr>
+              <tr><th>{tr("Cabang")}</th><th>{tr("Target Tahunan")} {year}</th><th>{tr("Target")} {labelPeriode(periode)}</th><th>{tr("Rencana")}</th><th>{tr("Realisasi (Won)")}</th><th>{tr("Weighted")}</th><th>{tr("Ach. Target")}</th><th>{tr("Realisasi/Rencana")}</th></tr>
             </thead>
             <tbody>
               {rows.map((r) => (
@@ -317,7 +313,7 @@ export function ForecastModal() {
                     ) : (
                       <span className="mono">
                         {formatRupiah(r.target)}
-                        {r.targetFrom && <span className="field-note" style={{ display: 'block' }}>dari {labelPeriode(r.targetFrom)}</span>}
+                        {r.targetFrom && <span className="field-note" style={{ display: 'block' }}>{tr("dari")} {labelPeriode(r.targetFrom)}</span>}
                       </span>
                     )}
                   </td>
@@ -358,22 +354,22 @@ export function ForecastModal() {
         </div>
       )}
 
-      <h4 style={{ marginTop: 18, marginBottom: 6 }}>Target per Sales — pembagian target cabang</h4>
+      <h4 style={{ marginTop: 18, marginBottom: 6 }}>{tr("Target per Sales — pembagian target cabang")}</h4>
       <div className="field-note" style={{ marginTop: 0, marginBottom: 8 }}>
-        Alur: pusat menetapkan target cabang (tahunan/bulanan) → BM <b>wajib</b> membagi target cabang ke tiap Sales → Sales menerima notifikasi target → RM/GM memantau status pembagian.
+        {tr("Alur: pusat menetapkan target cabang (tahunan/bulanan) → BM")} <b>{tr("wajib")}</b> {tr("membagi target cabang ke tiap Sales → Sales menerima notifikasi target → RM/GM memantau status pembagian.")}
       </div>
       <SeTargetSection periode={periode} cabangTargets={cabangTargets} seWon={seWon} canEdit={canEdit} currentUser={currentUser} roster={roster} />
 
-      <h4 style={{ marginTop: 18, marginBottom: 6 }}>Rollup per Regional</h4>
+      <h4 style={{ marginTop: 18, marginBottom: 6 }}>{tr("Rollup per Regional")}</h4>
       <div className="table-wrap" style={{ borderTop: 'none' }}>
         <table className="simple-table">
           <thead>
-            <tr><th>Regional</th><th>Cabang</th><th>Target</th><th>Rencana</th><th>Realisasi (Won)</th><th>Ach. Target</th><th>Realisasi/Rencana</th></tr>
+            <tr><th>{tr("Regional")}</th><th>{tr("Cabang")}</th><th>{tr("Target")}</th><th>{tr("Rencana")}</th><th>{tr("Realisasi (Won)")}</th><th>{tr("Ach. Target")}</th><th>{tr("Realisasi/Rencana")}</th></tr>
           </thead>
           <tbody>
             {regRows.map((g) => (
               <tr key={g.reg ?? 'unknown'}>
-                <td style={{ fontWeight: 600 }}>{g.reg != null ? `Regional ${g.reg}` : 'Belum diketahui'}</td>
+                <td style={{ fontWeight: 600 }}>{g.reg != null ? `Regional ${g.reg}` : tr("Belum diketahui")}</td>
                 <td className="center">{g.totals.cabangCount}</td>
                 <td className="mono">{formatRupiah(g.totals.target)}</td>
                 <td className="mono">{formatRupiah(g.totals.rencana)}</td>
@@ -397,17 +393,17 @@ export function ForecastModal() {
         </table>
       </div>
       <div className="field-note" style={{ marginTop: 6 }}>
-        Cabang tanpa regional yang diketahui (belum pernah muncul di data prospek manapun dengan regional terisi) dikelompokkan di baris &quot;Belum diketahui&quot;, bukan dibuang dari perhitungan.
+        {tr("Cabang tanpa regional yang diketahui (belum pernah muncul di data prospek manapun dengan regional terisi) dikelompokkan di baris \"Belum diketahui\", bukan dibuang dari perhitungan.")}
       </div>
 
-      <h4 style={{ marginTop: 18, marginBottom: 6 }}>Rencana Penjualan per Sales Engineer</h4>
+      <h4 style={{ marginTop: 18, marginBottom: 6 }}>{tr("Rencana Penjualan per Sales Engineer")}</h4>
       {seList.length === 0 ? (
-        <div className="import-summary" style={{ marginTop: 0 }}>Belum ada aktivitas atau rencana SE pada periode ini.</div>
+        <div className="import-summary" style={{ marginTop: 0 }}>{tr("Belum ada aktivitas atau rencana SE pada periode ini.")}</div>
       ) : (
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table">
             <thead>
-              <tr><th>Sales Engineer (SE)</th><th>Cabang</th><th>Target</th><th>Aktif Pipeline</th><th>Weighted</th><th>Rencana</th><th>Realisasi (Won)</th><th>Ach. Target</th><th>Realisasi/Rencana</th><th></th></tr>
+              <tr><th>{tr("Sales Engineer (SE)")}</th><th>{tr("Cabang")}</th><th>{tr("Target")}</th><th>{tr("Aktif Pipeline")}</th><th>{tr("Weighted")}</th><th>{tr("Rencana")}</th><th>{tr("Realisasi (Won)")}</th><th>{tr("Ach. Target")}</th><th>{tr("Realisasi/Rencana")}</th><th></th></tr>
             </thead>
             <tbody>
               {seList.map((r) => {
@@ -419,10 +415,10 @@ export function ForecastModal() {
                   <tr key={r.se}>
                     <td style={{ fontWeight: 600 }}>{r.se}</td>
                     <td>{r.cabang}</td>
-                    <td className="mono">{seT > 0 ? formatRupiah(seT) : <span className="badge rust">Belum ada</span>}</td>
+                    <td className="mono">{seT > 0 ? formatRupiah(seT) : <span className="badge rust">{tr("Belum ada")}</span>}</td>
                     <td className="center">{r.openCount}</td>
                     <td className="mono">{formatRupiah(r.weighted)}</td>
-                    <td className="mono">{rencana > 0 ? formatRupiah(rencana) : <span className="badge slate">Belum diisi</span>}</td>
+                    <td className="mono">{rencana > 0 ? formatRupiah(rencana) : <span className="badge slate">{tr("Belum diisi")}</span>}</td>
                     <td className="mono">{formatRupiah(r.won)}</td>
                     <td className="center">{seT > 0 ? <span className={`badge ${r.won >= seT ? 'green' : r.won >= seT * 0.6 ? 'amber' : 'rust'}`}>{Math.round((r.won / seT) * 100)}%</span> : '-'}</td>
                     <td className="center">{rasio == null ? '-' : <span className={`badge ${rasio >= 100 ? 'green' : rasio >= 60 ? 'amber' : 'rust'}`}>{rasio}%</span>}</td>
@@ -436,7 +432,7 @@ export function ForecastModal() {
                             openModal('salesPlan');
                           }}
                         >
-                          {rencana > 0 ? 'Ubah Rencana' : 'Isi Rencana'}
+                          {rencana > 0 ? tr("Ubah Rencana") : tr("Isi Rencana")}
                         </button>
                       )}
                     </td>
@@ -448,16 +444,16 @@ export function ForecastModal() {
         </div>
       )}
 
-      <h4 style={{ marginTop: 18, marginBottom: 6 }}>Rincian Rencana Penjualan — per Cabang &amp; Sales</h4>
+      <h4 style={{ marginTop: 18, marginBottom: 6 }}>{tr("Rincian Rencana Penjualan — per Cabang & Sales")}</h4>
       {planDetail.length === 0 ? (
-        <div className="import-summary" style={{ marginTop: 0 }}>Belum ada rencana penjualan pada periode ini.</div>
+        <div className="import-summary" style={{ marginTop: 0 }}>{tr("Belum ada rencana penjualan pada periode ini.")}</div>
       ) : (
         <>
           {planDetail.length > 1 && (
             <div className="toolbar-row">
-              <label style={{ fontSize: 12, textTransform: 'none' }}>Cabang</label>
+              <label style={{ fontSize: 12, textTransform: 'none' }}>{tr("Cabang")}</label>
               <select className="btn-sm" value={planCabang} onChange={(e) => setPlanCabang(e.target.value)} style={{ maxWidth: 200 }}>
-                <option value="">Semua cabang ({planDetail.length})</option>
+                <option value="">{tr("Semua cabang (")}{planDetail.length})</option>
                 {planDetail.map((g) => (
                   <option key={g.cabang} value={g.cabang}>
                     {g.cabang} — {formatRupiah(g.total)}
@@ -471,13 +467,13 @@ export function ForecastModal() {
               <thead>
                 <tr>
                   <th>SE</th>
-                  <th>Customer</th>
-                  <th>Line</th>
-                  <th>Uraian Material</th>
-                  <th style={{ textAlign: 'right' }}>Qty</th>
-                  <th style={{ textAlign: 'right' }}>Harga</th>
-                  <th style={{ textAlign: 'right' }}>Nominal</th>
-                  <th>Status Pipeline</th>
+                  <th>{tr("Customer")}</th>
+                  <th>{tr("Line")}</th>
+                  <th>{tr("Uraian Material")}</th>
+                  <th style={{ textAlign: 'right' }}>{tr("Qty")}</th>
+                  <th style={{ textAlign: 'right' }}>{tr("Harga")}</th>
+                  <th style={{ textAlign: 'right' }}>{tr("Nominal")}</th>
+                  <th>{tr("Status Pipeline")}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -485,7 +481,7 @@ export function ForecastModal() {
                 {planDetailShown.map((g) => (
                   <Fragment key={g.cabang}>
                     <tr style={{ background: 'var(--steel-100)', fontWeight: 700 }}>
-                      <td colSpan={6}>Cabang {g.cabang} · {g.ses.length} SE</td>
+                      <td colSpan={6}>{tr("Cabang")} {g.cabang} · {g.ses.length} SE</td>
                       <td className="mono" style={{ textAlign: 'right' }}>{formatRupiah(g.total)}</td>
                       <td colSpan={2}></td>
                     </tr>
@@ -508,7 +504,7 @@ export function ForecastModal() {
                                   <button
                                     type="button"
                                     className="icon-btn danger"
-                                    title="Hapus material dari rencana"
+                                    title={tr("Hapus material dari rencana")}
                                     disabled={deleting === `${x.se}|${it.index}`}
                                     onClick={() => deletePlanItem(x.se, it.index, it.uraian, it.nominal)}
                                   >
@@ -519,7 +515,7 @@ export function ForecastModal() {
                             </tr>
                           ))}
                           <tr style={{ fontWeight: 600 }}>
-                            <td colSpan={6} style={{ textAlign: 'right', color: 'var(--text-soft)' }}>Subtotal {x.se} ({x.items.length} material)</td>
+                            <td colSpan={6} style={{ textAlign: 'right', color: 'var(--text-soft)' }}>{tr("Subtotal")} {x.se} ({x.items.length} {tr("material)")}</td>
                             <td className="mono" style={{ textAlign: 'right' }}>{formatRupiah(x.total)}</td>
                             <td colSpan={2}></td>
                           </tr>
@@ -539,21 +535,21 @@ export function ForecastModal() {
             </table>
           </div>
           <div className="field-note" style={{ marginTop: 6 }}>
-            Status pipeline diambil dari prospek asal material (baris yang ditarik lewat &quot;Ambil dari Prospek&quot;); baris yang diketik manual ditandai &quot;Manual&quot;. Tombol hapus muncul untuk pemilik rencana, BM cabangnya, GM dan Admin. Rencana yang semua materialnya dihapus ikut terhapus.
+            {tr("Status pipeline diambil dari prospek asal material (baris yang ditarik lewat \"Ambil dari Prospek\"); baris yang diketik manual ditandai \"Manual\". Tombol hapus muncul untuk pemilik rencana, BM cabangnya, GM dan Admin. Rencana yang semua materialnya dihapus ikut terhapus.")}
           </div>
         </>
       )}
 
-      <h4 style={{ marginTop: 18, marginBottom: 6 }}>Aging Alert — Pipeline Macet</h4>
+      <h4 style={{ marginTop: 18, marginBottom: 6 }}>{tr("Aging Alert — Pipeline Macet")}</h4>
       {agingRows.length === 0 ? (
         <div className="import-summary" style={{ marginTop: 0 }}>
-          Tidak ada pipeline macet. Semua deal aktif masih bergerak dalam {AGING_THRESHOLD_DAYS} hari terakhir.
+          {tr("Tidak ada pipeline macet. Semua deal aktif masih bergerak dalam")} {AGING_THRESHOLD_DAYS} {tr("hari terakhir.")}
         </div>
       ) : (
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table">
             <thead>
-              <tr><th>Customer</th><th>Cabang</th><th>SE</th><th>Status</th><th>Nilai</th><th>Hari Macet</th></tr>
+              <tr><th>{tr("Customer")}</th><th>{tr("Cabang")}</th><th>SE</th><th>{tr("Status")}</th><th>{tr("Nilai")}</th><th>{tr("Hari Macet")}</th></tr>
             </thead>
             <tbody>
               {agingRows.map(({ record: r, days }) => {
@@ -565,7 +561,7 @@ export function ForecastModal() {
                     <td>{r.se || '-'}</td>
                     <td><span className={`badge ${meta?.color || 'slate'}`}>{meta?.label || '-'}</span></td>
                     <td className="mono">{formatRupiah(r.value)}</td>
-                    <td className="center"><span className="badge rust">{days} hari</span></td>
+                    <td className="center"><span className="badge rust">{days} {tr("hari")}</span></td>
                   </tr>
                 );
               })}

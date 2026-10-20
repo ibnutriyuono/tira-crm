@@ -17,6 +17,8 @@ import { appendSheet, buildBudgetTargetSheet, buildCustomerSheet, buildFupaSheet
 import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconDownload, IconExport, IconImport, IconPlus, IconPresentation, IconRfq, IconSave, IconSearch, IconTarget, IconTemplate, IconUsers } from './icons';
 import type { SalesActivity } from '@/lib/types';
 
+import { useT } from '@/store/useLangStore';
+import { LangSwitch } from './LangSwitch';
 const ROLE_LABEL: Record<string, { label: string; color: string }> = {
   admin: { label: 'Admin', color: 'amber' },
   gm: { label: 'GM', color: 'rust' },
@@ -26,6 +28,7 @@ const ROLE_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 export function TopBar() {
+  const tr = useT();
   const router = useRouter();
   const currentUser = useDataStore((s) => s.currentUser);
   const issues = useDataStore((s) => s.issues);
@@ -138,11 +141,11 @@ export function TopBar() {
       <div className="brand">
         <span className="logo-chip">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="logo-img" src="/logo.png" alt="Logo PT. TIRA AUSTENITE, Tbk" />
+          <img className="logo-img" src="/logo.png" alt={tr("Logo PT. TIRA AUSTENITE, Tbk")} />
         </span>
         <div>
-          <h1>CRM TIRA</h1>
-          <span className="sub">Steel Division · PT. TIRA AUSTENITE, <span style={{ textTransform: 'none' }}>Tbk</span></span>
+          <h1>{tr("CRM TIRA")}</h1>
+          <span className="sub">{tr("Steel Division · PT. TIRA AUSTENITE,")} <span style={{ textTransform: 'none' }}>{tr("Tbk")}</span></span>
         </div>
       </div>
       <div className="topbar-right">
@@ -155,11 +158,12 @@ export function TopBar() {
               </span>
             </div>
           </div>
-          <button className="btn btn-ghost-dark btn-sm" onClick={() => openModal('account')} title="Ubah username, password & email">
-            Akun Saya
+          <LangSwitch dark />
+          <button className="btn btn-ghost-dark btn-sm" onClick={() => openModal('account')} title={tr("Ubah username, password & email")}>
+            {tr("Akun Saya")}
           </button>
           <button className="btn btn-ghost-dark btn-sm" onClick={logout}>
-            Keluar
+            {tr("Keluar")}
           </button>
         </div>
         <span style={{ fontSize: 11, color: 'var(--slate-300)', fontFamily: "var(--font-ibm-plex-mono), monospace" }}>{savedLabel}</span>
@@ -172,25 +176,25 @@ export function TopBar() {
           {currentUser.role === 'admin' && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('database')}>
               <IconDatabase />
-              Kelola Database
+              {tr("Kelola Database")}
             </button>
           )}
           {currentUser.role === 'admin' && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('users')}>
               <IconUsers />
-              Kelola User
+              {tr("Kelola User")}
             </button>
           )}
           {currentUser.role === 'admin' && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('roles')}>
               <IconUsers />
-              Kelola Role
+              {tr("Kelola Role")}
             </button>
           )}
           {c('faktur') && (
             <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('adminQueue')}>
               <IconCheckSquare />
-              Antrian Admin
+              {tr("Antrian Admin")}
               {currentUser.role === 'salesadmin' && adminTasks > 0 && (
                 <span className="topbar-badge" title={`${adminTasks} tugas admin terbuka`}>
                   {adminTasks > 9 ? '9+' : adminTasks}
@@ -201,37 +205,37 @@ export function TopBar() {
           {!isPurchasingRoleClient(currentUser.role) && c('analisa') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('gmAnalysis')}>
               <IconPresentation />
-              Analisa Eksekutif
+              {tr("Analisa Eksekutif")}
             </button>
           )}
           {c('customer') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('customers')}>
               <IconCustomers />
-              Kelola Customer
+              {tr("Kelola Customer")}
             </button>
           )}
           {c('rfq') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('rfqManage')}>
               <IconRfq />
-              Kelola RFQ
+              {tr("Kelola RFQ")}
             </button>
           )}
           {c('rfq') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('fupaManage')}>
               <IconCart />
-              Kelola FUP A
+              {tr("Kelola FUP A")}
             </button>
           )}
           {c('marketing') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('qcdRecap')}>
               <IconCheckSquare />
-              Hasil QCD
+              {tr("Hasil QCD")}
             </button>
           )}
           {c('forecast') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('forecast')}>
               <IconChartLine />
-              Forecast
+              {tr("Forecast")}
             </button>
           )}
           {c('kpi') && (
@@ -243,7 +247,7 @@ export function TopBar() {
           {c('kpi') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('activityKpi')}>
               <IconTarget />
-              KPI Aktivitas
+              {tr("KPI Aktivitas")}
             </button>
           )}
           {/* Kelola Role menentukan: hak yang dicentang = tombol tampil. Batas
@@ -252,7 +256,7 @@ export function TopBar() {
           {c('trip') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('visitTrip')}>
               <IconCalendar />
-              Perjalanan Dinas
+              {tr("Perjalanan Dinas")}
             </button>
           )}
           {c('rencana') && (
@@ -264,31 +268,31 @@ export function TopBar() {
               }}
             >
               <IconChartLine />
-              Rencana Penjualan
+              {tr("Rencana Penjualan")}
             </button>
           )}
           {c('marketing') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('marketing')}>
               <IconCustomers />
-              Marketing
+              {tr("Marketing")}
             </button>
           )}
           {c('marketing') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('customerIntel')}>
               <IconSearch />
-              Customer Intelligence
+              {tr("Customer Intelligence")}
             </button>
           )}
           {!isPurchasingRoleClient(currentUser.role) && c('kam') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('keyAccount')}>
               <IconTarget />
-              Key Account
+              {tr("Key Account")}
             </button>
           )}
           {!isPurchasingRoleClient(currentUser.role) && c('masalah') && (
             <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('pipelineIssues')}>
               <span aria-hidden="true">⚑</span>
-              Masalah
+              {tr("Masalah")}
               {issueCount > 0 && (
                 <span className="topbar-badge" title={`${issueCount} masalah perlu tindakan Anda`}>
                   {issueCount > 9 ? '9+' : issueCount}
@@ -299,13 +303,13 @@ export function TopBar() {
           {c('marketing') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('competitorLog')}>
               <IconBarChart />
-              Log Kompetitor
+              {tr("Log Kompetitor")}
             </button>
           )}
           {c('prospek') && (
             <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('followUpBoard')}>
               <IconCalendar />
-              Follow-up
+              {tr("Follow-up")}
               {urgentFollowUpCount > 0 && (
                 <span className="topbar-badge" title={`${urgentFollowUpCount} follow-up perlu segera`}>
                   {urgentFollowUpCount > 9 ? '9+' : urgentFollowUpCount}
@@ -315,7 +319,7 @@ export function TopBar() {
           )}
           <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('notifications')}>
             <IconBell />
-            Notifikasi
+            {tr("Notifikasi")}
             {unreadNotifCount > 0 && (
               <span className="topbar-badge" title={`${unreadNotifCount} notifikasi belum dibaca`}>
                 {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
@@ -325,7 +329,7 @@ export function TopBar() {
           {c(isPurchasingRoleClient(currentUser.role) ? 'purch' : 'rfq') && (
             <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('purchasing')}>
               <IconBag />
-              Purchasing
+              {tr("Purchasing")}
               {newPurchasingCount > 0 && (
                 <span className="topbar-badge" title={`${newPurchasingCount} RFQ/FUP A baru belum diproses`}>
                   {newPurchasingCount > 9 ? '9+' : newPurchasingCount}
@@ -336,7 +340,7 @@ export function TopBar() {
           {c('prospek', 'x') && (
             <button className="btn btn-ghost-dark" onClick={downloadTemplate}>
               <IconTemplate />
-              Template
+              {tr("Template")}
             </button>
           )}
           {currentUser.role === 'admin' && (
@@ -348,19 +352,19 @@ export function TopBar() {
               }}
             >
               <IconImport />
-              Import Excel
+              {tr("Import Excel")}
             </button>
           )}
           {c('prospek', 'x') && (
             <button className="btn btn-ghost-dark" onClick={exportExcel}>
               <IconExport />
-              Export Excel
+              {tr("Export Excel")}
             </button>
           )}
           {c('prospek', 'x') && (
-            <button className="btn btn-ghost-dark" onClick={exportAllExcel} title="Satu file Excel berisi semua data (Prospek, RFQ, FUP A, Customer, Vendor, Rencana Penjualan, Target), tiap jenis di sheet terpisah">
+            <button className="btn btn-ghost-dark" onClick={exportAllExcel} title={tr("Satu file Excel berisi semua data (Prospek, RFQ, FUP A, Customer, Vendor, Rencana Penjualan, Target), tiap jenis di sheet terpisah")}>
               <IconDownload />
-              Export Semua
+              {tr("Export Semua")}
             </button>
           )}
           {/* Not in the single-file app's toolbar — this build's own addition,
@@ -368,17 +372,17 @@ export function TopBar() {
           {c('log') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('activity')}>
               <IconActivity />
-              Log Aktivitas
+              {tr("Log Aktivitas")}
             </button>
           )}
           <button className="btn btn-outline" onClick={saveAllNow}>
             <IconSave />
-            Simpan Perubahan
+            {tr("Simpan Perubahan")}
           </button>
           {c('aktivitas') && (
             <button className="btn btn-activity" onClick={() => openModal('salesActivity')}>
               <IconCalendar />
-              Aktivitas Harian
+              {tr("Aktivitas Harian")}
             </button>
           )}
           {c('prospek', 'e') && (
@@ -390,7 +394,7 @@ export function TopBar() {
               }}
             >
               <IconPlus />
-              Tambah Prospek
+              {tr("Tambah Prospek")}
             </button>
           )}
         </div>

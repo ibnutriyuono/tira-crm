@@ -14,6 +14,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 /** "Lebih murah — selisih 5%" from the level dropdown plus the optional note. */
 function dimText(r: Prospect, key: 'quality' | 'cost' | 'delivery'): string {
   const dim = QCD_DIMS.find((d) => d.key === key)!;
@@ -31,6 +32,7 @@ const levelColor = (level: string | null | undefined) => (level === 'unggul' ? '
  * role-scoped by the API; GM/Admin and RM can narrow it further here.
  */
 export function QcdRecapModal() {
+  const tr = useT();
   const show = useUiStore((s) => s.modal === 'qcdRecap');
   const closeModal = useUiStore((s) => s.closeModal);
   const openModal = useUiStore((s) => s.openModal);
@@ -127,37 +129,37 @@ export function QcdRecapModal() {
   };
 
   return (
-    <Modal show={show} onClose={closeModal} title="Hasil QCD (Quality / Cost / Delivery)" xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title={tr("Hasil QCD (Quality / Cost / Delivery)")} xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr("Tutup")}</button>}>
       <div className="view-toggle" style={{ marginBottom: 12 }}>
         <button type="button" className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}>
-          Dashboard QCD
+          {tr("Dashboard QCD")}
         </button>
         <button type="button" className={view === 'rekap' ? 'active' : ''} onClick={() => setView('rekap')}>
-          Rekap Data QCD ({rows.length})
+          {tr("Rekap Data QCD (")}{rows.length})
         </button>
       </div>
 
       <div className="form-grid" style={{ marginBottom: 10 }}>
         {view === 'dashboard' && (
           <div>
-            <label>Tahun</label>
+            <label>{tr("Tahun")}</label>
             <input type="number" value={year} onChange={(e) => setYear(e.target.value)} style={{ maxWidth: 110 }} />
           </div>
         )}
         <div>
-          <label>Lingkup</label>
+          <label>{tr("Lingkup")}</label>
           {canPick ? (
             <select value={scopeKey} onChange={(e) => setScopeKey(e.target.value)}>
-              <option value="">{baseScope?.label} (semua)</option>
+              <option value="">{baseScope?.label} {tr("(semua)")}</option>
               {baseScope?.kind === 'nasional' &&
                 regions.map((r) => (
                   <option key={r} value={`reg-${r}`}>
-                    Regional {r}
+                    {tr("Regional")} {r}
                   </option>
                 ))}
               {(baseScope?.cabangs || []).map((c) => (
                 <option key={c} value={c}>
-                  Cabang {c}
+                  {tr("Cabang")} {c}
                 </option>
               ))}
             </select>
@@ -172,35 +174,35 @@ export function QcdRecapModal() {
       ) : (
         <>
           <div className="toolbar-row">
-            <input type="search" className="search-grow" placeholder="Cari customer, kompetitor, cabang, SE..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input type="search" className="search-grow" placeholder={tr("Cari customer, kompetitor, cabang, SE...")} value={search} onChange={(e) => setSearch(e.target.value)} />
             <select className="btn-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="">Semua (Won &amp; Lose)</option>
-              <option value="won">Won (PO &amp; DO)</option>
-              <option value="4">PO / Kontrak</option>
+              <option value="">{tr("Semua (Won & Lose)")}</option>
+              <option value="won">{tr("Won (PO & DO)")}</option>
+              <option value="4">{tr("PO / Kontrak")}</option>
               <option value="5">DO</option>
-              <option value="6">Lose Order</option>
+              <option value="6">{tr("Lose Order")}</option>
             </select>
             {canNow('marketing', 'x') && (
               <button className="btn btn-outline btn-sm" onClick={exportExcel}>
-                Export Excel
+                {tr("Export Excel")}
               </button>
             )}
           </div>
           <div className="import-summary">
-            Menampilkan <b>{list.length}</b> dari <b>{rows.length}</b> deal yang sudah ditutup (PO / DO / Lose). QCD wajib diisi saat deal ditutup.
+            {tr("Menampilkan")} <b>{list.length}</b> {tr("dari")} <b>{rows.length}</b> {tr("deal yang sudah ditutup (PO / DO / Lose). QCD wajib diisi saat deal ditutup.")}
           </div>
 
           {list.length === 0 ? (
             <div className="empty-state" style={{ padding: '34px 10px' }}>
-              <h3>Belum ada data QCD</h3>
-              <p>Rekap ini terisi dari prospek berstatus PO / Kontrak, DO dan Lose Order.</p>
+              <h3>{tr("Belum ada data QCD")}</h3>
+              <p>{tr("Rekap ini terisi dari prospek berstatus PO / Kontrak, DO dan Lose Order.")}</p>
             </div>
           ) : (
             <div className="table-wrap" style={{ borderTop: 'none' }}>
               <table className="simple-table">
                 <thead>
                   <tr>
-                    <th>Customer</th><th>Cabang</th><th>SE</th><th>Status</th><th>Nilai</th><th>Quality</th><th>Cost</th><th>Delivery</th><th>Faktor Penentu</th><th>Kompetitor</th><th>Catatan</th><th>Aksi</th>
+                    <th>{tr("Customer")}</th><th>{tr("Cabang")}</th><th>SE</th><th>{tr("Status")}</th><th>{tr("Nilai")}</th><th>{tr("Quality")}</th><th>{tr("Cost")}</th><th>{tr("Delivery")}</th><th>{tr("Faktor Penentu")}</th><th>{tr("Kompetitor")}</th><th>{tr("Catatan")}</th><th>{tr("Aksi")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -216,13 +218,13 @@ export function QcdRecapModal() {
                         <td>{dimCell(r, 'quality')}</td>
                         <td>{dimCell(r, 'cost')}</td>
                         <td>{dimCell(r, 'delivery')}</td>
-                        <td>{QCD_FAKTOR_LABEL[r.qcdFaktor || ''] || <span className="badge amber">Belum diisi</span>}</td>
+                        <td>{QCD_FAKTOR_LABEL[r.qcdFaktor || ''] || <span className="badge amber">{tr("Belum diisi")}</span>}</td>
                         <td>{r.qcdKompetitor || '-'}</td>
                         <td style={{ maxWidth: 240 }}>{r.qcdCatatan || '-'}</td>
                         <td>
                           <button
                             className="icon-btn"
-                            title="Buka QCD"
+                            title={tr("Buka QCD")}
                             onClick={() => {
                               useUiStore.setState({ qcdCtx: { mode: 'kanban', statusVal: r.status, recordId: r.id, returnTo: 'qcdRecap' } });
                               openModal('qcd');

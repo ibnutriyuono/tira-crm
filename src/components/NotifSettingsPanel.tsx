@@ -5,6 +5,7 @@ import { api } from '@/lib/api-client';
 import { DIGEST_HOURS, EMAIL_MODES, NOTIF_CATEGORIES, defaultPrefs, validEmail, type EmailMode, type NotifPrefs } from '@/lib/notif-prefs';
 import { useDataStore } from '@/store/useDataStore';
 
+import { useT } from '@/store/useLangStore';
 interface MailInfo {
   configured: boolean;
   cap: number;
@@ -24,6 +25,7 @@ const MODE_COLOR: Record<EmailMode, string> = { langsung: 'var(--steel-600, #2f5
  * ringkasan harian, email uji. Admin juga melihat status server email.
  */
 export function NotifSettingsPanel() {
+  const tr = useT();
   const toast = useDataStore((s) => s.toast);
   const isAdmin = useDataStore((s) => s.currentUser?.role === 'admin');
   const [email, setEmail] = useState('');
@@ -78,25 +80,25 @@ export function NotifSettingsPanel() {
     }
   }
 
-  if (!loaded) return <div className="field-note">Memuat pengaturan…</div>;
+  if (!loaded) return <div className="field-note">{tr("Memuat pengaturan…")}</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {mail && !mail.configured && (
         <div className="import-summary if-warn" style={{ margin: 0 }}>
-          Server email belum diatur oleh Administrator — pengaturan bisa disimpan sekarang, email mulai terkirim setelah server email aktif.
+          {tr("Server email belum diatur oleh Administrator — pengaturan bisa disimpan sekarang, email mulai terkirim setelah server email aktif.")}
         </div>
       )}
       <div className="form-grid">
         <div className="full">
-          <label>Email penerima notifikasi</label>
+          <label>{tr("Email penerima notifikasi")}</label>
           <div style={{ display: 'flex', gap: 8 }}>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@perusahaan.co.id" style={{ flex: 1 }} />
-            <button type="button" className="btn btn-outline btn-sm" disabled={busy || !mail?.configured} onClick={test} title="Simpan dulu bila email baru diubah">
-              Kirim email uji
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={tr("nama@perusahaan.co.id")} style={{ flex: 1 }} />
+            <button type="button" className="btn btn-outline btn-sm" disabled={busy || !mail?.configured} onClick={test} title={tr("Simpan dulu bila email baru diubah")}>
+              {tr("Kirim email uji")}
             </button>
           </div>
-          <div className="field-note">Kosongkan bila tidak ingin menerima email. Notifikasi di dalam CRM tetap muncul.</div>
+          <div className="field-note">{tr("Kosongkan bila tidak ingin menerima email. Notifikasi di dalam CRM tetap muncul.")}</div>
         </div>
       </div>
 
@@ -104,8 +106,8 @@ export function NotifSettingsPanel() {
         <table className="simple-table" style={{ minWidth: 0 }}>
           <thead>
             <tr>
-              <th>Jenis notifikasi</th>
-              <th style={{ width: 320 }}>Email</th>
+              <th>{tr("Jenis notifikasi")}</th>
+              <th style={{ width: 320 }}>{tr("Email")}</th>
             </tr>
           </thead>
           <tbody>
@@ -135,7 +137,7 @@ export function NotifSettingsPanel() {
 
       <div className="form-grid">
         <div>
-          <label>Jam ringkasan harian (WIB)</label>
+          <label>{tr("Jam ringkasan harian (WIB)")}</label>
           <select value={prefs.jam} onChange={(e) => setPrefs((p) => ({ ...p, jam: e.target.value }))}>
             {DIGEST_HOURS.map((h) => (
               <option key={h} value={h}>
@@ -145,42 +147,42 @@ export function NotifSettingsPanel() {
           </select>
         </div>
         <div>
-          <label>Hari kirim ringkasan</label>
+          <label>{tr("Hari kirim ringkasan")}</label>
           <select value={prefs.hari} onChange={(e) => setPrefs((p) => ({ ...p, hari: e.target.value as NotifPrefs['hari'] }))}>
-            <option value="kerja">Senin – Jumat</option>
-            <option value="semua">Setiap hari</option>
+            <option value="kerja">{tr("Senin – Jumat")}</option>
+            <option value="semua">{tr("Setiap hari")}</option>
           </select>
         </div>
       </div>
       <div className="field-note" style={{ margin: 0 }}>
-        <b>Langsung</b> = satu email tiap kejadian (maks. {mail?.cap ?? 20} per hari, sisanya masuk ringkasan). <b>Ringkasan</b> = digabung dalam satu email harian berisi notifikasi yang belum dibaca. <b>Tidak</b> = hanya di CRM.
+        <b>{tr("Langsung")}</b> {tr("= satu email tiap kejadian (maks.")} {mail?.cap ?? 20} {tr("per hari, sisanya masuk ringkasan).")} <b>{tr("Ringkasan")}</b> {tr("= digabung dalam satu email harian berisi notifikasi yang belum dibaca.")} <b>{tr("Tidak")}</b> {tr("= hanya di CRM.")}
       </div>
 
       {isAdmin && mail && (
         <div className="import-summary" style={{ margin: 0 }}>
-          <b>Server email (Admin):</b>{' '}
+          <b>{tr("Server email (Admin):")}</b>{' '}
           {mail.configured ? (
             <>
-              aktif · {mail.server} · pengirim {mail.from} · terkirim hari ini {mail.sentToday ?? 0}, gagal {mail.failedToday ?? 0}
-              {!mail.appUrl && <> · <b>APP_URL belum diisi</b> (tombol &quot;Buka di CRM&quot; tidak tampil di email)</>}
+              {tr("aktif ·")} {mail.server} {tr("· pengirim")} {mail.from} {tr("· terkirim hari ini")} {mail.sentToday ?? 0}{tr(", gagal")} {mail.failedToday ?? 0}
+              {!mail.appUrl && <> · <b>{tr("APP_URL belum diisi")}</b> {tr("(tombol \"Buka di CRM\" tidak tampil di email)")}</>}
               {mail.lastError?.error && (
                 <div style={{ marginTop: 4, color: 'var(--rust-600, #9a2f17)' }}>
-                  Kesalahan terakhir ({new Date(mail.lastError.at).toLocaleString('id-ID')}): {mail.lastError.error}
+                  {tr("Kesalahan terakhir (")}{new Date(mail.lastError.at).toLocaleString('id-ID')}): {mail.lastError.error}
                 </div>
               )}
             </>
           ) : (
-            <>belum diatur — isi SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM dan APP_URL di file .env server, lalu restart aplikasi.</>
+            <>{tr("belum diatur — isi SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM dan APP_URL di file .env server, lalu restart aplikasi.")}</>
           )}
         </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
         <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => setPrefs(defaultPrefs())}>
-          Kembalikan bawaan
+          {tr("Kembalikan bawaan")}
         </button>
         <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={save}>
-          Simpan
+          {tr("Simpan")}
         </button>
       </div>
     </div>

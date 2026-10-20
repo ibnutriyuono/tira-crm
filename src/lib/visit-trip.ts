@@ -1,3 +1,4 @@
+import { liveLabels } from './i18n';
 import type { Role, TripHasil, TripStatus, TripVisit, VisitTrip } from './types';
 
 /**
@@ -30,6 +31,9 @@ export const TRIP_HASIL: { key: Exclude<TripHasil, ''>; label: string }[] = [
   { key: 'batal', label: 'Tidak jadi dikunjungi' },
 ];
 export const TRIP_HASIL_LABEL: Record<string, string> = Object.fromEntries(TRIP_HASIL.map((h) => [h.key, h.label]));
+Object.values(TRIP_STATUS_META).forEach((m) => liveLabels(m, ['label']));
+TRIP_HASIL.forEach((h) => liveLabels(h, ['label']));
+liveLabels(TRIP_HASIL_LABEL);
 
 type Actor = { id: string; role: Role | string; reg: number | null; cabang?: string | null };
 

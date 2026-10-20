@@ -1,12 +1,23 @@
 // Deklarasi minimal untuk nodemailer (yang dipakai src/lib/email-notify.ts),
 // supaya tidak perlu @types/nodemailer yang ikut menarik paket AWS SES.
 declare module 'nodemailer' {
+  export type Address = string | { name: string; address: string };
+  export interface Attachment {
+    filename?: string;
+    content?: string | Buffer;
+    contentType?: string;
+    /** Content-ID untuk gambar sisipan (<img src="cid:...">). */
+    cid?: string;
+  }
   export interface SendMailOptions {
-    from?: string;
-    to?: string;
+    from?: Address;
+    to?: string | string[];
+    cc?: string | string[];
+    replyTo?: string;
     subject?: string;
     text?: string;
     html?: string;
+    attachments?: Attachment[];
   }
   export interface Transporter {
     sendMail(options: SendMailOptions): Promise<{ messageId: string }>;

@@ -4,31 +4,36 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { CustomerNameInput } from '../CustomerNameInput';
 import { IconPlus, IconTrash } from '../icons';
-import { CABANG_LIST } from '@/lib/constants';
+import { CABANG_LIST, CUSTOMER_APLIKASI, CUSTOMER_SEGMENTS, PIC_PERAN } from '@/lib/constants';
 import { uid } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Customer, CustomerPic } from '@/lib/types';
 
+import { useT } from '@/store/useLangStore';
 /** One editable row in the PIC list — same shape as CustomerPic, but `id` is
  * always present (client-generated for a brand new row) so rows have a
  * stable React key even before the server assigns a real id on save. */
-type PicRow = Omit<CustomerPic, 'jabatan' | 'phone' | 'email'> & { jabatan: string; phone: string; email: string };
+type PicRow = Omit<CustomerPic, 'jabatan' | 'phone' | 'email' | 'peran'> & { jabatan: string; phone: string; email: string; peran: string };
 
 function picRowsFromCustomer(c: Customer | null): PicRow[] {
   if (c?.pics && c.pics.length > 0) {
-    return c.pics.map((p) => ({ id: p.id, nama: p.nama, jabatan: p.jabatan || '', phone: p.phone || '', email: p.email || '', isPrimary: p.isPrimary }));
+    return c.pics.map((p) => ({ id: p.id, nama: p.nama, jabatan: p.jabatan || '', phone: p.phone || '', email: p.email || '', isPrimary: p.isPrimary, peran: p.peran || '' }));
   }
   // Pre-fill one row from the legacy single pic/phone/email so editing an
   // old customer still shows its existing contact, now in the new editor.
   if (c && (c.pic || c.phone || c.email)) {
-    return [{ id: uid(), nama: c.pic || '', jabatan: '', phone: c.phone || '', email: c.email || '', isPrimary: true }];
+    return [{ id: uid(), nama: c.pic || '', jabatan: '', phone: c.phone || '', email: c.email || '', isPrimary: true, peran: '' }];
   }
-  return [{ id: uid(), nama: '', jabatan: '', phone: '', email: '', isPrimary: true }];
+  return [{ id: uid(), nama: '', jabatan: '', phone: '', email: '', isPrimary: true, peran: '' }];
 }
 
+/** "1.500.000.000" dari angka; kosong bila 0/null. */
+const fmtPotensi = (n: number | null | undefined) => (n && n > 0 ? Math.round(n).toLocaleString('id-ID') : '');
+
 export function CustomerFormModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'customerForm';
   const customerEditId = useUiStore((s) => s.customerEditId);
@@ -47,7 +52,12 @@ export function CustomerFormModal() {
   const [pics, setPics] = useState<PicRow[]>([]);
   const [address, setAddress] = useState('');
   const [catatan, setCatatan] = useState('');
+  const [segmen, setSegmen] = useState('');
+  const [aplikasi, setAplikasi] = useState<string[]>([]);
+  const [potensi, setPotensi] = useState('');
+  const [kompetitor, setKompetitor] = useState('');
   const [busy, setBusy] = useState(false);
+  const returnTo = useUiStore((s) => s.customerFormReturnTo) || 'customers';
 
   useEffect(() => {
     if (!show) return;
@@ -56,18 +66,26 @@ export function CustomerFormModal() {
       setCabang(editing.cabang || '');
       setAddress(editing.address || '');
       setCatatan(editing.catatan || '');
+      setSegmen(editing.segmen || '');
+      setAplikasi(Array.isArray(editing.aplikasi) ? editing.aplikasi : []);
+      setPotensi(fmtPotensi(editing.potensi));
+      setKompetitor(editing.kompetitor || '');
     } else {
       setName('');
       setCabang('');
       setAddress('');
       setCatatan('');
+      setSegmen('');
+      setAplikasi([]);
+      setPotensi('');
+      setKompetitor('');
     }
     setPics(picRowsFromCustomer(editing));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, customerEditId]);
 
   function addPicRow() {
-    setPics((list) => [...list, { id: uid(), nama: '', jabatan: '', phone: '', email: '', isPrimary: list.length === 0 }]);
+    setPics((list) => [...list, { id: uid(), nama: '', jabatan: '', phone: '', email: '', isPrimary: list.length === 0, peran: '' }]);
   }
   function removePicRow(id: string) {
     setPics((list) => {
@@ -93,12 +111,13 @@ export function CustomerFormModal() {
     setBusy(true);
     // Blank rows (no nama typed) are dropped server-side by
     // normalizeCustomerPics, so an untouched "+ Tambah PIC" row is harmless.
-    const payload = { name: trimmed, cabang, pics, address, catatan };
+    const payload = { name: trimmed, cabang, pics, address, catatan, segmen, aplikasi, potensi: potensi.replace(/\D/g, ''), kompetitor };
     try {
       const { customer } = customerEditId ? await api.put<{ customer: Customer }>(`/api/customers/${customerEditId}`, payload) : await api.post<{ customer: Customer }>('/api/customers', payload);
       upsertCustomer(customer);
       closeModal();
-      openModal('customers');
+      useUiStore.setState({ customerFormReturnTo: null });
+      openModal(returnTo);
       toast(customerEditId ? 'Perubahan customer disimpan' : 'Customer baru ditambahkan', 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal menyimpan customer', 'error');
@@ -112,9 +131,10 @@ export function CustomerFormModal() {
       show={show}
       onClose={() => {
         closeModal();
-        openModal('customers');
+        useUiStore.setState({ customerFormReturnTo: null });
+        openModal(returnTo);
       }}
-      title={customerEditId ? 'Edit Customer' : 'Tambah Customer'}
+      title={customerEditId ? tr("Edit Customer") : tr("Tambah Customer")}
       onSubmit={onSubmit}
       footer={
         <>
@@ -123,24 +143,25 @@ export function CustomerFormModal() {
             className="btn btn-outline"
             onClick={() => {
               closeModal();
-              openModal('customers');
+              useUiStore.setState({ customerFormReturnTo: null });
+              openModal(returnTo);
             }}
           >
-            Batal
+            {tr("Batal")}
           </button>
           <button type="submit" className="btn btn-primary" disabled={busy}>
-            Simpan Customer
+            {tr("Simpan Customer")}
           </button>
         </>
       }
     >
       <div className="form-grid">
         <div className="full">
-          <label>Nama Customer *</label>
-          <CustomerNameInput required mode="warn" ignore={editing?.name} value={name} onChange={setName} placeholder="Nama customer" />
+          <label>{tr("Nama Customer *")}</label>
+          <CustomerNameInput required mode="warn" ignore={editing?.name} value={name} onChange={setName} placeholder={tr("Nama customer")} />
         </div>
         <div>
-          <label>Cabang</label>
+          <label>{tr("Cabang")}</label>
           <input list="cabangList3" value={cabang} onChange={(e) => setCabang(e.target.value)} />
           <datalist id="cabangList3">
             {cabangOptions.map((c) => (
@@ -148,54 +169,104 @@ export function CustomerFormModal() {
             ))}
           </datalist>
         </div>
+        <div className="full cf-profile">
+          <div className="cf-profile-head">{tr("Profil customer")} <span>{tr("dipakai untuk status, skor & pembanding customer sejenis")}</span></div>
+          <div className="form-grid">
+            <div>
+              <label>{tr("Industri / segmen")}</label>
+              <select value={segmen} onChange={(e) => setSegmen(e.target.value)}>
+                <option value="">{tr("— belum diisi —")}</option>
+                {[...CUSTOMER_SEGMENTS, ...(segmen && !CUSTOMER_SEGMENTS.includes(segmen) ? [segmen] : [])].map((x) => (
+                  <option key={x} value={x}>{x}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label>{tr("Estimasi potensi pembelian / tahun (Rp)")}</label>
+              <input type="text" inputMode="numeric" value={potensi} onChange={(e) => setPotensi(fmtPotensi(Number(e.target.value.replace(/\D/g, ''))))} placeholder={tr("cth. 5.000.000.000")} />
+            </div>
+            <div className="full">
+              <label>{tr("Aplikasi pemakaian material")}</label>
+              <div className="cf-chips">
+                {CUSTOMER_APLIKASI.map((a) => {
+                  const on = aplikasi.includes(a.key);
+                  return (
+                    <button
+                      key={a.key}
+                      type="button"
+                      className={`cf-chip${on ? ' on' : ''}`}
+                      aria-pressed={on}
+                      onClick={() => setAplikasi((l) => (on ? l.filter((x) => x !== a.key) : [...l, a.key]))}
+                    >
+                      {on ? '✓ ' : ''}{a.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="full">
+              <label>{tr("Kompetitor yang memasok saat ini")}</label>
+              <input type="text" value={kompetitor} onChange={(e) => setKompetitor(e.target.value)} placeholder={tr("cth. distributor lokal, merek impor")} />
+            </div>
+          </div>
+        </div>
         <div className="full" style={{ marginTop: 6 }}>
-          <label>PIC / Kontak</label>
+          <label>{tr("PIC / Kontak")}</label>
           {pics.map((p) => (
             <div className="rfq-item-card" key={p.id}>
               <div className="rfq-item-head">
-                <span>{p.isPrimary ? 'PIC Utama' : 'PIC'}</span>
+                <span>{p.isPrimary ? tr("PIC Utama") : 'PIC'}</span>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {!p.isPrimary && (
                     <button type="button" className="btn btn-outline btn-sm" onClick={() => makePrimary(p.id)}>
-                      Jadikan Utama
+                      {tr("Jadikan Utama")}
                     </button>
                   )}
-                  <button type="button" className="icon-btn danger" disabled={pics.length <= 1} onClick={() => removePicRow(p.id)} title="Hapus PIC">
+                  <button type="button" className="icon-btn danger" disabled={pics.length <= 1} onClick={() => removePicRow(p.id)} title={tr("Hapus PIC")}>
                     <IconTrash />
                   </button>
                 </div>
               </div>
               <div className="form-grid">
                 <div>
-                  <label>Nama</label>
-                  <input type="text" value={p.nama} onChange={(e) => updatePicRow(p.id, { nama: e.target.value })} placeholder="Nama penanggung jawab" />
+                  <label>{tr("Nama")}</label>
+                  <input type="text" value={p.nama} onChange={(e) => updatePicRow(p.id, { nama: e.target.value })} placeholder={tr("Nama penanggung jawab")} />
                 </div>
                 <div>
-                  <label>Jabatan</label>
-                  <input type="text" value={p.jabatan} onChange={(e) => updatePicRow(p.id, { jabatan: e.target.value })} placeholder="cth. Purchasing Manager" />
+                  <label>{tr("Jabatan")}</label>
+                  <input type="text" value={p.jabatan} onChange={(e) => updatePicRow(p.id, { jabatan: e.target.value })} placeholder={tr("cth. Purchasing Manager")} />
                 </div>
                 <div>
-                  <label>No. Telp / WhatsApp</label>
-                  <input type="text" value={p.phone} onChange={(e) => updatePicRow(p.id, { phone: e.target.value })} placeholder="cth. 08123456789" />
+                  <label>{tr("No. Telp / WhatsApp")}</label>
+                  <input type="text" value={p.phone} onChange={(e) => updatePicRow(p.id, { phone: e.target.value })} placeholder={tr("cth. 08123456789")} />
                 </div>
                 <div>
-                  <label>Email</label>
-                  <input type="text" value={p.email} onChange={(e) => updatePicRow(p.id, { email: e.target.value })} placeholder="nama@perusahaan.com" />
+                  <label>{tr("Email")}</label>
+                  <input type="text" value={p.email} onChange={(e) => updatePicRow(p.id, { email: e.target.value })} placeholder={tr("nama@perusahaan.com")} />
+                </div>
+                <div>
+                  <label>{tr("Peran dalam pembelian")}</label>
+                  <select value={p.peran} onChange={(e) => updatePicRow(p.id, { peran: e.target.value })}>
+                    <option value="">{tr("— belum diisi —")}</option>
+                    {PIC_PERAN.map((r) => (
+                      <option key={r.key} value={r.key}>{r.label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
           ))}
           <button type="button" className="btn btn-outline btn-sm" onClick={addPicRow}>
-            <IconPlus /> Tambah PIC
+            <IconPlus /> {tr("Tambah PIC")}
           </button>
         </div>
         <div className="full">
-          <label>Alamat</label>
-          <textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Alamat lengkap customer" />
+          <label>{tr("Alamat")}</label>
+          <textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder={tr("Alamat lengkap customer")} />
         </div>
         <div className="full">
-          <label>Catatan</label>
-          <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Catatan tambahan (opsional)" />
+          <label>{tr("Catatan")}</label>
+          <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder={tr("Catatan tambahan (opsional)")} />
         </div>
       </div>
     </Modal>

@@ -15,6 +15,7 @@ import { useUiStore } from '@/store/useUiStore';
 import type { Fupa, PurchDocType, Rfq, RfqItem } from '@/lib/types';
 import { canNow, useCan } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 type Tab = 'dashboard' | 'masuk' | 'vendor' | 'masalah';
 
 /** One row in the combined RFQ + FUP A worklist. */
@@ -169,6 +170,7 @@ const UOM_OPTIONS = ['KG', 'PCS', 'MT', 'LOT', 'M', 'BATANG', 'LEMBAR'];
 
 /** One row of the worklist, shared by the flat and grouped renderings. */
 function PurchasingRow({ d, chatCount, onDetail, onCancel }: { d: PurchDoc; chatCount: number; onDetail: (d: PurchDoc) => void; onCancel: ((d: PurchDoc) => void) | null }) {
+  const tr = useT();
   const meta = WORKFLOW_META[workflowStage(d)];
   const lines = recordLines(d);
   return (
@@ -195,14 +197,14 @@ function PurchasingRow({ d, chatCount, onDetail, onCancel }: { d: PurchDoc; chat
       <td><span className={`badge ${meta.color}`}>{meta.label}</span></td>
       <td>
         <div className="row-actions">
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => onDetail(d)}>Detail</button>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => onDetail(d)}>{tr("Detail")}</button>
           {onCancel && (
             d.cancelledAt ? (
               <button type="button" className="btn btn-outline btn-sm" title={`Dibatalkan oleh ${d.cancelledBy || '-'} — ${d.cancelReason || ''}`} onClick={() => onCancel(d)}>
-                Aktifkan
+                {tr("Aktifkan")}
               </button>
             ) : (
-              <button type="button" className="icon-btn danger" title="Batalkan dokumen (wajib isi alasan)" onClick={() => onCancel(d)}>
+              <button type="button" className="icon-btn danger" title={tr("Batalkan dokumen (wajib isi alasan)")} onClick={() => onCancel(d)}>
                 <IconTrash />
               </button>
             )
@@ -227,6 +229,7 @@ export function PurchasingBoard({
       The single-file app words the empty dashboard differently in each. */
   standalone?: boolean;
 }) {
+  const tr = useT();
   // Kelola Role: tanpa hak Tambah/Ubah Purchasing, halaman Purchasing menjadi hanya-baca.
   const purchE = useCan('purch', 'e');
   const purchD = useCan('purch', 'd');
@@ -417,22 +420,21 @@ export function PurchasingBoard({
   return (
     <div>
       <div className={`purch-tabs${standalone ? ' pagebar' : ''}`}>
-        <button type="button" className={tab === 'dashboard' ? 'active' : ''} onClick={() => setTab('dashboard')}>Dashboard</button>
-        <button type="button" className={tab === 'masuk' ? 'active' : ''} onClick={() => setTab('masuk')}>Permintaan Masuk</button>
+        <button type="button" className={tab === 'dashboard' ? 'active' : ''} onClick={() => setTab('dashboard')}>{tr("Dashboard")}</button>
+        <button type="button" className={tab === 'masuk' ? 'active' : ''} onClick={() => setTab('masuk')}>{tr("Permintaan Masuk")}</button>
         {standalone && !isPic05 && canNow('masalah', 'v') && (
           <button type="button" className={tab === 'masalah' ? 'active' : ''} onClick={() => setTab('masalah')}>
-            ⚑ Masalah{issueCount > 0 && <span className="item-chat-bubble">{issueCount > 9 ? '9+' : issueCount}</span>}
+            {tr("⚑ Masalah")}{issueCount > 0 && <span className="item-chat-bubble">{issueCount > 9 ? '9+' : issueCount}</span>}
           </button>
         )}
-        <button type="button" className={tab === 'vendor' ? 'active' : ''} onClick={() => setTab('vendor')}>Database Vendor</button>
+        <button type="button" className={tab === 'vendor' ? 'active' : ''} onClick={() => setTab('vendor')}>{tr("Database Vendor")}</button>
       </div>
 
       {isPic05 && (
         <div className="pic05-banner">
-          <span className="pic05-tag">PIC LINE 05</span>
+          <span className="pic05-tag">{tr("PIC LINE 05")}</span>
           <span>
-            Anda hanya melihat <b>RFQ dan FUP A yang berisi material Line 05</b> (fabrikasi): {rfqs.length} RFQ · {fupas.length} FUP A.
-            Prospek, customer dan target penjualan tidak ditampilkan.
+            {tr("Anda hanya melihat")} <b>{tr("RFQ dan FUP A yang berisi material Line 05")}</b> {tr("(fabrikasi):")} {rfqs.length} {tr("RFQ ·")} {fupas.length} {tr("FUP A. Prospek, customer dan target penjualan tidak ditampilkan.")}
           </span>
         </div>
       )}
@@ -440,33 +442,33 @@ export function PurchasingBoard({
       {tab === 'dashboard' && (
         <>
           <div className="kpi-grid">
-            <div className="kpi steel"><div className="label">Total RFQ</div><div className="value">{rfqs.length}</div></div>
-            <div className="kpi amber"><div className="label">Total FUP A</div><div className="value">{fupas.length}</div></div>
+            <div className="kpi steel"><div className="label">{tr("Total RFQ")}</div><div className="value">{rfqs.length}</div></div>
+            <div className="kpi amber"><div className="label">{tr("Total FUP A")}</div><div className="value">{fupas.length}</div></div>
             {WORKFLOW_STAGES.map((st) => (
               <div key={st} className={`kpi ${WORKFLOW_META[st].color}`}>
                 <div className="label">{WORKFLOW_META[st].label.replace(/^\d+\.\s*/, '')}</div>
                 <div className="value">{stageCounts[st] || 0}</div>
               </div>
             ))}
-            <div className="kpi steel"><div className="label">Total Vendor</div><div className="value">{vendors.length}</div></div>
+            <div className="kpi steel"><div className="label">{tr("Total Vendor")}</div><div className="value">{vendors.length}</div></div>
           </div>
 
           {lineKpis.length > 0 && (
             <div className="panel" style={{ marginBottom: 18 }}>
               <div className="panel-head">
-                <h2>KPI per Line</h2>
-                <span className="field-note" style={{ margin: 0 }}>Klik baris untuk membuka Permintaan Masuk line tersebut. Dokumen berisi beberapa line dihitung di tiap line.</span>
+                <h2>{tr("KPI per Line")}</h2>
+                <span className="field-note" style={{ margin: 0 }}>{tr("Klik baris untuk membuka Permintaan Masuk line tersebut. Dokumen berisi beberapa line dihitung di tiap line.")}</span>
               </div>
               <div className="table-wrap" style={{ borderTop: 'none' }}>
                 <table className="simple-table line-kpi-table">
                   <thead>
                     <tr>
-                      <th>Line</th><th className="center">RFQ</th><th className="center">FUP A</th><th className="center">Material</th>
+                      <th>{tr("Line")}</th><th className="center">RFQ</th><th className="center">{tr("FUP A")}</th><th className="center">{tr("Material")}</th>
                       {WORKFLOW_STAGES.map((st) => (
                         <th key={st} className="center">{WORKFLOW_META[st].label.replace(/^\d+\.\s*/, '')}</th>
                       ))}
-                      <th title="Rata-rata waktu dari dokumen masuk Purchasing sampai jawaban dikirim ke Sales">Rata-rata dijawab</th>
-                      <th style={{ width: 170 }}>Terjawab / Selesai</th>
+                      <th title={tr("Rata-rata waktu dari dokumen masuk Purchasing sampai jawaban dikirim ke Sales")}>{tr("Rata-rata dijawab")}</th>
+                      <th style={{ width: 170 }}>{tr("Terjawab / Selesai")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -495,11 +497,11 @@ export function PurchasingBoard({
                           {WORKFLOW_STAGES.map((st) => (
                             <td key={st} className="center mono" style={{ color: k.stages[st] ? undefined : 'var(--slate-300)' }}>{k.stages[st] || 0}</td>
                           ))}
-                          <td className="mono" title={k.respN ? `Rata-rata dari ${k.respN} dokumen yang sudah dijawab` : 'Belum ada dokumen yang dijawab'}>
+                          <td className="mono" title={k.respN ? `Rata-rata dari ${k.respN} dokumen yang sudah dijawab` : tr("Belum ada dokumen yang dijawab")}>
                             {k.respN ? (
                               <>
                                 {formatDuration(k.respHours / k.respN)}
-                                <span style={{ color: 'var(--slate-500)', fontSize: 11 }}> · {k.respN} dok</span>
+                                <span style={{ color: 'var(--slate-500)', fontSize: 11 }}> · {k.respN} {tr("dok")}</span>
                               </>
                             ) : (
                               <span style={{ color: 'var(--slate-300)' }}>-</span>
@@ -521,18 +523,18 @@ export function PurchasingBoard({
           )}
 
           <div className="panel">
-            <div className="panel-head"><h2>Permintaan Terbaru</h2></div>
+            <div className="panel-head"><h2>{tr("Permintaan Terbaru")}</h2></div>
             <div className="panel-body">
           {docs.length === 0 ? (
             <div className="empty-state" style={{ padding: '28px 10px' }}>
-              <h3>Belum ada data</h3>
-              <p>{standalone ? 'RFQ dan FUP A dari Sales akan otomatis muncul di sini.' : 'Belum ada RFQ/FUP A pada cakupan Anda.'}</p>
+              <h3>{tr("Belum ada data")}</h3>
+              <p>{standalone ? tr("RFQ dan FUP A dari Sales akan otomatis muncul di sini.") : tr("Belum ada RFQ/FUP A pada cakupan Anda.")}</p>
             </div>
           ) : (
             <div className="table-wrap" style={{ borderTop: 'none' }}>
               <table className="simple-table">
                 <thead>
-                  <tr><th>Jenis</th><th>No.</th><th>Tanggal</th><th>Cabang</th><th>Customer</th><th>Material</th><th>Status</th></tr>
+                  <tr><th>{tr("Jenis")}</th><th>{tr("No.")}</th><th>{tr("Tanggal")}</th><th>{tr("Cabang")}</th><th>{tr("Customer")}</th><th>{tr("Material")}</th><th>{tr("Status")}</th></tr>
                 </thead>
                 <tbody>
                   {docs.slice(0, 8).map((d) => {
@@ -556,7 +558,7 @@ export function PurchasingBoard({
             </div>
           </div>
           {readOnly && (
-            <div className="import-summary">Tampilan ini hanya-baca; perubahan dilakukan oleh tim Purchasing.</div>
+            <div className="import-summary">{tr("Tampilan ini hanya-baca; perubahan dilakukan oleh tim Purchasing.")}</div>
           )}
         </>
       )}
@@ -565,44 +567,44 @@ export function PurchasingBoard({
         <>
           <div className="toolbar-row">
             <select className="btn-sm" value={jenisFilter} onChange={(e) => setJenisFilter(e.target.value)}>
-              <option value="">Semua Jenis</option>
+              <option value="">{tr("Semua Jenis")}</option>
               <option value="RFQ">RFQ</option>
-              <option value="FUPA">FUP A</option>
+              <option value="FUPA">{tr("FUP A")}</option>
             </select>
-            <select className="btn-sm" value={lineFilter} onChange={(e) => setLineFilter(e.target.value)} title="Saring per Line">
-              <option value="">Semua Line</option>
+            <select className="btn-sm" value={lineFilter} onChange={(e) => setLineFilter(e.target.value)} title={tr("Saring per Line")}>
+              <option value="">{tr("Semua Line")}</option>
               {lineKpis.map((k) => (
                 <option key={k.line} value={k.line}>{k.line === NO_LINE ? k.line : `Line ${k.line}`}</option>
               ))}
             </select>
             <select className="btn-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="">Semua Status</option>
+              <option value="">{tr("Semua Status")}</option>
               {Object.entries(WORKFLOW_META).map(([k, meta]) => (
                 <option key={k} value={k}>{meta.label}</option>
               ))}
             </select>
-            <input type="search" className="search-grow" placeholder="Cari No dokumen / customer / cabang..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input type="search" className="search-grow" placeholder={tr("Cari No dokumen / customer / cabang...")} value={search} onChange={(e) => setSearch(e.target.value)} />
             <div className="view-toggle">
-              <button type="button" className={masukView === 'table' ? 'active' : ''} onClick={() => setMasukView('table')}>Tabel</button>
-              <button type="button" className={masukView === 'card' ? 'active' : ''} onClick={() => setMasukView('card')}>Kartu</button>
+              <button type="button" className={masukView === 'table' ? 'active' : ''} onClick={() => setMasukView('table')}>{tr("Tabel")}</button>
+              <button type="button" className={masukView === 'card' ? 'active' : ''} onClick={() => setMasukView('card')}>{tr("Kartu")}</button>
             </div>
           </div>
           {masukView === 'table' && (
             <div className="toolbar-row">
-              <label style={{ fontSize: 12, color: 'var(--text-soft)', fontWeight: 600 }}>Kelompokkan:</label>
+              <label style={{ fontSize: 12, color: 'var(--text-soft)', fontWeight: 600 }}>{tr("Kelompokkan:")}</label>
               <select className="btn-sm" value={groupBy} onChange={(e) => setGroupBy(e.target.value as typeof groupBy)}>
-                <option value="">Tidak dikelompokkan</option>
-                <option value="line">Berdasar Line</option>
-                <option value="status">Berdasar Status</option>
+                <option value="">{tr("Tidak dikelompokkan")}</option>
+                <option value="line">{tr("Berdasar Line")}</option>
+                <option value="status">{tr("Berdasar Status")}</option>
               </select>
-              <label style={{ fontSize: 12, color: 'var(--text-soft)', fontWeight: 600, marginLeft: 10 }}>Urutkan:</label>
+              <label style={{ fontSize: 12, color: 'var(--text-soft)', fontWeight: 600, marginLeft: 10 }}>{tr("Urutkan:")}</label>
               <select className="btn-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} disabled={!!groupBy}>
-                <option value="waktu">Waktu Terbaru</option>
-                <option value="line">Line</option>
+                <option value="waktu">{tr("Waktu Terbaru")}</option>
+                <option value="line">{tr("Line")}</option>
               </select>
             </div>
           )}
-          <div className="import-summary">Menampilkan <b>{filtered.length}</b> dari <b>{docs.length}</b> permintaan</div>
+          <div className="import-summary">{tr("Menampilkan")} <b>{filtered.length}</b> {tr("dari")} <b>{docs.length}</b> {tr("permintaan")}</div>
 
           {filtered.length > 0 && masukView === 'card' ? (
             <div className="purch-card-grid">
@@ -622,11 +624,11 @@ export function PurchasingBoard({
                     </div>
                     <div className="purch-card-mat">
                       {head.map((h, i) => <div key={i}>{h}</div>)}
-                      {d.items.length > 2 && <div className="text-muted">+{d.items.length - 2} material lainnya</div>}
+                      {d.items.length > 2 && <div className="text-muted">+{d.items.length - 2} {tr("material lainnya")}</div>}
                     </div>
                     <div className="purch-card-foot">
-                      <span className="text-muted">{chatCounts[`${d.jenis}:${d.id}`] ? `${chatCounts[`${d.jenis}:${d.id}`]} pesan baru` : 'Tidak ada pesan baru'}</span>
-                      <button type="button" className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); openDetail(d); }}>Detail</button>
+                      <span className="text-muted">{chatCounts[`${d.jenis}:${d.id}`] ? `${chatCounts[`${d.jenis}:${d.id}`]} pesan baru` : tr("Tidak ada pesan baru")}</span>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); openDetail(d); }}>{tr("Detail")}</button>
                     </div>
                   </div>
                 );
@@ -634,15 +636,15 @@ export function PurchasingBoard({
             </div>
           ) : filtered.length === 0 ? (
             <div className="empty-state" style={{ padding: '34px 10px' }}>
-              <h3>Belum ada data</h3>
-              <p>Tidak ada RFQ/FUP A yang cocok dengan filter saat ini.</p>
+              <h3>{tr("Belum ada data")}</h3>
+              <p>{tr("Tidak ada RFQ/FUP A yang cocok dengan filter saat ini.")}</p>
             </div>
           ) : (
             <div className="table-wrap" style={{ borderTop: 'none' }}>
               <table className="simple-table">
                 <thead>
                   <tr>
-                    <th>Jenis</th><th>No.</th><th>Tanggal</th><th>Line</th><th>Cabang</th><th>Customer</th><th>Material</th><th>Diskusi</th><th>Diminta Oleh</th><th>Item</th><th>Status</th><th></th>
+                    <th>{tr("Jenis")}</th><th>{tr("No.")}</th><th>{tr("Tanggal")}</th><th>{tr("Line")}</th><th>{tr("Cabang")}</th><th>{tr("Customer")}</th><th>{tr("Material")}</th><th>{tr("Diskusi")}</th><th>{tr("Diminta Oleh")}</th><th>{tr("Item")}</th><th>{tr("Status")}</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -684,7 +686,7 @@ export function PurchasingBoard({
                   openModal('vendorForm');
                 }}
               >
-                + Tambah Vendor
+                {tr("+ Tambah Vendor")}
               </button>
               <button
                 className="btn btn-outline btn-sm"
@@ -693,27 +695,27 @@ export function PurchasingBoard({
                   openModal('import');
                 }}
               >
-                Import Excel
+                {tr("Import Excel")}
               </button>
               {canNow('purch', 'x') && (
-                <button className="btn btn-outline btn-sm" onClick={exportVendors}>Export Excel</button>
+                <button className="btn btn-outline btn-sm" onClick={exportVendors}>{tr("Export Excel")}</button>
               )}
               {canNow('purch', 'x') && (
-                <button className="btn btn-outline btn-sm" onClick={vendorTemplate}>Unduh Template</button>
+                <button className="btn btn-outline btn-sm" onClick={vendorTemplate}>{tr("Unduh Template")}</button>
               )}
-              <span className="hint">Menampilkan {vendors.length} dari {vendors.length} vendor</span>
+              <span className="hint">{tr("Menampilkan")} {vendors.length} {tr("dari")} {vendors.length} {tr("vendor")}</span>
             </div>
           )}
           <div className="table-wrap" style={{ borderTop: 'none' }}>
             {vendors.length === 0 ? (
               <div className="empty-state" style={{ padding: '34px 10px' }}>
-                <h3>Belum ada vendor</h3>
-                <p>Klik &quot;Tambah Vendor&quot; untuk mulai membangun database vendor.</p>
+                <h3>{tr("Belum ada vendor")}</h3>
+                <p>{tr("Klik \"Tambah Vendor\" untuk mulai membangun database vendor.")}</p>
               </div>
             ) : (
               <table className="simple-table">
                 <thead>
-                  <tr><th>Nama Vendor</th><th>PIC</th><th>WhatsApp</th><th>Email</th><th>Kategori</th><th></th></tr>
+                  <tr><th>{tr("Nama Vendor")}</th><th>PIC</th><th>{tr("WhatsApp")}</th><th>{tr("Email")}</th><th>{tr("Kategori")}</th><th></th></tr>
                 </thead>
                 <tbody>
                   {vendors.map((v) => (
@@ -728,7 +730,7 @@ export function PurchasingBoard({
                           <div className="row-actions">
                             <button
                               className="icon-btn"
-                              title="Edit"
+                              title={tr("Edit")}
                               onClick={() => {
                                 useUiStore.setState({ vendorEditId: v.id });
                                 openModal('vendorForm');
@@ -739,7 +741,7 @@ export function PurchasingBoard({
                             {purchD && (
                             <button
                               className="icon-btn danger"
-                              title="Hapus"
+                              title={tr("Hapus")}
                               onClick={() => {
                                 useUiStore.setState({
                                   deleteCtx: { mode: 'vendor', id: v.id, title: 'Hapus Vendor', message: `Yakin ingin menghapus vendor "${v.nama}"?` },
@@ -777,6 +779,7 @@ function PurchDetail({
   readOnly: boolean;
   onClose: () => void;
 }) {
+  const tr = useT();
   const toast = useDataStore((s) => s.toast);
 
   return (
@@ -784,39 +787,39 @@ function PurchDetail({
       <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 8, width: 'min(860px, 100%)', maxHeight: '86vh', overflow: 'auto', padding: 18 }}>
         <div className="panel-head" style={{ paddingLeft: 0, paddingRight: 0 }}>
           <h2 style={{ margin: 0 }}>
-            {doc.jenis === 'RFQ' ? 'RFQ' : 'FUP A'} {doc.noDoc || '(tanpa nomor)'}
+            {doc.jenis === 'RFQ' ? 'RFQ' : 'FUP A'} {doc.noDoc || tr("(tanpa nomor)")}
           </h2>
           <button type="button" className="close-x" onClick={onClose}>×</button>
         </div>
         <div className="form-grid" style={{ marginBottom: 16 }}>
-          <div><label>No. {doc.jenis === 'RFQ' ? 'RFQ' : 'FUP A'}</label><div className="mono">{doc.noDoc || '-'}</div></div>
-          <div><label>Tanggal</label><div>{formatDateID(doc.tglDoc)}</div></div>
-          <div><label>Cabang</label><div>{doc.cabang || '-'}</div></div>
-          <div><label>Customer</label><div>{doc.customer || '-'}</div></div>
-          <div><label>Diminta oleh (Sales)</label><div>{doc.requestedBy || '-'}</div></div>
+          <div><label>{tr("No.")} {doc.jenis === 'RFQ' ? 'RFQ' : 'FUP A'}</label><div className="mono">{doc.noDoc || '-'}</div></div>
+          <div><label>{tr("Tanggal")}</label><div>{formatDateID(doc.tglDoc)}</div></div>
+          <div><label>{tr("Cabang")}</label><div>{doc.cabang || '-'}</div></div>
+          <div><label>{tr("Customer")}</label><div>{doc.customer || '-'}</div></div>
+          <div><label>{tr("Diminta oleh (Sales)")}</label><div>{doc.requestedBy || '-'}</div></div>
           <div>
-            <label>Dikirim ke Purchasing</label>
+            <label>{tr("Dikirim ke Purchasing")}</label>
             <div>
               {doc.sentToPurchasingAt
                 ? <span className="badge green">{formatDateID(doc.sentToPurchasingAt)}</span>
-                : <span className="badge slate">Belum dikirim</span>}
+                : <span className="badge slate">{tr("Belum dikirim")}</span>}
             </div>
           </div>
           {doc.jenis === 'FUPA' && (
-            <div><label>No. RFQ Rujukan</label><div className="mono">{doc.sourceNoRfq || '-'}</div></div>
+            <div><label>{tr("No. RFQ Rujukan")}</label><div className="mono">{doc.sourceNoRfq || '-'}</div></div>
           )}
           {/* The old manual purchStatus dropdown lived here. It was removed once the
               automatic stage badge landed: two status systems side by side, both
               with a "Baru" and a "Selesai" meaning different things, read as a bug.
               purchStatus is still written server-side as internal bookkeeping. */}
           <div style={{ gridColumn: '1 / -1' }}>
-            <label>Status Purchasing</label>
+            <label>{tr("Status Purchasing")}</label>
             <div>
               <span className={`badge ${WORKFLOW_META[workflowStage(doc)].color}`}>{WORKFLOW_META[workflowStage(doc)].label}</span>
             </div>
             {doc.openedByPurchasingAt && (
               <div className="text-muted" style={{ fontSize: 11, marginTop: 4 }}>
-                Dibuka Purchasing {formatDateTimeID(doc.openedByPurchasingAt)}
+                {tr("Dibuka Purchasing")} {formatDateTimeID(doc.openedByPurchasingAt)}
               </div>
             )}
           </div>
@@ -826,18 +829,18 @@ function PurchDetail({
 
         {doc.jenis === 'FUPA' && (
           <>
-        <div style={{ fontWeight: 600, fontSize: 12.5, margin: '16px 0 8px' }}>Detail Material Diminta</div>
+        <div style={{ fontWeight: 600, fontSize: 12.5, margin: '16px 0 8px' }}>{tr("Detail Material Diminta")}</div>
         <div style={{ overflowX: 'auto' }}>
           <table className="simple-table">
             <thead>
               <tr>
-                <th>Line</th><th>Grade</th><th>Material</th><th>Dimensi</th><th>PCS</th>
-                <th>Berat (KGS)</th><th>Lokal/Import</th><th>Est. Kebutuhan</th>
+                <th>{tr("Line")}</th><th>{tr("Grade")}</th><th>{tr("Material")}</th><th>{tr("Dimensi")}</th><th>PCS</th>
+                <th>{tr("Berat (KGS)")}</th><th>{tr("Lokal/Import")}</th><th>{tr("Est. Kebutuhan")}</th>
               </tr>
             </thead>
             <tbody>
               {doc.items.length === 0 ? (
-                <tr><td colSpan={8} className="text-muted">Tidak ada rincian material.</td></tr>
+                <tr><td colSpan={8} className="text-muted">{tr("Tidak ada rincian material.")}</td></tr>
               ) : (
                 doc.items.map((mi, idx) => {
                   const dims = [mi.dia && `D${mi.dia}`, mi.thick && `T${mi.thick}`, mi.width && `W${mi.width}`, mi.length && `L${mi.length}`]
@@ -865,7 +868,7 @@ function PurchDetail({
 
         {doc.jenis === 'RFQ' && <RfqAnswerPanel rfqId={doc.id} readOnly={readOnly} />}
 
-        <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>Lampiran dari Sales</div>
+        <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>{tr("Lampiran dari Sales")}</div>
         {/* readOnly: Purchasing membaca lampiran yang dikirim Sales, tidak
             mengunggah dari sini — unggahan tetap lewat form RFQ/FUP A. */}
         <AttachmentList
@@ -875,7 +878,7 @@ function PurchDetail({
           readOnly
         />
 
-        <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>Diskusi</div>
+        <div style={{ fontWeight: 600, fontSize: 12.5, margin: '18px 0 8px' }}>{tr("Diskusi")}</div>
         {/* Sisi Purchasing dari thread yang sama dengan yang dilihat Sales di
             form RFQ/FUP A. Tanpa ini Purchasing hanya melihat badge jumlah
             pesan di daftar tanpa bisa membaca atau membalasnya. */}
@@ -900,6 +903,7 @@ function PurchDetail({
  * "Kirim Jawaban". Ported from the single-file app's RFQ answer table.
  */
 function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean }) {
+  const tr = useT();
   const rfqs = useDataStore((s) => s.rfqs);
   const upsertRfq = useDataStore((s) => s.upsertRfq);
   const currentUser = useDataStore((s) => s.currentUser);
@@ -938,26 +942,26 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
 
   return (
     <div style={{ marginTop: 16 }}>
-      <h4 style={{ marginBottom: 6 }}>Jawaban Purchasing</h4>
+      <h4 style={{ marginBottom: 6 }}>{tr("Jawaban Purchasing")}</h4>
       <div className="import-summary" style={{ marginTop: 0 }}>
-        Jawaban RFQ ke Sales:{' '}
+        {tr("Jawaban RFQ ke Sales:")}{' '}
         {rfq.jawabanRfqDikirim ? (
-          <span className="badge green">Terkirim {formatDateID(rfq.jawabanRfqAt)}</span>
+          <span className="badge green">{tr("Terkirim")} {formatDateID(rfq.jawabanRfqAt)}</span>
         ) : (
-          <span className="badge slate">Belum Dikirim</span>
+          <span className="badge slate">{tr("Belum Dikirim")}</span>
         )}
       </div>
       <table className="simple-table" style={{ marginTop: 8 }}>
         <thead>
           <tr>
-            <th>Line</th><th>Grade</th><th>Material</th><th>Dimensi</th><th>PCS</th>
-            <th>Berat (KGS)</th><th>Lokal/Import</th><th>Est. Kebutuhan</th>
-            <th>Harga</th><th>Currency</th><th>UOM</th><th>Delivery Time</th><th>Origin</th><th>Note</th><th>No Quote</th>
+            <th>{tr("Line")}</th><th>{tr("Grade")}</th><th>{tr("Material")}</th><th>{tr("Dimensi")}</th><th>PCS</th>
+            <th>{tr("Berat (KGS)")}</th><th>{tr("Lokal/Import")}</th><th>{tr("Est. Kebutuhan")}</th>
+            <th>{tr("Harga")}</th><th>{tr("Currency")}</th><th>UOM</th><th>{tr("Delivery Time")}</th><th>{tr("Origin")}</th><th>{tr("Note")}</th><th>{tr("No Quote")}</th>
           </tr>
         </thead>
         <tbody>
           {items.length === 0 ? (
-            <tr><td colSpan={15} className="text-muted">Tidak ada rincian material.</td></tr>
+            <tr><td colSpan={15} className="text-muted">{tr("Tidak ada rincian material.")}</td></tr>
           ) : (
             items.map((it, idx) => {
               const dims = [it.dia && `D${it.dia}`, it.thick && `T${it.thick}`, it.width && `W${it.width}`, it.length && `L${it.length}`]
@@ -1009,21 +1013,21 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
                 </td>
                 <td>
                   {canAnswer ? (
-                    <input type="text" value={it.deliveryTime ?? ''} placeholder="cth. 10 hari" disabled={!!it.noQuote} style={{ width: 110 }} onChange={(e) => setItem(idx, { deliveryTime: e.target.value })} />
+                    <input type="text" value={it.deliveryTime ?? ''} placeholder={tr("cth. 10 hari")} disabled={!!it.noQuote} style={{ width: 110 }} onChange={(e) => setItem(idx, { deliveryTime: e.target.value })} />
                   ) : (
                     it.deliveryTime || '-'
                   )}
                 </td>
                 <td>
                   {canAnswer ? (
-                    <input type="text" value={it.coo ?? ''} placeholder="cth. China" disabled={!!it.noQuote} style={{ width: 110 }} onChange={(e) => setItem(idx, { coo: e.target.value })} />
+                    <input type="text" value={it.coo ?? ''} placeholder={tr("cth. China")} disabled={!!it.noQuote} style={{ width: 110 }} onChange={(e) => setItem(idx, { coo: e.target.value })} />
                   ) : (
                     it.coo || '-'
                   )}
                 </td>
                 <td>
                   {canAnswer ? (
-                    <input type="text" value={it.note ?? ''} placeholder="cth. stok ready" style={{ width: 170 }} onChange={(e) => setItem(idx, { note: e.target.value })} />
+                    <input type="text" value={it.note ?? ''} placeholder={tr("cth. stok ready")} style={{ width: 170 }} onChange={(e) => setItem(idx, { note: e.target.value })} />
                   ) : (
                     it.note || '-'
                   )}
@@ -1032,7 +1036,7 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
                   {canAnswer ? (
                     <input type="checkbox" checked={!!it.noQuote} onChange={(e) => setItem(idx, { noQuote: e.target.checked })} />
                   ) : it.noQuote ? (
-                    <span className="badge rust">No Quote</span>
+                    <span className="badge rust">{tr("No Quote")}</span>
                   ) : (
                     '-'
                   )}
@@ -1046,10 +1050,10 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
       {canAnswer && items.length > 0 && (
         <div className="toolbar-row" style={{ marginTop: 8 }}>
           <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => save('answer')}>
-            Simpan Jawaban
+            {tr("Simpan Jawaban")}
           </button>
           <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => save('send-jawaban')}>
-            Kirim Jawaban ke Sales
+            {tr("Kirim Jawaban ke Sales")}
           </button>
         </div>
       )}
@@ -1064,6 +1068,7 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
  * sees on their own document.
  */
 function PurchNotes({ doc, readOnly }: { doc: PurchDoc; readOnly: boolean }) {
+  const tr = useT();
   const rfqs = useDataStore((s) => s.rfqs);
   const fupas = useDataStore((s) => s.fupas);
   const upsertRfq = useDataStore((s) => s.upsertRfq);
@@ -1101,40 +1106,40 @@ function PurchNotes({ doc, readOnly }: { doc: PurchDoc; readOnly: boolean }) {
   return (
     <div className="form-grid">
       <div style={{ gridColumn: '1 / -1' }}>
-        <label>Catatan Internal Purchasing</label>
+        <label>{tr("Catatan Internal Purchasing")}</label>
         <textarea
           value={notes}
           readOnly={readOnly}
-          placeholder="Catatan proses pembelian..."
+          placeholder={tr("Catatan proses pembelian...")}
           onChange={(e) => setNotes(e.target.value)}
         />
       </div>
       <div style={{ gridColumn: '1 / -1' }}>
-        <label>Jawaban Purchasing ke Sales</label>
+        <label>{tr("Jawaban Purchasing ke Sales")}</label>
         <textarea
           value={jawaban}
           readOnly={readOnly}
-          placeholder="cth. Sudah PO ke vendor X, estimasi barang datang 10 hari..."
+          placeholder={tr("cth. Sudah PO ke vendor X, estimasi barang datang 10 hari...")}
           onChange={(e) => setJawaban(e.target.value)}
         />
         {/* RFQ tracks its answer through the Harga/Keterangan panel below; FUP A has no
             such columns, so the written reply is what marks it answered. */}
         {doc.jenis === 'FUPA' && (
           <div style={{ marginTop: 6 }}>
-            Jawaban ke Sales:{' '}
+            {tr("Jawaban ke Sales:")}{' '}
             {(record as Fupa | undefined)?.jawabanFupaDikirim
-              ? <span className="badge green">Terkirim {formatDateID((record as Fupa).jawabanFupaAt)}</span>
-              : <span className="badge slate">Belum Dijawab</span>}
+              ? <span className="badge green">{tr("Terkirim")} {formatDateID((record as Fupa).jawabanFupaAt)}</span>
+              : <span className="badge slate">{tr("Belum Dijawab")}</span>}
           </div>
         )}
         <div className="text-muted" style={{ fontSize: 11, marginTop: 4 }}>
-          Kolom ini terlihat oleh Sales yang mengajukan permintaan, berbeda dari catatan internal di atas.
+          {tr("Kolom ini terlihat oleh Sales yang mengajukan permintaan, berbeda dari catatan internal di atas.")}
         </div>
       </div>
       {!readOnly && (
         <div style={{ gridColumn: '1 / -1' }}>
           <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={save}>
-            Simpan Catatan
+            {tr("Simpan Catatan")}
           </button>
         </div>
       )}

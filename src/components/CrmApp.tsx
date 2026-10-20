@@ -28,6 +28,7 @@ import { FupaModal } from './modals/FupaModal';
 import { FupaManageModal } from './modals/FupaManageModal';
 import { PurchasingMonitorModal } from './modals/PurchasingMonitorModal';
 import { CustomerIntelModal } from './modals/CustomerIntelModal';
+import { CustomerProfileModal } from './modals/CustomerProfileModal';
 import { KeyAccountModal } from './modals/KeyAccountModal';
 import { PipelineIssuesModal } from './modals/PipelineIssuesModal';
 import { AdminQueueModal } from './modals/AdminQueueModal';
@@ -59,7 +60,9 @@ import { useUiStore } from '@/store/useUiStore';
 import { useCrmSocket } from '@/hooks/useCrmSocket';
 import { useNotifDeepLink } from '@/hooks/useNotifDeepLink';
 
+import { useT } from '@/store/useLangStore';
 export function CrmApp() {
+  const tr = useT();
   const loaded = useDataStore((s) => s.loaded);
   const bootstrap = useDataStore((s) => s.bootstrap);
   const records = useDataStore((s) => s.prospects);
@@ -94,7 +97,7 @@ export function CrmApp() {
   if (!loaded) {
     return (
       <div>
-        <div className="app-loading">Memuat data CRM…</div>
+        <div className="app-loading">{tr("Memuat data CRM…")}</div>
       </div>
     );
   }
@@ -108,17 +111,17 @@ export function CrmApp() {
         <FunnelPanel list={filtered} />
         <div className="panel">
           <div className="panel-head">
-            <h2>Daftar Prospek</h2>
+            <h2>{tr("Daftar Prospek")}</h2>
             <div className="panel-head-right">
               <span className="hint">
-                {filtered.length} dari {records.length} total prospek{ui.viewMode === 'card' ? ' (tampilan card — geser kartu antar kolom untuk ubah status)' : ''}
+                {filtered.length} {tr("dari")} {records.length} {tr("total prospek")}{ui.viewMode === 'card' ? tr(" (tampilan card — geser kartu antar kolom untuk ubah status)") : ''}
               </span>
               <div className="view-toggle">
                 <button type="button" className={ui.viewMode === 'table' ? 'active' : ''} onClick={() => useUiStore.setState({ viewMode: 'table' })}>
-                  Tabel
+                  {tr("Tabel")}
                 </button>
                 <button type="button" className={ui.viewMode === 'card' ? 'active' : ''} onClick={() => useUiStore.setState({ viewMode: 'card' })}>
-                  Card
+                  {tr("Card")}
                 </button>
               </div>
             </div>
@@ -143,6 +146,7 @@ export function CrmApp() {
       <FupaManageModal />
       <PurchasingMonitorModal />
       <CustomerIntelModal />
+      <CustomerProfileModal />
       <KeyAccountModal />
       <PipelineIssuesModal />
       <AdminQueueModal />

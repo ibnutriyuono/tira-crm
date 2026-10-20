@@ -7,7 +7,9 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Vendor } from '@/lib/types';
 
+import { useT } from '@/store/useLangStore';
 export function VendorFormModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'vendorForm';
   const vendorEditId = useUiStore((s) => s.vendorEditId);
@@ -65,48 +67,48 @@ export function VendorFormModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title={editing ? 'Edit Vendor' : 'Tambah Vendor'}
+      title={editing ? tr("Edit Vendor") : tr("Tambah Vendor")}
       footer={
         <>
-          <button type="button" className="btn btn-outline" onClick={() => openModal('vendors')}>Batal</button>
+          <button type="button" className="btn btn-outline" onClick={() => openModal('vendors')}>{tr("Batal")}</button>
           <button type="button" className="btn btn-primary" disabled={busy} onClick={onSubmit}>
-            {busy ? 'Menyimpan…' : 'Simpan'}
+            {busy ? tr("Menyimpan…") : tr("Simpan")}
           </button>
         </>
       }
     >
       <div className="form-grid">
         <div style={{ gridColumn: '1 / -1' }}>
-          <label>Nama Vendor</label>
-          <input type="text" required value={nama} onChange={(e) => setNama(e.target.value)} placeholder="cth. PT. Baja Sejahtera" />
+          <label>{tr("Nama Vendor")}</label>
+          <input type="text" required value={nama} onChange={(e) => setNama(e.target.value)} placeholder={tr("cth. PT. Baja Sejahtera")} />
         </div>
         <div>
           <label>PIC</label>
-          <input type="text" value={pic} onChange={(e) => setPic(e.target.value)} placeholder="cth. Bapak Budi" />
+          <input type="text" value={pic} onChange={(e) => setPic(e.target.value)} placeholder={tr("cth. Bapak Budi")} />
         </div>
         <div>
-          <label>Kategori</label>
-          <input type="text" value={kategori} onChange={(e) => setKategori(e.target.value)} placeholder="cth. Plate, Round Bar" />
+          <label>{tr("Kategori")}</label>
+          <input type="text" value={kategori} onChange={(e) => setKategori(e.target.value)} placeholder={tr("cth. Plate, Round Bar")} />
         </div>
         <div>
-          <label>No. WhatsApp</label>
-          <input type="text" value={wa} onChange={(e) => setWa(e.target.value)} placeholder="cth. 08123456789" />
+          <label>{tr("No. WhatsApp")}</label>
+          <input type="text" value={wa} onChange={(e) => setWa(e.target.value)} placeholder={tr("cth. 08123456789")} />
         </div>
         <div>
-          <label>Email</label>
-          <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="sales@vendor.com" />
+          <label>{tr("Email")}</label>
+          <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={tr("sales@vendor.com")} />
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
-          <label>Alamat</label>
+          <label>{tr("Alamat")}</label>
           <input type="text" value={alamat} onChange={(e) => setAlamat(e.target.value)} />
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
-          <label>Catatan</label>
+          <label>{tr("Catatan")}</label>
           <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} />
         </div>
       </div>
       <div className="import-summary">
-        Nomor WhatsApp dan email dipakai saat mengirim permintaan penawaran ke vendor, jadi pastikan setidaknya salah satunya terisi.
+        {tr("Nomor WhatsApp dan email dipakai saat mengirim permintaan penawaran ke vendor, jadi pastikan setidaknya salah satunya terisi.")}
       </div>
     </Modal>
   );

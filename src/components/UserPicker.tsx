@@ -3,6 +3,7 @@
 import { ROLE_LABELS } from '@/lib/constants';
 import type { RosterUser } from './issues/shared';
 
+import { useT } from '@/store/useLangStore';
 const lbl = (u: RosterUser) => `${u.name} · ${ROLE_LABELS[u.role] || u.role}${u.cabang ? ` ${u.cabang}` : ''}`;
 
 /** Chip user + pilih user dari daftar (peserta perjalanan, dll.). */
@@ -14,6 +15,7 @@ export function UserPicker({ value, onChange, roster, exclude = [], placeholder 
   placeholder?: string;
   disabled?: boolean;
 }) {
+  const tr = useT();
   return (
     <div className="issue-pj">
       <div className="issue-pj-chips">
@@ -21,7 +23,7 @@ export function UserPicker({ value, onChange, roster, exclude = [], placeholder 
           const u = roster.find((x) => x.id === id);
           return (
             <span key={id} className="kam-chip">
-              {u ? lbl(u) : '(user)'}
+              {u ? lbl(u) : tr("(user)")}
               {!disabled && (
                 <button type="button" aria-label={`Hapus ${u?.name || ''}`} onClick={() => onChange(value.filter((x) => x !== id))}>
                   ×

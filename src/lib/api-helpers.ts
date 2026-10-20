@@ -1,5 +1,6 @@
 import { normalizeItemLines, normalizeLine } from './format';
 import { pickSpecExtra } from './material-extra';
+import { CUSTOMER_APLIKASI_LABEL, PIC_PERAN_LABEL } from './constants';
 import { qcdMissing, qcdRequiredOnMove, type QcdInput } from './qcd';
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
@@ -179,6 +180,7 @@ export function normalizeCustomerPics(input: unknown): CustomerPic[] {
         phone: String(row.phone ?? '').trim() || null,
         email: String(row.email ?? '').trim() || null,
         isPrimary: !!row.isPrimary,
+        peran: PIC_PERAN_LABEL[String(row.peran ?? '')] ? String(row.peran) : null,
       };
     })
     .filter((r) => r.nama);
@@ -270,4 +272,19 @@ export async function resolveProspectScope(
     else if (cabang) reg = (await cabangRegMap())[cabang] ?? bodyReg;
   }
   return { reg: Number.isFinite(reg as number) ? (reg as number) : null, cabang, se };
+}
+
+/** Field profil customer dari body form (segmen, aplikasi, potensi, kompetitor). */
+export function customerProfileFields(body: unknown) {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const seg = String(b.segmen ?? '').trim();
+  const apl = Array.isArray(b.aplikasi) ? Array.from(new Set(b.aplikasi.map((x) => String(x)).filter((x) => CUSTOMER_APLIKASI_LABEL[x]))) : [];
+  // Rupiah tanpa desimal: "Rp 4.500.000.000", "4500000000" dan 4.5e9 sama-sama terbaca.
+  const pot = typeof b.potensi === 'number' ? b.potensi : Number(String(b.potensi ?? '').replace(/\D/g, ''));
+  return {
+    segmen: seg ? seg.slice(0, 60) : null,
+    aplikasi: apl,
+    potensi: Number.isFinite(pot) && pot > 0 ? pot : null,
+    kompetitor: String(b.kompetitor ?? '').trim().slice(0, 200) || null,
+  };
 }

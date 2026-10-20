@@ -7,6 +7,7 @@ import { ACT_LABEL, BASE_ROLES, PERM_MODULES, clampPerms, limitReason, normalize
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
+import { useT } from '@/store/useLangStore';
 export interface RoleItem {
   key: string;
   label: string;
@@ -34,6 +35,7 @@ const baseMeta = (k: string) => BASE_ROLES.find((b) => b.key === k);
  * dasar (cakupan data, alur persetujuan) tetap berlaku.
  */
 export function RolesModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'roles';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -159,10 +161,10 @@ export function RolesModal() {
     <button type="button" className={`rl-item${r.key === sel ? ' on' : ''}`} onClick={() => pick(r.key)}>
       <span>
         <b>{r.label}</b>
-        <small>{r.key === 'admin' ? 'Semua data' : r.key === 'purchasing05' ? 'Dokumen Line 05' : baseMeta(r.base)?.scope}</small>
+        <small>{r.key === 'admin' ? tr("Semua data") : r.key === 'purchasing05' ? tr("Dokumen Line 05") : baseMeta(r.base)?.scope}</small>
       </span>
       <span className="rl-meta">
-        <small>{r.users.length} user</small>
+        <small>{r.users.length} {tr("user")}</small>
         <span className={`badge ${r.locked ? 'slate' : !r.builtin ? 'violet' : r.customized ? 'amber' : 'steel'}`}>{r.locked ? 'terkunci' : !r.builtin ? 'tambahan' : r.customized ? 'diubah' : 'bawaan'}</span>
       </span>
     </button>
@@ -172,21 +174,21 @@ export function RolesModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="Kelola Role"
+      title={tr("Kelola Role")}
       xwide
       footer={
         <>
           {role && !role.locked && (
             <button type="button" className="btn btn-outline" style={{ marginRight: 'auto', color: role.builtin ? undefined : 'var(--rust-600)' }} disabled={busy || (role.builtin && !role.customized)} onClick={resetOrDelete}>
-              {role.builtin ? 'Kembalikan ke bawaan' : 'Hapus role'}
+              {role.builtin ? tr("Kembalikan ke bawaan") : tr("Hapus role")}
             </button>
           )}
           <button type="button" className="btn btn-outline" onClick={() => { if (!dirty || window.confirm('Perubahan belum disimpan. Tutup?')) closeModal(); }}>
-            Tutup
+            {tr("Tutup")}
           </button>
           {role && !role.locked && (
             <button type="button" className="btn btn-primary" disabled={busy || !dirty} onClick={save}>
-              {busy ? 'Menyimpan…' : 'Simpan role'}
+              {busy ? tr("Menyimpan…") : tr("Simpan role")}
             </button>
           )}
         </>
@@ -196,22 +198,22 @@ export function RolesModal() {
         <div className="rl-list">
           {adding ? (
             <div className="rl-new">
-              <input type="text" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Nama role, cth. Supervisor Cabang" autoFocus />
-              <select value={newBase} onChange={(e) => setNewBase(e.target.value)} aria-label="Tipe dasar">
-                {BASE_ROLES.map((b) => <option key={b.key} value={b.key}>Tipe dasar: {b.label}</option>)}
+              <input type="text" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder={tr("Nama role, cth. Supervisor Cabang")} autoFocus />
+              <select value={newBase} onChange={(e) => setNewBase(e.target.value)} aria-label={tr("Tipe dasar")}>
+                {BASE_ROLES.map((b) => <option key={b.key} value={b.key}>{tr("Tipe dasar:")} {b.label}</option>)}
               </select>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button type="button" className="btn btn-outline btn-sm" onClick={() => setAdding(false)}>Batal</button>
-                <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={create}>Buat</button>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setAdding(false)}>{tr("Batal")}</button>
+                <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={create}>{tr("Buat")}</button>
               </div>
             </div>
           ) : (
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => setAdding(true)}>+ Role baru</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setAdding(true)}>{tr("+ Role baru")}</button>
           )}
-          <div className="rl-cap">ROLE BAWAAN</div>
+          <div className="rl-cap">{tr("ROLE BAWAAN")}</div>
           {builtin.map((r) => <ListItem key={r.key} r={r} />)}
-          <div className="rl-cap">ROLE TAMBAHAN</div>
-          {custom.length === 0 && <div className="field-note" style={{ margin: 0 }}>Belum ada. Klik + Role baru.</div>}
+          <div className="rl-cap">{tr("ROLE TAMBAHAN")}</div>
+          {custom.length === 0 && <div className="field-note" style={{ margin: 0 }}>{tr("Belum ada. Klik + Role baru.")}</div>}
           {custom.map((r) => <ListItem key={r.key} r={r} />)}
         </div>
 
@@ -219,13 +221,13 @@ export function RolesModal() {
           <div className="rl-edit">
             <div className="rl-head">
               <label>
-                Nama role
+                {tr("Nama role")}
                 {role.builtin ? <b>{role.label}</b> : <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} />}
               </label>
               <label>
-                Tipe dasar
+                {tr("Tipe dasar")}
                 {role.builtin ? (
-                  <b>{role.key === 'admin' ? 'Admin' : baseMeta(role.base)?.label}</b>
+                  <b>{role.key === 'admin' ? tr("Admin") : baseMeta(role.base)?.label}</b>
                 ) : (
                   <select value={base} onChange={(e) => { setBase(e.target.value); setDraft(clampPerms(draft, e.target.value)); }}>
                     {BASE_ROLES.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
@@ -233,59 +235,59 @@ export function RolesModal() {
                 )}
               </label>
               <label>
-                Cakupan data
-                <span className="rl-scope">{role.key === 'admin' ? 'Semua data' : role.key === 'purchasing05' ? 'Dokumen Line 05 saja' : baseMeta(role.builtin ? role.base : base)?.scope}</span>
+                {tr("Cakupan data")}
+                <span className="rl-scope">{role.key === 'admin' ? tr("Semua data") : role.key === 'purchasing05' ? tr("Dokumen Line 05 saja") : baseMeta(role.builtin ? role.base : base)?.scope}</span>
               </label>
               {!role.builtin && reference && <span className={`badge ${diffFromBase ? 'amber' : 'steel'}`} style={{ alignSelf: 'center' }}>{diffFromBase ? `${diffFromBase} beda dari ${baseMeta(base)?.label}` : `sama dengan ${baseMeta(base)?.label}`}</span>}
             </div>
             {role.locked ? (
-              <div className="import-summary" style={{ marginTop: 0 }}><b>Role Admin terkunci</b> — selalu memiliki semua hak, termasuk Kelola User, Kelola Role dan Database.</div>
+              <div className="import-summary" style={{ marginTop: 0 }}><b>{tr("Role Admin terkunci")}</b> {tr("— selalu memiliki semua hak, termasuk Kelola User, Kelola Role dan Database.")}</div>
             ) : (
               <div className="field-note" style={{ marginTop: 0 }}>
-                {baseMeta(role.builtin ? role.base : base)?.note} Centang = menu & tombol tampil dan berfungsi untuk role ini. Sel <span className="rl-x">✕</span> = tidak tersedia untuk tipe dasarnya (alasan di bawah nama modul).
+                {baseMeta(role.builtin ? role.base : base)?.note} {tr("Centang = menu & tombol tampil dan berfungsi untuk role ini. Sel")} <span className="rl-x">✕</span> {tr("= tidak tersedia untuk tipe dasarnya (alasan di bawah nama modul).")}
               </div>
             )}
 
             {!role.locked && (
               <div className="toolbar-row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                <button type="button" className="btn btn-outline btn-sm" onClick={() => setDraft(clampPerms(viewOnlyPerms(draft), limitBase))}>Jadikan hanya-lihat</button>
-                <select value="" onChange={(e) => { const r = roles.find((x) => x.key === e.target.value); if (r) setDraft(clampPerms(normalizePerms(r.perms), limitBase)); }} style={{ maxWidth: 220 }} aria-label="Salin hak dari role lain">
-                  <option value="">Salin hak dari…</option>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setDraft(clampPerms(viewOnlyPerms(draft), limitBase))}>{tr("Jadikan hanya-lihat")}</button>
+                <select value="" onChange={(e) => { const r = roles.find((x) => x.key === e.target.value); if (r) setDraft(clampPerms(normalizePerms(r.perms), limitBase)); }} style={{ maxWidth: 220 }} aria-label={tr("Salin hak dari role lain")}>
+                  <option value="">{tr("Salin hak dari…")}</option>
                   {roles.filter((r) => r.key !== role.key).map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
                 </select>
-                {dirty && <span className="badge amber" style={{ alignSelf: 'center' }}>Belum disimpan</span>}
+                {dirty && <span className="badge amber" style={{ alignSelf: 'center' }}>{tr("Belum disimpan")}</span>}
               </div>
             )}
 
             <div className="table-wrap" style={{ borderTop: 'none' }}>
               <table className="simple-table rl-table">
                 <thead>
-                  <tr><th>Modul</th>{ACTS.map((a) => <th key={a} className="c">{ACT_LABEL[a]}</th>)}</tr>
+                  <tr><th>{tr("Modul")}</th>{ACTS.map((a) => <th key={a} className="c">{ACT_LABEL[a]}</th>)}</tr>
                 </thead>
                 <tbody>
                   {GROUPS.map((g) => (
                     <FragmentRows key={g} group={g} base={role.locked ? '' : limitBase} draft={draft} saved={role.perms} locked={role.locked} toggle={toggle} />
                   ))}
                   <tr className="rl-group"><td colSpan={5}>SISTEM</td></tr>
-                  <tr><td><b>Kelola User · Kelola Role · Database</b><small>selalu khusus Admin</small></td>{ACTS.map((a) => <td key={a} className="c"><span className="rl-lock">Admin</span></td>)}</tr>
+                  <tr><td><b>{tr("Kelola User · Kelola Role · Database")}</b><small>{tr("selalu khusus Admin")}</small></td>{ACTS.map((a) => <td key={a} className="c"><span className="rl-lock">{tr("Admin")}</span></td>)}</tr>
                 </tbody>
               </table>
             </div>
 
             <div className="rl-bottom">
               <div className="rl-box">
-                <b>Menu yang tampil untuk {role.builtin ? role.label : label || 'role ini'}</b>
+                <b>{tr("Menu yang tampil untuk")} {role.builtin ? role.label : label || tr("role ini")}</b>
                 <div className="rl-chips">
                   {MENU.map(([k, l]) => (
                     <span key={k} className={`rl-chip ${draft[k]?.v ? 'on' : ''}`}>{l}{draft[k]?.v && draft[k]?.x ? ' ⤓' : ''}</span>
                   ))}
                 </div>
-                <small>Dicoret = tidak tampil · ⤓ = tombol download/export tersedia</small>
+                <small>{tr("Dicoret = tidak tampil · ⤓ = tombol download/export tersedia")}</small>
               </div>
               <div className="rl-box">
-                <b>User dengan role ini ({role.users.length})</b>
+                <b>{tr("User dengan role ini (")}{role.users.length})</b>
                 <div className="rl-users">{role.users.length ? role.users.slice(0, 12).join(', ') + (role.users.length > 12 ? `, … ${role.users.length - 12} lainnya` : '') : '—'}</div>
-                <small>Ganti role user di Kelola User. Perubahan hak berlaku langsung, tanpa logout, dan tercatat di Log Aktivitas.</small>
+                <small>{tr("Ganti role user di Kelola User. Perubahan hak berlaku langsung, tanpa logout, dan tercatat di Log Aktivitas.")}</small>
               </div>
             </div>
           </div>

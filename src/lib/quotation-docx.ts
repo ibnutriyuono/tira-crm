@@ -3,7 +3,7 @@
  * dengan pratinjau (lib/quotation-doc.ts). Dimuat dinamis di browser saat
  * tombol Unduh ditekan, jadi tidak menambah ukuran halaman awal.
  */
-import { quoteColumns, quoteTerms, quoteTexts, quoteTotals, terbilang, type QuoteData, type QuoteOpts } from './quotation-doc';
+import { quoteColumns, quoteLabels, quoteTerms, quoteTexts, quoteTotals, terbilang, type QuoteData, type QuoteOpts } from './quotation-doc';
 
 const INK = '1A222B';
 const STEEL = '456484';
@@ -28,6 +28,7 @@ export async function buildQuoteDocx(d: QuoteData, o: QuoteOpts, logo: LogoImage
   const { AlignmentType, BorderStyle, Document, Footer, Header, ImageRun, Packer, PageNumber, Paragraph, ShadingType, Table, TableCell, TableLayoutType, TableRow, TabStopType, TextRun, VerticalAlign, WidthType } = D;
 
   const tx = quoteTexts(d);
+  const L = quoteLabels(d.lang);
   const cols = quoteColumns(d, o);
   const tot = quoteTotals(d, o);
   const terms = quoteTerms(d, o);
@@ -100,13 +101,13 @@ export async function buildQuoteDocx(d: QuoteData, o: QuoteOpts, logo: LogoImage
       new Paragraph({
         tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_W }],
         border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: AMBER, space: 4 } },
-        children: [run(tx.company, { bold: true, size: 18, color: INK }), run(`  ·  ${tx.division}`, { size: 16, color: STEEL }), new TextRun({ text: `\tSurat Penawaran No. ${d.nomor}`, size: 16, color: SOFT })],
+        children: [run(tx.company, { bold: true, size: 18, color: INK }), run(`  ·  ${tx.division}`, { size: 16, color: STEEL }), new TextRun({ text: `\t${L.headerDoc} ${d.nomor}`, size: 16, color: SOFT })],
       }),
     ],
   });
 
   // ---------------------------------------------------------------- nomor / tanggal
-  const metaRows: [string, string, boolean][] = [['Nomor', d.nomor, false], ...(o.lampiran ? ([['Lampiran', d.lampiran || '-', false]] as [string, string, boolean][]) : []), ['Perihal', d.perihal, true]];
+  const metaRows: [string, string, boolean][] = [[L.nomor, d.nomor, false], ...(o.lampiran ? ([[L.lampiran, d.lampiran || '-', false]] as [string, string, boolean][]) : []), [L.perihal, d.perihal, true]];
   blocks.push(
     new Table({
       width: { size: CONTENT_W, type: WidthType.DXA },
@@ -128,10 +129,10 @@ export async function buildQuoteDocx(d: QuoteData, o: QuoteOpts, logo: LogoImage
 
   // ---------------------------------------------------------------- tujuan
   blocks.push(
-    para('Kepada Yth.', { after: 0 }),
+    para(L.kepada, { after: 0 }),
     para(d.kepada, { bold: true, after: 0 }),
     ...(o.alamat && d.alamat.trim() ? [para(d.alamat.trim(), { after: 0 })] : []),
-    ...(o.pic && d.pic.trim() ? [para(`Up. ${d.pic.trim()}`, { after: 0 })] : []),
+    ...(o.pic && d.pic.trim() ? [para(`${L.up} ${d.pic.trim()}`, { after: 0 })] : []),
     para('', { after: 120 }),
     para(tx.pembuka),
     para(tx.intro, { align: 'justify' }),
@@ -176,13 +177,13 @@ export async function buildQuoteDocx(d: QuoteData, o: QuoteOpts, logo: LogoImage
     }),
   );
   if (o.terbilang) {
-    blocks.push(new Paragraph({ spacing: { before: 80, after: 160 }, children: [run('Terbilang: ', { size: 20, color: SOFT }), run(terbilang(tot.grand), { italics: true, size: 20 })] }));
+    blocks.push(new Paragraph({ spacing: { before: 80, after: 160 }, children: [run(`${L.terbilang}: `, { size: 20, color: SOFT }), run(terbilang(tot.grand, d.lang), { italics: true, size: 20 })] }));
   } else {
     blocks.push(para('', { after: 80 }));
   }
 
   // ---------------------------------------------------------------- syarat
-  blocks.push(para('Syarat & Ketentuan', { bold: true, before: 120, after: 60 }));
+  blocks.push(para(L.syarat, { bold: true, before: 120, after: 60 }));
   blocks.push(
     new Table({
       width: { size: CONTENT_W, type: WidthType.DXA },
@@ -200,11 +201,11 @@ export async function buildQuoteDocx(d: QuoteData, o: QuoteOpts, logo: LogoImage
       ),
     }),
   );
-  if (o.catatan && d.catatan.trim()) blocks.push(para('Catatan', { bold: true, before: 160, after: 60 }), para(d.catatan.trim(), { align: 'justify' }));
+  if (o.catatan && d.catatan.trim()) blocks.push(para(L.catatan, { bold: true, before: 160, after: 60 }), para(d.catatan.trim(), { align: 'justify' }));
 
   // ---------------------------------------------------------------- penutup & tanda tangan
   const sig = o.ttdGambar ? signature : null;
-  blocks.push(para(tx.penutup, { before: 160, align: 'justify' }), para('Hormat kami,', { before: 120, after: 0 }), para(tx.company, { after: sig ? 40 : o.ttd ? 960 : 120 }));
+  blocks.push(para(tx.penutup, { before: 160, align: 'justify' }), para(L.hormat, { before: 120, after: 0 }), para(tx.company, { after: sig ? 40 : o.ttd ? 960 : 120 }));
   if (sig) {
     // Tinggi tetap ±1,6 cm; lebar mengikuti rasio gambar (maks. ±5,3 cm).
     let h = 60;
@@ -218,8 +219,8 @@ export async function buildQuoteDocx(d: QuoteData, o: QuoteOpts, logo: LogoImage
   blocks.push(new Paragraph({ spacing: { after: 0 }, children: [run(d.signer.nama, { bold: true, underline: true })] }));
   if (d.signer.jabatan.trim()) blocks.push(para(d.signer.jabatan.trim(), { after: 0 }));
   if (o.kontak) {
-    if (d.signer.telp.trim()) blocks.push(para(`Telp/WA: ${d.signer.telp.trim()}`, { size: 18, color: SOFT, after: 0 }));
-    if (d.signer.email.trim()) blocks.push(para(`Email: ${d.signer.email.trim()}`, { size: 18, color: SOFT, after: 0 }));
+    if (d.signer.telp.trim()) blocks.push(para(`${L.telp}: ${d.signer.telp.trim()}`, { size: 18, color: SOFT, after: 0 }));
+    if (d.signer.email.trim()) blocks.push(para(`${L.email}: ${d.signer.email.trim()}`, { size: 18, color: SOFT, after: 0 }));
   }
 
   const makeFooter = () => new Footer({
@@ -227,14 +228,14 @@ export async function buildQuoteDocx(d: QuoteData, o: QuoteOpts, logo: LogoImage
       new Paragraph({
         alignment: AlignmentType.RIGHT,
         border: { top: { style: BorderStyle.SINGLE, size: 4, color: GRID, space: 4 } },
-        children: [run(`${d.nomor}  ·  Halaman `, { size: 16, color: SOFT }), new TextRun({ children: [PageNumber.CURRENT], size: 16, color: SOFT }), run(' dari ', { size: 16, color: SOFT }), new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 16, color: SOFT })],
+        children: [run(`${d.nomor}  ·  ${L.halaman} `, { size: 16, color: SOFT }), new TextRun({ children: [PageNumber.CURRENT], size: 16, color: SOFT }), run(` ${L.dari} `, { size: 16, color: SOFT }), new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 16, color: SOFT })],
       }),
     ],
   });
 
   const doc = new Document({
     creator: tx.company,
-    title: `Surat Penawaran ${d.nomor}`,
+    title: `${L.judulDoc} ${d.nomor}`,
     styles: { default: { document: { run: { font: 'Calibri', size: 22, color: INK } } } },
     sections: [
       {

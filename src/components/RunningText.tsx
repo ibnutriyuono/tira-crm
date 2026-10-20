@@ -8,6 +8,7 @@ import { buildPersonalTicker } from '@/lib/ticker-personal';
 import { useDataStore } from '@/store/useDataStore';
 import { IconEdit } from './icons';
 
+import { useT } from '@/store/useLangStore';
 const GROUPS = Array.from(new Set(TICKER_ITEMS.map((i) => i.group)));
 const dots = (n: number | null | undefined) => (n ? Math.round(n).toLocaleString('id-ID') : '');
 const undot = (s: string) => Number(s.replace(/\D/g, '')) || null;
@@ -20,6 +21,7 @@ const undot = (s: string) => Number(s.replace(/\D/g, '')) || null;
  * (debounced), when the settings change, and every 5 minutes.
  */
 export function RunningText() {
+  const tr = useT();
   const currentUser = useDataStore((s) => s.currentUser);
   const prospects = useDataStore((s) => s.prospects);
   const salesPlans = useDataStore((s) => s.salesPlans);
@@ -101,21 +103,21 @@ export function RunningText() {
 
   return (
     <div className="running-text">
-      <div className="rt-viewport" title="Arahkan kursor untuk menjeda">
+      <div className="rt-viewport" title={tr("Arahkan kursor untuk menjeda")}>
         <div className="rt-track" style={{ animationDuration: `${seconds}s` }}>
           <span>{text}</span>
         </div>
       </div>
       {canEdit && (
-        <button type="button" className="rt-edit" title="Atur isi running text" onClick={startEdit}>
+        <button type="button" className="rt-edit" title={tr("Atur isi running text")} onClick={startEdit}>
           <IconEdit />
         </button>
       )}
       {editing && items && (
         <div className="rt-editor">
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Pengaturan running text</div>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>{tr("Pengaturan running text")}</div>
           <div className="field-note" style={{ marginBottom: 8 }}>
-            Centang item yang ditampilkan. Berlaku untuk semua pengguna; pengingat pribadi dihitung dari data masing-masing.
+            {tr("Centang item yang ditampilkan. Berlaku untuk semua pengguna; pengingat pribadi dihitung dari data masing-masing.")}
           </div>
           <div className="rt-checklist">
             {GROUPS.map((g) => (
@@ -136,42 +138,42 @@ export function RunningText() {
 
           {(items.kursUsd || items.kursEur) && (
             <div style={{ marginTop: 10 }}>
-              <div className="rt-group-title">Kurs manual (opsional)</div>
+              <div className="rt-group-title">{tr("Kurs manual (opsional)")}</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <label className="rt-kurs">
-                  USD 1 = Rp
+                  {tr("USD 1 = Rp")}
                   <input type="text" inputMode="numeric" value={kursUsd} onChange={(e) => setKursUsd(dots(undot(e.target.value)))} placeholder={onlineKurs?.usd ? dots(onlineKurs.usd) : 'otomatis'} />
                 </label>
                 <label className="rt-kurs">
-                  EUR 1 = Rp
+                  {tr("EUR 1 = Rp")}
                   <input type="text" inputMode="numeric" value={kursEur} onChange={(e) => setKursEur(dots(undot(e.target.value)))} placeholder={onlineKurs?.eur ? dots(onlineKurs.eur) : 'otomatis'} />
                 </label>
               </div>
               <div className="field-note">
-                Kosongkan untuk memakai kurs referensi harian otomatis (Bank Sentral Eropa, cadangan open.er-api). Isi bila perusahaan memakai kurs internal.
+                {tr("Kosongkan untuk memakai kurs referensi harian otomatis (Bank Sentral Eropa, cadangan open.er-api). Isi bila perusahaan memakai kurs internal.")}
               </div>
             </div>
           )}
 
           {items.custom && (
             <div style={{ marginTop: 10 }}>
-              <div className="rt-group-title">Teks custom</div>
+              <div className="rt-group-title">{tr("Teks custom")}</div>
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder={'Satu pesan per baris, cth.\nSelamat ulang tahun Pak Budi (BM SMG)!\nStock opname tanggal 30 Oktober.'}
+                placeholder={tr("Satu pesan per baris, cth.\nSelamat ulang tahun Pak Budi (BM SMG)!\nStock opname tanggal 30 Oktober.")}
                 style={{ width: '100%', minHeight: 80 }}
               />
-              <div className="field-note">Maks. {TICKER_MAX_MESSAGES} pesan, 300 karakter per pesan.</div>
+              <div className="field-note">{tr("Maks.")} {TICKER_MAX_MESSAGES} {tr("pesan, 300 karakter per pesan.")}</div>
             </div>
           )}
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setEditing(false)}>
-              Batal
+              {tr("Batal")}
             </button>
             <button type="button" className="btn btn-primary btn-sm" disabled={saving} onClick={save}>
-              Simpan
+              {tr("Simpan")}
             </button>
           </div>
         </div>

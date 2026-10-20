@@ -11,6 +11,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 const DAY = 86400000;
 const daysSince = (d: string | null | undefined, today: string) => (d ? Math.max(0, Math.floor((Date.parse(today) - Date.parse(d.slice(0, 10))) / DAY)) : null);
 
@@ -37,6 +38,7 @@ export function adminTaskCount(prospects: Prospect[]): number {
  * cakupan cabang pengguna.
  */
 export function AdminQueueModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'adminQueue';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -118,13 +120,13 @@ export function AdminQueueModal() {
   const pickedValue = git.filter((x) => picked.includes(x.p.id)).reduce((s, x) => s + num(x.p.value), 0);
 
   return (
-    <Modal show={show} onClose={closeModal} title={`Antrian Admin Sales${currentUser?.cabang ? ` — ${currentUser.cabang}` : ''}`} xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title={`Antrian Admin Sales${currentUser?.cabang ? ` — ${currentUser.cabang}` : ''}`} xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr("Tutup")}</button>}>
       <div className="kpi-grid">
-        <div className="kpi git"><div className="label">DO belum terfaktur</div><div className="value">{git.length}</div><div className="foot">{formatRupiah(gitValue)}</div></div>
-        <div className="kpi lost"><div className="label">GIT &gt; 30 hari</div><div className="value">{gitOld}</div><div className="foot">percepat faktur / penagihan</div></div>
-        <div className="kpi rate"><div className="label">Dokumen belum lengkap</div><div className="value">{docs.length}</div><div className="foot">PO / DO tanpa No PO, tanggal</div></div>
-        <div className="kpi pending"><div className="label">Penawaran pending</div><div className="value">{pending.length}</div><div className="foot">belum dikirim ke customer</div></div>
-        <div className="kpi won"><div className="label">Terfaktur bulan ini</div><div className="value">{fakturMonth.length}</div><div className="foot">{formatRupiah(fakturMonth.reduce((s, p) => s + num(p.value), 0))}</div></div>
+        <div className="kpi git"><div className="label">{tr("DO belum terfaktur")}</div><div className="value">{git.length}</div><div className="foot">{formatRupiah(gitValue)}</div></div>
+        <div className="kpi lost"><div className="label">{tr("GIT > 30 hari")}</div><div className="value">{gitOld}</div><div className="foot">{tr("percepat faktur / penagihan")}</div></div>
+        <div className="kpi rate"><div className="label">{tr("Dokumen belum lengkap")}</div><div className="value">{docs.length}</div><div className="foot">{tr("PO / DO tanpa No PO, tanggal")}</div></div>
+        <div className="kpi pending"><div className="label">{tr("Penawaran pending")}</div><div className="value">{pending.length}</div><div className="foot">{tr("belum dikirim ke customer")}</div></div>
+        <div className="kpi won"><div className="label">{tr("Terfaktur bulan ini")}</div><div className="value">{fakturMonth.length}</div><div className="foot">{formatRupiah(fakturMonth.reduce((s, p) => s + num(p.value), 0))}</div></div>
       </div>
 
       <div className="toolbar-row" style={{ alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -141,8 +143,8 @@ export function AdminQueueModal() {
             </button>
           ))}
         </div>
-        <select value={se} onChange={(e) => { setSe(e.target.value); setPicked([]); }} style={{ maxWidth: 170, marginLeft: 'auto' }} aria-label="Filter SE">
-          <option value="">Semua Sales</option>
+        <select value={se} onChange={(e) => { setSe(e.target.value); setPicked([]); }} style={{ maxWidth: 170, marginLeft: 'auto' }} aria-label={tr("Filter SE")}>
+          <option value="">{tr("Semua Sales")}</option>
           {seOptions.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
@@ -151,11 +153,11 @@ export function AdminQueueModal() {
         <>
           {fakturOk && (
             <div className="aq-bar">
-              <b>{picked.length} DO dipilih</b> <span className="mono">{formatRupiah(pickedValue)}</span>
-              <label>Tgl faktur <input type="date" value={tglFaktur} onChange={(e) => setTglFaktur(e.target.value)} /></label>
-              <label>No faktur <input type="text" value={noFaktur} onChange={(e) => setNoFaktur(e.target.value)} placeholder="opsional — satu faktur gabungan" style={{ width: 220 }} /></label>
+              <b>{picked.length} {tr("DO dipilih")}</b> <span className="mono">{formatRupiah(pickedValue)}</span>
+              <label>{tr("Tgl faktur")} <input type="date" value={tglFaktur} onChange={(e) => setTglFaktur(e.target.value)} /></label>
+              <label>{tr("No faktur")} <input type="text" value={noFaktur} onChange={(e) => setNoFaktur(e.target.value)} placeholder={tr("opsional — satu faktur gabungan")} style={{ width: 220 }} /></label>
               <button type="button" className="btn btn-primary btn-sm" disabled={busy || !picked.length || !tglFaktur} onClick={markFaktur}>
-                {busy ? 'Menyimpan…' : `Tandai terfaktur (${picked.length})`}
+                {busy ? tr("Menyimpan…") : `Tandai terfaktur (${picked.length})`}
               </button>
             </div>
           )}
@@ -163,12 +165,12 @@ export function AdminQueueModal() {
             <table className="simple-table">
               <thead>
                 <tr>
-                  {fakturOk && <th style={{ width: 34 }}><input type="checkbox" aria-label="Pilih semua" checked={allPicked} onChange={(e) => setPicked(e.target.checked ? allGit : [])} /></th>}
-                  <th>Customer</th><th>SE</th><th>No PO</th><th>Tgl delivery</th><th>Umur GIT</th><th>Nilai</th><th></th>
+                  {fakturOk && <th style={{ width: 34 }}><input type="checkbox" aria-label={tr("Pilih semua")} checked={allPicked} onChange={(e) => setPicked(e.target.checked ? allGit : [])} /></th>}
+                  <th>{tr("Customer")}</th><th>SE</th><th>{tr("No PO")}</th><th>{tr("Tgl delivery")}</th><th>{tr("Umur GIT")}</th><th>{tr("Nilai")}</th><th></th>
                 </tr>
               </thead>
               <tbody>
-                {git.length === 0 && <tr><td colSpan={8} className="field-note">Semua DO sudah terfaktur.</td></tr>}
+                {git.length === 0 && <tr><td colSpan={8} className="field-note">{tr("Semua DO sudah terfaktur.")}</td></tr>}
                 {git.map(({ p, age }) => (
                   <tr key={p.id}>
                     {fakturOk && (
@@ -176,18 +178,18 @@ export function AdminQueueModal() {
                     )}
                     <td style={{ fontWeight: 600 }}>{p.customer}</td>
                     <td>{p.se || '-'}</td>
-                    <td className="mono">{p.noPo || <span className="badge rust">kosong</span>}</td>
-                    <td>{p.tglDelivery ? formatDateID(p.tglDelivery) : <span className="badge amber">kosong</span>}</td>
-                    <td>{age == null ? '-' : <span className={`badge ${age > 30 ? 'rust' : age > 14 ? 'amber' : 'slate'}`}>{age} hari</span>}</td>
+                    <td className="mono">{p.noPo || <span className="badge rust">{tr("kosong")}</span>}</td>
+                    <td>{p.tglDelivery ? formatDateID(p.tglDelivery) : <span className="badge amber">{tr("kosong")}</span>}</td>
+                    <td>{age == null ? '-' : <span className={`badge ${age > 30 ? 'rust' : age > 14 ? 'amber' : 'slate'}`}>{age} {tr("hari")}</span>}</td>
                     <td className="mono">{formatRupiah(num(p.value))}</td>
-                    <td><button type="button" className="btn btn-outline btn-sm" onClick={() => openProspect(p.id)}>Buka</button></td>
+                    <td><button type="button" className="btn btn-outline btn-sm" onClick={() => openProspect(p.id)}>{tr("Buka")}</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <div className="field-note" style={{ marginTop: 6 }}>
-            Omzet dibukukan di bulan <b>tanggal faktur</b> (Target vs Pencapaian, KPI). Umur GIT dihitung dari tanggal delivery. No faktur diisi sama untuk semua DO yang dipilih bila diisi.
+            {tr("Omzet dibukukan di bulan")} <b>{tr("tanggal faktur")}</b> {tr("(Target vs Pencapaian, KPI). Umur GIT dihitung dari tanggal delivery. No faktur diisi sama untuk semua DO yang dipilih bila diisi.")}
           </div>
         </>
       )}
@@ -195,17 +197,17 @@ export function AdminQueueModal() {
       {tab === 'dokumen' && (
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table">
-            <thead><tr><th>Customer</th><th>SE</th><th>Status</th><th>Belum ada</th><th>Nilai</th><th></th></tr></thead>
+            <thead><tr><th>{tr("Customer")}</th><th>SE</th><th>{tr("Status")}</th><th>{tr("Belum ada")}</th><th>{tr("Nilai")}</th><th></th></tr></thead>
             <tbody>
-              {docs.length === 0 && <tr><td colSpan={6} className="field-note">Semua dokumen PO/DO lengkap.</td></tr>}
+              {docs.length === 0 && <tr><td colSpan={6} className="field-note">{tr("Semua dokumen PO/DO lengkap.")}</td></tr>}
               {docs.map(({ p, miss }) => (
                 <tr key={p.id}>
                   <td style={{ fontWeight: 600 }}>{p.customer}</td>
                   <td>{p.se || '-'}</td>
-                  <td>{num(p.status) === 5 ? 'DO' : 'PO / Kontrak'}</td>
+                  <td>{num(p.status) === 5 ? 'DO' : tr("PO / Kontrak")}</td>
                   <td>{miss.map((m) => <span key={m} className="badge amber" style={{ marginRight: 4 }}>{m}</span>)}</td>
                   <td className="mono">{formatRupiah(num(p.value))}</td>
-                  <td><button type="button" className="btn btn-outline btn-sm" onClick={() => openProspect(p.id)}>Lengkapi</button></td>
+                  <td><button type="button" className="btn btn-outline btn-sm" onClick={() => openProspect(p.id)}>{tr("Lengkapi")}</button></td>
                 </tr>
               ))}
             </tbody>
@@ -216,19 +218,19 @@ export function AdminQueueModal() {
       {tab === 'penawaran' && (
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table">
-            <thead><tr><th>Customer</th><th>SE</th><th>Tgl penawaran</th><th>Umur</th><th>Nilai</th><th></th></tr></thead>
+            <thead><tr><th>{tr("Customer")}</th><th>SE</th><th>{tr("Tgl penawaran")}</th><th>{tr("Umur")}</th><th>{tr("Nilai")}</th><th></th></tr></thead>
             <tbody>
-              {pending.length === 0 && <tr><td colSpan={6} className="field-note">Tidak ada penawaran pending.</td></tr>}
+              {pending.length === 0 && <tr><td colSpan={6} className="field-note">{tr("Tidak ada penawaran pending.")}</td></tr>}
               {pending.map(({ p, age }) => (
                 <tr key={p.id}>
                   <td style={{ fontWeight: 600 }}>{p.customer}</td>
                   <td>{p.se || '-'}</td>
                   <td>{p.tglPenawaran ? formatDateID(p.tglPenawaran) : '-'}</td>
-                  <td>{age == null ? '-' : <span className={`badge ${age > 7 ? 'rust' : age > 3 ? 'amber' : 'slate'}`}>{age} hari</span>}</td>
+                  <td>{age == null ? '-' : <span className={`badge ${age > 7 ? 'rust' : age > 3 ? 'amber' : 'slate'}`}>{age} {tr("hari")}</span>}</td>
                   <td className="mono">{formatRupiah(num(p.value))}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    {canNow('prospek', 'e') && <button type="button" className="btn btn-outline btn-sm" onClick={() => markSent(p)} style={{ marginRight: 6 }}>Tandai terkirim</button>}
-                    <button type="button" className="btn btn-outline btn-sm" onClick={() => openProspect(p.id)}>Buka</button>
+                    {canNow('prospek', 'e') && <button type="button" className="btn btn-outline btn-sm" onClick={() => markSent(p)} style={{ marginRight: 6 }}>{tr("Tandai terkirim")}</button>}
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => openProspect(p.id)}>{tr("Buka")}</button>
                   </td>
                 </tr>
               ))}

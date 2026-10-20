@@ -20,6 +20,7 @@ import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
+import { useT } from '@/store/useLangStore';
 type Mode = 'po' | 'kirim' | null;
 
 /** Three-part bar: terkirim · PO belum kirim · tidak di-PO (or one "ditawarkan" segment before PO). */
@@ -42,12 +43,13 @@ export function FlowBar({ it }: { it: Pick<FlowItem, 'offered' | 'po' | 'sent'> 
 }
 
 export function FlowLegend() {
+  const tr = useT();
   return (
     <span className="if-legend">
-      <span><i className="sent" />Terkirim</span>
-      <span><i className="open" />PO belum kirim</span>
-      <span><i className="off" />Ditawarkan</span>
-      <span><i className="lost" />Tidak di-PO</span>
+      <span><i className="sent" />{tr("Terkirim")}</span>
+      <span><i className="open" />{tr("PO belum kirim")}</span>
+      <span><i className="off" />{tr("Ditawarkan")}</span>
+      <span><i className="lost" />{tr("Tidak di-PO")}</span>
     </span>
   );
 }
@@ -58,6 +60,7 @@ export function FlowLegend() {
  * Analisa Eksekutif, and automatically after a move into PO / DO.
  */
 export function ItemFlowModal() {
+  const tr = useT();
   const show = useUiStore((s) => s.modal === 'itemFlow');
   const ctx = useUiStore((s) => s.itemFlowCtx);
   const openModal = useUiStore((s) => s.openModal);
@@ -176,68 +179,68 @@ export function ItemFlowModal() {
       xwide
       footer={
         <button type="button" className="btn btn-outline" onClick={close}>
-          Tutup
+          {tr("Tutup")}
         </button>
       }
     >
       {!record ? (
-        <div className="field-note">{loading ? 'Memuat…' : 'Prospek tidak ditemukan.'}</div>
+        <div className="field-note">{loading ? tr("Memuat…") : tr("Prospek tidak ditemukan.")}</div>
       ) : (
         <>
           <div className="toolbar-row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 13 }}>
               <span className={`badge ${STATUS_META[status]?.color || 'slate'}`}>{status} · {STATUS_META[status]?.label ?? '-'}</span>{' '}
-              {record.cabang || '-'} · SE {record.se || '-'} · Penawaran {record.tglPenawaran ? formatDateID(record.tglPenawaran) : '-'}
-              {record.noPo && <> · PO <b>{record.noPo}</b>{record.tglPO ? ` (${formatDateID(record.tglPO)})` : ''}</>}
+              {record.cabang || '-'} {tr("· SE")} {record.se || '-'} {tr("· Penawaran")} {record.tglPenawaran ? formatDateID(record.tglPenawaran) : '-'}
+              {record.noPo && <> {tr("· PO")} <b>{record.noPo}</b>{record.tglPO ? ` (${formatDateID(record.tglPO)})` : ''}</>}
             </div>
             {canEdit && won && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button type="button" className="btn btn-primary btn-sm" disabled={busy || loading} onClick={() => startPo()}>
-                  {allConfirmed ? 'Koreksi qty PO' : 'Konfirmasi qty PO per item'}
+                  {allConfirmed ? tr("Koreksi qty PO") : tr("Konfirmasi qty PO per item")}
                 </button>
                 <button
                   type="button"
                   className="btn btn-outline btn-sm"
                   disabled={busy || loading || !allConfirmed || !outstanding}
-                  title={!allConfirmed ? 'Konfirmasi qty PO per item dulu' : !outstanding ? 'Semua PO sudah terkirim' : ''}
+                  title={!allConfirmed ? tr("Konfirmasi qty PO per item dulu") : !outstanding ? tr("Semua PO sudah terkirim") : ''}
                   onClick={() => startKirim()}
                 >
-                  Catat Pengiriman (DO)
+                  {tr("Catat Pengiriman (DO)")}
                 </button>
               </div>
             )}
           </div>
           {!won && status !== 6 && (
             <div className="import-summary" style={{ marginTop: 0, marginBottom: 12 }}>
-              Belum PO. Qty per item dikonfirmasi setelah status dipindah ke <b>PO / Kontrak</b> (No. PO &amp; QCD wajib).
+              {tr("Belum PO. Qty per item dikonfirmasi setelah status dipindah ke")} <b>{tr("PO / Kontrak")}</b> {tr("(No. PO & QCD wajib).")}
             </div>
           )}
           {won && !allConfirmed && mode !== 'po' && (
             <div className="import-summary if-warn" style={{ marginTop: 0, marginBottom: 12 }}>
-              Qty PO per item belum dikonfirmasi — angka PO{status === 5 ? ' dan terkirim' : ''} di bawah masih <b>perkiraan</b> (dianggap penuh sesuai penawaran).
+              {tr("Qty PO per item belum dikonfirmasi — angka PO")}{status === 5 ? tr(" dan terkirim") : ''} {tr("di bawah masih")} <b>{tr("perkiraan")}</b> {tr("(dianggap penuh sesuai penawaran).")}
             </div>
           )}
 
           {mode === 'po' && (
             <div className="if-panel po">
               <div className="if-panel-head">
-                <b>Konfirmasi PO — qty per item</b>
-                <span>Terisi penuh sesuai penawaran. Ubah hanya item yang berbeda; selisihnya tercatat sebagai <b>tidak di-PO</b>.</span>
+                <b>{tr("Konfirmasi PO — qty per item")}</b>
+                <span>{tr("Terisi penuh sesuai penawaran. Ubah hanya item yang berbeda; selisihnya tercatat sebagai")} <b>{tr("tidak di-PO")}</b>.</span>
               </div>
               <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 260px))', marginBottom: 10 }}>
                 <div>
-                  <label>No. PO / Kontrak</label>
+                  <label>{tr("No. PO / Kontrak")}</label>
                   <input type="text" value={noPo} onChange={(e) => setNoPo(e.target.value)} />
                 </div>
                 <div>
-                  <label>Tgl. PO</label>
+                  <label>{tr("Tgl. PO")}</label>
                   <input type="date" value={tglPO} onChange={(e) => setTglPO(e.target.value)} />
                 </div>
               </div>
               <div className="table-wrap" style={{ borderTop: 'none' }}>
                 <table className="simple-table if-nowrap" style={{ minWidth: 640 }}>
                   <thead>
-                    <tr><th>Material</th><th style={{ textAlign: 'right' }}>Ditawarkan</th><th style={{ width: 130 }}>Qty PO</th><th style={{ textAlign: 'right' }}>Tidak di-PO</th></tr>
+                    <tr><th>{tr("Material")}</th><th style={{ textAlign: 'right' }}>{tr("Ditawarkan")}</th><th style={{ width: 130 }}>{tr("Qty PO")}</th><th style={{ textAlign: 'right' }}>{tr("Tidak di-PO")}</th></tr>
                   </thead>
                   <tbody>
                     {items.map((it) => {
@@ -258,10 +261,10 @@ export function ItemFlowModal() {
                 </table>
               </div>
               <div className="if-panel-foot">
-                <span>{totals.offKg > 0 && <>PO <b className="mono">{formatTon(poSumKg)}</b> dari ditawarkan <b className="mono">{formatTon(totals.offKg)}</b></>}</span>
+                <span>{totals.offKg > 0 && <>PO <b className="mono">{formatTon(poSumKg)}</b> {tr("dari ditawarkan")} <b className="mono">{formatTon(totals.offKg)}</b></>}</span>
                 <span style={{ display: 'flex', gap: 8 }}>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setMode(null)}>Batal</button>
-                  <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={savePo}>{busy ? 'Menyimpan…' : 'Simpan PO'}</button>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setMode(null)}>{tr("Batal")}</button>
+                  <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={savePo}>{busy ? tr("Menyimpan…") : tr("Simpan PO")}</button>
                 </span>
               </div>
             </div>
@@ -270,23 +273,23 @@ export function ItemFlowModal() {
           {mode === 'kirim' && (
             <div className="if-panel kirim">
               <div className="if-panel-head">
-                <b>Catat Pengiriman</b>
-                <span>Qty kirim terisi sisa PO. Pengiriman bertahap dicatat beberapa kali; sisanya tetap terbuka.</span>
+                <b>{tr("Catat Pengiriman")}</b>
+                <span>{tr("Qty kirim terisi sisa PO. Pengiriman bertahap dicatat beberapa kali; sisanya tetap terbuka.")}</span>
               </div>
               <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 260px))', marginBottom: 10 }}>
                 <div>
-                  <label>No. DO / Surat Jalan</label>
-                  <input type="text" value={noDo} onChange={(e) => setNoDo(e.target.value)} placeholder="cth. DO-2026-1043" />
+                  <label>{tr("No. DO / Surat Jalan")}</label>
+                  <input type="text" value={noDo} onChange={(e) => setNoDo(e.target.value)} placeholder={tr("cth. DO-2026-1043")} />
                 </div>
                 <div>
-                  <label>Tgl. Kirim</label>
+                  <label>{tr("Tgl. Kirim")}</label>
                   <input type="date" value={tglDo} onChange={(e) => setTglDo(e.target.value)} />
                 </div>
               </div>
               <div className="table-wrap" style={{ borderTop: 'none' }}>
                 <table className="simple-table if-nowrap" style={{ minWidth: 640 }}>
                   <thead>
-                    <tr><th>Material</th><th style={{ textAlign: 'right' }}>Qty PO</th><th style={{ textAlign: 'right' }}>Sudah dikirim</th><th style={{ width: 130 }}>Kirim sekarang</th><th style={{ textAlign: 'right' }}>Sisa</th></tr>
+                    <tr><th>{tr("Material")}</th><th style={{ textAlign: 'right' }}>{tr("Qty PO")}</th><th style={{ textAlign: 'right' }}>{tr("Sudah dikirim")}</th><th style={{ width: 130 }}>{tr("Kirim sekarang")}</th><th style={{ textAlign: 'right' }}>{tr("Sisa")}</th></tr>
                   </thead>
                   <tbody>
                     {items.filter((it) => (it.po || 0) > 0).map((it) => {
@@ -302,7 +305,7 @@ export function ItemFlowModal() {
                           <td>
                             <input type="number" min={0} max={max} step="any" disabled={max === 0} aria-label={`Qty kirim ${it.label}`} value={v} onChange={(e) => setDoDraft((d) => ({ ...d, [it.itemId]: e.target.value }))} style={{ width: 110, textAlign: 'right' }} />
                           </td>
-                          <td className="mono" style={{ textAlign: 'right', color: rest > 0 ? 'var(--amber-600)' : 'var(--green-600)', fontWeight: rest > 0 ? 700 : 400 }}>{rest > 0 ? qtyText(rest, it) : 'Lunas'}</td>
+                          <td className="mono" style={{ textAlign: 'right', color: rest > 0 ? 'var(--amber-600)' : 'var(--green-600)', fontWeight: rest > 0 ? 700 : 400 }}>{rest > 0 ? qtyText(rest, it) : tr("Lunas")}</td>
                         </tr>
                       );
                     })}
@@ -310,10 +313,10 @@ export function ItemFlowModal() {
                 </table>
               </div>
               <div className="if-panel-foot">
-                <span>{status === 4 && 'Status prospek pindah ke DO saat pengiriman pertama disimpan.'}</span>
+                <span>{status === 4 && tr("Status prospek pindah ke DO saat pengiriman pertama disimpan.")}</span>
                 <span style={{ display: 'flex', gap: 8 }}>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setMode(null)}>Batal</button>
-                  <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={saveKirim}>{busy ? 'Menyimpan…' : 'Simpan Pengiriman'}</button>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setMode(null)}>{tr("Batal")}</button>
+                  <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={saveKirim}>{busy ? tr("Menyimpan…") : tr("Simpan Pengiriman")}</button>
                 </span>
               </div>
             </div>
@@ -322,25 +325,25 @@ export function ItemFlowModal() {
           <div className="if-grid">
             <div>
               <div className="if-sec-head">
-                <b>Status Item</b>
+                <b>{tr("Status Item")}</b>
                 <FlowLegend />
               </div>
               <div className="table-wrap" style={{ borderTop: 'none' }}>
                 <table className="simple-table if-nowrap" style={{ minWidth: 560 }}>
                   <thead>
-                    <tr><th>Material</th><th style={{ textAlign: 'right' }}>Ditawarkan</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>Terkirim</th><th style={{ width: 120 }}>Alur</th><th>Status</th></tr>
+                    <tr><th>{tr("Material")}</th><th style={{ textAlign: 'right' }}>{tr("Ditawarkan")}</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>{tr("Terkirim")}</th><th style={{ width: 120 }}>{tr("Alur")}</th><th>{tr("Status")}</th></tr>
                   </thead>
                   <tbody>
                     {items.map((it) => (
-                      <tr key={it.itemId} className={`if-row${filter === it.itemId ? ' sel' : ''}`} onClick={() => setFilter((f) => (f === it.itemId ? '' : it.itemId))} title="Tampilkan riwayat item ini">
-                        <td>{it.label}{it.fab && <span className="badge amber" style={{ marginLeft: 6 }}>Line 05</span>}</td>
+                      <tr key={it.itemId} className={`if-row${filter === it.itemId ? ' sel' : ''}`} onClick={() => setFilter((f) => (f === it.itemId ? '' : it.itemId))} title={tr("Tampilkan riwayat item ini")}>
+                        <td>{it.label}{it.fab && <span className="badge amber" style={{ marginLeft: 6 }}>{tr("Line 05")}</span>}</td>
                         <td className="mono" style={{ textAlign: 'right' }}>{qtyText(it.offered, it)}</td>
                         <td className="mono" style={{ textAlign: 'right' }}>{qtyText(it.po, it)}</td>
                         <td className="mono" style={{ textAlign: 'right' }}>{it.po === null ? '–' : qtyText(it.sent, it)}</td>
                         <td><FlowBar it={it} /></td>
                         <td>
                           <span className={`badge ${ITEM_STATE_META[it.state].color}`}>{ITEM_STATE_META[it.state].label}</span>
-                          {it.estimated && <span className="if-est" title="Belum dikonfirmasi per item — dihitung penuh dari status prospek">perkiraan</span>}
+                          {it.estimated && <span className="if-est" title={tr("Belum dikonfirmasi per item — dihitung penuh dari status prospek")}>{tr("perkiraan")}</span>}
                         </td>
                       </tr>
                     ))}
@@ -348,12 +351,12 @@ export function ItemFlowModal() {
                   {totals.offKg > 0 && (
                     <tfoot>
                       <tr>
-                        <td><b>Total tonase</b></td>
+                        <td><b>{tr("Total tonase")}</b></td>
                         <td className="mono" style={{ textAlign: 'right' }}><b>{formatTon(totals.offKg)}</b></td>
                         <td className="mono" style={{ textAlign: 'right' }}><b>{won ? formatTon(totals.poKg) : '–'}</b></td>
                         <td className="mono" style={{ textAlign: 'right' }}><b>{won ? formatTon(totals.sentKg) : '–'}</b></td>
                         <td colSpan={2} style={{ fontSize: 12, color: 'var(--text-soft)' }}>
-                          {won ? `PO ${Math.round((totals.poKg / totals.offKg) * 100)}% dari penawaran · terkirim ${totals.poKg ? Math.round((totals.sentKg / totals.poKg) * 100) : 0}% dari PO` : 'Menunggu PO'}
+                          {won ? `PO ${Math.round((totals.poKg / totals.offKg) * 100)}% dari penawaran · terkirim ${totals.poKg ? Math.round((totals.sentKg / totals.poKg) * 100) : 0}% dari PO` : tr("Menunggu PO")}
                         </td>
                       </tr>
                     </tfoot>
@@ -364,19 +367,19 @@ export function ItemFlowModal() {
 
             <div>
               <div className="if-sec-head">
-                <b>Riwayat Item</b>
-                <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ maxWidth: 260 }} aria-label="Filter item">
-                  <option value="">Semua item</option>
+                <b>{tr("Riwayat Item")}</b>
+                <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ maxWidth: 260 }} aria-label={tr("Filter item")}>
+                  <option value="">{tr("Semua item")}</option>
                   {items.map((it) => (
                     <option key={it.itemId} value={it.itemId}>{it.label}</option>
                   ))}
                 </select>
               </div>
               {loading ? (
-                <div className="field-note">Memuat riwayat…</div>
+                <div className="field-note">{tr("Memuat riwayat…")}</div>
               ) : shown.length === 0 ? (
                 <div className="field-note">
-                  Belum ada riwayat{filter ? ' untuk item ini' : ''}. Riwayat mulai tercatat saat penawaran ditandai terkirim, qty PO dikonfirmasi, atau pengiriman dicatat.
+                  {tr("Belum ada riwayat")}{filter ? tr(" untuk item ini") : ''}{tr(". Riwayat mulai tercatat saat penawaran ditandai terkirim, qty PO dikonfirmasi, atau pengiriman dicatat.")}
                 </div>
               ) : (
                 <ol className="if-timeline">

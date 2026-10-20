@@ -8,6 +8,7 @@ import { buildQcdDashboard } from '@/lib/qcd-analysis';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore, type ModalKey } from '@/store/useUiStore';
 
+import { useT } from '@/store/useLangStore';
 const SEG = [
   { k: 'unggul', color: 'var(--green-500)' },
   { k: 'setara', color: 'var(--slate-500)' },
@@ -20,8 +21,9 @@ function Title({ children }: { children: React.ReactNode }) {
 }
 
 function StackBar({ counts, options }: { counts: Record<string, number>; options: Record<string, string> }) {
+  const tr = useT();
   const total = Object.values(counts).reduce((s, v) => s + v, 0);
-  if (!total) return <div className="field-note" style={{ margin: 0 }}>Belum ada data</div>;
+  if (!total) return <div className="field-note" style={{ margin: 0 }}>{tr("Belum ada data")}</div>;
   return (
     <div>
       <div style={{ display: 'flex', height: 16, borderRadius: 8, overflow: 'hidden', background: 'var(--steel-100)' }}>
@@ -30,7 +32,7 @@ function StackBar({ counts, options }: { counts: Record<string, number>; options
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 11.5, marginTop: 4, color: 'var(--text-soft)' }}>
         {SEG.filter((s) => counts[s.k]).map((s) => (
           <span key={s.k}>
-            <span style={{ color: s.color }}>■</span> {s.k === 'kosong' ? 'Belum diisi' : options[s.k]} {Math.round((counts[s.k] / total) * 100)}%
+            <span style={{ color: s.color }}>■</span> {s.k === 'kosong' ? tr("Belum diisi") : options[s.k]} {Math.round((counts[s.k] / total) * 100)}%
           </span>
         ))}
       </div>
@@ -45,6 +47,7 @@ function StackBar({ counts, options }: { counts: Record<string, number>; options
  * opens the QCD form and comes back here).
  */
 export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdRecap' }: { cabangList: string[]; year: string; scopeLabel: string; returnTo?: ModalKey }) {
+  const tr = useT();
   const prospects = useDataStore((s) => s.prospects);
   const [month, setMonth] = useState('');
   const periode = month ? `${year}-${month}` : year;
@@ -60,9 +63,9 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
   return (
     <>
       <div className="toolbar-row" style={{ alignItems: 'center', marginBottom: 12 }}>
-        <label style={{ margin: 0 }}>Bulan</label>
+        <label style={{ margin: 0 }}>{tr("Bulan")}</label>
         <select value={month} onChange={(e) => setMonth(e.target.value)} style={{ maxWidth: 170 }}>
-          <option value="">Sepanjang {year}</option>
+          <option value="">{tr("Sepanjang")} {year}</option>
           {MONTH_LABELS.map((m, i) => (
             <option key={m} value={String(i + 1).padStart(2, '0')}>
               {m} {year}
@@ -70,45 +73,45 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
           ))}
         </select>
         <span className="field-note" style={{ margin: 0 }}>
-          Lingkup: <b>{scopeLabel}</b> · deal dihitung pada bulan ditutup (Won: Tgl PO, Lose: tanggal pindah status)
+          {tr("Lingkup:")} <b>{scopeLabel}</b> {tr("· deal dihitung pada bulan ditutup (Won: Tgl PO, Lose: tanggal pindah status)")}
         </span>
       </div>
 
       <div className="kpi-grid">
         <div className="kpi won">
-          <div className="label">Menang</div>
+          <div className="label">{tr("Menang")}</div>
           <div className="value">{d.won}</div>
           <div className="foot">{formatRupiah(d.wonValue)}</div>
         </div>
         <div className="kpi lost">
-          <div className="label">Kalah</div>
+          <div className="label">{tr("Kalah")}</div>
           <div className="value">{d.lost}</div>
           <div className="foot">{formatRupiah(d.lostValue)}</div>
         </div>
         <div className="kpi">
-          <div className="label">Win Rate</div>
+          <div className="label">{tr("Win Rate")}</div>
           <div className="value">{d.winRate == null ? '-' : `${d.winRate}%`}</div>
-          <div className="foot">menang ÷ (menang + kalah)</div>
+          <div className="foot">{tr("menang ÷ (menang + kalah)")}</div>
         </div>
         <div className="kpi aktif">
-          <div className="label">QCD Lengkap</div>
+          <div className="label">{tr("QCD Lengkap")}</div>
           <div className="value">{d.completeness == null ? '-' : `${d.completeness}%`}</div>
           <div className="foot">
-            {d.complete} dari {d.won + d.lost} deal ditutup
+            {d.complete} {tr("dari")} {d.won + d.lost} {tr("deal ditutup")}
           </div>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 18 }}>
         <div>
-          <Title>Posisi kita dibanding kompetitor</Title>
+          <Title>{tr("Posisi kita dibanding kompetitor")}</Title>
           <div className="table-wrap" style={{ borderTop: 'none' }}>
             <table className="simple-table" style={{ minWidth: 0 }}>
               <thead>
                 <tr>
-                  <th style={{ width: '22%' }}>Aspek</th>
-                  <th>Pada deal MENANG</th>
-                  <th>Pada deal KALAH</th>
+                  <th style={{ width: '22%' }}>{tr("Aspek")}</th>
+                  <th>{tr("Pada deal MENANG")}</th>
+                  <th>{tr("Pada deal KALAH")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -130,9 +133,9 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
           </div>
         </div>
         <div>
-          <Title>Faktor penentu</Title>
+          <Title>{tr("Faktor penentu")}</Title>
           {d.faktor.length === 0 ? (
-            <div className="field-note">Belum ada faktor penentu tercatat pada periode ini.</div>
+            <div className="field-note">{tr("Belum ada faktor penentu tercatat pada periode ini.")}</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {d.faktor.map((f) => (
@@ -141,12 +144,12 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ height: 10, width: `${(f.won / maxF) * 100}%`, minWidth: f.won ? 4 : 0, background: 'var(--green-500)', borderRadius: 5 }} />
-                      <span style={{ color: 'var(--text-soft)' }}>{f.won} menang</span>
+                      <span style={{ color: 'var(--text-soft)' }}>{f.won} {tr("menang")}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ height: 10, width: `${(f.lost / maxF) * 100}%`, minWidth: f.lost ? 4 : 0, background: 'var(--rust-500)', borderRadius: 5 }} />
                       <span style={{ color: 'var(--text-soft)' }}>
-                        {f.lost} kalah{f.lostValue ? ` · ${formatRupiah(f.lostValue)}` : ''}
+                        {f.lost} {tr("kalah")}{f.lostValue ? ` · ${formatRupiah(f.lostValue)}` : ''}
                       </span>
                     </div>
                   </div>
@@ -157,21 +160,21 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
         </div>
       </div>
 
-      <Title>Kompetitor</Title>
+      <Title>{tr("Kompetitor")}</Title>
       {d.kompetitor.length === 0 ? (
-        <div className="field-note">Belum ada kompetitor tercatat pada periode ini.</div>
+        <div className="field-note">{tr("Belum ada kompetitor tercatat pada periode ini.")}</div>
       ) : (
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table" style={{ minWidth: 0 }}>
             <thead>
               <tr>
-                <th>Kompetitor</th>
-                <th>Kita kalah</th>
-                <th>Nilai hilang</th>
-                <th>Kita menang</th>
-                <th>Win rate vs mereka</th>
-                <th>Faktor kekalahan utama</th>
-                <th>Aspek terlemah kita</th>
+                <th>{tr("Kompetitor")}</th>
+                <th>{tr("Kita kalah")}</th>
+                <th>{tr("Nilai hilang")}</th>
+                <th>{tr("Kita menang")}</th>
+                <th>{tr("Win rate vs mereka")}</th>
+                <th>{tr("Faktor kekalahan utama")}</th>
+                <th>{tr("Aspek terlemah kita")}</th>
               </tr>
             </thead>
             <tbody>
@@ -195,17 +198,17 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
 
       {d.cabang.length > 1 && (
         <>
-          <Title>Per cabang</Title>
+          <Title>{tr("Per cabang")}</Title>
           <div className="table-wrap" style={{ borderTop: 'none' }}>
             <table className="simple-table" style={{ minWidth: 0 }}>
               <thead>
                 <tr>
-                  <th>Cabang</th>
-                  <th>Menang</th>
-                  <th>Kalah</th>
-                  <th>Win rate</th>
-                  <th>Faktor kekalahan utama</th>
-                  <th>QCD lengkap</th>
+                  <th>{tr("Cabang")}</th>
+                  <th>{tr("Menang")}</th>
+                  <th>{tr("Kalah")}</th>
+                  <th>{tr("Win rate")}</th>
+                  <th>{tr("Faktor kekalahan utama")}</th>
+                  <th>{tr("QCD lengkap")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -229,23 +232,23 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
         </>
       )}
 
-      <Title>QCD belum lengkap ({d.incomplete.length})</Title>
+      <Title>{tr("QCD belum lengkap (")}{d.incomplete.length})</Title>
       {d.incomplete.length === 0 ? (
-        <div className="field-note">Semua deal yang ditutup pada periode ini sudah lengkap QCD-nya.</div>
+        <div className="field-note">{tr("Semua deal yang ditutup pada periode ini sudah lengkap QCD-nya.")}</div>
       ) : (
         <>
           <div className="field-note" style={{ marginBottom: 6 }}>
-            Deal yang ditutup sebelum QCD wajib diberlakukan. Lengkapi agar dashboard akurat — klik &quot;Isi QCD&quot;.
+            {tr("Deal yang ditutup sebelum QCD wajib diberlakukan. Lengkapi agar dashboard akurat — klik \"Isi QCD\".")}
           </div>
           <div className="table-wrap" style={{ borderTop: 'none' }}>
             <table className="simple-table" style={{ minWidth: 0 }}>
               <thead>
                 <tr>
-                  <th>Customer</th>
-                  <th>Cabang</th>
+                  <th>{tr("Customer")}</th>
+                  <th>{tr("Cabang")}</th>
                   <th>SE</th>
-                  <th>Status</th>
-                  <th>Nilai</th>
+                  <th>{tr("Status")}</th>
+                  <th>{tr("Nilai")}</th>
                   <th />
                 </tr>
               </thead>
@@ -261,7 +264,7 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
                     <td>{formatRupiah(r.value)}</td>
                     <td>
                       <button type="button" className="btn btn-outline btn-sm" onClick={() => openQcd(r.id, r.status)}>
-                        Isi QCD
+                        {tr("Isi QCD")}
                       </button>
                     </td>
                   </tr>
@@ -269,7 +272,7 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
               </tbody>
             </table>
           </div>
-          {d.incomplete.length > 20 && <div className="field-note">+{d.incomplete.length - 20} deal lainnya.</div>}
+          {d.incomplete.length > 20 && <div className="field-note">+{d.incomplete.length - 20} {tr("deal lainnya.")}</div>}
         </>
       )}
     </>

@@ -13,6 +13,7 @@ import { EMPTY_QCD, useUiStore, type PendingQcd } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 /**
  * QCD for one prospect, opened from the Kanban (a drag into a closing
  * column) or from Rekap QCD (editing a closed deal).
@@ -23,6 +24,7 @@ import { canNow } from '@/hooks/useCan';
  * "Batal" leaves the card where it was. The API enforces the same rule.
  */
 export function QcdModal() {
+  const tr = useT();
   const show = useUiStore((s) => s.modal === 'qcd');
   const qcdCtx = useUiStore((s) => s.qcdCtx);
   const closeModalRaw = useUiStore((s) => s.closeModal);
@@ -96,17 +98,17 @@ export function QcdModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title="Quality · Cost · Delivery"
+      title={tr("Quality · Cost · Delivery")}
       wide2
       onSubmit={onSubmit}
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Batal
+            {tr("Batal")}
           </button>
           {canNow('prospek', 'e') && (
             <button type="submit" className="btn btn-primary" disabled={busy}>
-              {commit ? 'Simpan & Pindahkan' : 'Simpan QCD'}
+              {commit ? tr("Simpan & Pindahkan") : tr("Simpan QCD")}
             </button>
           )}
         </>
@@ -116,19 +118,19 @@ export function QcdModal() {
         <b>{record.customer}</b> —{' '}
         {commit ? (
           <>
-            status akan pindah ke <b>{target} · {label}</b> setelah {poRequired ? 'No. PO dan ' : ''}QCD diisi. Kartu tetap di kolom semula bila dibatalkan.
+            {tr("status akan pindah ke")} <b>{target} · {label}</b> {tr("setelah")} {poRequired ? tr("No. PO dan ") : ''}{tr("QCD diisi. Kartu tetap di kolom semula bila dibatalkan.")}
           </>
         ) : (
-          <>status {label}. Lengkapi QCD untuk evaluasi menang/kalah.</>
+          <>{tr("status")} {label}{tr(". Lengkapi QCD untuk evaluasi menang/kalah.")}</>
         )}
       </p>
       {poRequired && (
         <div className="form-grid" style={{ marginBottom: 12 }}>
           <div className="full">
             <label>
-              No. PO / Kontrak <span style={{ color: 'var(--rust-500)' }}>*</span>
+              {tr("No. PO / Kontrak")} <span style={{ color: 'var(--rust-500)' }}>*</span>
             </label>
-            <input type="text" autoFocus value={noPo} onChange={(e) => setNoPo(e.target.value)} placeholder="cth. PO-2026-00123" />
+            <input type="text" autoFocus value={noPo} onChange={(e) => setNoPo(e.target.value)} placeholder={tr("cth. PO-2026-00123")} />
           </div>
         </div>
       )}

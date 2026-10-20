@@ -7,6 +7,7 @@ import { formatFileSize } from '@/lib/format';
 import { useDataStore } from '@/store/useDataStore';
 import type { Attachment } from '@/lib/types';
 
+import { useT } from '@/store/useLangStore';
 interface Props {
   rfqId?: string | null;
   fupaId?: string | null;
@@ -28,6 +29,7 @@ interface Props {
  * short-lived presigned URL, so the bucket never has to be public.
  */
 export function AttachmentList({ rfqId, fupaId, prospectId, withProspect, readOnly: readOnlyProp, ensureParentId }: Props) {
+  const tr = useT();
   // Kelola Role: unggah butuh hak Tambah/Ubah, hapus butuh hak Hapus pada modul pemilik lampiran.
   const permMod = rfqId || fupaId ? 'rfq' : 'prospek';
   const permE = useCan(permMod, 'e');
@@ -100,7 +102,7 @@ export function AttachmentList({ rfqId, fupaId, prospectId, withProspect, readOn
   };
 
   if (!parentId && !ensureParentId) {
-    return <div className="import-summary">Simpan dokumen terlebih dahulu untuk menambahkan lampiran.</div>;
+    return <div className="import-summary">{tr("Simpan dokumen terlebih dahulu untuk menambahkan lampiran.")}</div>;
   }
 
   return (
@@ -121,13 +123,13 @@ export function AttachmentList({ rfqId, fupaId, prospectId, withProspect, readOn
           onClick={() => inputRef.current?.click()}
         >
           <IconUpload />
-          <span>{busy ? 'Mengunggah…' : 'Klik atau tarik file ke sini untuk melampirkan (foto, PDF, dokumen)'}</span>
+          <span>{busy ? tr("Mengunggah…") : tr("Klik atau tarik file ke sini untuk melampirkan (foto, PDF, dokumen)")}</span>
           <input ref={inputRef} type="file" multiple hidden onChange={(e) => upload(e.target.files)} />
         </div>
       )}
 
       {items.length === 0 ? (
-        <div className="import-summary" style={{ marginTop: 10 }}>Belum ada lampiran.</div>
+        <div className="import-summary" style={{ marginTop: 10 }}>{tr("Belum ada lampiran.")}</div>
       ) : (
         <table className="simple-table" style={{ marginTop: 10 }}>
           <tbody>
@@ -135,13 +137,13 @@ export function AttachmentList({ rfqId, fupaId, prospectId, withProspect, readOn
               <tr key={a.id}>
                 <td>
                   <a href={`/api/attachments/${a.id}`} target="_blank" rel="noreferrer">{a.name}</a>
-                  {a.fromProspect && <span className="badge amber" style={{ marginLeft: 8 }}>dari prospek</span>}
+                  {a.fromProspect && <span className="badge amber" style={{ marginLeft: 8 }}>{tr("dari prospek")}</span>}
                 </td>
                 <td style={{ width: 90, whiteSpace: 'nowrap' }}>{formatFileSize(a.size)}</td>
                 <td style={{ width: 140 }}>{a.uploadedBy || '-'}</td>
                 {!readOnly && permD && (
                   <td style={{ width: 40 }}>
-                    <button type="button" className="icon-btn danger" title="Hapus lampiran" disabled={a.fromProspect} onClick={() => remove(a.id)}>
+                    <button type="button" className="icon-btn danger" title={tr("Hapus lampiran")} disabled={a.fromProspect} onClick={() => remove(a.id)}>
                       <IconTrash />
                     </button>
                   </td>

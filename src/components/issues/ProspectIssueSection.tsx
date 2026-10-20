@@ -8,6 +8,7 @@ import { useUiStore } from '@/store/useUiStore';
 import { IssueForm, issueAgeText, nameOf, useRoster } from './shared';
 import { useCan } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 const up = (s: string | null | undefined) => (s || '').trim().toUpperCase();
 
 /**
@@ -17,6 +18,7 @@ const up = (s: string | null | undefined) => (s || '').trim().toUpperCase();
  *  - bila ada masalah aktif: ringkasan + tombol buka di papan Masalah Pipeline.
  */
 export function ProspectIssueSection({ prospect }: { prospect: Prospect }) {
+  const tr = useT();
   const me = useDataStore((s) => s.currentUser);
   const issue = useDataStore((s) => s.issues.find((i) => i.prospectId === prospect.id && isActiveIssue(i))) || null;
   const roster = useRoster();
@@ -38,7 +40,7 @@ export function ProspectIssueSection({ prospect }: { prospect: Prospect }) {
   return (
     <div className="issue-section">
       <div className="issue-section-head">
-        <label style={{ margin: 0 }}>Masalah</label>
+        <label style={{ margin: 0 }}>{tr("Masalah")}</label>
         {issue && <span className={`badge ${ISSUE_STATUS_META[issue.status].badge}`}>{ISSUE_STATUS_META[issue.status].label}</span>}
       </div>
       {form ? (
@@ -46,34 +48,34 @@ export function ProspectIssueSection({ prospect }: { prospect: Prospect }) {
       ) : issue ? (
         <div className="issue-report">
           <div>
-            <b>⚑ {issueCatLabel(issue.kategori)}</b> · urgensi {urgensiLabel(issue.urgensi)} · {issueAgeText(issue)}
-            {issue.pjIds.length > 0 && <> · PJ: {issue.pjIds.map((id) => nameOf(roster, id)).join(', ')}</>}
+            <b>⚑ {issueCatLabel(issue.kategori)}</b> {tr("· urgensi")} {urgensiLabel(issue.urgensi)} · {issueAgeText(issue)}
+            {issue.pjIds.length > 0 && <> {tr("· PJ:")} {issue.pjIds.map((id) => nameOf(roster, id)).join(', ')}</>}
           </div>
           <div style={{ marginTop: 3 }}>{issue.keterangan}</div>
           <div className="issue-row" style={{ marginTop: 6 }}>
             {issue.status === 'usulan' && isBm && canE && (
               <button type="button" className="btn btn-primary btn-sm" onClick={() => setForm('terima')}>
-                Proses usulan (tentukan PJ / tolak)
+                {tr("Proses usulan (tentukan PJ / tolak)")}
               </button>
             )}
             <button type="button" className="btn btn-outline btn-sm" onClick={openBoard}>
-              Buka di papan Masalah Pipeline
+              {tr("Buka di papan Masalah Pipeline")}
             </button>
-            <span className="field-note" style={{ margin: 0 }}>Diskusi masalah memakai thread Diskusi di bawah.</span>
+            <span className="field-note" style={{ margin: 0 }}>{tr("Diskusi masalah memakai thread Diskusi di bawah.")}</span>
           </div>
         </div>
       ) : (
         <div className="issue-row">
           {isBm ? (
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setForm('lapor')}>
-              ⚑ Laporkan masalah
+              {tr("⚑ Laporkan masalah")}
             </button>
           ) : (
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setForm('usulan')}>
-              ⚑ Ajukan masalah ke BM
+              {tr("⚑ Ajukan masalah ke BM")}
             </button>
           )}
-          <span className="field-note" style={{ margin: 0 }}>{isBm ? 'Tentukan penanggung jawab (user) — mereka mendapat notifikasi.' : 'BM akan menerima notifikasi dan membuat laporannya.'}</span>
+          <span className="field-note" style={{ margin: 0 }}>{isBm ? tr("Tentukan penanggung jawab (user) — mereka mendapat notifikasi.") : tr("BM akan menerima notifikasi dan membuat laporannya.")}</span>
         </div>
       )}
     </div>

@@ -234,3 +234,46 @@ export async function mailStatus() {
     cap: INSTANT_DAILY_CAP,
   };
 }
+
+/**
+ * Email ke customer (Surat Penawaran). Pengirim tampil atas nama penanda
+ * tangan ("Nama - PT. TIRA AUSTENITE"), balasan langsung ke email penanda
+ * tangan; alamat pengirim tetap SMTP_FROM supaya tidak ditolak server email.
+ */
+export async function sendCustomerMail(input: {
+  userId: string;
+  kind: string;
+  senderName: string;
+  replyTo?: string;
+  to: string[];
+  cc: string[];
+  subject: string;
+  html: string;
+  text: string;
+  attachments: { filename: string; content: Buffer; contentType: string; cid?: string }[];
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!mailConfigured()) return { ok: false, error: 'Server email belum dikonfigurasi (SMTP_HOST di .env).' };
+  const raw = fromAddress();
+  const addr = (raw.match(/<([^>]+)>/)?.[1] || raw).trim();
+  const name = `${input.senderName} - PT. TIRA AUSTENITE`.replace(/["\\]/g, '');
+  const toLog = [...input.to, ...input.cc.map((c) => `cc:${c}`)].join(', ').slice(0, 300);
+  try {
+    await getTransport().sendMail({
+      from: { name, address: addr },
+      replyTo: input.replyTo || undefined,
+      to: input.to,
+      cc: input.cc.length ? input.cc : undefined,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+      attachments: input.attachments,
+    });
+    await prisma.emailLog.create({ data: { userId: input.userId, kind: input.kind, to: toLog, subject: input.subject.slice(0, 300), ok: true } });
+    return { ok: true };
+  } catch (err) {
+    const error = (err instanceof Error ? err.message : String(err)).slice(0, 500);
+    await prisma.emailLog.create({ data: { userId: input.userId, kind: input.kind, to: toLog, subject: input.subject.slice(0, 300), ok: false, error } }).catch(() => {});
+    console.error('[email] gagal kirim penawaran ke', toLog, error);
+    return { ok: false, error };
+  }
+}

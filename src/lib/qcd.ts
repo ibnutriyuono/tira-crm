@@ -6,6 +6,8 @@
  * Pure: shared by the forms, the API gate and the KPI dashboard.
  */
 
+import { liveLabels } from './i18n';
+
 export type QcdLevel = 'unggul' | 'setara' | 'kalah';
 export type QcdDim = 'quality' | 'cost' | 'delivery';
 
@@ -27,6 +29,8 @@ export const QCD_FAKTOR: { key: string; label: string }[] = [
   { key: 'lainnya', label: 'Lainnya' },
 ];
 export const QCD_FAKTOR_LABEL: Record<string, string> = Object.fromEntries(QCD_FAKTOR.map((f) => [f.key, f.label]));
+QCD_FAKTOR.forEach((f) => liveLabels(f, ['label']));
+liveLabels(QCD_FAKTOR_LABEL);
 
 export interface QcdInput {
   qcdQualityLevel?: unknown;

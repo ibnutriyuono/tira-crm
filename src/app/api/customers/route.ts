@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
-import { isResponse, normalizeCustomerPics, requireUser } from '@/lib/api-helpers';
+import { customerProfileFields, isResponse, normalizeCustomerPics, requireUser } from '@/lib/api-helpers';
 import { customerScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
@@ -33,6 +33,7 @@ export async function POST(req: Request) {
   // falls back to whatever it sent for those fields.
   const pics = normalizeCustomerPics(body?.pics);
   const primary = pics.find((p) => p.isPrimary);
+  const profile = customerProfileFields(body);
 
   const customer = await prisma.customer.create({
     data: {
@@ -44,6 +45,7 @@ export async function POST(req: Request) {
       address: String(body?.address || '').trim(),
       catatan: String(body?.catatan || '').trim(),
       pics: pics as unknown as Prisma.InputJsonValue,
+      ...profile,
     },
   });
 

@@ -3,7 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { useT } from '@/store/useLangStore';
+import { LangSwitch } from '@/components/LangSwitch';
 export default function LoginPage() {
+  const tr = useT();
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -22,7 +25,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Username atau password salah.');
+        setError(data.error ? tr(data.error) : tr('Username atau password salah.'));
         setBusy(false);
         return;
       }
@@ -31,7 +34,7 @@ export default function LoginPage() {
       router.replace(n ? `/?n=${encodeURIComponent(n)}` : '/');
       router.refresh();
     } catch {
-      setError('Gagal terhubung ke server. Coba lagi.');
+      setError(tr('Gagal terhubung ke server. Coba lagi.'));
       setBusy(false);
     }
   }
@@ -41,22 +44,25 @@ export default function LoginPage() {
       <div className="auth-card">
         <div className="auth-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="logo-img" src="/logo.png" alt="Logo PT. TIRA AUSTENITE, Tbk" />
-          <h1>CRM TIRA</h1>
+          <img className="logo-img" src="/logo.png" alt={tr("Logo PT. TIRA AUSTENITE, Tbk")} />
+          <h1>{tr("CRM TIRA")}</h1>
         </div>
-        <div className="auth-sub">Steel Division · PT. TIRA AUSTENITE, Tbk &mdash; Masuk untuk melanjutkan</div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -6 }}>
+          <LangSwitch />
+        </div>
+        <div className="auth-sub">{tr("Steel Division · PT. TIRA AUSTENITE, Tbk — Masuk untuk melanjutkan")}</div>
         <div className={`auth-error${error ? ' show' : ''}`}>{error}</div>
         <form onSubmit={onSubmit}>
           <div className="auth-field">
-            <label>Username</label>
+            <label>{tr("Username")}</label>
             <input type="text" autoComplete="username" required value={username} onChange={(e) => setUsername(e.target.value)} />
           </div>
           <div className="auth-field">
-            <label>Password</label>
+            <label>{tr("Password")}</label>
             <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           <button type="submit" className="btn btn-primary auth-submit" disabled={busy}>
-            {busy ? 'Memproses...' : 'Masuk'}
+            {busy ? tr('Memproses...') : tr('Masuk')}
           </button>
         </form>
       </div>

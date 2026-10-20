@@ -14,11 +14,13 @@ import { useUiStore } from '@/store/useUiStore';
 import type { Fupa } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 function statusColor(status: string): string {
   return status === 'Selesai' ? 'green' : status === 'Terkirim' ? 'steel' : 'slate';
 }
 
 export function FupaManageModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'fupaManage';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -68,7 +70,7 @@ export function FupaManageModal() {
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title="Kelola FUP A" xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title={tr("Kelola FUP A")} xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr("Tutup")}</button>}>
       <div className="toolbar-row">
         {canNow('rfq', 'e') && (
         <button
@@ -78,45 +80,44 @@ export function FupaManageModal() {
             openModal('fupa');
           }}
         >
-          + Buat FUP A Baru
+          {tr("+ Buat FUP A Baru")}
         </button>
         )}
         <select className="btn-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">Semua Status</option>
-          <option value="Draft">Draft</option>
-          <option value="Terkirim">Terkirim</option>
-          <option value="Selesai">Selesai</option>
+          <option value="">{tr("Semua Status")}</option>
+          <option value="Draft">{tr("Draft")}</option>
+          <option value="Terkirim">{tr("Terkirim")}</option>
+          <option value="Selesai">{tr("Selesai")}</option>
         </select>
-        <input type="search" className="search-grow" placeholder="Cari No FUP A / RFQ / Customer..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input type="search" className="search-grow" placeholder={tr("Cari No FUP A / RFQ / Customer...")} value={search} onChange={(e) => setSearch(e.target.value)} />
         {canNow('rfq', 'x') && (
-          <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+          <button className="btn btn-outline btn-sm" onClick={exportExcel}>{tr("Export Excel")}</button>
         )}
       </div>
       <div className="import-summary">
-        FUP A adalah permintaan pembelian (purchase request) resmi yang dibuat setelah RFQ dinyatakan Won. Setiap FUP A
-        mencatat No. RFQ rujukannya sebagai jejak asal permintaan.
+        {tr("FUP A adalah permintaan pembelian (purchase request) resmi yang dibuat setelah RFQ dinyatakan Won. Setiap FUP A mencatat No. RFQ rujukannya sebagai jejak asal permintaan.")}
       </div>
 
       {list.length === 0 ? (
         <div className="empty-state" style={{ padding: '34px 10px' }}>
-          <h3>{fupas.length === 0 ? 'Belum ada FUP A' : 'Tidak ditemukan'}</h3>
-          <p>{fupas.length === 0 ? 'FUP A dibuat dari tombol pada prospek yang sudah berstatus Won, atau klik "+ Buat FUP A Baru" di atas.' : 'Coba kata kunci pencarian lain.'}</p>
+          <h3>{fupas.length === 0 ? tr("Belum ada FUP A") : tr("Tidak ditemukan")}</h3>
+          <p>{fupas.length === 0 ? tr("FUP A dibuat dari tombol pada prospek yang sudah berstatus Won, atau klik \"+ Buat FUP A Baru\" di atas.") : tr("Coba kata kunci pencarian lain.")}</p>
         </div>
       ) : (
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table">
             <thead>
               <tr>
-                <th>No. FUP A</th>
-                <th>Tanggal</th>
-                <th>Ref. RFQ</th>
-                <th>Customer</th>
-                <th>Cabang</th>
-                <th>Item</th>
-                <th>Lampiran</th>
-                <th>Status</th>
-                <th>Pembelian</th>
-                <th>Aksi</th>
+                <th>{tr("No. FUP A")}</th>
+                <th>{tr("Tanggal")}</th>
+                <th>{tr("Ref. RFQ")}</th>
+                <th>{tr("Customer")}</th>
+                <th>{tr("Cabang")}</th>
+                <th>{tr("Item")}</th>
+                <th>{tr("Lampiran")}</th>
+                <th>{tr("Status")}</th>
+                <th>{tr("Pembelian")}</th>
+                <th>{tr("Aksi")}</th>
               </tr>
             </thead>
             <tbody>
@@ -137,14 +138,14 @@ export function FupaManageModal() {
                           this used to render the retired purchStatus ladder. */}
                       <span className={`badge ${pmeta.color}`}>{pmeta.label}</span>
                       <div className="text-muted" style={{ fontSize: 10.5, marginTop: 3 }}>
-                        {f.sentToPurchasingAt ? `Dikirim ${formatDateTimeID(f.sentToPurchasingAt)}` : 'Belum dikirim'}
+                        {f.sentToPurchasingAt ? `Dikirim ${formatDateTimeID(f.sentToPurchasingAt)}` : tr("Belum dikirim")}
                       </div>
                     </td>
                     <td>
                       <div className="row-actions">
                         <button
                           className="icon-btn"
-                          title={canNow('rfq', 'e') ? 'Edit' : 'Lihat (hanya-baca)'}
+                          title={canNow('rfq', 'e') ? tr("Edit") : tr("Lihat (hanya-baca)")}
                           onClick={() => {
                             useUiStore.setState({ fupaCtx: { fupaId: f.id, sourceRfqId: f.sourceRfqId } });
                             openModal('fupa');
@@ -153,14 +154,14 @@ export function FupaManageModal() {
                           <IconEdit />
                         </button>
                         {f.status !== 'Selesai' && canNow('rfq', 'e') && (
-                          <button className="icon-btn" title="Tandai selesai" onClick={() => markDone(f.id)}>
+                          <button className="icon-btn" title={tr("Tandai selesai")} onClick={() => markDone(f.id)}>
                             <IconCheck />
                           </button>
                         )}
                         {canNow('rfq', 'd') && (
                         <button
                           className="icon-btn danger"
-                          title="Hapus"
+                          title={tr("Hapus")}
                           onClick={() => {
                             useUiStore.setState({ deleteCtx: { mode: 'fupa', id: f.id, title: 'Hapus FUP A', message: `Yakin ingin menghapus FUP A "${f.noFupa || '(tanpa nomor)'}"?` } });
                             openModal('delete');

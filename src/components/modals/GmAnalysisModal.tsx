@@ -21,6 +21,7 @@ import { canNow } from '@/hooks/useCan';
 
 
 
+import { useT } from '@/store/useLangStore';
 /** Compact Rupiah for KPI tiles ("Rp 3,00 M", "Rp 820 jt") -- the full figure sits in the tile's tooltip. */
 function rpShort(n: number): string {
   const abs = Math.abs(n);
@@ -38,6 +39,7 @@ const achColor = (a: number) => (a >= 100 ? 'green' : a >= 90 ? 'amber' : a > 0 
  * the PPT can never disagree.
  */
 export function GmAnalysisModal() {
+  const tr = useT();
   const show = useUiStore((s) => s.modal === 'gmAnalysis');
   const closeModal = useUiStore((s) => s.closeModal);
 
@@ -161,11 +163,11 @@ export function GmAnalysisModal() {
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Tutup
+            {tr("Tutup")}
           </button>
           {tab === 'sales' && canNow('analisa', 'x') && (
             <button type="button" className="btn btn-primary" disabled={busy || !a} onClick={onGeneratePpt}>
-              <IconDownload /> {busy ? 'Membuat PPT…' : 'Buat PPT'}
+              <IconDownload /> {busy ? tr("Membuat PPT…") : tr("Buat PPT")}
             </button>
           )}
         </>
@@ -174,10 +176,10 @@ export function GmAnalysisModal() {
       <div className="ea-tabs" role="tablist">
         {(
           [
-            ['sales', 'Sales'],
-            ['target', 'Target'],
-            ['product', 'Product'],
-            ['pipeline', 'Pipeline'],
+            ['sales', tr("Sales")],
+            ['target', tr("Target")],
+            ['product', tr("Product")],
+            ['pipeline', tr("Pipeline")],
           ] as const
         ).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
@@ -191,10 +193,10 @@ export function GmAnalysisModal() {
       {a && tab === 'sales' && (
         <>
           <div className="toolbar-row" style={{ alignItems: 'center', marginBottom: 12 }}>
-            <label style={{ margin: 0 }}>Periode</label>
-            <input type="month" value={periode} onChange={(e) => setRange(e.target.value, periodeTo)} style={{ maxWidth: 170 }} title="Dari bulan" />
-            <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>s/d</span>
-            <input type="month" value={periodeTo} onChange={(e) => setRange(periode, e.target.value)} style={{ maxWidth: 170 }} title="Sampai bulan" />
+            <label style={{ margin: 0 }}>{tr("Periode")}</label>
+            <input type="month" value={periode} onChange={(e) => setRange(e.target.value, periodeTo)} style={{ maxWidth: 170 }} title={tr("Dari bulan")} />
+            <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>{tr("s/d")}</span>
+            <input type="month" value={periodeTo} onChange={(e) => setRange(periode, e.target.value)} style={{ maxWidth: 170 }} title={tr("Sampai bulan")} />
             {quick.map((q) => (
               <button
                 key={q.label}
@@ -206,55 +208,55 @@ export function GmAnalysisModal() {
               </button>
             ))}
             <span className="field-note" style={{ margin: 0 }}>
-              <b>{a.periodLabel}</b>{a.monthCount > 1 ? ` (${a.monthCount} bulan)` : ''} · Cakupan: <b>{scope.label}</b>
-              {scope.kind === 'se' && ' — target yang ditampilkan adalah target cabang sebagai acuan kontribusi Anda'}
+              <b>{a.periodLabel}</b>{a.monthCount > 1 ? ` (${a.monthCount} bulan)` : ''} {tr("· Cakupan:")} <b>{scope.label}</b>
+              {scope.kind === 'se' && tr(" — target yang ditampilkan adalah target cabang sebagai acuan kontribusi Anda")}
             </span>
           </div>
 
           <div className="kpi-grid">
             <div className="kpi">
-              <div className="label">{scope.kind === 'se' ? 'Target Cabang' : 'Target'}</div>
+              <div className="label">{scope.kind === 'se' ? tr("Target Cabang") : tr("Target")}</div>
               <div className="value" title={formatRupiah(a.target)}>{rpShort(a.target)}</div>
-              <div className="foot">Rencana {formatRupiah(a.rencana)} ({a.rencanaVsTarget}%)</div>
+              <div className="foot">{tr("Rencana")} {formatRupiah(a.rencana)} ({a.rencanaVsTarget}%)</div>
             </div>
             <div className="kpi won">
-              <div className="label">Realisasi</div>
+              <div className="label">{tr("Realisasi")}</div>
               <div className="value" title={formatRupiah(a.won)}>{rpShort(a.won)}</div>
               <div className="foot">
-                {a.wonCount} deal · {a.momPct == null ? `${a.compareLabel} -` : `${a.momPct >= 0 ? '▲' : '▼'} ${Math.abs(a.momPct)}% vs ${a.compareLabel}`}
+                {a.wonCount} {tr("deal ·")} {a.momPct == null ? `${a.compareLabel} -` : `${a.momPct >= 0 ? '▲' : '▼'} ${Math.abs(a.momPct)}% vs ${a.compareLabel}`}
               </div>
             </div>
             <div className="kpi">
-              <div className="label">Achievement</div>
+              <div className="label">{tr("Achievement")}</div>
               <div className="value">{a.achievement}%</div>
-              <div className="foot">Realisasi vs rencana {a.wonVsRencana}%</div>
+              <div className="foot">{tr("Realisasi vs rencana")} {a.wonVsRencana}%</div>
             </div>
             <div className="kpi lost">
-              <div className="label">Sisa Gap</div>
+              <div className="label">{tr("Sisa Gap")}</div>
               <div className="value" title={formatRupiah(a.gap)}>{rpShort(a.gap)}</div>
-              <div className="foot">{a.requiredPerDay ? `Perlu ${formatRupiah(a.requiredPerDay)}/hari kerja (${a.daysLeft} hari)` : a.daysLeft == null ? 'Bukan periode berjalan' : 'Target tercapai'}</div>
+              <div className="foot">{a.requiredPerDay ? `Perlu ${formatRupiah(a.requiredPerDay)}/hari kerja (${a.daysLeft} hari)` : a.daysLeft == null ? tr("Bukan periode berjalan") : tr("Target tercapai")}</div>
             </div>
             <div className="kpi aktif">
-              <div className="label">Weighted Pipeline</div>
+              <div className="label">{tr("Weighted Pipeline")}</div>
               <div className="value" title={formatRupiah(a.weighted)}>{rpShort(a.weighted)}</div>
-              <div className="foot">Coverage gap {a.coverage == null ? '-' : `${Math.round(a.coverage * 100)}%`}</div>
+              <div className="foot">{tr("Coverage gap")} {a.coverage == null ? '-' : `${Math.round(a.coverage * 100)}%`}</div>
             </div>
             <div className="kpi">
-              <div className="label">Win Rate</div>
+              <div className="label">{tr("Win Rate")}</div>
               <div className="value">{a.winRate == null ? '-' : `${a.winRate}%`}</div>
               <div className="foot">
-                {a.lostCount} kalah · {formatRupiah(a.lostValue)}
+                {a.lostCount} {tr("kalah ·")} {formatRupiah(a.lostValue)}
               </div>
             </div>
           </div>
 
           <div className="import-summary" style={{ marginTop: 0, marginBottom: 14 }}>
-            <b>Komposisi realisasi:</b> PO/Kontrak {formatRupiah(a.wonPo)} · DO GIT (belum faktur) {formatRupiah(a.wonDoGit)} · DO Omzet (terfaktur) {formatRupiah(a.wonDoOmzet)} · rata-rata per deal {formatRupiah(a.avgDeal)}
+            <b>{tr("Komposisi realisasi:")}</b> {tr("PO/Kontrak")} {formatRupiah(a.wonPo)} {tr("· DO GIT (belum faktur)")} {formatRupiah(a.wonDoGit)} {tr("· DO Omzet (terfaktur)")} {formatRupiah(a.wonDoOmzet)} {tr("· rata-rata per deal")} {formatRupiah(a.avgDeal)}
           </div>
 
-          <Section title="Catatan & Rekomendasi">
+          <Section title={tr("Catatan & Rekomendasi")}>
             {a.insights.length === 0 ? (
-              <div className="field-note">Tidak ada catatan khusus untuk periode ini.</div>
+              <div className="field-note">{tr("Tidak ada catatan khusus untuk periode ini.")}</div>
             ) : (
               <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, lineHeight: 1.7 }}>
                 {a.insights.map((t, i) => (
@@ -265,56 +267,56 @@ export function GmAnalysisModal() {
           </Section>
 
           {scope.kind === 'nasional' && regionRows.length > 0 && (
-            <Section title="Per Regional">
+            <Section title={tr("Per Regional")}>
               <Table
-                head={['Regional', 'Target', 'Rencana', 'Realisasi', 'Ach.', 'Weighted']}
+                head={[tr("Regional"), tr("Target"), tr("Rencana"), tr("Realisasi"), tr("Ach."), tr("Weighted")]}
                 rows={regionRows.map((r) => [r.reg != null ? `Regional ${r.reg}` : 'Belum diketahui', formatRupiah(r.totals.target), formatRupiah(r.totals.rencana), formatRupiah(r.totals.won), pctBadge(r.totals.achievement), formatRupiah(r.totals.weighted)])}
               />
             </Section>
           )}
 
           {scope.kind !== 'se' && (
-            <Section title="Per Cabang">
+            <Section title={tr("Per Cabang")}>
               <Table
-                head={['Cabang', 'Target', 'Rencana', 'Realisasi', 'Ach.', 'Weighted', 'Deal aktif', 'Mangkrak']}
+                head={[tr("Cabang"), tr("Target"), tr("Rencana"), tr("Realisasi"), tr("Ach."), tr("Weighted"), tr("Deal aktif"), tr("Mangkrak")]}
                 rows={cabangRows.map((r) => [r.cabang, formatRupiah(r.target), formatRupiah(r.rencana), formatRupiah(r.won), pctBadge(r.achievement), formatRupiah(r.weighted), r.openCount, r.agingCount])}
               />
-              {hiddenCabang > 0 && <div className="field-note">{hiddenCabang} cabang tanpa target, rencana, maupun aktivitas pada periode ini tidak ditampilkan.</div>}
+              {hiddenCabang > 0 && <div className="field-note">{hiddenCabang} {tr("cabang tanpa target, rencana, maupun aktivitas pada periode ini tidak ditampilkan.")}</div>}
             </Section>
           )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
             {scope.kind !== 'se' && (
-              <Section title="Peringkat SE (realisasi periode)">
-                <Table head={['SE', 'Cabang', 'Realisasi', 'Deal', 'Weighted']} rows={a.seRows.slice(0, 15).map((r) => [r.se, r.cabang, formatRupiah(r.won), r.wonCount, formatRupiah(r.weighted)])} />
+              <Section title={tr("Peringkat SE (realisasi periode)")}>
+                <Table head={[tr("SE"), tr("Cabang"), tr("Realisasi"), tr("Deal"), tr("Weighted")]} rows={a.seRows.slice(0, 15).map((r) => [r.se, r.cabang, formatRupiah(r.won), r.wonCount, formatRupiah(r.weighted)])} />
               </Section>
             )}
-            <Section title="Customer terbesar (realisasi periode)">
-              <Table head={['Customer', 'Cabang', 'Realisasi', 'Deal']} rows={a.topCustomers.map((c) => [c.name, c.cabang, formatRupiah(c.value), c.count])} />
+            <Section title={tr("Customer terbesar (realisasi periode)")}>
+              <Table head={[tr("Customer"), tr("Cabang"), tr("Realisasi"), tr("Deal")]} rows={a.topCustomers.map((c) => [c.name, c.cabang, formatRupiah(c.value), c.count])} />
             </Section>
-            <Section title="Pipeline aktif per tahap">
-              <Table head={['Tahap', 'Deal', 'Nilai']} rows={a.funnel.map((f) => [STATUS_META[f.stage]?.label ?? f.stage, f.count, formatRupiah(f.value)])} />
+            <Section title={tr("Pipeline aktif per tahap")}>
+              <Table head={[tr("Tahap"), tr("Deal"), tr("Nilai")]} rows={a.funnel.map((f) => [STATUS_META[f.stage]?.label ?? f.stage, f.count, formatRupiah(f.value)])} />
             </Section>
             <Section title={`Kalah periode ini — kompetitor (${a.lostCount} deal)`}>
-              <Table head={['Kompetitor', 'Kali menang atas kita']} rows={a.topCompetitors.map((c) => [c.name, c.count])} empty="Belum ada data kompetitor pada deal kalah" />
+              <Table head={[tr("Kompetitor"), tr("Kali menang atas kita")]} rows={a.topCompetitors.map((c) => [c.name, c.count])} empty={tr("Belum ada data kompetitor pada deal kalah")} />
             </Section>
             <Section title={`Deal mangkrak (${a.aging.length})`}>
-              <Table head={['Customer', 'Cabang', 'Tahap', 'Hari', 'Nilai']} rows={a.aging.slice(0, 10).map((x) => [x.record.customer, x.record.cabang || '-', STATUS_META[Number(x.record.status)]?.label ?? '-', x.days, formatRupiah(x.record.value)])} />
+              <Table head={[tr("Customer"), tr("Cabang"), tr("Tahap"), tr("Hari"), tr("Nilai")]} rows={a.aging.slice(0, 10).map((x) => [x.record.customer, x.record.cabang || '-', STATUS_META[Number(x.record.status)]?.label ?? '-', x.days, formatRupiah(x.record.value)])} />
             </Section>
             <Section title={`DO belum terfaktur > 30 hari (${a.gitOld.length})`}>
-              <Table head={['Customer', 'Cabang', 'Hari', 'Nilai']} rows={a.gitOld.slice(0, 10).map((g) => [g.customer, g.cabang, g.days, formatRupiah(g.value)])} />
+              <Table head={[tr("Customer"), tr("Cabang"), tr("Hari"), tr("Nilai")]} rows={a.gitOld.slice(0, 10).map((g) => [g.customer, g.cabang, g.days, formatRupiah(g.value)])} />
             </Section>
-            <Section title="Customer dingin bernilai terbesar">
-              <Table head={['Customer', 'Cabang', 'Tidak order', 'Nilai historis']} rows={a.topDingin.map((c) => [c.name, c.cabang, `${c.daysSinceOrder ?? '-'} hari`, formatRupiah(c.wonValue)])} />
+            <Section title={tr("Customer dingin bernilai terbesar")}>
+              <Table head={[tr("Customer"), tr("Cabang"), tr("Tidak order"), tr("Nilai historis")]} rows={a.topDingin.map((c) => [c.name, c.cabang, `${c.daysSinceOrder ?? '-'} hari`, formatRupiah(c.wonValue)])} />
             </Section>
           </div>
 
-          <Section title="Kualitas Data — perlu dirapikan agar angka akurat">
+          <Section title={tr("Kualitas Data — perlu dirapikan agar angka akurat")}>
             {a.dataIssues.length === 0 ? (
-              <div className="field-note">Tidak ada masalah data terdeteksi. 👍</div>
+              <div className="field-note">{tr("Tidak ada masalah data terdeteksi. 👍")}</div>
             ) : (
               <Table
-                head={['Masalah', 'Jumlah', 'Dampak', 'Contoh']}
+                head={[tr("Masalah"), tr("Jumlah"), tr("Dampak"), tr("Contoh")]}
                 rows={a.dataIssues.map((d) => [<b key="l">{d.label}</b>, <span key="c" className="badge amber">{d.count}</span>, d.hint, <span key="e" style={{ fontSize: 12 }}>{d.examples.join('; ')}</span>])}
               />
             )}

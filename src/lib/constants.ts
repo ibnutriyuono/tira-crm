@@ -1,3 +1,5 @@
+import { liveLabels } from './i18n';
+
 export const CABANG_LIST = ['BLP', 'MDN', 'SBY', 'PKB', 'CLG', 'BDG', 'MKS', 'CLP', 'PLB', 'PDG', 'DKI', 'BJM', 'SMG'];
 
 export const STATUS_META: Record<number, { label: string; color: string }> = {
@@ -161,3 +163,52 @@ export const DEFAULT_ACTIVITY_TARGETS: Record<ActivityTipe, number> = {
 
 /** Status pipeline yang bisa dituju tombol "Masukkan ke Pipeline". */
 export const ACTIVITY_CONVERT_STATUSES = [1, 2, 4] as const;
+
+/** Industri / segmen customer (profil customer). */
+export const CUSTOMER_SEGMENTS: string[] = [
+  'Tambang',
+  'Semen',
+  'Sawit & agro',
+  'Pulp & kertas',
+  'Energi & pembangkit',
+  'Migas & petrokimia',
+  'Fabrikator / bengkel',
+  'Konstruksi',
+  'Manufaktur',
+  'Distributor / trader',
+  'Lainnya',
+];
+
+/** Aplikasi pemakaian material di customer (boleh lebih dari satu). */
+export const CUSTOMER_APLIKASI: { key: string; label: string }[] = [
+  { key: 'wear', label: 'Wear / abrasi' },
+  { key: 'struktur', label: 'Struktur' },
+  { key: 'tekanan', label: 'Tekanan / boiler' },
+  { key: 'piping', label: 'Piping' },
+  { key: 'korosi', label: 'Tangki / tahan korosi' },
+  { key: 'mesin', label: 'Shaft / komponen mesin' },
+  { key: 'lainnya', label: 'Lainnya' },
+];
+export const CUSTOMER_APLIKASI_LABEL: Record<string, string> = Object.fromEntries(CUSTOMER_APLIKASI.map((a) => [a.key, a.label]));
+
+/** Peran PIC dalam keputusan pembelian. */
+export const PIC_PERAN: { key: string; label: string; color: string }[] = [
+  { key: 'dm', label: 'Pengambil keputusan', color: 'steel' },
+  { key: 'purchasing', label: 'Purchasing', color: 'slate' },
+  { key: 'user', label: 'User / teknik', color: 'green' },
+  { key: 'lainnya', label: 'Lainnya', color: 'slate' },
+];
+export const PIC_PERAN_LABEL: Record<string, string> = Object.fromEntries(PIC_PERAN.map((p) => [p.key, p.label]));
+
+// Label konstanta mengikuti bahasa pilihan user (lib/i18n.ts).
+Object.values(STATUS_META).forEach((m) => liveLabels(m, ['label']));
+Object.values(PSTATUS_META).forEach((m) => liveLabels(m, ['label']));
+Object.values(ACTIVITY_ACTION_META).forEach((m) => liveLabels(m, ['label']));
+liveLabels(ACTIVITY_ENTITY_LABEL);
+ACTIVITY_TYPES.forEach((t) => liveLabels(t, ['label', 'short', 'unit']));
+INTERNAL_ACTIVITY_TYPES.forEach((t) => liveLabels(t, ['label', 'short']));
+liveLabels(ACTIVITY_LABEL);
+CUSTOMER_APLIKASI.forEach((a) => liveLabels(a, ['label']));
+liveLabels(CUSTOMER_APLIKASI_LABEL);
+PIC_PERAN.forEach((r) => liveLabels(r, ['label']));
+liveLabels(PIC_PERAN_LABEL);

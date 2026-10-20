@@ -87,6 +87,8 @@ export interface CustomerPic {
   phone: string | null;
   email: string | null;
   isPrimary: boolean;
+  /** Peran dalam keputusan pembelian (PIC_PERAN): dm | purchasing | user | lainnya. */
+  peran?: string | null;
 }
 
 export interface Customer {
@@ -102,6 +104,12 @@ export interface Customer {
   address: string | null;
   catatan: string | null;
   pics: CustomerPic[] | null;
+  /** Profil (diisi Sales) — lihat CUSTOMER_SEGMENTS / CUSTOMER_APLIKASI. */
+  segmen?: string | null;
+  aplikasi?: string[];
+  /** Estimasi potensi pembelian per tahun (Rupiah). */
+  potensi?: number | null;
+  kompetitor?: string | null;
 }
 
 export interface RfqItem {

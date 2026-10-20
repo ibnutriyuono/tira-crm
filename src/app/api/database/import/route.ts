@@ -72,6 +72,11 @@ export async function POST(req: Request) {
           catatan: (c.catatan as string) ?? '',
           // Multi-PIC list; backups taken before it existed have none.
           pics: (Array.isArray(c.pics) ? c.pics : []) as unknown as Prisma.InputJsonValue,
+          // Profil customer (phase47); backup lama tidak punya.
+          segmen: typeof c.segmen === 'string' && c.segmen ? c.segmen : null,
+          aplikasi: (Array.isArray(c.aplikasi) ? c.aplikasi : []) as unknown as Prisma.InputJsonValue,
+          potensi: typeof c.potensi === 'number' ? c.potensi : null,
+          kompetitor: typeof c.kompetitor === 'string' && c.kompetitor ? c.kompetitor : null,
         })),
       });
     }

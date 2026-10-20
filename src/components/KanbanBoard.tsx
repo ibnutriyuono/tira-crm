@@ -7,7 +7,7 @@ import { KamBadge } from './KamBadge';
 import { IssueBadge } from './issues/shared';
 import { useMemo, useState } from 'react';
 import { KANBAN_STATUSES, STATUS_META } from '@/lib/constants';
-import { classify, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
+import { classify, formatDateID, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
 import { buildProspectStarCounts } from '@/lib/reports';
 import { qcdRequiredOnMove } from '@/lib/qcd';
 import { api } from '@/lib/api-client';
@@ -19,10 +19,14 @@ import { changeDate, periodDate } from '@/lib/filter';
 import { NewBadge } from './NewBadge';
 import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './ProspectPurchasingBubble';
 import { useCan, canNow } from '@/hooks/useCan';
+import { FollowUpMoveModal } from './FollowUpMoveModal';
+import { followUpRequiredOnMove } from '@/lib/followup-rule';
 
+import { useT } from '@/store/useLangStore';
 const CAP = 40;
 
 function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: number; starCount?: number }) {
+  const tr = useT();
   const openModal = useUiStore((s) => s.openModal);
   const currentUser = useDataStore((s) => s.currentUser);
   const klas = classify(r);
@@ -66,13 +70,13 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         </span>
       </div>
       <div className="kc-meta-row">
-        <span className={`badge ${r.penawaranTerkirim ? 'green' : 'rust pending-dot'}`}>{r.penawaranTerkirim ? 'Penawaran Terkirim' : 'Penawaran Pending'}</span>
+        <span className={`badge ${r.penawaranTerkirim ? 'green' : 'rust pending-dot'}`}>{r.penawaranTerkirim ? tr("Penawaran Terkirim") : tr("Penawaran Pending")}</span>
         <IssueBadge prospectId={r.id} />
       </div>
       {num(r.status) === 5 && (
         <div className="kc-meta-row">
           <span className={`badge ${r.terfaktur ? 'green' : 'amber'}`}>
-            {r.terfaktur ? 'Omzet (Terfaktur)' : 'GIT (Belum Terfaktur)'}
+            {r.terfaktur ? tr("Omzet (Terfaktur)") : tr("GIT (Belum Terfaktur)")}
           </span>
         </div>
       )}
@@ -81,7 +85,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         {canE && (
         <button
           className="icon-btn wa-btn"
-          title="WhatsApp"
+          title={tr("WhatsApp")}
           onClick={(e) => {
             e.stopPropagation();
             useUiStore.setState({ followUpCtx: { type: 'prospect', id: r.id } });
@@ -94,7 +98,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         {canX && (
         <button
           className="icon-btn doc-btn"
-          title="Buat Surat Penawaran"
+          title={tr("Buat Surat Penawaran")}
           onClick={(e) => {
             e.stopPropagation();
             useUiStore.setState({ quotationProspectId: r.id });
@@ -107,7 +111,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         {canRfq && (
         <button
           className="icon-btn rfq-btn"
-          title="Buat RFQ ke Purchasing"
+          title={tr("Buat RFQ ke Purchasing")}
           onClick={(e) => {
             e.stopPropagation();
             useUiStore.setState({ rfqCtx: { prospectId: r.id, rfqId: null } });
@@ -120,7 +124,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         {canRfq && (
         <button
           className="icon-btn fupa-btn"
-          title={klas === 'Won' ? 'Buat FUP A (Permintaan Pembelian)' : 'FUP A hanya tersedia untuk prospek berstatus Won (PO/Kontrak atau DO)'}
+          title={klas === 'Won' ? tr("Buat FUP A (Permintaan Pembelian)") : tr("FUP A hanya tersedia untuk prospek berstatus Won (PO/Kontrak atau DO)")}
           disabled={klas !== 'Won'}
           onClick={(e) => {
             e.stopPropagation();
@@ -133,7 +137,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         )}
         <button
           className="icon-btn"
-          title={canE ? 'Edit' : 'Lihat (hanya-baca)'}
+          title={canE ? tr("Edit") : tr("Lihat (hanya-baca)")}
           onClick={(e) => {
             e.stopPropagation();
             useUiStore.setState({ editProspectId: r.id });
@@ -145,7 +149,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         {canDelete && (
           <button
             className="icon-btn danger"
-            title="Hapus"
+            title={tr("Hapus")}
             onClick={(e) => {
               e.stopPropagation();
               useUiStore.setState({ deleteCtx: { mode: 'prospect', id: r.id, title: 'Hapus Prospek', message: `Yakin ingin menghapus prospek "${r.customer}"? Tindakan ini tidak dapat dibatalkan.` } });
@@ -162,6 +166,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
 
 /** Won card: per-item progress (PO vs terkirim); opens Status Item & Riwayat. */
 function ItemFlowChip({ r }: { r: Prospect }) {
+  const tr = useT();
   const items = flowItems(r);
   const t = flowTotals(items);
   const sent = items.reduce((s, i) => s + i.sent, 0);
@@ -172,7 +177,7 @@ function ItemFlowChip({ r }: { r: Prospect }) {
       <button
         type="button"
         className="kc-item-btn"
-        title="Status Item & Riwayat (penawaran → PO → kirim)"
+        title={tr("Status Item & Riwayat (penawaran → PO → kirim)")}
         onClick={(e) => {
           e.stopPropagation();
           useUiStore.setState({ itemFlowCtx: { prospectId: r.id }, modal: 'itemFlow' });
@@ -212,6 +217,7 @@ function sortKolom(list: Prospect[], by: KolomSort): Prospect[] {
 }
 
 export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
+  const tr = useT();
   const openModal = useUiStore((s) => s.openModal);
   // Filter bulan per kolom (periodDate): kolom PO/Kontrak memakai bulan PO,
   // kolom DO memakai bulan faktur untuk yang terfaktur (Omzet) dan bulan
@@ -228,6 +234,8 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
   const upsertProspect = useDataStore((s) => s.upsertProspect);
   const toast = useDataStore((s) => s.toast);
   const [dragOverStatus, setDragOverStatus] = useState<number | null>(null);
+  // Pindah ke Permintaan/Penawaran/Negosiasi: tunggu jadwal follow-up dulu.
+  const [pendingMove, setPendingMove] = useState<{ rec: Prospect; to: number } | null>(null);
 
   async function handleDrop(newStatus: number, e: React.DragEvent) {
     e.preventDefault();
@@ -250,16 +258,29 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
       return;
     }
 
-    const optimistic = { ...rec, status: newStatus };
+    // Tahap pipeline aktif: kartu belum pindah sampai jadwal follow-up diisi
+    // ("Batal" = tetap di kolom asal). Lihat lib/followup-rule.ts.
+    if (followUpRequiredOnMove(prev, newStatus)) {
+      setPendingMove({ rec, to: newStatus });
+      return;
+    }
+    await commitMove(rec, newStatus);
+  }
+
+  async function commitMove(rec: Prospect, newStatus: number, followUp?: { followUpAt: string; followUpNote: string }) {
+    const prev = num(rec.status);
+    const optimistic = { ...rec, status: newStatus, ...(followUp ? { followUpAt: followUp.followUpAt, followUpNote: followUp.followUpNote || null } : {}) };
     upsertProspect(optimistic);
-    toast('Status prospek diperbarui', 'success');
     try {
-      const { prospect } = await api.patch<{ prospect: Prospect }>(`/api/prospects/${id}`, { status: newStatus });
+      const { prospect } = await api.patch<{ prospect: Prospect }>(`/api/prospects/${rec.id}`, { status: newStatus, ...(followUp || {}) });
       upsertProspect(prospect);
+      toast(followUp ? `Status prospek diperbarui · follow-up ${formatDateID(followUp.followUpAt)}` : 'Status prospek diperbarui', 'success');
       promptItemFlow(prev, prospect);
+      return true;
     } catch (err) {
       upsertProspect(rec); // revert on failure
       toast(err instanceof Error ? err.message : 'Gagal menyimpan perubahan status', 'error');
+      return false;
     }
   }
 
@@ -295,8 +316,8 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                   {s} · {STATUS_META[s].label}
                 </div>
                 <div className="kc-meta">
-                  {items.length} prospek · {formatRupiah(totalVal)}
-                  {(bulanAktif || hariAktif || fakturAktif) && semua.length !== items.length && <span> (dari {semua.length})</span>}
+                  {items.length} {tr("prospek ·")} {formatRupiah(totalVal)}
+                  {(bulanAktif || hariAktif || fakturAktif) && semua.length !== items.length && <span> {tr("(dari")} {semua.length})</span>}
                 </div>
                 {bulanOptions.length > 0 && (
                   <select
@@ -311,9 +332,9 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                       // menyaring ke hasil yang diam-diam kosong.
                       setHariPerKolom((prev) => ({ ...prev, [s]: '' }));
                     }}
-                    title={s === 4 ? 'Saring berdasar bulan PO' : s === 5 ? 'DO terfaktur (Omzet): bulan faktur · GIT (belum terfaktur): bulan masuk DO' : 'Saring berdasar bulan perubahan status ke tahap ini'}
+                    title={s === 4 ? tr("Saring berdasar bulan PO") : s === 5 ? tr("DO terfaktur (Omzet): bulan faktur · GIT (belum terfaktur): bulan masuk DO") : tr("Saring berdasar bulan perubahan status ke tahap ini")}
                   >
-                    <option value="">Semua bulan</option>
+                    <option value="">{tr("Semua bulan")}</option>
                     {bulanOptions.map((m) => (
                       <option key={m} value={m}>
                         {new Date(`${m}-01T00:00:00`).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })}
@@ -326,9 +347,9 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                     className="kc-month"
                     value={hariAktif}
                     onChange={(e) => setHariPerKolom((prev) => ({ ...prev, [s]: e.target.value }))}
-                    title={s === 4 ? 'Persempit ke tanggal PO tertentu' : s === 5 ? 'Persempit ke tanggal faktur (Omzet) / tanggal masuk DO (GIT)' : 'Persempit lagi ke hari tertentu perubahan status ke tahap ini'}
+                    title={s === 4 ? tr("Persempit ke tanggal PO tertentu") : s === 5 ? tr("Persempit ke tanggal faktur (Omzet) / tanggal masuk DO (GIT)") : tr("Persempit lagi ke hari tertentu perubahan status ke tahap ini")}
                   >
-                    <option value="">Semua hari{bulanAktif ? ' di bulan ini' : ''}</option>
+                    <option value="">{tr("Semua hari")}{bulanAktif ? tr(" di bulan ini") : ''}</option>
                     {hariOptions.map((d) => (
                       <option key={d} value={d}>
                         {new Date(`${d}T00:00:00`).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: bulanAktif ? undefined : 'numeric' })}
@@ -341,7 +362,7 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                     className="kc-month"
                     value={sortAktif}
                     onChange={(e) => setSortPerKolom((prev) => ({ ...prev, [s]: e.target.value as KolomSort }))}
-                    title="Urutkan kartu di kolom ini"
+                    title={tr("Urutkan kartu di kolom ini")}
                   >
                     {SORT_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>
@@ -355,11 +376,11 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                     className="kc-month"
                     value={fakturDo}
                     onChange={(e) => setFakturDo(e.target.value as '' | 'omzet' | 'git')}
-                    title="Saring DO berdasar status faktur: Omzet (sudah terfaktur) atau GIT (belum terfaktur)"
+                    title={tr("Saring DO berdasar status faktur: Omzet (sudah terfaktur) atau GIT (belum terfaktur)")}
                   >
-                    <option value="">Semua (Omzet + GIT)</option>
-                    <option value="omzet">Omzet (Terfaktur) · {nOmzet}</option>
-                    <option value="git">GIT (Belum Terfaktur) · {dalamHari.length - nOmzet}</option>
+                    <option value="">{tr("Semua (Omzet + GIT)")}</option>
+                    <option value="omzet">{tr("Omzet (Terfaktur) ·")} {nOmzet}</option>
+                    <option value="git">{tr("GIT (Belum Terfaktur) ·")} {dalamHari.length - nOmzet}</option>
                   </select>
                 )}
               </div>
@@ -373,16 +394,27 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
                 onDrop={(e) => handleDrop(s, e)}
               >
                 {shown.length === 0 ? (
-                  <div className="kanban-empty">{fakturAktif ? (fakturAktif === 'omzet' ? 'Tidak ada DO terfaktur' : 'Tidak ada DO berstatus GIT') + (bulanAktif || hariAktif ? ' pada periode ini' : '') : hariAktif ? 'Tidak ada perubahan status di hari ini' : bulanAktif ? 'Tidak ada perubahan status di bulan ini' : 'Tidak ada data'}</div>
+                  <div className="kanban-empty">{fakturAktif ? (fakturAktif === 'omzet' ? 'Tidak ada DO terfaktur' : 'Tidak ada DO berstatus GIT') + (bulanAktif || hariAktif ? ' pada periode ini' : '') : hariAktif ? tr("Tidak ada perubahan status di hari ini") : bulanAktif ? tr("Tidak ada perubahan status di bulan ini") : tr("Tidak ada data")}</div>
                 ) : (
                   shown.map((r) => <KanbanCard key={r.id} r={r} purchCount={purchCounts[r.id]} starCount={starCounts.get(r.id)} />)
                 )}
-                {items.length > CAP && <div className="kanban-more">+{items.length - CAP} lainnya — persempit dengan filter</div>}
+                {items.length > CAP && <div className="kanban-more">+{items.length - CAP} {tr("lainnya — persempit dengan filter")}</div>}
               </div>
             </div>
           );
         })}
       </div>
+      {pendingMove && (
+        <FollowUpMoveModal
+          prospect={pendingMove.rec}
+          toStatus={pendingMove.to}
+          onCancel={() => setPendingMove(null)}
+          onConfirm={async (followUpAt, followUpNote) => {
+            const ok = await commitMove(pendingMove.rec, pendingMove.to, { followUpAt, followUpNote });
+            if (ok) setPendingMove(null);
+          }}
+        />
+      )}
     </>
   );
 }

@@ -17,14 +17,16 @@ import type { Rfq, RfqItem } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
 
 
+import { useT } from '@/store/useLangStore';
 /** Purchasing's answer on one material, shown under the row once it exists. */
 function PurchasingAnswer({ it }: { it?: RfqItem }) {
+  const tr = useT();
   if (!it || !(it.hargaPurchasing || it.coo || it.note || it.deliveryTime || it.noQuote)) return null;
   return (
     <div className="import-summary" style={{ margin: 0 }}>
-      <b>Jawaban Purchasing:</b>{' '}
+      <b>{tr("Jawaban Purchasing:")}</b>{' '}
       {it.noQuote ? (
-        <span className="badge rust">No Quote</span>
+        <span className="badge rust">{tr("No Quote")}</span>
       ) : (
         <>
           {it.hargaPurchasing ? `${it.currency || 'IDR'} ${Math.round(it.hargaPurchasing).toLocaleString('id-ID')}` : '-'}
@@ -39,6 +41,7 @@ function PurchasingAnswer({ it }: { it?: RfqItem }) {
 }
 
 export function RfqModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'rfq';
   const ctx = useUiStore((s) => s.rfqCtx);
@@ -267,33 +270,33 @@ export function RfqModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title={canNow('rfq', 'e') ? 'Buat RFQ ke Purchasing' : 'RFQ (hanya-baca)'}
+      title={canNow('rfq', 'e') ? tr("Buat RFQ ke Purchasing") : tr("RFQ (hanya-baca)")}
       wide2
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Tutup
+            {tr("Tutup")}
           </button>
           {canNow('rfq', 'e') && (
             <button type="button" className="btn btn-outline" disabled={busy} onClick={onSaveDraft}>
-              <IconSave /> Simpan RFQ
+              <IconSave /> {tr("Simpan RFQ")}
             </button>
           )}
           {canNow('rfq', 'x') && (
             <button type="button" className="btn btn-outline" disabled={busy} onClick={onExportExcel}>
-              <IconDownload /> Export Excel
+              <IconDownload /> {tr("Export Excel")}
             </button>
           )}
           {canNow('rfq', 'e') && (
             <>
               <button type="button" className="btn btn-outline" disabled={busy} onClick={onSendEmail}>
-                <IconMail /> Kirim via Email
+                <IconMail /> {tr("Kirim via Email")}
               </button>
               <button type="button" className="btn btn-wa" disabled={busy} onClick={onSendWa}>
-                <IconWa /> Kirim via WhatsApp
+                <IconWa /> {tr("Kirim via WhatsApp")}
               </button>
               <button type="button" className="btn btn-primary" disabled={busy} onClick={onSendPurchasing}>
-                Kirim ke Purchasing
+                {tr("Kirim ke Purchasing")}
               </button>
             </>
           )}
@@ -302,64 +305,64 @@ export function RfqModal() {
     >
       <div className="form-grid">
         <div>
-          <label>No. RFQ</label>
-          <input type="text" value={noRfq} onChange={(e) => setNoRfq(e.target.value)} placeholder={rfqId ? '' : 'Otomatis saat disimpan'} />
-          {!rfqId && !noRfq.trim() && <div className="field-note">Dikosongkan saja — nomor urut dibuat otomatis (RFQ-{new Date().getFullYear()}-0001). Isi manual hanya jika perlu nomor khusus.</div>}
+          <label>{tr("No. RFQ")}</label>
+          <input type="text" value={noRfq} onChange={(e) => setNoRfq(e.target.value)} placeholder={rfqId ? '' : tr("Otomatis saat disimpan")} />
+          {!rfqId && !noRfq.trim() && <div className="field-note">{tr("Dikosongkan saja — nomor urut dibuat otomatis (RFQ-")}{new Date().getFullYear()}{tr("-0001). Isi manual hanya jika perlu nomor khusus.")}</div>}
         </div>
         <div>
-          <label>Tgl RFQ</label>
+          <label>{tr("Tgl RFQ")}</label>
           <input type="date" value={tglRfq} onChange={(e) => setTglRfq(e.target.value)} />
         </div>
         <div>
-          <label>Cabang</label>
+          <label>{tr("Cabang")}</label>
           <input type="text" value={cabang} onChange={(e) => setCabang(e.target.value)} />
         </div>
         <div>
-          <label>Customer (CUST)</label>
+          <label>{tr("Customer (CUST)")}</label>
           <CustomerNameInput value={cust} onChange={setCust} />
         </div>
       </div>
       <div className="full" style={{ marginTop: 14 }}>
-        <label>Daftar Material yang Diminta</label>
+        <label>{tr("Daftar Material yang Diminta")}</label>
         <MaterialSpecEditor variant="doc" rows={rows} onChange={setRows} renderRowExtra={(row) => <PurchasingAnswer it={row.src as RfqItem | undefined} />} />
       </div>
       <div className="form-grid" style={{ marginTop: 12 }}>
         <div style={{ gridColumn: '1 / -1' }}>
-          <label>Catatan</label>
-          <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Catatan tambahan untuk Purchasing..." />
+          <label>{tr("Catatan")}</label>
+          <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder={tr("Catatan tambahan untuk Purchasing...")} />
         </div>
       </div>
       {(() => {
         const rec = rfqId ? rfqs.find((r) => r.id === rfqId) : null;
         return rec?.purchJawaban ? (
           <div className="import-summary" style={{ marginTop: 16 }}>
-            <b>Jawaban Purchasing:</b> {rec.purchJawaban}
+            <b>{tr("Jawaban Purchasing:")}</b> {rec.purchJawaban}
           </div>
         ) : null;
       })()}
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>Lampiran File (maks. {formatFileSize(ATTACHMENT_MAX_BYTES)}/file)</label>
+        <label style={{ display: 'block', marginBottom: 8 }}>{tr("Lampiran File (maks.")} {formatFileSize(ATTACHMENT_MAX_BYTES)}{tr("/file)")}</label>
         <AttachmentList rfqId={rfqId} withProspect ensureParentId={async () => (await saveOrUpdateRecord(false)).id} />
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>
-          Diskusi
+          {tr("Diskusi")}
           {chatUnread > 0 && <span className="item-chat-bubble">{chatUnread > 9 ? '9+' : chatUnread}</span>}
         </label>
         <ItemChat entity="rfq" entityId={rfqId} onUnreadAtOpen={setChatUnread} />
       </div>
       <div className="form-grid" style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <div>
-          <label>No. WhatsApp Purchasing</label>
-          <input type="text" value={purchWa} onChange={(e) => setPurchWa(e.target.value)} placeholder="cth. 08123456789" />
+          <label>{tr("No. WhatsApp Purchasing")}</label>
+          <input type="text" value={purchWa} onChange={(e) => setPurchWa(e.target.value)} placeholder={tr("cth. 08123456789")} />
         </div>
         <div>
-          <label>Email Purchasing</label>
-          <input type="text" value={purchEmail} onChange={(e) => setPurchEmail(e.target.value)} placeholder="purchasing@tiraaustenite.com" />
+          <label>{tr("Email Purchasing")}</label>
+          <input type="text" value={purchEmail} onChange={(e) => setPurchEmail(e.target.value)} placeholder={tr("purchasing@tiraaustenite.com")} />
         </div>
       </div>
       <div className="import-summary" style={{ marginTop: 12 }}>
-        Nomor WhatsApp &amp; email Purchasing di atas otomatis diingat untuk RFQ berikutnya. Setelah export Excel, lampirkan filenya secara manual pada email sebelum dikirim.
+        {tr("Nomor WhatsApp & email Purchasing di atas otomatis diingat untuk RFQ berikutnya. Setelah export Excel, lampirkan filenya secara manual pada email sebelum dikirim.")}
       </div>
     </Modal>
   );

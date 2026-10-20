@@ -8,7 +8,9 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 export function CompetitorLogModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'competitorLog';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -47,16 +49,16 @@ export function CompetitorLogModal() {
         onClose={() => { setDetail(null); closeModal(); }}
         title={`Deal Kalah — ${active.name}`}
         wide
-        footer={<button type="button" className="btn btn-outline" onClick={() => setDetail(null)}>← Kembali</button>}
+        footer={<button type="button" className="btn btn-outline" onClick={() => setDetail(null)}>{tr("← Kembali")}</button>}
       >
         <div className="import-summary" style={{ marginTop: 0 }}>
-          <b>{active.lostCount}</b> deal kalah senilai <b>{formatRupiah(active.lostValue)}</b> · paling sering di cabang{' '}
-          <b>{active.topCabang}</b> · line <b>{active.topLine}</b>.
+          <b>{active.lostCount}</b> {tr("deal kalah senilai")} <b>{formatRupiah(active.lostValue)}</b> {tr("· paling sering di cabang")}{' '}
+          <b>{active.topCabang}</b> {tr("· line")} <b>{active.topLine}</b>.
         </div>
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table">
             <thead>
-              <tr><th>Customer</th><th>Uraian</th><th>Cabang</th><th>SE</th><th>Tgl Penawaran</th><th>Nilai</th><th>Catatan QCD</th></tr>
+              <tr><th>{tr("Customer")}</th><th>{tr("Uraian")}</th><th>{tr("Cabang")}</th><th>SE</th><th>{tr("Tgl Penawaran")}</th><th>{tr("Nilai")}</th><th>{tr("Catatan QCD")}</th></tr>
             </thead>
             <tbody>
               {active.records.map((r) => (
@@ -78,26 +80,25 @@ export function CompetitorLogModal() {
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title="Log Kompetitor" xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title={tr("Log Kompetitor")} xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr("Tutup")}</button>}>
           <div className="import-summary" style={{ marginTop: 0 }}>
-        Rekap otomatis dari data QCD pada prospek yang Lose Order dan sudah diisi kolom Kompetitor. Menunjukkan
-        kompetitor mana yang paling sering menang, di cabang dan line material apa. Data mengikuti cakupan role Anda.
+        {tr("Rekap otomatis dari data QCD pada prospek yang Lose Order dan sudah diisi kolom Kompetitor. Menunjukkan kompetitor mana yang paling sering menang, di cabang dan line material apa. Data mengikuti cakupan role Anda.")}
       </div>
       <div className="kpi-grid" style={{ marginTop: 12 }}>
         <div className="kpi">
-          <div className="label">Kompetitor Teridentifikasi</div>
+          <div className="label">{tr("Kompetitor Teridentifikasi")}</div>
           <div className="value">{rows.length}</div>
         </div>
         <div className="kpi lost">
-          <div className="label">Total Kejadian Lose</div>
+          <div className="label">{tr("Total Kejadian Lose")}</div>
           <div className="value">{rows.reduce((n, r) => n + r.lostCount, 0)}</div>
         </div>
         <div className="kpi lost">
-          <div className="label">Total Value Hilang</div>
+          <div className="label">{tr("Total Value Hilang")}</div>
           <div className="value">{formatRupiah(totalLost)}</div>
         </div>
         <div className="kpi">
-          <div className="label">Paling Sering Menang</div>
+          <div className="label">{tr("Paling Sering Menang")}</div>
           <div className="value" style={{ fontSize: 16 }}>
             {rows.slice().sort((a, b) => b.lostCount - a.lostCount)[0]?.name || '-'}
           </div>
@@ -105,32 +106,32 @@ export function CompetitorLogModal() {
       </div>
       <div className="toolbar-row">
         <select className="btn-sm" value={cabangFilter} onChange={(e) => setCabangFilter(e.target.value)}>
-          <option value="">Semua Cabang</option>
+          <option value="">{tr("Semua Cabang")}</option>
           {Array.from(new Set(allRows.map((r) => r.topCabang).filter((c) => c && c !== '-'))).sort().map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
         {canNow('marketing', 'x') && (
-          <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+          <button className="btn btn-outline btn-sm" onClick={exportExcel}>{tr("Export Excel")}</button>
         )}
-        <span className="hint">Menampilkan {rows.length} dari {allRows.length} kompetitor</span>
+        <span className="hint">{tr("Menampilkan")} {rows.length} {tr("dari")} {allRows.length} {tr("kompetitor")}</span>
       </div>
 
       {rows.length === 0 ? (
         <div className="empty-state" style={{ padding: '34px 10px' }}>
-          <h3>Belum ada data kompetitor</h3>
-          <p>Data akan muncul setelah prospek Lose Order diisi kolom Kompetitor pada QCD.</p>
+          <h3>{tr("Belum ada data kompetitor")}</h3>
+          <p>{tr("Data akan muncul setelah prospek Lose Order diisi kolom Kompetitor pada QCD.")}</p>
         </div>
       ) : (
         <>
           <div className="table-wrap" style={{ borderTop: 'none' }}>
             <table className="simple-table">
               <thead>
-                <tr><th>Kompetitor</th><th>Kali Menang</th><th>Total Value Hilang</th><th>Cabang Terbanyak</th><th>Line Terbanyak</th><th>Terakhir Terjadi</th></tr>
+                <tr><th>{tr("Kompetitor")}</th><th>{tr("Kali Menang")}</th><th>{tr("Total Value Hilang")}</th><th>{tr("Cabang Terbanyak")}</th><th>{tr("Line Terbanyak")}</th><th>{tr("Terakhir Terjadi")}</th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.name} style={{ cursor: 'pointer' }} onClick={() => setDetail(r.name)} title="Lihat deal yang kalah">
+                  <tr key={r.name} style={{ cursor: 'pointer' }} onClick={() => setDetail(r.name)} title={tr("Lihat deal yang kalah")}>
                     <td style={{ fontWeight: 600, color: 'var(--steel-600)' }}>{r.name}</td>
                     <td className="center">{r.lostCount}</td>
                     <td className="mono">{formatRupiah(r.lostValue)}</td>

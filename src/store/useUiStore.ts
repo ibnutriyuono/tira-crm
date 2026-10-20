@@ -25,6 +25,7 @@ export type ModalKey =
   | 'purchasing'
   | 'marketing'
   | 'customerIntel'
+  | 'customerProfile'
   | 'keyAccount'
   | 'pipelineIssues'
   | 'adminQueue'
@@ -144,6 +145,11 @@ interface UiState {
   issueFocus: { id: string } | null;
   userEditId: string | null;
   customerEditId: string | null;
+  /** Modal tujuan setelah form customer ditutup (default: Kelola Customer). */
+  customerFormReturnTo: ModalKey;
+  /** Nama customer yang dibuka di Profil Customer, dan layar asalnya. */
+  profileCustomer: string | null;
+  profileReturnTo: ModalKey;
   vendorEditId: string | null;
   /** `sourceRfqId` promotes a won RFQ; `prospectId` starts one straight from a
       Kanban card, where there is no RFQ to carry the header over from. */
@@ -233,6 +239,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   issueFocus: null,
   userEditId: null,
   customerEditId: null,
+  customerFormReturnTo: null,
+  profileCustomer: null,
+  profileReturnTo: null,
   vendorEditId: null,
   fupaCtx: null,
   quotationProspectId: null,

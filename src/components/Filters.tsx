@@ -7,7 +7,9 @@ import { createdInRange } from '@/lib/new-records';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
+import { useT } from '@/store/useLangStore';
 export function Filters() {
+  const tr = useT();
   const currentUser = useDataStore((s) => s.currentUser);
   const records = useDataStore((s) => s.prospects);
   const ui = useUiStore();
@@ -34,30 +36,30 @@ export function Filters() {
   return (
     <div className="filters">
       <div className="field">
-        <label>Dibuat</label>
+        <label>{tr("Dibuat")}</label>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             type="button"
             className={`btn btn-outline btn-sm filter-chip-new${ui.fDibuat === 'today' ? ' active' : ''}`}
             onClick={() => ui.setFilter({ fDibuat: ui.fDibuat === 'today' ? '' : 'today' })}
-            title="Tampilkan hanya prospek yang dibuat hari ini"
+            title={tr("Tampilkan hanya prospek yang dibuat hari ini")}
           >
-            Hari ini ({createdCounts.today})
+            {tr("Hari ini (")}{createdCounts.today})
           </button>
           <button
             type="button"
             className={`btn btn-outline btn-sm filter-chip-new${ui.fDibuat === 'week' ? ' active' : ''}`}
             onClick={() => ui.setFilter({ fDibuat: ui.fDibuat === 'week' ? '' : 'week' })}
-            title="Tampilkan prospek yang dibuat sejak Senin minggu ini"
+            title={tr("Tampilkan prospek yang dibuat sejak Senin minggu ini")}
           >
-            Minggu ini ({createdCounts.week})
+            {tr("Minggu ini (")}{createdCounts.week})
           </button>
         </div>
       </div>
       <div className="field">
-        <label title="PO/Kontrak: bulan PO · DO terfaktur (Omzet): bulan faktur · GIT & tahap lain: bulan perubahan status">Bulan</label>
+        <label title={tr("PO/Kontrak: bulan PO · DO terfaktur (Omzet): bulan faktur · GIT & tahap lain: bulan perubahan status")}>{tr("Bulan")}</label>
         <select value={ui.fBulan} onChange={(e) => ui.setFilter({ fBulan: e.target.value })}>
-          <option value="">Semua</option>
+          <option value="">{tr("Semua")}</option>
           {BULAN_LIST.map((b) => (
             <option key={b.v} value={b.v}>
               {b.l}
@@ -66,9 +68,9 @@ export function Filters() {
         </select>
       </div>
       <div className="field">
-        <label title="PO/Kontrak: tahun PO · DO terfaktur (Omzet): tahun faktur · GIT & tahap lain: tahun perubahan status">Tahun</label>
+        <label title={tr("PO/Kontrak: tahun PO · DO terfaktur (Omzet): tahun faktur · GIT & tahap lain: tahun perubahan status")}>{tr("Tahun")}</label>
         <select value={ui.fTahun} onChange={(e) => ui.setFilter({ fTahun: e.target.value })}>
-          <option value="">Semua</option>
+          <option value="">{tr("Semua")}</option>
           {tahunSet.map((t) => (
             <option key={t} value={t}>
               {t}
@@ -77,18 +79,18 @@ export function Filters() {
         </select>
       </div>
       <div className="field">
-        <label>Regional</label>
+        <label>{tr("Regional")}</label>
         <select value={ui.fReg} onChange={(e) => ui.setFilter({ fReg: e.target.value })}>
-          <option value="">Semua</option>
-          <option value="1">Regional 1</option>
-          <option value="2">Regional 2</option>
-          <option value="3">Regional 3</option>
+          <option value="">{tr("Semua")}</option>
+          <option value="1">{tr("Regional 1")}</option>
+          <option value="2">{tr("Regional 2")}</option>
+          <option value="3">{tr("Regional 3")}</option>
         </select>
       </div>
       <div className="field">
-        <label>Cabang</label>
+        <label>{tr("Cabang")}</label>
         <select value={ui.fCabang} onChange={(e) => ui.setFilter({ fCabang: e.target.value })}>
-          <option value="">Semua</option>
+          <option value="">{tr("Semua")}</option>
           {cabangSet.map((c) => (
             <option key={c} value={c}>
               {c}
@@ -100,7 +102,7 @@ export function Filters() {
         <div className="field">
           <label>SE</label>
           <select value={ui.fSe} onChange={(e) => ui.setFilter({ fSe: e.target.value })}>
-            <option value="">Semua</option>
+            <option value="">{tr("Semua")}</option>
             {seSet.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -110,9 +112,9 @@ export function Filters() {
         </div>
       )}
       <div className="field">
-        <label>Status</label>
+        <label>{tr("Status")}</label>
         <select value={ui.fStatus} onChange={(e) => ui.setFilter({ fStatus: e.target.value })}>
-          <option value="">Semua</option>
+          <option value="">{tr("Semua")}</option>
           {Object.entries(STATUS_META).map(([k, v]) => (
             <option key={k} value={k}>
               {k} · {v.label}
@@ -121,28 +123,28 @@ export function Filters() {
         </select>
       </div>
       <div className="field">
-        <label>Klasifikasi</label>
+        <label>{tr("Klasifikasi")}</label>
         <select value={ui.fKlas} onChange={(e) => ui.setFilter({ fKlas: e.target.value })}>
-          <option value="">Semua</option>
-          <option value="Aktif">Aktif</option>
-          <option value="Won">Won</option>
-          <option value="Lost">Lost</option>
-            <option value="Activity">Sales Activity</option>
+          <option value="">{tr("Semua")}</option>
+          <option value="Aktif">{tr("Aktif")}</option>
+          <option value="Won">{tr("Won")}</option>
+          <option value="Lost">{tr("Lost")}</option>
+            <option value="Activity">{tr("Sales Activity")}</option>
         </select>
       </div>
       <div className="field">
-        <label>Status Penawaran</label>
+        <label>{tr("Status Penawaran")}</label>
         <select value={ui.fPenawaran} onChange={(e) => ui.setFilter({ fPenawaran: e.target.value })}>
-          <option value="">Semua</option>
-          <option value="sent">Terkirim</option>
-          <option value="pending">Pending</option>
+          <option value="">{tr("Semua")}</option>
+          <option value="sent">{tr("Terkirim")}</option>
+          <option value="pending">{tr("Pending")}</option>
         </select>
       </div>
       <div className="field search-field">
-        <label>Cari</label>
+        <label>{tr("Cari")}</label>
         <input
           type="search"
-          placeholder="Cari customer, produk, SE, keterangan..."
+          placeholder={tr("Cari customer, produk, SE, keterangan...")}
           value={searchInput}
           onChange={(e) => {
             const val = e.target.value;
@@ -152,7 +154,7 @@ export function Filters() {
         />
       </div>
       <div className="field">
-        <label>&nbsp;</label>
+        <label>{tr(" ")}</label>
         <button
           className="btn btn-outline btn-sm"
           type="button"
@@ -161,7 +163,7 @@ export function Filters() {
             ui.resetFilters();
           }}
         >
-          Reset Filter
+          {tr("Reset Filter")}
         </button>
       </div>
     </div>

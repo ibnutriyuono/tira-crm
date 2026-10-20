@@ -8,6 +8,7 @@ import { pendingDbImport, type DbBackupPayload } from '@/lib/pending-db-import';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
+import { useT } from '@/store/useLangStore';
 interface Stats {
   prospects: number;
   customers: number;
@@ -17,6 +18,7 @@ interface Stats {
 }
 
 export function DatabaseModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'database';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -74,24 +76,24 @@ export function DatabaseModal() {
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title="Kelola Database" wide2 footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title={tr("Kelola Database")} wide2 footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr("Tutup")}</button>}>
       <div className="import-summary" style={{ marginBottom: 14 }}>
         {stats ? (
           <>
-            Total Prospek: <b>{stats.prospects}</b> &nbsp;|&nbsp; Total Customer: <b>{stats.customers}</b> &nbsp;|&nbsp; Total RFQ: <b>{stats.rfqs}</b> &nbsp;|&nbsp; Total FUP A: <b>{stats.fupas ?? 0}</b> &nbsp;|&nbsp; Total User: <b>{stats.users}</b>
+            {tr("Total Prospek:")} <b>{stats.prospects}</b> {tr(" |  Total Customer:")} <b>{stats.customers}</b> {tr(" |  Total RFQ:")} <b>{stats.rfqs}</b> {tr(" |  Total FUP A:")} <b>{stats.fupas ?? 0}</b> {tr(" |  Total User:")} <b>{stats.users}</b>
             <br />
-            Penyimpanan: <b>PostgreSQL (realtime, tersinkron ke semua user)</b>
+            {tr("Penyimpanan:")} <b>{tr("PostgreSQL (realtime, tersinkron ke semua user)")}</b>
           </>
         ) : (
-          'Memuat statistik...'
+          tr("Memuat statistik...")
         )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <button type="button" className="btn btn-primary" style={{ justifyContent: 'center' }} onClick={saveAllNow}>
-          <IconSave /> Simpan Sekarang
+          <IconSave /> {tr("Simpan Sekarang")}
         </button>
         <button type="button" className="btn btn-outline" style={{ justifyContent: 'center' }} onClick={exportBackup}>
-          <IconDownload /> Export Database (.json) — pilih lokasi penyimpanan sendiri
+          <IconDownload /> {tr("Export Database (.json) — pilih lokasi penyimpanan sendiri")}
         </button>
         <div
           className={`drop-zone${dragging ? ' drag' : ''}`}
@@ -108,7 +110,7 @@ export function DatabaseModal() {
           }}
         >
           <IconUpload />
-          <div>Klik atau tarik file backup .json ke sini untuk Import / Restore</div>
+          <div>{tr("Klik atau tarik file backup .json ke sini untuk Import / Restore")}</div>
           <div className="file-name">{fileName}</div>
         </div>
         <input
@@ -122,7 +124,7 @@ export function DatabaseModal() {
         />
       </div>
       <div className="import-summary" style={{ marginTop: 14 }}>
-        Catatan: file hasil Export dapat disimpan di lokasi mana pun sesuai pilihan Anda saat dialog unduhan muncul — folder komputer, Google Drive, USB, dsb — sebagai cadangan database di luar penyimpanan aplikasi. Gunakan Import untuk memulihkan seluruh data dari file cadangan tersebut kapan saja.
+        {tr("Catatan: file hasil Export dapat disimpan di lokasi mana pun sesuai pilihan Anda saat dialog unduhan muncul — folder komputer, Google Drive, USB, dsb — sebagai cadangan database di luar penyimpanan aplikasi. Gunakan Import untuk memulihkan seluruh data dari file cadangan tersebut kapan saja.")}
       </div>
     </Modal>
   );

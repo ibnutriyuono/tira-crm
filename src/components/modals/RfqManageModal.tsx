@@ -14,6 +14,7 @@ import { useUiStore } from '@/store/useUiStore';
 import type { Rfq, RfqItem } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 /** Mirrors the single-file app's rfqJawabanSummary(). */
 function jawabanSummary(items: RfqItem[]): string {
   const answered = (items || []).filter((it) => it.hargaPurchasing || it.coo);
@@ -28,6 +29,7 @@ function statusColor(status: string): string {
 }
 
 export function RfqManageModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'rfqManage';
   const closeModal = useUiStore((s) => s.closeModal);
@@ -71,7 +73,7 @@ export function RfqManageModal() {
   }
 
   return (
-    <Modal show={show} onClose={closeModal} title="Kelola RFQ" xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>}>
+    <Modal show={show} onClose={closeModal} title={tr("Kelola RFQ")} xwide stickyHead footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr("Tutup")}</button>}>
       <div className="toolbar-row">
         {canNow('rfq', 'e') && (
         <button
@@ -81,47 +83,45 @@ export function RfqManageModal() {
             openModal('rfq');
           }}
         >
-          + Buat RFQ Baru
+          {tr("+ Buat RFQ Baru")}
         </button>
         )}
         <select className="btn-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">Semua Status</option>
-          <option value="Draft">Draft</option>
-          <option value="Terkirim">Terkirim</option>
-          <option value="Selesai">Selesai</option>
+          <option value="">{tr("Semua Status")}</option>
+          <option value="Draft">{tr("Draft")}</option>
+          <option value="Terkirim">{tr("Terkirim")}</option>
+          <option value="Selesai">{tr("Selesai")}</option>
         </select>
-        <input type="search" className="search-grow" placeholder="Cari No RFQ / Customer / Cabang..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input type="search" className="search-grow" placeholder={tr("Cari No RFQ / Customer / Cabang...")} value={search} onChange={(e) => setSearch(e.target.value)} />
         {canNow('rfq', 'x') && (
-          <button className="btn btn-outline btn-sm" onClick={exportExcel}>Export Excel</button>
+          <button className="btn btn-outline btn-sm" onClick={exportExcel}>{tr("Export Excel")}</button>
         )}
       </div>
       <div className="import-summary">
-        RFQ digunakan untuk meminta ketersediaan/harga material ke Purchasing selama prospek masih berjalan (Aktif).
-        Setelah prospek dinyatakan <b>Won</b>, buat <b>FUP A</b> (permintaan pembelian resmi) dari menu Kelola FUP A
-        dengan merujuk No. RFQ ini.
+        {tr("RFQ digunakan untuk meminta ketersediaan/harga material ke Purchasing selama prospek masih berjalan (Aktif). Setelah prospek dinyatakan")} <b>{tr("Won")}</b>{tr(", buat")} <b>{tr("FUP A")}</b> {tr("(permintaan pembelian resmi) dari menu Kelola FUP A dengan merujuk No. RFQ ini.")}
       </div>
       {list.length === 0 ? (
         <div className="empty-state" style={{ padding: '34px 10px' }}>
-          <h3>{rfqs.length === 0 ? 'Belum ada RFQ' : 'Tidak ditemukan'}</h3>
-          <p>{rfqs.length === 0 ? 'Buat RFQ dari tombol pada daftar prospek, atau klik "+ Buat RFQ Baru" di atas.' : 'Coba ubah filter atau kata kunci pencarian.'}</p>
+          <h3>{rfqs.length === 0 ? tr("Belum ada RFQ") : tr("Tidak ditemukan")}</h3>
+          <p>{rfqs.length === 0 ? tr("Buat RFQ dari tombol pada daftar prospek, atau klik \"+ Buat RFQ Baru\" di atas.") : tr("Coba ubah filter atau kata kunci pencarian.")}</p>
         </div>
       ) : (
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table">
             <thead>
               <tr>
-                <th>No RFQ</th>
-                <th>Tanggal</th>
-                <th>Cabang</th>
-                <th>Customer</th>
-                <th>Material</th>
-                <th>Status</th>
-                <th>FUP A</th>
-                <th>Purchasing</th>
-                <th>Lampiran</th>
-                <th>Jawaban Harga</th>
-                <th>Dibuat Oleh</th>
-                <th>Aksi</th>
+                <th>{tr("No RFQ")}</th>
+                <th>{tr("Tanggal")}</th>
+                <th>{tr("Cabang")}</th>
+                <th>{tr("Customer")}</th>
+                <th>{tr("Material")}</th>
+                <th>{tr("Status")}</th>
+                <th>{tr("FUP A")}</th>
+                <th>{tr("Purchasing")}</th>
+                <th>{tr("Lampiran")}</th>
+                <th>{tr("Jawaban Harga")}</th>
+                <th>{tr("Dibuat Oleh")}</th>
+                <th>{tr("Aksi")}</th>
               </tr>
             </thead>
             <tbody>
@@ -133,10 +133,10 @@ export function RfqManageModal() {
                   <td>{r.customer || '-'}</td>
                   <td className="center">{(r.items || []).length}</td>
                   <td>
-                    <span className={`badge ${statusColor(r.status)}`}>{r.status || 'Draft'}</span>
+                    <span className={`badge ${statusColor(r.status)}`}>{r.status || tr("Draft")}</span>
                   </td>
                   <td>
-                    {r.fupaId ? <span className="badge amber">Ada</span> : <span className="badge slate">-</span>}
+                    {r.fupaId ? <span className="badge amber">{tr("Ada")}</span> : <span className="badge slate">-</span>}
                   </td>
                   <td>
                     {/* The real 5-stage Purchasing status, same as the detail
@@ -147,15 +147,15 @@ export function RfqManageModal() {
                       {WORKFLOW_META[workflowStage(rfqAsWorkflowDoc(r))].label}
                     </span>
                     <div className="text-muted" style={{ fontSize: 10.5, marginTop: 3 }}>
-                      {r.sentToPurchasingAt ? `Dikirim ${formatDateTimeID(r.sentToPurchasingAt)}` : 'Belum dikirim'}
+                      {r.sentToPurchasingAt ? `Dikirim ${formatDateTimeID(r.sentToPurchasingAt)}` : tr("Belum dikirim")}
                     </div>
                   </td>
                   <td><AttachNoteBadges rfqId={r.id} /></td>
                   <td>
                     {r.jawabanRfqDikirim ? (
-                      <span className="badge green" title={formatDateID(r.jawabanRfqAt)}>Terkirim</span>
+                      <span className="badge green" title={formatDateID(r.jawabanRfqAt)}>{tr("Terkirim")}</span>
                     ) : (
-                      <span className="badge slate">Belum</span>
+                      <span className="badge slate">{tr("Belum")}</span>
                     )}
                     <div className="text-muted" style={{ fontSize: 11 }}>{jawabanSummary(r.items)}</div>
                   </td>
@@ -164,7 +164,7 @@ export function RfqManageModal() {
                     <div className="row-actions">
                       <button
                         className="icon-btn"
-                        title={canNow('rfq', 'e') ? 'Buka / Edit' : 'Lihat (hanya-baca)'}
+                        title={canNow('rfq', 'e') ? tr("Buka / Edit") : tr("Lihat (hanya-baca)")}
                         onClick={() => {
                           useUiStore.setState({ rfqCtx: { prospectId: r.prospectId, rfqId: r.id } });
                           openModal('rfq');
@@ -173,14 +173,14 @@ export function RfqManageModal() {
                         <IconEdit />
                       </button>
                       {r.status !== 'Selesai' && canNow('rfq', 'e') && (
-                        <button className="icon-btn" title="Tandai Selesai" onClick={() => markDone(r.id)}>
+                        <button className="icon-btn" title={tr("Tandai Selesai")} onClick={() => markDone(r.id)}>
                           <IconCheck />
                         </button>
                       )}
                       {canNow('rfq', 'd') && (
                       <button
                         className="icon-btn danger"
-                        title="Hapus"
+                        title={tr("Hapus")}
                         onClick={() => {
                           useUiStore.setState({
                             deleteCtx: { mode: 'rfq', id: r.id, title: 'Hapus RFQ', message: `Yakin ingin menghapus RFQ "${r.noRfq || '(tanpa nomor)'}" untuk ${r.customer || '-'}? Tindakan ini tidak dapat dibatalkan.` },

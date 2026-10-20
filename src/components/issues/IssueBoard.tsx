@@ -23,6 +23,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { IssueDetail, IssueForm, issueAgeText, nameOf, useRoster } from './shared';
 
+import { useT } from '@/store/useLangStore';
 type StFilter = 'aktif' | 'usulan' | 'selesai' | 'semua';
 const up = (s: string | null | undefined) => (s || '').trim().toUpperCase();
 const PURCH_CATS = ['stok', 'leadtime'];
@@ -45,6 +46,7 @@ const dayTxt = (n: number | null) => (n == null ? '-' : `${n.toFixed(1).replace(
  * di halaman Purchasing (variant "purchasing": daftar + detail saja).
  */
 export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
+  const tr = useT();
   const me = useDataStore((s) => s.currentUser);
   const issues = useDataStore((s) => s.issues);
   const prospects = useDataStore((s) => s.prospects);
@@ -177,30 +179,30 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
       {!purch && (
         <>
           <div className="issue-tiles">
-            <div className="t rust"><span className="kam-role">MASALAH TERBUKA</span><b className="mono">{open.length}</b><span>{open.filter((i) => i.status === 'open').length} belum ditangani{usulan.length ? ` · ${usulan.length} usulan menunggu BM` : ''}</span></div>
-            <div className="t amber"><span className="kam-role">NILAI TERTAHAN</span><b className="mono">{formatRupiah(open.reduce((s, i) => s + valueOf(i), 0))}</b><span>nilai prospek bermasalah</span></div>
-            <div className="t rust2"><span className="kam-role">LEWAT SLA</span><b className="mono">{open.filter((i) => lewatSla(i, today)).length}</b><span>&gt;{ESKALASI_BM_HARI} hr belum ditangani / &gt;{ESKALASI_ATAS_HARI} hr belum selesai</span></div>
-            <div className="t green"><span className="kam-role">SELESAI BULAN INI</span><b className="mono">{doneMonth.length}</b><span>{doneMonth.filter((i) => i.hasil === 'deal').length} Done/Deal · {doneMonth.filter((i) => i.hasil === 'lose').length} Lose</span></div>
-            <div className="t steel"><span className="kam-role">RATA² PENYELESAIAN</span><b className="mono">{dayTxt(avgDays(doneMonth))}</b><span>bulan lalu {dayTxt(avgDays(donePrev))}</span></div>
+            <div className="t rust"><span className="kam-role">{tr("MASALAH TERBUKA")}</span><b className="mono">{open.length}</b><span>{open.filter((i) => i.status === 'open').length} {tr("belum ditangani")}{usulan.length ? ` · ${usulan.length} usulan menunggu BM` : ''}</span></div>
+            <div className="t amber"><span className="kam-role">{tr("NILAI TERTAHAN")}</span><b className="mono">{formatRupiah(open.reduce((s, i) => s + valueOf(i), 0))}</b><span>{tr("nilai prospek bermasalah")}</span></div>
+            <div className="t rust2"><span className="kam-role">{tr("LEWAT SLA")}</span><b className="mono">{open.filter((i) => lewatSla(i, today)).length}</b><span>{tr(">")}{ESKALASI_BM_HARI} {tr("hr belum ditangani / >")}{ESKALASI_ATAS_HARI} {tr("hr belum selesai")}</span></div>
+            <div className="t green"><span className="kam-role">{tr("SELESAI BULAN INI")}</span><b className="mono">{doneMonth.length}</b><span>{doneMonth.filter((i) => i.hasil === 'deal').length} {tr("Done/Deal ·")} {doneMonth.filter((i) => i.hasil === 'lose').length} {tr("Lose")}</span></div>
+            <div className="t steel"><span className="kam-role">{tr("RATA² PENYELESAIAN")}</span><b className="mono">{dayTxt(avgDays(doneMonth))}</b><span>{tr("bulan lalu")} {dayTxt(avgDays(donePrev))}</span></div>
           </div>
 
           <div className="issue-two">
             <div>
-              <div className="issue-sub"><b>Pareto kategori — nilai tertahan</b><span className="field-note" style={{ margin: 0 }}>klik untuk menyaring daftar</span></div>
-              {pareto.length === 0 && <div className="field-note">Tidak ada masalah terbuka.</div>}
+              <div className="issue-sub"><b>{tr("Pareto kategori — nilai tertahan")}</b><span className="field-note" style={{ margin: 0 }}>{tr("klik untuk menyaring daftar")}</span></div>
+              {pareto.length === 0 && <div className="field-note">{tr("Tidak ada masalah terbuka.")}</div>}
               {pareto.map((p) => (
                 <button key={p.key} type="button" className={`issue-pareto${cat === p.key ? ' on' : ''}`} onClick={() => setCat(cat === p.key ? '' : p.key)}>
                   <span className="l">{p.label}</span>
                   <span className="bar"><span style={{ width: `${Math.max(3, Math.round((p.v / maxV) * 100))}%` }} /></span>
                   <span className="mono v">{formatRupiah(p.v)}</span>
-                  <span className="n">{p.n} kasus</span>
+                  <span className="n">{p.n} {tr("kasus")}</span>
                 </button>
               ))}
             </div>
             <div>
-              <div className="issue-sub"><b>Per penanggung jawab (user)</b></div>
+              <div className="issue-sub"><b>{tr("Per penanggung jawab (user)")}</b></div>
               <table className="simple-table">
-                <thead><tr><th>PJ</th><th>Terbuka</th><th>&gt; SLA</th><th>Rata² selesai (90 hr)</th></tr></thead>
+                <thead><tr><th>PJ</th><th>{tr("Terbuka")}</th><th>{tr("> SLA")}</th><th>{tr("Rata² selesai (90 hr)")}</th></tr></thead>
                 <tbody>
                   {byPj.length === 0 ? (
                     <tr><td colSpan={4} className="field-note">-</td></tr>
@@ -229,25 +231,25 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
             </button>
           ))}
         </div>
-        <label className="issue-check"><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> Ditugaskan ke saya</label>
-        {purch && <label className="issue-check"><input type="checkbox" checked={purchCat} onChange={(e) => setPurchCat(e.target.checked)} /> Hanya stok &amp; lead time</label>}
-        {cat && <button type="button" className="btn btn-outline btn-sm" onClick={() => setCat('')}>Kategori: {issueCatLabel(cat)} ×</button>}
+        <label className="issue-check"><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> {tr("Ditugaskan ke saya")}</label>
+        {purch && <label className="issue-check"><input type="checkbox" checked={purchCat} onChange={(e) => setPurchCat(e.target.checked)} /> {tr("Hanya stok & lead time")}</label>}
+        {cat && <button type="button" className="btn btn-outline btn-sm" onClick={() => setCat('')}>{tr("Kategori:")} {issueCatLabel(cat)} ×</button>}
         {!purch && cabangs.length > 1 && (
           <select value={cabang} onChange={(e) => setCabang(e.target.value)} style={{ width: 160 }}>
-            <option value="">Semua cabang</option>
+            <option value="">{tr("Semua cabang")}</option>
             {cabangs.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
         {canNow('masalah', 'x') && (
           <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: 'auto' }} onClick={exportExcel}>
-            Export Excel
+            {tr("Export Excel")}
           </button>
         )}
       </div>
 
       <div className={`issue-split${sel || lapor ? ' has-detail' : ''}`}>
         <div className="issue-list">
-          {list.length === 0 && <div className="field-note" style={{ padding: 12 }}>Tidak ada masalah pada filter ini.</div>}
+          {list.length === 0 && <div className="field-note" style={{ padding: 12 }}>{tr("Tidak ada masalah pada filter ini.")}</div>}
           {list.map((i) => {
             const late = lewatSla(i, today);
             const meta = ISSUE_STATUS_META[i.status];
@@ -256,7 +258,7 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
                 <div className="r1"><b>{i.customer}</b><span className={`badge ${meta.badge}`}>{meta.label}</span></div>
                 <div className="r2">{issueCatLabel(i.kategori)} · {i.se || '-'} · {i.cabang || '-'} · <span className="mono">{formatRupiah(valueOf(i))}</span></div>
                 <div className="r3">
-                  <span>PJ: {i.pjIds.length ? i.pjIds.map((id, k) => `${nameOf(roster, id)}${k === 0 && i.pjIds.length > 1 ? '*' : ''}`).join(', ') : i.status === 'usulan' ? `menunggu BM (dari ${i.diajukanNama || 'Sales'})` : '-'}</span>
+                  <span>{tr("PJ:")} {i.pjIds.length ? i.pjIds.map((id, k) => `${nameOf(roster, id)}${k === 0 && i.pjIds.length > 1 ? '*' : ''}`).join(', ') : i.status === 'usulan' ? `menunggu BM (dari ${i.diajukanNama || 'Sales'})` : '-'}</span>
                   <span className={late ? 'late' : ''}>{issueAgeText(i, today)}{i.eskalasi ? ` · ↑ ${i.eskalasi >= 2 ? 'RM & GM' : 'BM'}` : ''}</span>
                 </div>
                 {i.status === 'selesai' && <div className="r2 ok">✓ {i.solusi} · {i.hasil ? HASIL_META[i.hasil] : ''}</div>}
@@ -267,7 +269,7 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
         {(sel || lapor) && (
           <div className="issue-side">
             <div className="issue-side-close">
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => { setSelId(null); setLapor(null); }}>Tutup panel</button>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => { setSelId(null); setLapor(null); }}>{tr("Tutup panel")}</button>
             </div>
             {lapor ? (
               <div className="issue-card">
@@ -289,17 +291,17 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
 
       {suggestions.length > 0 && (
         <div className="issue-sug">
-          <div className="issue-sub"><b>Saran CRM — prospek berpotensi bermasalah</b><span className="field-note" style={{ margin: 0 }}>{suggestions.length} prospek · dideteksi otomatis</span></div>
+          <div className="issue-sub"><b>{tr("Saran CRM — prospek berpotensi bermasalah")}</b><span className="field-note" style={{ margin: 0 }}>{suggestions.length} {tr("prospek · dideteksi otomatis")}</span></div>
           {suggestions.slice(0, 15).map((s) => (
             <div key={s.key} className="issue-sug-row">
               <span className="txt"><b>{s.prospect.customer}</b> · {s.prospect.se || '-'} · <span className="mono">{formatRupiah(Number(s.prospect.value) || 0)}</span> — {s.why}</span>
               <button type="button" className="btn btn-primary btn-sm" onClick={() => { setLapor(s); setSelId(null); }}>
-                ⚑ {isBmLike ? 'Laporkan' : 'Ajukan ke BM'}
+                ⚑ {isBmLike ? tr("Laporkan") : tr("Ajukan ke BM")}
               </button>
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => abaikan(s)}>Abaikan</button>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => abaikan(s)}>{tr("Abaikan")}</button>
             </div>
           ))}
-          {suggestions.length > 15 && <div className="field-note">+{suggestions.length - 15} saran lain.</div>}
+          {suggestions.length > 15 && <div className="field-note">+{suggestions.length - 15} {tr("saran lain.")}</div>}
         </div>
       )}
     </div>

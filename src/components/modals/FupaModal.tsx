@@ -18,7 +18,9 @@ import type { Fupa, Rfq, RfqItem } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
 
 
+import { useT } from '@/store/useLangStore';
 export function FupaModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'fupa';
   const ctx = useUiStore((s) => s.fupaCtx);
@@ -184,31 +186,31 @@ export function FupaModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title={!canNow('rfq', 'e') ? 'FUP A (hanya-baca)' : fupaId ? 'Edit FUP A' : 'Buat FUP A (Permintaan Pembelian)'}
+      title={!canNow('rfq', 'e') ? tr("FUP A (hanya-baca)") : fupaId ? tr("Edit FUP A") : tr("Buat FUP A (Permintaan Pembelian)")}
       wide2
       footer={
         <>
-          <button type="button" className="btn btn-outline" onClick={closeModal}>Tutup</button>
+          <button type="button" className="btn btn-outline" onClick={closeModal}>{tr("Tutup")}</button>
           {canNow('rfq', 'e') && (
             <button type="button" className="btn btn-outline" disabled={busy} onClick={() => save(false)}>
-              <IconSave /> Simpan Draft
+              <IconSave /> {tr("Simpan Draft")}
             </button>
           )}
           {canNow('rfq', 'x') && (
             <button type="button" className="btn btn-outline" disabled={busy} onClick={exportExcel}>
-              <IconDownload /> Excel
+              <IconDownload /> {tr("Excel")}
             </button>
           )}
           {canNow('rfq', 'e') && (
             <>
               <button type="button" className="btn btn-outline" disabled={busy} onClick={sendEmail}>
-                <IconMail /> Email
+                <IconMail /> {tr("Email")}
               </button>
               <button type="button" className="btn btn-wa" disabled={busy} onClick={sendWa}>
-                <IconWa /> Kirim WhatsApp
+                <IconWa /> {tr("Kirim WhatsApp")}
               </button>
               <button type="button" className="btn btn-primary" disabled={busy} onClick={sendToPurchasing}>
-                Kirim ke Purchasing
+                {tr("Kirim ke Purchasing")}
               </button>
             </>
           )}
@@ -217,40 +219,39 @@ export function FupaModal() {
     >
       <div className="form-grid">
         <div>
-          <label>No. FUP A</label>
-          <input type="text" value={noFupa} onChange={(e) => setNoFupa(e.target.value)} placeholder="cth. FUPA/2026/001" />
+          <label>{tr("No. FUP A")}</label>
+          <input type="text" value={noFupa} onChange={(e) => setNoFupa(e.target.value)} placeholder={tr("cth. FUPA/2026/001")} />
         </div>
         <div>
-          <label>Tanggal</label>
+          <label>{tr("Tanggal")}</label>
           <input type="date" value={tglFupa} onChange={(e) => setTglFupa(e.target.value)} />
         </div>
         <div>
-          <label>No. RFQ Rujukan</label>
-          <input type="text" value={sourceNoRfq} onChange={(e) => setSourceNoRfq(e.target.value)} placeholder="RFQ asal" />
+          <label>{tr("No. RFQ Rujukan")}</label>
+          <input type="text" value={sourceNoRfq} onChange={(e) => setSourceNoRfq(e.target.value)} placeholder={tr("RFQ asal")} />
         </div>
         <div>
-          <label>Cabang</label>
+          <label>{tr("Cabang")}</label>
           <input type="text" value={cabang} onChange={(e) => setCabang(e.target.value.toUpperCase())} />
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
-          <label>Customer (Cust)</label>
+          <label>{tr("Customer (Cust)")}</label>
           <CustomerNameInput value={customer} onChange={setCustomer} />
         </div>
       </div>
 
       <div className="import-summary" style={{ marginTop: 0 }}>
-        FUP A hanya dibuat untuk prospek yang sudah Won (PO/Kontrak atau DO). Pilih No. RFQ yang sudah dibuat
-        sebelumnya saat prospek masih Aktif — data cabang, customer, dan material akan terisi otomatis.
+        {tr("FUP A hanya dibuat untuk prospek yang sudah Won (PO/Kontrak atau DO). Pilih No. RFQ yang sudah dibuat sebelumnya saat prospek masih Aktif — data cabang, customer, dan material akan terisi otomatis.")}
       </div>
 
       <div style={{ marginTop: 16 }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>Daftar Material Permintaan Pembelian</label>
+        <label style={{ display: 'block', marginBottom: 8 }}>{tr("Daftar Material Permintaan Pembelian")}</label>
         <MaterialSpecEditor variant="doc" rows={rows} onChange={setRows} />
       </div>
 
       <div className="form-grid" style={{ marginTop: 16 }}>
         <div style={{ gridColumn: '1 / -1' }}>
-          <label>Catatan</label>
+          <label>{tr("Catatan")}</label>
           <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} />
         </div>
       </div>
@@ -259,21 +260,20 @@ export function FupaModal() {
         const rec = fupaId ? fupas.find((f) => f.id === fupaId) : null;
         return rec?.purchJawaban ? (
           <div className="import-summary" style={{ marginTop: 16 }}>
-            <b>Jawaban Purchasing:</b> {rec.purchJawaban}
+            <b>{tr("Jawaban Purchasing:")}</b> {rec.purchJawaban}
           </div>
         ) : null;
       })()}
       <div className="import-summary">
-        Nomor WhatsApp &amp; email Purchasing di atas otomatis diingat untuk dokumen berikutnya. Setelah export Excel,
-        lampirkan filenya secara manual pada email sebelum dikirim.
+        {tr("Nomor WhatsApp & email Purchasing di atas otomatis diingat untuk dokumen berikutnya. Setelah export Excel, lampirkan filenya secara manual pada email sebelum dikirim.")}
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>Lampiran File (maks. {formatFileSize(ATTACHMENT_MAX_BYTES)}/file)</label>
+        <label style={{ display: 'block', marginBottom: 8 }}>{tr("Lampiran File (maks.")} {formatFileSize(ATTACHMENT_MAX_BYTES)}{tr("/file)")}</label>
         <AttachmentList fupaId={fupaId} withProspect ensureParentId={() => save(false)} />
       </div>
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
         <label style={{ display: 'block', marginBottom: 8 }}>
-          Diskusi
+          {tr("Diskusi")}
           {chatUnread > 0 && <span className="item-chat-bubble">{chatUnread > 9 ? '9+' : chatUnread}</span>}
         </label>
         <ItemChat entity="fupa" entityId={fupaId} onUnreadAtOpen={setChatUnread} />

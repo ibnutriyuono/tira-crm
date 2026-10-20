@@ -8,7 +8,7 @@ import { ItemChat } from '../ItemChat';
 import { AttachmentList } from '../AttachmentList';
 import { ProspectIssueSection } from '../issues/ProspectIssueSection';
 import { MaterialSpecEditor } from '../MaterialSpecEditor';
-import { CABANG_LIST } from '@/lib/constants';
+import { CABANG_LIST, STATUS_META } from '@/lib/constants';
 import { formatFileSize, formatRupiah, getProspectMaterials, materialUnitPrice, num } from '@/lib/format';
 import { ATTACHMENT_MAX_BYTES } from '@/lib/constants';
 import { emptyRow, isFabRow, materialToRow, rowToMaterial, type SpecRow } from '@/lib/material-spec';
@@ -21,7 +21,11 @@ import { QcdFields } from '../QcdFields';
 import type { Prospect } from '@/lib/types';
 import { canSetFaktur } from '@/lib/roles';
 
+import { FollowUpFields } from '../FollowUpMoveModal';
+import { followUpDateProblem, followUpRequiredOnMove, jakartaDate } from '@/lib/followup-rule';
+import { useT } from '@/store/useLangStore';
 export function ProspectFormModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'prospectForm';
   // Kelola Role: tanpa hak Tambah/Ubah, form dibuka hanya-baca.
@@ -84,9 +88,16 @@ export function ProspectFormModal() {
   const [tglDelivery, setTglDelivery] = useState('');
   const [keterangan, setKeterangan] = useState('');
   const [busy, setBusy] = useState(false);
+  // Jadwal follow-up — wajib saat status dipindah ke tahap pipeline aktif.
+  const [fuDate, setFuDate] = useState('');
+  const [fuNote, setFuNote] = useState('');
+  const [fuErr, setFuErr] = useState(false);
 
   useEffect(() => {
     if (!show) return;
+    setFuNote('');
+    setFuErr(false);
+    setFuDate(editing?.followUpAt && editing.followUpAt >= jakartaDate() ? editing.followUpAt : '');
     if (editing) {
       setReg(String(editing.reg ?? 1));
       setCabang(editing.cabang || '');
@@ -160,6 +171,7 @@ export function ProspectFormModal() {
   }
 
   const qcdNeeded = qcdRequiredOnMove(editing ? num(editing.status) : null, Number(status));
+  const fuNeeded = followUpRequiredOnMove(editing ? num(editing.status) : null, Number(status));
 
   // QCD fields appear inline below for a closed status (PO/DO/Lose).
   // Previously a separate modal replaced this form and its unsaved edits were
@@ -205,8 +217,14 @@ export function ProspectFormModal() {
         return;
       }
     }
+    if (fuNeeded && followUpDateProblem(fuDate)) {
+      setFuErr(true);
+      toast(followUpDateProblem(fuDate)!, 'error');
+      return;
+    }
     setBusy(true);
     const payload = {
+      ...(fuNeeded ? { followUpAt: fuDate, followUpNote: fuNote.trim() } : {}),
       reg: Number(reg),
       cabang,
       se,
@@ -253,17 +271,17 @@ export function ProspectFormModal() {
     <Modal
       show={show} wide2
       onClose={closeModal}
-      title={readOnly ? 'Lihat Prospek' : editId ? 'Edit Prospek' : 'Tambah Prospek Baru'}
+      title={readOnly ? tr("Lihat Prospek") : editId ? tr("Edit Prospek") : tr("Tambah Prospek Baru")}
       onSubmit={onSubmit}
       footer={
         <>
-          {readOnly && <span className="field-note" style={{ margin: '0 auto 0 0' }}>Hanya-baca — role Anda tidak memiliki hak mengubah prospek.</span>}
+          {readOnly && <span className="field-note" style={{ margin: '0 auto 0 0' }}>{tr("Hanya-baca — role Anda tidak memiliki hak mengubah prospek.")}</span>}
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            {readOnly ? 'Tutup' : 'Batal'}
+            {readOnly ? tr("Tutup") : tr("Batal")}
           </button>
           {!readOnly && (
             <button type="submit" className="btn btn-primary" disabled={busy}>
-              Simpan Prospek
+              {tr("Simpan Prospek")}
             </button>
           )}
         </>
@@ -272,135 +290,143 @@ export function ProspectFormModal() {
       <fieldset disabled={readOnly} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="form-grid">
         <div>
-          <label>Regional</label>
+          <label>{tr("Regional")}</label>
           <select value={reg} disabled={locks.reg} onChange={(e) => setReg(e.target.value)}>
-            <option value="1">Regional 1</option>
-            <option value="2">Regional 2</option>
-            <option value="3">Regional 3</option>
+            <option value="1">{tr("Regional 1")}</option>
+            <option value="2">{tr("Regional 2")}</option>
+            <option value="3">{tr("Regional 3")}</option>
           </select>
-          {locks.reg && <div className="field-note">Terkunci sesuai akun Anda</div>}
+          {locks.reg && <div className="field-note">{tr("Terkunci sesuai akun Anda")}</div>}
         </div>
         <div>
-          <label>Cabang</label>
-          <input list="cabangList" value={cabang} readOnly={locks.cabang} onChange={(e) => setCabang(e.target.value)} placeholder="cth. DKI" />
+          <label>{tr("Cabang")}</label>
+          <input list="cabangList" value={cabang} readOnly={locks.cabang} onChange={(e) => setCabang(e.target.value)} placeholder={tr("cth. DKI")} />
           <datalist id="cabangList">
             {cabangOptions.map((c) => (
               <option key={c} value={c} />
             ))}
           </datalist>
-          {locks.cabang && <div className="field-note">Terkunci sesuai akun Anda</div>}
+          {locks.cabang && <div className="field-note">{tr("Terkunci sesuai akun Anda")}</div>}
         </div>
         <div>
-          <label>Sales Engineer (SE)</label>
-          <input type="text" value={se} readOnly={locks.se} onChange={(e) => setSe(e.target.value)} placeholder="Inisial SE" />
-          {locks.se && <div className="field-note">Terkunci sesuai akun Anda</div>}
+          <label>{tr("Sales Engineer (SE)")}</label>
+          <input type="text" value={se} readOnly={locks.se} onChange={(e) => setSe(e.target.value)} placeholder={tr("Inisial SE")} />
+          {locks.se && <div className="field-note">{tr("Terkunci sesuai akun Anda")}</div>}
         </div>
         <div>
-          <label>Status Pipeline</label>
+          <label>{tr("Status Pipeline")}</label>
           <select value={status} onChange={(e) => onStatusChange(e.target.value)}>
-            <option value="0">Sales Activity</option>
-            <option value="1">1 · Permintaan</option>
-            <option value="2">2 · Penawaran Harga</option>
-            <option value="3">3 · Negosiasi</option>
-            <option value="4">4 · PO / Kontrak</option>
-            <option value="5">5 · DO</option>
-            <option value="6">6 · Lose Order / Batal</option>
+            <option value="0">{tr("Sales Activity")}</option>
+            <option value="1">{tr("1 · Permintaan")}</option>
+            <option value="2">{tr("2 · Penawaran Harga")}</option>
+            <option value="3">{tr("3 · Negosiasi")}</option>
+            <option value="4">{tr("4 · PO / Kontrak")}</option>
+            <option value="5">{tr("5 · DO")}</option>
+            <option value="6">{tr("6 · Lose Order / Batal")}</option>
           </select>
         </div>
+        {fuNeeded && !readOnly && (
+          <div className="fu-inline">
+            <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 8 }}>
+              {tr('Pindah ke {tahap} — jadwalkan follow-up', { tahap: STATUS_META[Number(status)]?.label ?? status })}
+            </div>
+            <FollowUpFields date={fuDate} note={fuNote} onDate={setFuDate} onNote={setFuNote} showErr={fuErr} />
+          </div>
+        )}
         <div className="full">
-          <label>Customer *</label>
-          <CustomerNameInput required value={customer} onChange={onCustomerChange} placeholder="Nama customer" />
-          <div className="field-note">Customer baru otomatis tercatat di Kelola Customer.</div>
+          <label>{tr("Customer *")}</label>
+          <CustomerNameInput required value={customer} onChange={onCustomerChange} placeholder={tr("Nama customer")} />
+          <div className="field-note">{tr("Customer baru otomatis tercatat di Kelola Customer.")}</div>
         </div>
         <div className="full">
-          <label>No. WhatsApp / HP Customer</label>
-          <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="cth. 08123456789" />
+          <label>{tr("No. WhatsApp / HP Customer")}</label>
+          <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={tr("cth. 08123456789")} />
         </div>
         <div className="full" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: -4 }}>
           <input type="checkbox" style={{ width: 'auto' }} checked={penawaranTerkirim} onChange={(e) => setPenawaranTerkirim(e.target.checked)} id="f_penawaranTerkirim" />
           <label htmlFor="f_penawaranTerkirim" style={{ margin: 0, textTransform: 'none', fontWeight: 500, color: 'var(--text)', fontSize: 13 }}>
-            Penawaran sudah terkirim ke customer <span style={{ color: 'var(--text-soft)', fontWeight: 400 }}>(kosongkan jika masih Pending / belum dikirim)</span>
+            {tr("Penawaran sudah terkirim ke customer")} <span style={{ color: 'var(--text-soft)', fontWeight: 400 }}>{tr("(kosongkan jika masih Pending / belum dikirim)")}</span>
           </label>
         </div>
         {Number(status) === 5 && (
           <div className="full" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: -4 }}>
             <input type="checkbox" style={{ width: 'auto' }} checked={terfaktur} disabled={!fakturEditable} onChange={(e) => setTerfaktur(e.target.checked)} id="f_terfaktur" />
             <label htmlFor="f_terfaktur" style={{ margin: 0, textTransform: 'none', fontWeight: 500, color: 'var(--text)', fontSize: 13 }}>
-              Sudah terfaktur (invoice) <span style={{ color: 'var(--text-soft)', fontWeight: 400 }}>{fakturEditable ? '(centang = masuk Omzet, kosongkan = masih GIT/barang jalan)' : '(diisi oleh Admin Sales / BM)'}</span>
+              {tr("Sudah terfaktur (invoice)")} <span style={{ color: 'var(--text-soft)', fontWeight: 400 }}>{fakturEditable ? tr("(centang = masuk Omzet, kosongkan = masih GIT/barang jalan)") : tr("(diisi oleh Admin Sales / BM)")}</span>
             </label>
           </div>
         )}
         {Number(status) === 5 && terfaktur && (
           <>
             <div>
-              <label>Tgl. Faktur</label>
+              <label>{tr("Tgl. Faktur")}</label>
               <input type="date" value={tglFaktur} onChange={(e) => setTglFaktur(e.target.value)} disabled={!fakturEditable} />
             </div>
             <div>
-              <label>No. Faktur</label>
-              <input type="text" value={noFaktur} onChange={(e) => setNoFaktur(e.target.value)} disabled={!fakturEditable} placeholder="cth. INV/DKI/2026/10/0123" />
+              <label>{tr("No. Faktur")}</label>
+              <input type="text" value={noFaktur} onChange={(e) => setNoFaktur(e.target.value)} disabled={!fakturEditable} placeholder={tr("cth. INV/DKI/2026/10/0123")} />
             </div>
           </>
         )}
         <div className="full">
-          <label>Daftar Material</label>
+          <label>{tr("Daftar Material")}</label>
           <MaterialSpecEditor variant="prospek" rows={rows} onChange={setRows} hideSummary />
           {hasFab && (
             <div style={{ marginTop: 10, padding: '10px 12px', border: '1px solid #EEDFC8', borderRadius: 8, background: '#FFFBF4' }}>
-              <label style={{ display: 'block', marginBottom: 6 }}>Gambar kerja Line 05 (maks. {formatFileSize(ATTACHMENT_MAX_BYTES)}/file)</label>
+              <label style={{ display: 'block', marginBottom: 6 }}>{tr("Gambar kerja Line 05 (maks.")} {formatFileSize(ATTACHMENT_MAX_BYTES)}{tr("/file)")}</label>
               {editId ? (
                 <AttachmentList prospectId={editId} />
               ) : (
-                <div className="field-note" style={{ margin: 0 }}>Simpan prospek dulu, lalu buka Edit Prospek untuk melampirkan gambar.</div>
+                <div className="field-note" style={{ margin: 0 }}>{tr("Simpan prospek dulu, lalu buka Edit Prospek untuk melampirkan gambar.")}</div>
               )}
             </div>
           )}
         </div>
         <div>
-          <label>Total Qty (Pcs)</label>
+          <label>{tr("Total Qty (Pcs)")}</label>
           <input type="text" readOnly value={totals.totalQty} style={{ background: 'var(--steel-100)', fontFamily: "var(--font-ibm-plex-mono), monospace", fontWeight: 600 }} />
         </div>
         <div>
-          <label>Total Berat (Kg)</label>
+          <label>{tr("Total Berat (Kg)")}</label>
           <input type="text" readOnly value={`${totals.totalBerat.toLocaleString('id-ID')} Kg`} style={{ background: 'var(--steel-100)', fontFamily: "var(--font-ibm-plex-mono), monospace", fontWeight: 600 }} />
         </div>
         <div>
-          <label>Total Value (Rp)</label>
+          <label>{tr("Total Value (Rp)")}</label>
           <input type="text" readOnly value={formatRupiah(totals.totalValue)} style={{ background: 'var(--steel-100)', fontFamily: "var(--font-ibm-plex-mono), monospace", fontWeight: 600 }} />
         </div>
         <div>
-          <label>Kondisi Stock</label>
-          <input type="text" value={kondisiStock} onChange={(e) => setKondisiStock(e.target.value)} placeholder="cth. Ready / Indent" />
+          <label>{tr("Kondisi Stock")}</label>
+          <input type="text" value={kondisiStock} onChange={(e) => setKondisiStock(e.target.value)} placeholder={tr("cth. Ready / Indent")} />
         </div>
         <div>
-          <label>Tgl. Penawaran</label>
+          <label>{tr("Tgl. Penawaran")}</label>
           <input type="date" value={tglPenawaran} onChange={(e) => setTglPenawaran(e.target.value)} />
         </div>
         <div>
           <label>
-            No. PO{(Number(status) === 4 || Number(status) === 5) && <span style={{ color: 'var(--rust-500)' }}> *</span>}
+            {tr("No. PO")}{(Number(status) === 4 || Number(status) === 5) && <span style={{ color: 'var(--rust-500)' }}> *</span>}
           </label>
-          <input type="text" value={noPo} onChange={(e) => setNoPo(e.target.value)} placeholder="cth. PO-2026-00123" />
+          <input type="text" value={noPo} onChange={(e) => setNoPo(e.target.value)} placeholder={tr("cth. PO-2026-00123")} />
           {(Number(status) === 4 || Number(status) === 5) && !noPo.trim() && (
-            <div className="field-note">Wajib diisi untuk status PO/Kontrak atau DO</div>
+            <div className="field-note">{tr("Wajib diisi untuk status PO/Kontrak atau DO")}</div>
           )}
         </div>
         <div>
-          <label>Tgl. PO</label>
+          <label>{tr("Tgl. PO")}</label>
           <input type="date" value={tglPO} onChange={(e) => setTglPO(e.target.value)} />
         </div>
         <div>
-          <label>Tgl. Delivery</label>
+          <label>{tr("Tgl. Delivery")}</label>
           <input type="date" value={tglDelivery} onChange={(e) => setTglDelivery(e.target.value)} />
         </div>
         <div className="full">
-          <label>Keterangan</label>
-          <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="Catatan / progres terbaru" />
+          <label>{tr("Keterangan")}</label>
+          <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder={tr("Catatan / progres terbaru")} />
         </div>
         {[4, 5, 6].includes(Number(status)) && (
           <div className="full rfq-item-card" style={{ borderColor: qcdNeeded ? 'var(--amber-600)' : undefined }}>
             <div className="rfq-item-head">
-              <span>Quality · Cost · Delivery {qcdNeeded ? '(wajib — deal ditutup)' : ''}</span>
+              <span>{tr("Quality · Cost · Delivery")} {qcdNeeded ? tr("(wajib — deal ditutup)") : ''}</span>
             </div>
             <QcdFields value={pendingQCD} onChange={(v) => useUiStore.setState({ pendingProspectQCD: v })} statusVal={Number(status)} required={qcdNeeded} />
           </div>
@@ -409,7 +435,7 @@ export function ProspectFormModal() {
       </fieldset>
       {editing && <ProspectIssueSection prospect={editing} />}
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>Diskusi</label>
+        <label style={{ display: 'block', marginBottom: 8 }}>{tr("Diskusi")}</label>
         <ItemChat entity="prospect" entityId={editId} />
       </div>
     </Modal>

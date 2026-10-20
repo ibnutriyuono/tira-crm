@@ -31,6 +31,7 @@ import { UserPicker } from '../UserPicker';
 import { useRoster, type RosterUser } from '../issues/shared';
 import { canNow, useCan } from '@/hooks/useCan';
 
+import { useT } from '@/store/useLangStore';
 const ROLE_SHORT: Record<string, string> = { gm: 'GM', rm: 'RM', bm: 'BM', sales: 'Sales' };
 const blankVisit = (): TripVisit => ({ id: '', customer: '', pic: '', tanggal: '', tujuan: '', realisasi: '', uraian: '', hasil: '', tambahan: false });
 let tmpSeq = 0;
@@ -89,6 +90,7 @@ async function shrinkPhoto(file: File): Promise<File> {
  * then record what actually happened. Every trip prints as one form.
  */
 export function VisitTripModal() {
+  const tr = useT();
   const show = useUiStore((s) => s.modal === 'visitTrip');
   const closeModal = useUiStore((s) => s.closeModal);
   const currentUser = useDataStore((s) => s.currentUser);
@@ -349,22 +351,22 @@ export function VisitTripModal() {
   const listView = (
     <>
       <div className="toolbar-row" style={{ alignItems: 'center', marginBottom: 10 }}>
-        <label style={{ margin: 0 }}>Bulan berangkat</label>
+        <label style={{ margin: 0 }}>{tr("Bulan berangkat")}</label>
         <input type="month" value={periode} onChange={(e) => setPeriode(e.target.value)} />
         <button type="button" className="btn btn-outline btn-sm" onClick={() => setPeriode('')} disabled={!periode}>
-          Semua bulan
+          {tr("Semua bulan")}
         </button>
-        {loading && <span className="field-note">Memuat…</span>}
+        {loading && <span className="field-note">{tr("Memuat…")}</span>}
         {canPlan && (
           <button type="button" className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }} onClick={openNew}>
-            <IconPlus /> Rencana Perjalanan
+            <IconPlus /> {tr("Rencana Perjalanan")}
           </button>
         )}
       </div>
 
       {pending.length > 0 && (
         <div className="import-summary" style={{ marginTop: 0, marginBottom: 12 }}>
-          <b>{pending.length} rencana menunggu persetujuan Anda:</b>{' '}
+          <b>{pending.length} {tr("rencana menunggu persetujuan Anda:")}</b>{' '}
           {pending.map((t, i) => (
             <span key={t.id}>
               {i > 0 && ' · '}
@@ -378,20 +380,20 @@ export function VisitTripModal() {
 
       {trips.length === 0 ? (
         <div className="empty-state">
-          <h3>Belum ada perjalanan{periode ? ' pada bulan ini' : ''}</h3>
-          {canPlan && <p>Klik &quot;Rencana Perjalanan&quot; untuk membuat rencana kunjungan ke customer di cabang.</p>}
+          <h3>{tr("Belum ada perjalanan")}{periode ? tr(" pada bulan ini") : ''}</h3>
+          {canPlan && <p>{tr("Klik \"Rencana Perjalanan\" untuk membuat rencana kunjungan ke customer di cabang.")}</p>}
         </div>
       ) : (
         <div className="table-wrap">
           <table className="simple-table" style={{ minWidth: 760 }}>
             <thead>
               <tr>
-                <th>Tanggal</th>
-                <th>Nama</th>
-                <th>Cabang</th>
-                <th>Keperluan</th>
-                <th>Kunjungan</th>
-                <th>Status</th>
+                <th>{tr("Tanggal")}</th>
+                <th>{tr("Nama")}</th>
+                <th>{tr("Cabang")}</th>
+                <th>{tr("Keperluan")}</th>
+                <th>{tr("Kunjungan")}</th>
+                <th>{tr("Status")}</th>
                 <th />
               </tr>
             </thead>
@@ -402,7 +404,7 @@ export function VisitTripModal() {
                   <tr key={t.id}>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {formatDateID(t.tglBerangkat)}
-                      {t.tglPulang !== t.tglBerangkat && <div className="field-note">s/d {formatDateID(t.tglPulang)}</div>}
+                      {t.tglPulang !== t.tglBerangkat && <div className="field-note">{tr("s/d")} {formatDateID(t.tglPulang)}</div>}
                     </td>
                     <td>
                       <b>{t.ownerName}</b> <span className="field-note" style={{ display: 'inline' }}>{ROLE_SHORT[t.ownerRole] || t.ownerRole}</span>
@@ -410,10 +412,10 @@ export function VisitTripModal() {
                     <td>{t.cabang}</td>
                     <td>{t.keperluan || '-'}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      {r.planned} rencana
+                      {r.planned} {tr("rencana")}
                       {(t.status === 'disetujui' || t.status === 'selesai') && (
                         <div className="field-note">
-                          {r.done}/{r.planned} tercapai{r.extra ? ` · +${r.extra}` : ''}
+                          {r.done}/{r.planned} {tr("tercapai")}{r.extra ? ` · +${r.extra}` : ''}
                         </div>
                       )}
                     </td>
@@ -421,11 +423,11 @@ export function VisitTripModal() {
                     <td>
                       <div className="row-actions">
                         <button type="button" className="btn btn-outline btn-sm" onClick={() => openDetail(t)}>
-                          Buka
+                          {tr("Buka")}
                         </button>
                         {canNow('trip', 'x') && (
-                          <button type="button" className="btn btn-outline btn-sm" title="Cetak laporan kunjungan (lampiran reimbursement)" onClick={() => onPrint(t)}>
-                            Cetak
+                          <button type="button" className="btn btn-outline btn-sm" title={tr("Cetak laporan kunjungan (lampiran reimbursement)")} onClick={() => onPrint(t)}>
+                            {tr("Cetak")}
                           </button>
                         )}
                       </div>
@@ -446,9 +448,9 @@ export function VisitTripModal() {
       {lists}
       <div className="form-grid">
         <div>
-          <label>Cabang tujuan *</label>
+          <label>{tr("Cabang tujuan *")}</label>
           <select value={cabang} onChange={(e) => setCabang(e.target.value)} disabled={tripCabangLocked(currentUser?.role)}>
-            <option value="">— pilih cabang —</option>
+            <option value="">{tr("— pilih cabang —")}</option>
             {CABANG_LIST.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -458,61 +460,61 @@ export function VisitTripModal() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <div style={{ flex: 1 }}>
-            <label>Berangkat *</label>
+            <label>{tr("Berangkat *")}</label>
             <input type="date" value={tglBerangkat} onChange={(e) => setTglBerangkat(e.target.value)} />
           </div>
           <div style={{ flex: 1 }}>
-            <label>Pulang *</label>
+            <label>{tr("Pulang *")}</label>
             <input type="date" value={tglPulang} min={tglBerangkat} onChange={(e) => setTglPulang(e.target.value)} />
           </div>
         </div>
         <div className="full">
-          <label>Keperluan perjalanan</label>
-          <input type="text" value={keperluan} onChange={(e) => setKeperluan(e.target.value)} placeholder="cth. Review cabang & kunjungan key account Q4" />
+          <label>{tr("Keperluan perjalanan")}</label>
+          <input type="text" value={keperluan} onChange={(e) => setKeperluan(e.target.value)} placeholder={tr("cth. Review cabang & kunjungan key account Q4")} />
         </div>
         <div className="full">
-          <label>Peserta perjalanan (selain Anda)</label>
-          <UserPicker value={peserta} onChange={setPeserta} roster={roster} exclude={currentUser ? [currentUser.id] : []} placeholder="+ Tambah peserta (pilih user)…" />
-          <div className="field-note" style={{ margin: 0 }}>Peserta diberi notifikasi saat perjalanan disetujui/dibatalkan dan bisa melihat perjalanan ini. Saat realisasi, pilih personil yang ikut ke tiap customer — kunjungan tercatat di Aktivitas Harian mereka.</div>
+          <label>{tr("Peserta perjalanan (selain Anda)")}</label>
+          <UserPicker value={peserta} onChange={setPeserta} roster={roster} exclude={currentUser ? [currentUser.id] : []} placeholder={tr("+ Tambah peserta (pilih user)…")} />
+          <div className="field-note" style={{ margin: 0 }}>{tr("Peserta diberi notifikasi saat perjalanan disetujui/dibatalkan dan bisa melihat perjalanan ini. Saat realisasi, pilih personil yang ikut ke tiap customer — kunjungan tercatat di Aktivitas Harian mereka.")}</div>
         </div>
       </div>
 
-      <div style={{ fontWeight: 700, fontSize: 13, margin: '14px 0 6px' }}>Rencana kunjungan customer</div>
+      <div style={{ fontWeight: 700, fontSize: 13, margin: '14px 0 6px' }}>{tr("Rencana kunjungan customer")}</div>
       {planVisits.map((v, i) => (
         <div className="rfq-item-card" key={v.id || i}>
           <div className="rfq-item-head">
-            <span>Kunjungan {i + 1}</span>
-            <button type="button" className="icon-btn danger" title="Hapus kunjungan" disabled={planVisits.length === 1} onClick={() => setPlanVisits((list) => list.filter((_, idx) => idx !== i))}>
+            <span>{tr("Kunjungan")} {i + 1}</span>
+            <button type="button" className="icon-btn danger" title={tr("Hapus kunjungan")} disabled={planVisits.length === 1} onClick={() => setPlanVisits((list) => list.filter((_, idx) => idx !== i))}>
               <IconTrash />
             </button>
           </div>
           <div className="form-grid">
             <div>
-              <label>Customer *</label>
+              <label>{tr("Customer *")}</label>
               <CustomerNameInput value={v.customer} onChange={(val) => setPlan(i, 'customer', val)} />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <div style={{ flex: 2 }}>
-                <label>PIC yang ditemui</label>
-                <input type="text" list="tripPics" value={v.pic} onChange={(e) => setPlan(i, 'pic', e.target.value)} placeholder="Nama (Jabatan)" />
+                <label>{tr("PIC yang ditemui")}</label>
+                <input type="text" list="tripPics" value={v.pic} onChange={(e) => setPlan(i, 'pic', e.target.value)} placeholder={tr("Nama (Jabatan)")} />
               </div>
               <div style={{ flex: 1 }}>
-                <label>Tanggal</label>
+                <label>{tr("Tanggal")}</label>
                 <input type="date" value={v.tanggal} min={tglBerangkat} max={tglPulang} onChange={(e) => setPlan(i, 'tanggal', e.target.value)} />
               </div>
             </div>
             <div className="full">
-              <label>Tujuan kunjungan *</label>
-              <textarea value={v.tujuan} onChange={(e) => setPlan(i, 'tujuan', e.target.value)} placeholder="cth. Negosiasi harga kontrak 2027, follow up penawaran SS304, keluhan delivery" />
+              <label>{tr("Tujuan kunjungan *")}</label>
+              <textarea value={v.tujuan} onChange={(e) => setPlan(i, 'tujuan', e.target.value)} placeholder={tr("cth. Negosiasi harga kontrak 2027, follow up penawaran SS304, keluhan delivery")} />
             </div>
           </div>
         </div>
       ))}
       <button type="button" className="btn btn-outline btn-sm" onClick={() => setPlanVisits((list) => [...list, { ...blankVisit(), id: tmpId() }])}>
-        <IconPlus /> Tambah kunjungan
+        <IconPlus /> {tr("Tambah kunjungan")}
       </button>
       <div className="field-note" style={{ marginTop: 8 }}>
-        {currentUser?.role === 'gm' ? 'Sebagai GM, rencana langsung berstatus Disetujui saat ditetapkan.' : `Setelah diajukan, rencana ini disetujui oleh ${approverLabel(currentUser?.role || '')}.`}
+        {currentUser?.role === 'gm' ? tr("Sebagai GM, rencana langsung berstatus Disetujui saat ditetapkan.") : `Setelah diajukan, rencana ini disetujui oleh ${approverLabel(currentUser?.role || '')}.`}
       </div>
     </>
   );
@@ -532,30 +534,30 @@ export function VisitTripModal() {
             <b>{current.ownerName}</b> ({ROLE_SHORT[current.ownerRole] || current.ownerRole})
           </div>
           <div>
-            Cabang tujuan: <b>{current.cabang}</b>
+            {tr("Cabang tujuan:")} <b>{current.cabang}</b>
           </div>
           <div>
-            {formatDateID(current.tglBerangkat)} s/d {formatDateID(current.tglPulang)}
+            {formatDateID(current.tglBerangkat)} {tr("s/d")} {formatDateID(current.tglPulang)}
           </div>
           <div>
             {statusBadge(current)} <span className="field-note" style={{ display: 'inline' }}>{tripDocNo(current)}</span>
           </div>
-          {current.keperluan && <div style={{ gridColumn: '1 / -1' }}>Keperluan: {current.keperluan}</div>}
+          {current.keperluan && <div style={{ gridColumn: '1 / -1' }}>{tr("Keperluan:")} {current.keperluan}</div>}
           {!!current.pesertaIds?.length && (
             <div style={{ gridColumn: '1 / -1' }}>
-              Peserta: <b>{current.pesertaIds.map((id) => roster.find((u) => u.id === id)?.name || '(user)').join(', ')}</b>
+              {tr("Peserta:")} <b>{current.pesertaIds.map((id) => roster.find((u) => u.id === id)?.name || '(user)').join(', ')}</b>
             </div>
           )}
           {current.approverName && (
             <div style={{ gridColumn: '1 / -1' }}>
-              {current.status === 'ditolak' ? 'Ditolak' : 'Disetujui'} oleh <b>{current.approverName}</b>
+              {current.status === 'ditolak' ? tr("Ditolak") : tr("Disetujui")} {tr("oleh")} <b>{current.approverName}</b>
               {current.approvedAt ? ` · ${new Date(current.approvedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}` : ''}
               {current.approvalNote ? ` — "${current.approvalNote}"` : ''}
             </div>
           )}
           {(current.status === 'disetujui' || current.status === 'selesai') && (
             <div style={{ gridColumn: '1 / -1' }}>
-              Realisasi: <b>{r.done}/{r.planned}</b> kunjungan rencana tercapai{r.extra ? ` · +${r.extra} di luar rencana` : ''}
+              {tr("Realisasi:")} <b>{r.done}/{r.planned}</b> {tr("kunjungan rencana tercapai")}{r.extra ? ` · +${r.extra} di luar rencana` : ''}
             </div>
           )}
         </div>
@@ -565,13 +567,13 @@ export function VisitTripModal() {
             <thead>
               <tr>
                 <th>#</th>
-                <th>Customer</th>
+                <th>{tr("Customer")}</th>
                 <th>PIC</th>
-                <th>Tgl</th>
-                <th>Tujuan kunjungan (rencana)</th>
-                <th>Realisasi</th>
-                <th>Hasil</th>
-                <th title="Personil yang ikut ke customer ini — kunjungan tercatat di Aktivitas Harian mereka">Personil ikut → Aktivitas Harian</th>
+                <th>{tr("Tgl")}</th>
+                <th>{tr("Tujuan kunjungan (rencana)")}</th>
+                <th>{tr("Realisasi")}</th>
+                <th>{tr("Hasil")}</th>
+                <th title={tr("Personil yang ikut ke customer ini — kunjungan tercatat di Aktivitas Harian mereka")}>{tr("Personil ikut → Aktivitas Harian")}</th>
                 {editReal && <th />}
               </tr>
             </thead>
@@ -581,11 +583,11 @@ export function VisitTripModal() {
                   <td>{i + 1}</td>
                   <td style={{ minWidth: 140 }}>
                     {editReal && v.tambahan ? (
-                      <CustomerNameInput value={v.customer} onChange={(val) => setReal(i, 'customer', val)} placeholder="Customer" />
+                      <CustomerNameInput value={v.customer} onChange={(val) => setReal(i, 'customer', val)} placeholder={tr("Customer")} />
                     ) : (
                       <b>{v.customer}</b>
                     )}
-                    {v.tambahan && <div className="field-note">di luar rencana</div>}
+                    {v.tambahan && <div className="field-note">{tr("di luar rencana")}</div>}
                   </td>
                   <td style={{ minWidth: 110 }}>
                     {editReal && v.tambahan ? <input type="text" list="tripPics" value={v.pic} onChange={(e) => setReal(i, 'pic', e.target.value)} placeholder="PIC" style={{ width: '100%' }} /> : v.pic || '-'}
@@ -594,15 +596,15 @@ export function VisitTripModal() {
                   <td style={{ minWidth: 180 }}>{v.tujuan}</td>
                   <td style={{ minWidth: 220 }}>
                     {editReal ? (
-                      <textarea value={v.realisasi} onChange={(e) => setReal(i, 'realisasi', e.target.value)} placeholder="Apa yang terjadi / hasil pembicaraan" style={{ width: '100%', minHeight: 54 }} />
+                      <textarea value={v.realisasi} onChange={(e) => setReal(i, 'realisasi', e.target.value)} placeholder={tr("Apa yang terjadi / hasil pembicaraan")} style={{ width: '100%', minHeight: 54 }} />
                     ) : (
-                      v.realisasi || <span className="field-note">belum diisi</span>
+                      v.realisasi || <span className="field-note">{tr("belum diisi")}</span>
                     )}
                   </td>
                   <td style={{ minWidth: 130 }}>
                     {editReal ? (
                       <select value={v.hasil} onChange={(e) => setReal(i, 'hasil', e.target.value)} style={{ width: '100%' }}>
-                        <option value="">— pilih —</option>
+                        <option value="">{tr("— pilih —")}</option>
                         {TRIP_HASIL.map((h) => (
                           <option key={h.key} value={h.key}>
                             {h.label}
@@ -619,7 +621,7 @@ export function VisitTripModal() {
                   {editReal && (
                     <td>
                       {v.tambahan && (
-                        <button type="button" className="icon-btn danger" title="Hapus" onClick={() => setRealVisits((list) => list.filter((_, idx) => idx !== i))}>
+                        <button type="button" className="icon-btn danger" title={tr("Hapus")} onClick={() => setRealVisits((list) => list.filter((_, idx) => idx !== i))}>
                           <IconTrash />
                         </button>
                       )}
@@ -632,14 +634,14 @@ export function VisitTripModal() {
         </div>
         {editReal && (
           <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 8 }} onClick={() => setRealVisits((list) => [...list, { ...blankVisit(), id: tmpId(), tambahan: true }])}>
-            <IconPlus /> Kunjungan di luar rencana
+            <IconPlus /> {tr("Kunjungan di luar rencana")}
           </button>
         )}
 
         {(editReal || current.status === 'selesai' || current.visits.some((v) => (v.uraian || '').trim()) || photos.length > 0) && (
           <>
-            <div style={{ fontWeight: 700, fontSize: 13, margin: '16px 0 4px' }}>Uraian realisasi &amp; foto kunjungan</div>
-            <div className="field-note" style={{ marginBottom: 6 }}>Ceritakan suasana dan isi kunjungan secara rinci. Uraian dan foto tercetak sebagai lampiran laporan kunjungan.</div>
+            <div style={{ fontWeight: 700, fontSize: 13, margin: '16px 0 4px' }}>{tr("Uraian realisasi & foto kunjungan")}</div>
+            <div className="field-note" style={{ marginBottom: 6 }}>{tr("Ceritakan suasana dan isi kunjungan secara rinci. Uraian dan foto tercetak sebagai lampiran laporan kunjungan.")}</div>
             {(editReal ? realVisits : current.visits).map((v, i) => {
               const vp = photos.filter((p) => p.visitId === v.id);
               const unsaved = !v.id || v.id.startsWith('new-');
@@ -648,18 +650,18 @@ export function VisitTripModal() {
                 <div className="rfq-item-card" key={`u-${v.id || i}`}>
                   <div className="rfq-item-head">
                     <span>
-                      {i + 1}. {v.customer || '(customer belum diisi)'}
+                      {i + 1}. {v.customer || tr("(customer belum diisi)")}
                       {v.pic ? ` · ${v.pic}` : ''}
                     </span>
                     <span className="field-note" style={{ margin: 0 }}>
-                      {vp.length} foto
+                      {vp.length} {tr("foto")}
                     </span>
                   </div>
                   {editReal ? (
                     <textarea
                       value={v.uraian || ''}
                       onChange={(e) => setReal(i, 'uraian', e.target.value)}
-                      placeholder="cth. Diterima Pak Rudi dan tim engineering di ruang meeting. Suasana terbuka; customer sedang mengevaluasi supplier tool steel karena masalah lead time pemasok lama. Kami presentasikan SKD11 & DC53, mereka minta sampel 2 grade dan penawaran untuk 3 bulan ke depan…"
+                      placeholder={tr("cth. Diterima Pak Rudi dan tim engineering di ruang meeting. Suasana terbuka; customer sedang mengevaluasi supplier tool steel karena masalah lead time pemasok lama. Kami presentasikan SKD11 & DC53, mereka minta sampel 2 grade dan penawaran untuk 3 bulan ke depan…")}
                       style={{ width: '100%', minHeight: 110 }}
                     />
                   ) : (
@@ -674,7 +676,7 @@ export function VisitTripModal() {
                             <img src={photoUrl(current.id, p.id)} alt={p.name} style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border)', display: 'block' }} />
                           </a>
                           {editReal && permD && (
-                            <button type="button" className="icon-btn danger" title="Hapus foto" onClick={() => deletePhoto(p)} style={{ position: 'absolute', top: 4, right: 4, background: '#fff' }}>
+                            <button type="button" className="icon-btn danger" title={tr("Hapus foto")} onClick={() => deletePhoto(p)} style={{ position: 'absolute', top: 4, right: 4, background: '#fff' }}>
                               <IconTrash />
                             </button>
                           )}
@@ -682,11 +684,11 @@ export function VisitTripModal() {
                       ))}
                       {editReal &&
                         (unsaved ? (
-                          <span className="field-note">Klik &quot;Simpan Realisasi&quot; dulu untuk menambah foto pada kunjungan baru ini.</span>
+                          <span className="field-note">{tr("Klik \"Simpan Realisasi\" dulu untuk menambah foto pada kunjungan baru ini.")}</span>
                         ) : (
                           vp.length < TRIP_PHOTO_MAX_PER_VISIT && (
                             <label className="btn btn-outline btn-sm" style={{ width: 120, height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', cursor: 'pointer', margin: 0 }}>
-                              {uploadingVisit === v.id ? 'Mengunggah…' : '+ Foto'}
+                              {uploadingVisit === v.id ? tr("Mengunggah…") : tr("+ Foto")}
                               <input
                                 type="file"
                                 accept="image/*"
@@ -712,40 +714,40 @@ export function VisitTripModal() {
         {editReal && (
           <>
             <div style={{ marginTop: 10 }}>
-              <label>Catatan realisasi</label>
-              <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Ringkasan perjalanan, temuan di cabang, tindak lanjut" style={{ width: '100%', minHeight: 54 }} />
+              <label>{tr("Catatan realisasi")}</label>
+              <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder={tr("Ringkasan perjalanan, temuan di cabang, tindak lanjut")} style={{ width: '100%', minHeight: 54 }} />
             </div>
           </>
         )}
         {!editReal && current.catatanRealisasi && (
           <div className="import-summary" style={{ marginTop: 10 }}>
-            <b>Catatan realisasi:</b> {current.catatanRealisasi}
+            <b>{tr("Catatan realisasi:")}</b> {current.catatanRealisasi}
           </div>
         )}
 
         {approve && (
           <div className="rfq-item-card" style={{ marginTop: 12, borderColor: 'var(--amber-600)' }}>
             <div className="rfq-item-head">
-              <span>Persetujuan</span>
+              <span>{tr("Persetujuan")}</span>
             </div>
-            <label>Catatan (wajib bila ditolak)</label>
-            <input type="text" value={approvalNote} onChange={(e) => setApprovalNote(e.target.value)} placeholder="cth. Tambahkan kunjungan ke PT X" style={{ width: '100%' }} />
+            <label>{tr("Catatan (wajib bila ditolak)")}</label>
+            <input type="text" value={approvalNote} onChange={(e) => setApprovalNote(e.target.value)} placeholder={tr("cth. Tambahkan kunjungan ke PT X")} style={{ width: '100%' }} />
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => doAction('approve', approvalNote)}>
-                Setujui
+                {tr("Setujui")}
               </button>
               <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => doAction('reject', approvalNote)}>
-                Tolak
+                {tr("Tolak")}
               </button>
             </div>
           </div>
         )}
         {current.status === 'selesai' && (
           <div className="field-note" style={{ marginTop: 10 }}>
-            Perjalanan selesai — klik <b>Cetak Laporan</b> untuk lampiran reimbursement ke Keuangan.
+            {tr("Perjalanan selesai — klik")} <b>{tr("Cetak Laporan")}</b> {tr("untuk lampiran reimbursement ke Keuangan.")}
           </div>
         )}
-        {isOwner && current.status === 'diajukan' && <div className="field-note" style={{ marginTop: 10 }}>Menunggu persetujuan {approverLabel(current.ownerRole)}. Realisasi dapat diisi setelah disetujui.</div>}
+        {isOwner && current.status === 'diajukan' && <div className="field-note" style={{ marginTop: 10 }}>{tr("Menunggu persetujuan")} {approverLabel(current.ownerRole)}{tr(". Realisasi dapat diisi setelah disetujui.")}</div>}
       </>
     );
   }
@@ -755,20 +757,20 @@ export function VisitTripModal() {
   if (view === 'list') {
     footer = (
       <button type="button" className="btn btn-outline" onClick={closeModal}>
-        Tutup
+        {tr("Tutup")}
       </button>
     );
   } else if (view === 'edit') {
     footer = (
       <>
         <button type="button" className="btn btn-outline" onClick={() => (current ? openDetail(current) : setView('list'))}>
-          Batal
+          {tr("Batal")}
         </button>
         <button type="button" className="btn btn-outline" disabled={busy} onClick={() => savePlan(false)}>
-          Simpan Draft
+          {tr("Simpan Draft")}
         </button>
         <button type="button" className="btn btn-primary" disabled={busy} onClick={() => savePlan(true)}>
-          {currentUser?.role === 'gm' ? 'Simpan & Tetapkan' : 'Simpan & Ajukan'}
+          {currentUser?.role === 'gm' ? tr("Simpan & Tetapkan") : tr("Simpan & Ajukan")}
         </button>
       </>
     );
@@ -777,40 +779,40 @@ export function VisitTripModal() {
     footer = (
       <>
         <button type="button" className="btn btn-outline" onClick={() => setView('list')} style={{ marginRight: 'auto' }}>
-          ← Daftar
+          {tr("← Daftar")}
         </button>
         {canNow('trip', 'x') && (
-          <button type="button" className={`btn ${current.status === 'selesai' ? 'btn-primary' : 'btn-outline'}`} onClick={() => onPrint(current)} title="Laporan kunjungan untuk lampiran reimbursement ke Keuangan">
-            Cetak Laporan
+          <button type="button" className={`btn ${current.status === 'selesai' ? 'btn-primary' : 'btn-outline'}`} onClick={() => onPrint(current)} title={tr("Laporan kunjungan untuk lampiran reimbursement ke Keuangan")}>
+            {tr("Cetak Laporan")}
           </button>
         )}
         {isOwner && permD && current.status === 'draft' && (
           <button type="button" className="btn btn-outline" disabled={busy} onClick={deleteDraft}>
-            Hapus Draft
+            {tr("Hapus Draft")}
           </button>
         )}
         {isOwner && permE && current.status !== 'selesai' && current.status !== 'batal' && current.status !== 'draft' && (
           <button type="button" className="btn btn-outline" disabled={busy} onClick={() => doAction('cancel')}>
-            Batalkan
+            {tr("Batalkan")}
           </button>
         )}
         {(permE && canEditPlan(currentUser, current)) && (
           <>
             <button type="button" className="btn btn-outline" onClick={() => openEdit(current)}>
-              Ubah Rencana
+              {tr("Ubah Rencana")}
             </button>
             <button type="button" className="btn btn-primary" disabled={busy} onClick={() => doAction('submit')}>
-              {current.ownerRole === 'gm' ? 'Tetapkan' : 'Ajukan'}
+              {current.ownerRole === 'gm' ? tr("Tetapkan") : tr("Ajukan")}
             </button>
           </>
         )}
         {(permE && canEditRealisasi(currentUser, current)) && (
           <>
             <button type="button" className="btn btn-outline" disabled={busy} onClick={() => saveRealisasi(false)}>
-              Simpan Realisasi
+              {tr("Simpan Realisasi")}
             </button>
             <button type="button" className="btn btn-primary" disabled={busy} onClick={() => saveRealisasi(true)}>
-              Selesaikan Perjalanan
+              {tr("Selesaikan Perjalanan")}
             </button>
           </>
         )}
@@ -837,6 +839,7 @@ const isField = (u: RosterUser) => u.role === 'sales' || u.role === 'bm';
  * tujuan) dan pratinjau baris Aktivitas Harian yang akan tercatat.
  */
 function PersonilCell({ trip, v, roster, edit, onChange }: { trip: VisitTrip; v: TripVisit; roster: RosterUser[]; edit: boolean; onChange: (ids: string[]) => void }) {
+  const tr = useT();
   const peserta = Array.isArray(trip.pesertaIds) ? trip.pesertaIds : [];
   const base = [trip.ownerId, ...peserta];
   const local = roster.filter((u) => (u.role === 'sales' || u.role === 'bm') && up(u.cabang) === up(trip.cabang) && !base.includes(u.id)).map((u) => u.id);
@@ -865,7 +868,7 @@ function PersonilCell({ trip, v, roster, edit, onChange }: { trip: VisitTrip; v:
       )}
       <div className="field-note" style={{ margin: '3px 0 0' }}>
         {!counts
-          ? v.hasil === 'batal' ? 'Tidak dicatat (tidak jadi dikunjungi).' : 'Tercatat setelah realisasi diisi.'
+          ? v.hasil === 'batal' ? tr("Tidak dicatat (tidak jadi dikunjungi).") : tr("Tercatat setelah realisasi diisi.")
           : `→ ${[
               ...owners.map((u) => `${u.name}${others(u.id).length ? ` (didampingi ${others(u.id).join(', ')})` : ''}`),
               ...(users.some(isField) ? [] : [`Sales pemilik customer di ${trip.cabang}${users.length ? ` (didampingi ${users.map((u) => u.name).join(', ')})` : ''}`]),

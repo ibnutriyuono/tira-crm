@@ -10,7 +10,9 @@ import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
+import { useT } from '@/store/useLangStore';
 export function ImportModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'import';
   const target = useUiStore((s) => s.importTarget);
@@ -152,10 +154,10 @@ export function ImportModal() {
               reset();
             }}
           >
-            Batal
+            {tr("Batal")}
           </button>
           <button type="button" className="btn btn-primary" disabled={parsed.length === 0 || busy} onClick={onConfirm}>
-            Import Data
+            {tr("Import Data")}
           </button>
         </>
       }
@@ -175,7 +177,7 @@ export function ImportModal() {
         }}
       >
         <IconUpload />
-        <div>Klik atau tarik file .xlsx ke sini</div>
+        <div>{tr("Klik atau tarik file .xlsx ke sini")}</div>
         <div style={{ fontSize: 11.5, marginTop: 4 }}>{hint}</div>
         <div className="file-name">{fileName}</div>
       </div>
@@ -192,7 +194,7 @@ export function ImportModal() {
         <div>
           <div className="form-grid" style={{ marginTop: 14 }}>
             <div className="full">
-              <label>Pilih Sheet</label>
+              <label>{tr("Pilih Sheet")}</label>
               <select value={sheetName} onChange={(e) => onSheetChange(e.target.value)}>
                 {sheetNames.map((n) => (
                   <option key={n} value={n}>
@@ -205,28 +207,28 @@ export function ImportModal() {
           <div className="import-summary">
             {parseError ? (
               <>
-                <b style={{ color: 'var(--rust-500)' }}>Gagal membaca sheet:</b> {parseError}
+                <b style={{ color: 'var(--rust-500)' }}>{tr("Gagal membaca sheet:")}</b> {parseError}
               </>
             ) : target === 'vendor' ? (
               <>
-                Ditemukan <b>{parsed.length}</b> baris data vendor pada sheet &quot;<b>{sheetName}</b>&quot;.
+                {tr("Ditemukan")} <b>{parsed.length}</b> {tr("baris data vendor pada sheet \"")}<b>{sheetName}</b>{tr("\".")}
               </>
             ) : target === 'customer' ? (
               <>
-                Ditemukan <b>{parsed.length}</b> baris data customer pada sheet &quot;<b>{sheetName}</b>&quot;.
+                {tr("Ditemukan")} <b>{parsed.length}</b> {tr("baris data customer pada sheet \"")}<b>{sheetName}</b>{tr("\".")}
               </>
             ) : (
               <>
-                Ditemukan <b>{parsed.length}</b> baris data prospek pada sheet &quot;<b>{sheetName}</b>&quot;. Total estimasi nilai: <b>{formatRupiah(parsed.reduce((s, r) => s + num((r as { value?: unknown }).value), 0))}</b>.
+                {tr("Ditemukan")} <b>{parsed.length}</b> {tr("baris data prospek pada sheet \"")}<b>{sheetName}</b>{tr("\". Total estimasi nilai:")} <b>{formatRupiah(parsed.reduce((s, r) => s + num((r as { value?: unknown }).value), 0))}</b>.
               </>
             )}
           </div>
           <div className="radio-row">
             <label>
-              <input type="radio" name="importMode" checked={mode === 'append'} onChange={() => setMode('append')} /> Tambahkan ke data yang ada
+              <input type="radio" name="importMode" checked={mode === 'append'} onChange={() => setMode('append')} /> {tr("Tambahkan ke data yang ada")}
             </label>
             <label>
-              <input type="radio" name="importMode" checked={mode === 'replace'} onChange={() => setMode('replace')} /> Ganti seluruh data
+              <input type="radio" name="importMode" checked={mode === 'replace'} onChange={() => setMode('replace')} /> {tr("Ganti seluruh data")}
             </label>
           </div>
         </div>

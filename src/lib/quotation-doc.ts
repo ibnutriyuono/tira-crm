@@ -26,7 +26,11 @@ export interface QuoteSigner {
   email: string;
 }
 
+export type QuoteLang = 'id' | 'en';
+
 export interface QuoteData {
+  /** Bahasa surat: Indonesia (bawaan) atau Inggris. */
+  lang?: QuoteLang;
   nomor: string;
   tanggal: string;
   kota: string;
@@ -117,6 +121,47 @@ export function normalizeQuoteOpts(raw: unknown): QuoteOpts {
   return o;
 }
 
+
+/** Teks tetap surat per bahasa. */
+const QL = {
+  id: {
+    nomor: 'Nomor', lampiran: 'Lampiran', perihal: 'Perihal', kepada: 'Kepada Yth.', up: 'Up.',
+    pembuka: 'Dengan hormat,',
+    intro: 'Menindaklanjuti permintaan Bapak/Ibu, bersama ini kami sampaikan penawaran harga dengan rincian sebagai berikut:',
+    penutup: (to: string) => `Demikian penawaran ini kami sampaikan. Besar harapan kami dapat bekerja sama dengan ${to || 'Bapak/Ibu'}. Atas perhatian dan kepercayaan Bapak/Ibu, kami ucapkan terima kasih.`,
+    hormat: 'Hormat kami,', telp: 'Telp/WA', email: 'Email',
+    colNo: 'No', colLine: 'Line', colUraian: 'Uraian Material', colGrade: 'Grade', colQty: 'Qty', colSatuan: 'Satuan',
+    colBerat: 'Berat/pcs (kg)', colTBerat: 'Total Berat (kg)', colHargaKg: 'Harga/kg', colHarga: 'Harga Satuan', colJumlah: 'Jumlah',
+    dpp: 'Dasar Pengenaan Pajak (DPP)', ppn: 'PPN 11%', totalIncl: 'Total (termasuk PPN 11%)', totalExcl: 'Total (belum termasuk PPN 11%)', subtotal: 'Subtotal', total: 'Total',
+    terbilang: 'Terbilang', syarat: 'Syarat & Ketentuan', catatan: 'Catatan',
+    pembayaran: 'Pembayaran', pengiriman: 'Pengiriman', kondisiStock: 'Kondisi Stock', berlaku: 'Masa Berlaku', harga: 'Harga',
+    hargaIncl: 'Sudah termasuk PPN 11%', hargaExcl: 'Belum termasuk PPN 11%',
+    headerDoc: 'Surat Penawaran No.', halaman: 'Halaman', dari: 'dari', judulDoc: 'Surat Penawaran',
+  },
+  en: {
+    nomor: 'Ref. No.', lampiran: 'Attachment', perihal: 'Subject', kepada: 'To:', up: 'Attn.',
+    pembuka: 'Dear Sir/Madam,',
+    intro: 'Following up on your inquiry, we are pleased to submit our price quotation as follows:',
+    penutup: (to: string) => `We hope this quotation meets your requirements and look forward to working with ${to || 'you'}. Thank you for your attention and trust.`,
+    hormat: 'Sincerely,', telp: 'Phone/WA', email: 'Email',
+    colNo: 'No', colLine: 'Line', colUraian: 'Description', colGrade: 'Grade', colQty: 'Qty', colSatuan: 'Unit',
+    colBerat: 'Weight/pcs (kg)', colTBerat: 'Total Weight (kg)', colHargaKg: 'Price/kg', colHarga: 'Unit Price', colJumlah: 'Amount',
+    dpp: 'Tax Base (DPP)', ppn: 'VAT 11%', totalIncl: 'Total (incl. VAT 11%)', totalExcl: 'Total (excl. VAT 11%)', subtotal: 'Subtotal', total: 'Total',
+    terbilang: 'In words', syarat: 'Terms & Conditions', catatan: 'Notes',
+    pembayaran: 'Payment', pengiriman: 'Delivery', kondisiStock: 'Stock Condition', berlaku: 'Validity', harga: 'Price',
+    hargaIncl: 'Including VAT 11%', hargaExcl: 'Excluding VAT 11%',
+    headerDoc: 'Quotation No.', halaman: 'Page', dari: 'of', judulDoc: 'Quotation',
+  },
+};
+export type QuoteLabels = (typeof QL)['id'];
+export const quoteLabels = (lang?: QuoteLang): QuoteLabels => QL[lang === 'en' ? 'en' : 'id'];
+
+/** Isian bawaan per bahasa (perihal, syarat). */
+export const QUOTE_DEFAULTS: Record<QuoteLang, { perihal: string; pembayaran: string; pengiriman: string; berlaku: string }> = {
+  id: { perihal: 'Penawaran Harga', pembayaran: '30 hari setelah invoice diterima', pengiriman: '2-4 minggu setelah PO diterima / sesuai kondisi stock', berlaku: '14 hari kerja sejak tanggal penawaran' },
+  en: { perihal: 'Price Quotation', pembayaran: '30 days after receipt of invoice', pengiriman: '2-4 weeks after receipt of PO / subject to stock availability', berlaku: '14 working days from the quotation date' },
+};
+
 export const PPN_RATE = 0.11;
 
 export const unitPrice = (it: QuoteItem) => (it.beratPc > 0 && it.hargaKg > 0 ? it.beratPc * it.hargaKg : num(it.harga));
@@ -139,17 +184,18 @@ export interface QuoteCol {
 /** Kolom tabel sesuai opsi; berat & harga/kg hanya muncul bila ada material yang dihitung per kg. */
 export function quoteColumns(d: QuoteData, o: QuoteOpts): QuoteCol[] {
   const perKg = d.items.some((it) => it.beratPc > 0 && it.hargaKg > 0);
-  const cols: QuoteCol[] = [{ key: 'no', label: 'No', w: 5, align: 'center', cell: (_it, i) => String(i + 1) }];
-  if (o.colLine) cols.push({ key: 'line', label: 'Line', w: 6, align: 'center', cell: (it) => it.line || '-' });
-  cols.push({ key: 'uraian', label: 'Uraian Material', w: 30, align: 'left', cell: (it) => it.uraian });
-  if (o.colGrade) cols.push({ key: 'grade', label: 'Grade', w: 12, align: 'left', cell: (it) => it.grade || '-' });
-  cols.push({ key: 'qty', label: 'Qty', w: 6, align: 'center', cell: (it) => qtyFmt(it.qty) });
-  if (o.colSatuan) cols.push({ key: 'satuan', label: 'Satuan', w: 8, align: 'center', cell: (it) => it.satuan || 'pcs' });
-  if (o.colBerat && perKg) cols.push({ key: 'berat', label: 'Berat/pcs (kg)', w: 10, align: 'right', cell: (it) => (it.beratPc > 0 ? kg(it.beratPc) : '-') });
-  if (o.colTotalBerat && perKg) cols.push({ key: 'tberat', label: 'Total Berat (kg)', w: 10, align: 'right', cell: (it) => (it.beratPc > 0 ? kg(it.beratPc * it.qty) : '-') });
-  if (o.colHargaKg && perKg) cols.push({ key: 'hkg', label: 'Harga/kg', w: 11, align: 'right', cell: (it) => (it.hargaKg > 0 && it.beratPc > 0 ? rupiah(it.hargaKg) : '-') });
-  if (o.colHarga) cols.push({ key: 'harga', label: 'Harga Satuan', w: 15, align: 'right', cell: (it) => rupiah(unitPrice(it)) });
-  cols.push({ key: 'jumlah', label: 'Jumlah', w: 17, align: 'right', cell: (it) => rupiah(lineTotal(it)) });
+  const L = quoteLabels(d.lang);
+  const cols: QuoteCol[] = [{ key: 'no', label: L.colNo, w: 5, align: 'center', cell: (_it, i) => String(i + 1) }];
+  if (o.colLine) cols.push({ key: 'line', label: L.colLine, w: 6, align: 'center', cell: (it) => it.line || '-' });
+  cols.push({ key: 'uraian', label: L.colUraian, w: 30, align: 'left', cell: (it) => it.uraian });
+  if (o.colGrade) cols.push({ key: 'grade', label: L.colGrade, w: 12, align: 'left', cell: (it) => it.grade || '-' });
+  cols.push({ key: 'qty', label: L.colQty, w: 6, align: 'center', cell: (it) => qtyFmt(it.qty) });
+  if (o.colSatuan) cols.push({ key: 'satuan', label: L.colSatuan, w: 8, align: 'center', cell: (it) => it.satuan || 'pcs' });
+  if (o.colBerat && perKg) cols.push({ key: 'berat', label: L.colBerat, w: 10, align: 'right', cell: (it) => (it.beratPc > 0 ? kg(it.beratPc) : '-') });
+  if (o.colTotalBerat && perKg) cols.push({ key: 'tberat', label: L.colTBerat, w: 10, align: 'right', cell: (it) => (it.beratPc > 0 ? kg(it.beratPc * it.qty) : '-') });
+  if (o.colHargaKg && perKg) cols.push({ key: 'hkg', label: L.colHargaKg, w: 11, align: 'right', cell: (it) => (it.hargaKg > 0 && it.beratPc > 0 ? rupiah(it.hargaKg) : '-') });
+  if (o.colHarga) cols.push({ key: 'harga', label: L.colHarga, w: 15, align: 'right', cell: (it) => rupiah(unitPrice(it)) });
+  cols.push({ key: 'jumlah', label: L.colJumlah, w: 17, align: 'right', cell: (it) => rupiah(lineTotal(it)) });
   return cols;
 }
 
@@ -160,24 +206,25 @@ export interface QuoteTotals {
 
 export function quoteTotals(d: QuoteData, o: QuoteOpts): QuoteTotals {
   const sum = d.items.reduce((s, it) => s + lineTotal(it), 0);
+  const L = quoteLabels(d.lang);
   if (d.ppnInclude) {
     const dpp = Math.round(sum / (1 + PPN_RATE));
     const rows = o.ppnRinci
       ? [
-          { label: 'Dasar Pengenaan Pajak (DPP)', value: rupiah(dpp) },
-          { label: 'PPN 11%', value: rupiah(sum - dpp) },
-          { label: 'Total (termasuk PPN 11%)', value: rupiah(sum), bold: true },
+          { label: L.dpp, value: rupiah(dpp) },
+          { label: L.ppn, value: rupiah(sum - dpp) },
+          { label: L.totalIncl, value: rupiah(sum), bold: true },
         ]
-      : [{ label: 'Total (termasuk PPN 11%)', value: rupiah(sum), bold: true }];
+      : [{ label: L.totalIncl, value: rupiah(sum), bold: true }];
     return { rows, grand: sum };
   }
   const ppn = Math.round(sum * PPN_RATE);
-  if (!o.ppnRinci) return { rows: [{ label: 'Total (belum termasuk PPN 11%)', value: rupiah(sum), bold: true }], grand: sum };
+  if (!o.ppnRinci) return { rows: [{ label: L.totalExcl, value: rupiah(sum), bold: true }], grand: sum };
   return {
     rows: [
-      { label: 'Subtotal', value: rupiah(sum) },
-      { label: 'PPN 11%', value: rupiah(ppn) },
-      { label: 'Total', value: rupiah(sum + ppn), bold: true },
+      { label: L.subtotal, value: rupiah(sum) },
+      { label: L.ppn, value: rupiah(ppn) },
+      { label: L.total, value: rupiah(sum + ppn), bold: true },
     ],
     grand: sum + ppn,
   };
@@ -199,14 +246,33 @@ function words(n: number): string {
 }
 
 /** 23429952 -> "Dua puluh tiga juta empat ratus dua puluh sembilan ribu sembilan ratus lima puluh dua rupiah" */
-export function terbilang(n: number): string {
+const EN_ONES = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const EN_TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+function wordsEn(n: number): string {
+  if (n < 20) return EN_ONES[n];
+  if (n < 100) return `${EN_TENS[Math.floor(n / 10)]}${n % 10 ? `-${EN_ONES[n % 10]}` : ''}`;
+  if (n < 1000) return `${EN_ONES[Math.floor(n / 100)]} hundred${n % 100 ? ` ${wordsEn(n % 100)}` : ''}`;
+  const scales: [number, string][] = [[1e12, 'trillion'], [1e9, 'billion'], [1e6, 'million'], [1e3, 'thousand']];
+  for (const [v, w] of scales) if (n >= v) return `${wordsEn(Math.floor(n / v))} ${w}${n % v ? ` ${wordsEn(n % v)}` : ''}`;
+  return '';
+}
+
+/** 23429952 -> "Twenty-three million four hundred twenty-nine thousand nine hundred fifty-two rupiah" */
+export function terbilangEn(n: number): string {
+  const v = Math.round(Math.abs(num(n)));
+  const s = v === 0 ? 'zero' : wordsEn(v);
+  return `${s.charAt(0).toUpperCase()}${s.slice(1)} rupiah`;
+}
+
+export function terbilang(n: number, lang?: QuoteLang): string {
+  if (lang === 'en') return terbilangEn(n);
   const v = Math.round(Math.abs(num(n)));
   const s = v === 0 ? 'nol' : words(v).replace(/\s+/g, ' ').trim();
   return `${s.charAt(0).toUpperCase()}${s.slice(1)} rupiah`;
 }
 
-export function formatTanggalSurat(iso: string): string {
-  const bulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+export function formatTanggalSurat(iso: string, lang?: QuoteLang): string {
+  const bulan = lang === 'en' ? ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] : ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   const d = new Date(`${iso}T00:00:00`);
   if (!iso || Number.isNaN(d.getTime())) return iso || '';
   return `${d.getDate()} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
@@ -214,24 +280,26 @@ export function formatTanggalSurat(iso: string): string {
 
 /** Teks tetap surat (dipakai pratinjau & .docx). */
 export function quoteTexts(d: QuoteData) {
+  const L = quoteLabels(d.lang);
   return {
     company: 'PT. TIRA AUSTENITE, Tbk',
     division: 'STEEL DIVISION',
-    tempatTanggal: [d.kota.trim(), formatTanggalSurat(d.tanggal)].filter(Boolean).join(', '),
-    pembuka: 'Dengan hormat,',
-    intro: 'Menindaklanjuti permintaan Bapak/Ibu, bersama ini kami sampaikan penawaran harga dengan rincian sebagai berikut:',
-    penutup: `Demikian penawaran ini kami sampaikan. Besar harapan kami dapat bekerja sama dengan ${d.kepada.trim() || 'Bapak/Ibu'}. Atas perhatian dan kepercayaan Bapak/Ibu, kami ucapkan terima kasih.`,
+    tempatTanggal: [d.kota.trim(), formatTanggalSurat(d.tanggal, d.lang)].filter(Boolean).join(', '),
+    pembuka: L.pembuka,
+    intro: L.intro,
+    penutup: L.penutup(d.kepada.trim()),
   };
 }
 
 /** Baris Syarat & Ketentuan yang tampil (label, isi). */
 export function quoteTerms(d: QuoteData, o: QuoteOpts): [string, string][] {
+  const L = quoteLabels(d.lang);
   const t: [string, string][] = [];
-  if (o.pembayaran && d.pembayaran.trim()) t.push(['Pembayaran', d.pembayaran.trim()]);
-  if (o.pengiriman && d.pengiriman.trim()) t.push(['Pengiriman', d.pengiriman.trim()]);
-  if (o.kondisiStock && d.kondisiStock.trim()) t.push(['Kondisi Stock', d.kondisiStock.trim()]);
-  if (o.berlaku && d.berlaku.trim()) t.push(['Masa Berlaku', d.berlaku.trim()]);
-  t.push(['Harga', d.ppnInclude ? 'Sudah termasuk PPN 11%' : 'Belum termasuk PPN 11%']);
+  if (o.pembayaran && d.pembayaran.trim()) t.push([L.pembayaran, d.pembayaran.trim()]);
+  if (o.pengiriman && d.pengiriman.trim()) t.push([L.pengiriman, d.pengiriman.trim()]);
+  if (o.kondisiStock && d.kondisiStock.trim()) t.push([L.kondisiStock, d.kondisiStock.trim()]);
+  if (o.berlaku && d.berlaku.trim()) t.push([L.berlaku, d.berlaku.trim()]);
+  t.push([L.harga, d.ppnInclude ? L.hargaIncl : L.hargaExcl]);
   return t;
 }
 
@@ -241,6 +309,7 @@ const br = (s: string) => esc(s).replace(/\n/g, '<br>');
 /** Pratinjau surat (HTML) — tata letak sama dengan file .docx. */
 export function quoteHtml(d: QuoteData, o: QuoteOpts, logoSrc: string, signatureSrc = ''): string {
   const tx = quoteTexts(d);
+  const L = quoteLabels(d.lang);
   const cols = quoteColumns(d, o);
   const tot = quoteTotals(d, o);
   const wsum = cols.reduce((s, c) => s + c.w, 0);
@@ -250,27 +319,27 @@ export function quoteHtml(d: QuoteData, o: QuoteOpts, logoSrc: string, signature
     ? `<table class="qp-kop"><tr><td style="width:70px"><img src="${esc(logoSrc)}" alt=""></td><td><div class="qp-co">${tx.company}</div><div class="qp-div">${tx.division}</div>${d.kopText.trim() ? `<div class="qp-kt">${br(d.kopText.trim())}</div>` : ''}</td></tr></table>`
     : '';
   const meta = [
-    ['Nomor', d.nomor],
-    ...(o.lampiran ? [['Lampiran', d.lampiran || '-']] : []),
-    ['Perihal', d.perihal],
+    [L.nomor, d.nomor],
+    ...(o.lampiran ? [[L.lampiran, d.lampiran || '-']] : []),
+    [L.perihal, d.perihal],
   ];
   return `<div class="qp">
   ${head}
-  <table class="qp-meta"><tr><td>${meta.map(([k, v]) => `<div><span class="qp-k">${k}</span>: ${k === 'Perihal' ? `<b>${esc(v)}</b>` : esc(v)}</div>`).join('')}</td><td class="qp-date">${esc(tx.tempatTanggal)}</td></tr></table>
-  <p>Kepada Yth.<br><b>${esc(d.kepada)}</b>${o.alamat && d.alamat.trim() ? `<br>${br(d.alamat.trim())}` : ''}${o.pic && d.pic.trim() ? `<br>Up. ${esc(d.pic.trim())}` : ''}</p>
+  <table class="qp-meta"><tr><td>${meta.map(([k, v]) => `<div><span class="qp-k">${k}</span>: ${k === L.perihal ? `<b>${esc(v)}</b>` : esc(v)}</div>`).join('')}</td><td class="qp-date">${esc(tx.tempatTanggal)}</td></tr></table>
+  <p>${L.kepada}<br><b>${esc(d.kepada)}</b>${o.alamat && d.alamat.trim() ? `<br>${br(d.alamat.trim())}` : ''}${o.pic && d.pic.trim() ? `<br>${L.up} ${esc(d.pic.trim())}` : ''}</p>
   <p>${tx.pembuka}</p>
   <p>${tx.intro}</p>
   <table class="qp-tbl"><thead><tr>${cols.map((c) => `<th style="width:${((c.w / wsum) * 100).toFixed(1)}%;text-align:${c.align}">${c.label}</th>`).join('')}</tr></thead>
   <tbody>${items.map((it, i) => `<tr>${cols.map((c) => `<td style="text-align:${c.align}">${esc(c.cell(it, i))}</td>`).join('')}</tr>`).join('')}
   ${tot.rows.map((r) => `<tr class="${r.bold ? 'qp-grand' : 'qp-sub'}"><td colspan="${cols.length - 1}" style="text-align:right">${esc(r.label)}</td><td style="text-align:right">${esc(r.value)}</td></tr>`).join('')}
   </tbody></table>
-  ${o.terbilang ? `<p class="qp-terb">Terbilang: <i>${esc(terbilang(tot.grand))}</i></p>` : ''}
-  <p class="qp-h">Syarat &amp; Ketentuan</p>
+  ${o.terbilang ? `<p class="qp-terb">${L.terbilang}: <i>${esc(terbilang(tot.grand, d.lang))}</i></p>` : ''}
+  <p class="qp-h">${esc(L.syarat)}</p>
   <table class="qp-terms">${terms.map(([k, v]) => `<tr><td class="qp-k">${k}</td><td>: ${esc(v)}</td></tr>`).join('')}</table>
-  ${o.catatan && d.catatan.trim() ? `<p class="qp-h">Catatan</p><p>${br(d.catatan.trim())}</p>` : ''}
+  ${o.catatan && d.catatan.trim() ? `<p class="qp-h">${L.catatan}</p><p>${br(d.catatan.trim())}</p>` : ''}
   <p>${esc(tx.penutup)}</p>
-  <p>Hormat kami,<br>${tx.company}</p>
+  <p>${L.hormat}<br>${tx.company}</p>
   ${o.ttdGambar && signatureSrc ? `<div class="qp-sig"><img src="${esc(signatureSrc)}" alt=""></div>` : o.ttd ? '<div class="qp-ttd"></div>' : ''}
-  <p><b><u>${esc(d.signer.nama)}</u></b>${d.signer.jabatan.trim() ? `<br>${esc(d.signer.jabatan.trim())}` : ''}${o.kontak ? [d.signer.telp.trim() && `Telp/WA: ${esc(d.signer.telp.trim())}`, d.signer.email.trim() && `Email: ${esc(d.signer.email.trim())}`].filter(Boolean).map((x) => `<br><span class="qp-small">${x}</span>`).join('') : ''}</p>
+  <p><b><u>${esc(d.signer.nama)}</u></b>${d.signer.jabatan.trim() ? `<br>${esc(d.signer.jabatan.trim())}` : ''}${o.kontak ? [d.signer.telp.trim() && `${L.telp}: ${esc(d.signer.telp.trim())}`, d.signer.email.trim() && `${L.email}: ${esc(d.signer.email.trim())}`].filter(Boolean).map((x) => `<br><span class="qp-small">${x}</span>`).join('') : ''}</p>
 </div>`;
 }

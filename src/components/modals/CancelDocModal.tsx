@@ -7,6 +7,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Fupa, Rfq } from '@/lib/types';
 
+import { useT } from '@/store/useLangStore';
 /**
  * Membatalkan RFQ/FUP A — dokumennya tidak dihapus, hanya berubah status
  * jadi "Dibatalkan" beserta alasannya, jadi riwayatnya tetap terbaca.
@@ -14,6 +15,7 @@ import type { Fupa, Rfq } from '@/lib/types';
  * dibatalkan.
  */
 export function CancelDocModal() {
+  const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'cancelDoc';
   const ctx = useUiStore((s) => s.cancelDocCtx);
@@ -62,29 +64,29 @@ export function CancelDocModal() {
       footer={
         <>
           <button type="button" className="btn btn-outline" onClick={closeModal}>
-            Tutup
+            {tr("Tutup")}
           </button>
           <button type="button" className={ctx.cancelled ? 'btn btn-primary' : 'btn btn-danger'} onClick={submit} disabled={busy || (!ctx.cancelled && reason.trim().length < 5)}>
-            {ctx.cancelled ? 'Aktifkan Kembali' : 'Batalkan'}
+            {ctx.cancelled ? tr("Aktifkan Kembali") : tr("Batalkan")}
           </button>
         </>
       }
     >
       {ctx.cancelled ? (
         <p>
-          Aktifkan kembali {label} <b>{ctx.noDoc || '(tanpa nomor)'}</b> untuk {ctx.customer || '-'}? Statusnya akan kembali mengikuti progres terakhir, dan catatan pembatalan sebelumnya dihapus.
+          {tr("Aktifkan kembali")} {label} <b>{ctx.noDoc || tr("(tanpa nomor)")}</b> {tr("untuk")} {ctx.customer || '-'}{tr("? Statusnya akan kembali mengikuti progres terakhir, dan catatan pembatalan sebelumnya dihapus.")}
         </p>
       ) : (
         <>
           <p>
-            Batalkan {label} <b>{ctx.noDoc || '(tanpa nomor)'}</b> untuk {ctx.customer || '-'}?
+            {tr("Batalkan")} {label} <b>{ctx.noDoc || tr("(tanpa nomor)")}</b> {tr("untuk")} {ctx.customer || '-'}?
           </p>
           <div className="form-grid" style={{ marginTop: 12 }}>
             <div className="full">
-              <label>Alasan Pembatalan *</label>
-              <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="cth. Customer membatalkan permintaan, duplikat dengan RFQ-0012, salah input..." autoFocus />
+              <label>{tr("Alasan Pembatalan *")}</label>
+              <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={tr("cth. Customer membatalkan permintaan, duplikat dengan RFQ-0012, salah input...")} autoFocus />
               <div className="field-note">
-                Wajib diisi (minimal 5 karakter). Dokumen <b>tidak dihapus</b> — statusnya berubah jadi &quot;Dibatalkan&quot; dan tetap tampil di daftar beserta alasan, nama pembatal, dan waktunya. Bisa diaktifkan kembali kalau ternyata salah.
+                {tr("Wajib diisi (minimal 5 karakter). Dokumen")} <b>{tr("tidak dihapus")}</b> {tr("— statusnya berubah jadi \"Dibatalkan\" dan tetap tampil di daftar beserta alasan, nama pembatal, dan waktunya. Bisa diaktifkan kembali kalau ternyata salah.")}
               </div>
             </div>
           </div>

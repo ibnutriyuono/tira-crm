@@ -24,6 +24,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { ItemChat } from '../ItemChat';
 import { openPurchDoc } from '@/hooks/useCrmSocket';
 
+import { useT } from '@/store/useLangStore';
 export interface RosterUser {
   id: string;
   username: string;
@@ -103,17 +104,18 @@ function plusDays(n: number) {
 
 /** PJ: chip user + tambah user dari daftar; PJ pertama = utama. */
 export function PjPicker({ value, onChange, roster, suggested, disabled }: { value: string[]; onChange: (v: string[]) => void; roster: RosterUser[]; suggested: string[]; disabled?: boolean }) {
+  const tr = useT();
   return (
     <div className="issue-pj">
       <div className="issue-pj-chips">
-        {value.length === 0 && <span className="field-note" style={{ margin: 0 }}>Belum ada penanggung jawab.</span>}
+        {value.length === 0 && <span className="field-note" style={{ margin: 0 }}>{tr("Belum ada penanggung jawab.")}</span>}
         {value.map((id, i) => {
           const u = roster.find((x) => x.id === id);
           return (
             <span key={id} className="kam-chip">
-              {u ? u.name : '(user)'}
+              {u ? u.name : tr("(user)")}
               <span className="issue-pj-role">{u ? `${ROLE_LABELS[u.role] || u.role}${u.cabang ? ` ${u.cabang}` : ''}` : ''}</span>
-              {i === 0 ? <span className="badge steel issue-pj-tag">utama</span> : suggested.includes(id) ? <span className="badge amber issue-pj-tag">usulan</span> : null}
+              {i === 0 ? <span className="badge steel issue-pj-tag">{tr("utama")}</span> : suggested.includes(id) ? <span className="badge amber issue-pj-tag">{tr("usulan")}</span> : null}
               {!disabled && (
                 <button type="button" aria-label={`Hapus ${u?.name || ''}`} onClick={() => onChange(value.filter((x) => x !== id))}>
                   ×
@@ -125,7 +127,7 @@ export function PjPicker({ value, onChange, roster, suggested, disabled }: { val
       </div>
       {!disabled && (
         <select value="" onChange={(e) => e.target.value && onChange([...value, e.target.value])}>
-          <option value="">+ Tambah penanggung jawab (pilih user)…</option>
+          <option value="">{tr("+ Tambah penanggung jawab (pilih user)…")}</option>
           {roster.filter((u) => !value.includes(u.id) && u.role !== 'admin').map((u) => (
             <option key={u.id} value={u.id}>{userLabel(u)}</option>
           ))}
@@ -150,6 +152,7 @@ export function IssueForm({ mode, prospect, issue, kategoriAwal, saran, onDone, 
   onDone: (i: PipelineIssue) => void;
   onCancel: () => void;
 }) {
+  const tr = useT();
   const roster = useRoster();
   const groups = useDataStore((s) => s.customerGroups);
   const toast = useDataStore((s) => s.toast);
@@ -217,12 +220,12 @@ export function IssueForm({ mode, prospect, issue, kategoriAwal, saran, onDone, 
   return (
     <div className="issue-form">
       <div className="issue-form-head">
-        <b>{mode === 'usulan' ? '⚑ Ajukan masalah ke BM' : mode === 'terima' ? `⚑ Proses usulan dari ${issue?.diajukanNama || 'Sales'}` : '⚑ Laporkan masalah'}</b>
+        <b>{mode === 'usulan' ? tr("⚑ Ajukan masalah ke BM") : mode === 'terima' ? `⚑ Proses usulan dari ${issue?.diajukanNama || 'Sales'}` : tr("⚑ Laporkan masalah")}</b>
         <span className="field-note" style={{ margin: 0 }}>
           {prospect.customer} · <span className="mono">{formatRupiah(Number(prospect.value) || 0)}</span> · {prospect.se || '-'} {prospect.cabang || ''}
         </span>
       </div>
-      <label>Kategori masalah *</label>
+      <label>{tr("Kategori masalah *")}</label>
       <div className="sa-pills">
         {ISSUE_CATS.map((c) => (
           <button key={c.key} type="button" className={kategori === c.key ? 'on' : ''} aria-pressed={kategori === c.key} onClick={() => pickKategori(c.key)}>
@@ -232,14 +235,14 @@ export function IssueForm({ mode, prospect, issue, kategoriAwal, saran, onDone, 
       </div>
       {withPj && (
         <>
-          <label>Penanggung jawab * · {pjIds.length} orang</label>
+          <label>{tr("Penanggung jawab * ·")} {pjIds.length} {tr("orang")}</label>
           <PjPicker value={pjIds} onChange={setPjIds} roster={roster} suggested={sug} />
-          <div className="field-note" style={{ margin: 0 }}>Usulan otomatis dari kategori — boleh dihapus atau ditambah user lain. Semua PJ mendapat notifikasi & ikut diskusi kartu; yang pertama = PJ utama.</div>
+          <div className="field-note" style={{ margin: 0 }}>{tr("Usulan otomatis dari kategori — boleh dihapus atau ditambah user lain. Semua PJ mendapat notifikasi & ikut diskusi kartu; yang pertama = PJ utama.")}</div>
         </>
       )}
       <div className="form-grid" style={{ marginTop: 6 }}>
         <div>
-          <label>Urgensi</label>
+          <label>{tr("Urgensi")}</label>
           <div className="sa-pills">
             {URGENSI.map((u) => (
               <button key={u.key} type="button" className={urgensi === u.key ? 'on' : ''} aria-pressed={urgensi === u.key} onClick={() => setUrgensi(u.key)}>
@@ -249,29 +252,29 @@ export function IssueForm({ mode, prospect, issue, kategoriAwal, saran, onDone, 
           </div>
         </div>
         <div>
-          <label>Target selesai</label>
+          <label>{tr("Target selesai")}</label>
           <input type="date" value={targetDate || ''} onChange={(e) => setTargetDate(e.target.value)} />
         </div>
       </div>
-      <label>Keterangan *</label>
-      <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="cth. Customer minta harga ≤ 105rb/kg seperti repeat order lalu; harga baru 118rb/kg." rows={3} />
+      <label>{tr("Keterangan *")}</label>
+      <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder={tr("cth. Customer minta harga ≤ 105rb/kg seperti repeat order lalu; harga baru 118rb/kg.")} rows={3} />
       <div className="field-note" style={{ margin: 0 }}>
-        {mode === 'usulan' ? 'BM akan menerima notifikasi dan membuat laporan resmi (menentukan penanggung jawab).' : 'Belum ditangani 2 hari → notifikasi ke BM; belum selesai 4 hari → RM & GM. Lampiran: unggah di bagian Lampiran prospek.'}
+        {mode === 'usulan' ? tr("BM akan menerima notifikasi dan membuat laporan resmi (menentukan penanggung jawab).") : tr("Belum ditangani 2 hari → notifikasi ke BM; belum selesai 4 hari → RM & GM. Lampiran: unggah di bagian Lampiran prospek.")}
       </div>
       {mode === 'terima' && (
         <div className="issue-reject">
-          <input type="text" value={alasan} onChange={(e) => setAlasan(e.target.value)} placeholder="Alasan bila usulan ditolak…" />
+          <input type="text" value={alasan} onChange={(e) => setAlasan(e.target.value)} placeholder={tr("Alasan bila usulan ditolak…")} />
           <button type="button" className="btn btn-outline btn-sm" disabled={busy || alasan.trim().length < 5} onClick={reject}>
-            Tolak usulan
+            {tr("Tolak usulan")}
           </button>
         </div>
       )}
       <div className="issue-form-actions">
         <button type="button" className="btn btn-outline btn-sm" onClick={onCancel} disabled={busy}>
-          Batal
+          {tr("Batal")}
         </button>
         <button type="button" className="btn btn-primary btn-sm" onClick={submit} disabled={busy}>
-          {mode === 'usulan' ? 'Ajukan ke BM' : 'Laporkan masalah'}
+          {mode === 'usulan' ? tr("Ajukan ke BM") : tr("Laporkan masalah")}
         </button>
       </div>
     </div>
@@ -280,6 +283,7 @@ export function IssueForm({ mode, prospect, issue, kategoriAwal, saran, onDone, 
 
 /** Panel detail masalah: ringkasan prospek (baca), dokumen terkait, laporan, diskusi kartu, tindak lanjut. */
 export function IssueDetail({ issue }: { issue: PipelineIssue }) {
+  const tr = useT();
   const roster = useRoster();
   const me = useDataStore((s) => s.currentUser);
   const prospect = useDataStore((s) => s.prospects.find((p) => p.id === issue.prospectId)) || null;
@@ -326,20 +330,20 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
         <div className="issue-detail-head">
           <div>
             <div className="kam-title" style={{ fontSize: 22 }}>{issue.customer}</div>
-            <div className="field-note" style={{ margin: 0 }}>Prospek · hanya baca{prospect?.uraian ? ` · ${prospect.uraian}` : ''}</div>
+            <div className="field-note" style={{ margin: 0 }}>{tr("Prospek · hanya baca")}{prospect?.uraian ? ` · ${prospect.uraian}` : ''}</div>
           </div>
           <span className={`badge ${st.badge}`}>{st.label}</span>
         </div>
         <div className="issue-facts">
-          <div><span className="kam-role">NILAI PROSPEK</span><b className="mono">{prospect ? formatRupiah(Number(prospect.value) || 0) : '-'}</b></div>
+          <div><span className="kam-role">{tr("NILAI PROSPEK")}</span><b className="mono">{prospect ? formatRupiah(Number(prospect.value) || 0) : '-'}</b></div>
           <div><span className="kam-role">TAHAP</span><b>{prospect ? stageLabel(prospect.status) : '-'}</b></div>
-          <div><span className="kam-role">SALES · CABANG</span><b>{issue.se || '-'} · {issue.cabang || '-'}</b></div>
-          <div><span className="kam-role">TARGET SELESAI</span><b>{issue.targetDate || '-'}</b></div>
+          <div><span className="kam-role">{tr("SALES · CABANG")}</span><b>{issue.se || '-'} · {issue.cabang || '-'}</b></div>
+          <div><span className="kam-role">{tr("TARGET SELESAI")}</span><b>{issue.targetDate || '-'}</b></div>
         </div>
         <div className="issue-docs">
-          <span className="kam-role">DOKUMEN TERKAIT</span>
+          <span className="kam-role">{tr("DOKUMEN TERKAIT")}</span>
           {docs.length === 0 ? (
-            <span className="field-note" style={{ margin: 0 }}>— belum ada RFQ / FUP A</span>
+            <span className="field-note" style={{ margin: 0 }}>{tr("— belum ada RFQ / FUP A")}</span>
           ) : (
             docs.map((d) => (
               <button key={d.id} type="button" className="issue-doc" onClick={() => openPurchDoc(d.kind, d.id)}>
@@ -357,16 +361,16 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
             </span>
           </div>
           <div style={{ marginTop: 3 }}>{issue.keterangan}</div>
-          {issue.pjIds.length > 0 && <div className="field-note" style={{ margin: '4px 0 0' }}>Penanggung jawab: {issue.pjIds.map((id, i) => `${nameOf(roster, id)}${i === 0 ? ' (utama)' : ''}`).join(', ')}</div>}
-          {issue.status === 'ditolak' && <div className="field-note" style={{ margin: '4px 0 0' }}>Ditolak: {issue.alasanTolak}</div>}
+          {issue.pjIds.length > 0 && <div className="field-note" style={{ margin: '4px 0 0' }}>{tr("Penanggung jawab:")} {issue.pjIds.map((id, i) => `${nameOf(roster, id)}${i === 0 ? ' (utama)' : ''}`).join(', ')}</div>}
+          {issue.status === 'ditolak' && <div className="field-note" style={{ margin: '4px 0 0' }}>{tr("Ditolak:")} {issue.alasanTolak}</div>}
           {issue.status === 'selesai' && <div className="issue-done">✓ {issue.solusi} · {issue.hasil ? HASIL_META[issue.hasil] : ''} ({issue.selesaiNama})</div>}
         </div>
       </div>
 
       <div className="issue-card">
         <div className="issue-detail-head" style={{ marginBottom: 6 }}>
-          <b>Diskusi</b>
-          <span className="field-note" style={{ margin: 0 }}>thread yang sama dengan Diskusi di kartu prospek</span>
+          <b>{tr("Diskusi")}</b>
+          <span className="field-note" style={{ margin: 0 }}>{tr("thread yang sama dengan Diskusi di kartu prospek")}</span>
         </div>
         <ItemChat entity="prospect" entityId={issue.prospectId} />
       </div>
@@ -377,7 +381,7 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
             <IssueForm mode="terima" prospect={prospect} issue={issue} onDone={() => setTerima(false)} onCancel={() => setTerima(false)} />
           ) : (
             <button type="button" className="btn btn-primary btn-sm" onClick={() => setTerima(true)} disabled={!prospect}>
-              Proses usulan (tentukan PJ / tolak)
+              {tr("Proses usulan (tentukan PJ / tolak)")}
             </button>
           )}
         </div>
@@ -385,19 +389,19 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
 
       {(issue.status === 'open' || issue.status === 'proses') && (
         <div className="issue-card issue-actions">
-          <b>Tindak lanjut</b>
+          <b>{tr("Tindak lanjut")}</b>
           {canHandle ? (
             <>
               {issue.status === 'open' && (
                 <div className="issue-row">
                   <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => act('tangani', {}, 'Status → Ditangani')}>
-                    Tangani
+                    {tr("Tangani")}
                   </button>
-                  <span className="field-note" style={{ margin: 0 }}>Status → Ditangani; Sales, BM & PJ lain diberi tahu.</span>
+                  <span className="field-note" style={{ margin: 0 }}>{tr("Status → Ditangani; Sales, BM & PJ lain diberi tahu.")}</span>
                 </div>
               )}
-              <label>Solusi *</label>
-              <textarea rows={2} value={solusi} onChange={(e) => setSolusi(e.target.value)} placeholder="cth. Stok plate 6 mm tersedia di vendor — kirim 10 hari, harga sudah dikirim di RFQ." />
+              <label>{tr("Solusi *")}</label>
+              <textarea rows={2} value={solusi} onChange={(e) => setSolusi(e.target.value)} placeholder={tr("cth. Stok plate 6 mm tersedia di vendor — kirim 10 hari, harga sudah dikirim di RFQ.")} />
               <div className="issue-row">
                 <span className="kam-role">HASIL</span>
                 <div className="sa-pills">
@@ -416,32 +420,32 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
                     if (await act('selesai', { solusi, hasil }, 'Masalah ditandai selesai')) setSolusi('');
                   }}
                 >
-                  Tandai Selesai
+                  {tr("Tandai Selesai")}
                 </button>
               </div>
             </>
           ) : (
-            <span className="field-note" style={{ margin: 0 }}>Ditangani oleh penanggung jawab. Anda bisa ikut berdiskusi di atas.</span>
+            <span className="field-note" style={{ margin: 0 }}>{tr("Ditangani oleh penanggung jawab. Anda bisa ikut berdiskusi di atas.")}</span>
           )}
           {isBm && canE && (
             <div style={{ marginTop: 8 }}>
               {editPj ? (
                 <>
-                  <label>Ubah penanggung jawab</label>
+                  <label>{tr("Ubah penanggung jawab")}</label>
                   <PjPicker value={editPj} onChange={setEditPj} roster={roster} suggested={[]} />
                   <div className="issue-row">
-                    <button type="button" className="btn btn-outline btn-sm" onClick={() => setEditPj(null)}>Batal</button>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => setEditPj(null)}>{tr("Batal")}</button>
                     <button type="button" className="btn btn-primary btn-sm" disabled={busy || !editPj.length} onClick={async () => { if (await act('ubah', { pjIds: editPj }, 'Penanggung jawab diperbarui')) setEditPj(null); }}>
-                      Simpan PJ
+                      {tr("Simpan PJ")}
                     </button>
                   </div>
                 </>
               ) : (
-                <button type="button" className="btn btn-outline btn-sm" onClick={() => setEditPj(issue.pjIds)}>Ubah penanggung jawab</button>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setEditPj(issue.pjIds)}>{tr("Ubah penanggung jawab")}</button>
               )}
             </div>
           )}
-          <span className="field-note" style={{ margin: 0 }}>Penanggung jawab hanya mengubah status masalah & berdiskusi — data prospek tetap milik Sales.</span>
+          <span className="field-note" style={{ margin: 0 }}>{tr("Penanggung jawab hanya mengubah status masalah & berdiskusi — data prospek tetap milik Sales.")}</span>
         </div>
       )}
     </div>
