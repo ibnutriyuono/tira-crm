@@ -14,6 +14,7 @@ interface ImportRow {
   phone?: string;
   tglPenawaran?: string;
   tglPO?: string;
+  tglLose?: string;
   tglDelivery?: string;
   line?: string;
   uraian?: string;
@@ -61,6 +62,7 @@ export async function POST(req: Request) {
           kondisiStock: r.kondisiStock || '',
           keterangan: r.keterangan || '',
           status: Number(r.status) || 0,
+          tglLose: Number(r.status) === 6 ? r.tglLose || new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10) : null,
           penawaranTerkirim: !!r.penawaranTerkirim,
         },
       });

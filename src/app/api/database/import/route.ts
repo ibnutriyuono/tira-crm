@@ -40,6 +40,7 @@ export async function POST(req: Request) {
           tglPenawaran: (p.tglPenawaran as string) ?? null,
           tglPO: (p.tglPO as string) ?? null,
           tglDelivery: (p.tglDelivery as string) ?? null,
+          tglLose: (p.tglLose as string) ?? null,
           line: (p.line as string) ?? '',
           uraian: (p.uraian as string) ?? '',
           qty: Number(p.qty) || 0,

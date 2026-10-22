@@ -9,6 +9,7 @@ export const PROSPECT_COL_ALIASES: Record<string, string[]> = {
   tglPenawaran: ['TGL PENAWARAN'],
   tglPO: ['TGL PO'],
   tglDelivery: ['TGL DELIVERY'],
+  tglLose: ['TGL LOSE ORDER', 'TGL LOSE'],
   line: ['LINE'],
   uraian: ['URAIAN PRODUCT', 'URAIAN'],
   qty: ['QTY PCS', 'QTY'],
@@ -20,7 +21,7 @@ export const PROSPECT_COL_ALIASES: Record<string, string[]> = {
 };
 export const PROSPECT_FIELD_TYPES: Record<string, string> = {
   reg: 'numOrBlank', cabang: 'upper', se: 'upper', customer: 'string', phone: 'string',
-  tglPenawaran: 'date', tglPO: 'date', tglDelivery: 'date', line: 'string', uraian: 'string',
+  tglPenawaran: 'date', tglPO: 'date', tglDelivery: 'date', tglLose: 'date', line: 'string', uraian: 'string',
   qty: 'number', value: 'number', kondisiStock: 'string', keterangan: 'string', status: 'number',
   penawaranTerkirim: 'bool',
 };

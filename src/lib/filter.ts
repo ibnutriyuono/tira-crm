@@ -25,14 +25,16 @@ export function changeDate(r: Pick<Prospect, 'statusChangedAt' | 'tglPenawaran'>
  * Tanggal yang dipakai filter bulan/tahun & filter bulan per kolom Kanban:
  * - PO / Kontrak (status 4)  -> tanggal PO (bulan PO);
  * - DO terfaktur (Omzet)     -> tanggal faktur (bulan omzet);
+ * - Lose Order (status 6)    -> tanggal Lose Order;
  * - DO belum terfaktur (GIT) & tahap lain -> tanggal perubahan status
  *   (masuk DO / tahap itu).
  * Bila tanggal PO / faktur belum diisi, kembali ke tanggal perubahan status.
  */
-export function periodDate(r: Pick<Prospect, 'status' | 'statusChangedAt' | 'tglPenawaran' | 'tglPO' | 'tglFaktur' | 'terfaktur'>): string {
+export function periodDate(r: Pick<Prospect, 'status' | 'statusChangedAt' | 'tglPenawaran' | 'tglPO' | 'tglFaktur' | 'terfaktur' | 'tglLose'>): string {
   const st = num(r.status);
   if (st === 4 && r.tglPO) return String(r.tglPO).slice(0, 10);
   if (st === 5 && r.terfaktur && r.tglFaktur) return String(r.tglFaktur).slice(0, 10);
+  if (st === 6 && r.tglLose) return String(r.tglLose).slice(0, 10);
   return changeDate(r);
 }
 

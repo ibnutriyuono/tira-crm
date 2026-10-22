@@ -12,6 +12,8 @@ import { useDataStore } from '@/store/useDataStore';
 import { EMPTY_QCD, useUiStore, type PendingQcd } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
+import { loseDateProblem } from '@/lib/lose-date';
+import { jakartaDate } from '@/lib/followup-rule';
 
 import { useT } from '@/store/useLangStore';
 /**
@@ -37,6 +39,7 @@ export function QcdModal() {
 
   const [qcd, setQcd] = useState<PendingQcd>({ ...EMPTY_QCD });
   const [noPo, setNoPo] = useState('');
+  const [tglLose, setTglLose] = useState('');
   const [busy, setBusy] = useState(false);
 
   const record = qcdCtx?.recordId ? records.find((x) => x.id === qcdCtx.recordId) || null : null;
@@ -63,18 +66,26 @@ export function QcdModal() {
       faktor: record.qcdFaktor || '',
     });
     setNoPo(record.noPo || '');
+    setTglLose(record.tglLose || jakartaDate());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, qcdCtx]);
 
   if (!qcdCtx || !record) return null;
   const label = STATUS_META[target]?.label ?? String(target);
+  // Lose: tanggal Lose Order (bawaan hari ini) ikut disimpan.
+  const loseDateShown = target === 6;
 
   async function onSubmit() {
     if (!canNow('prospek', 'e')) return;
     if (poRequired && !noPo.trim()) return toast('No. PO wajib diisi sebelum status dipindahkan ke PO/Kontrak atau DO', 'error');
-    const payload = qcdPayload(qcd);
+    const payload: Record<string, unknown> = qcdPayload(qcd);
+    if (loseDateShown) {
+      const loseErr = tglLose !== record!.tglLose ? loseDateProblem(tglLose, record!.tglPenawaran) : null;
+      if (loseErr) return toast(loseErr, 'error');
+      payload.tglLose = tglLose;
+    }
     if (qcdRequired) {
-      const miss = qcdMissing(target, payload);
+      const miss = qcdMissing(target, payload as Parameters<typeof qcdMissing>[1]);
       if (miss) return toast(miss, 'error');
     }
     setBusy(true);
@@ -131,6 +142,17 @@ export function QcdModal() {
               {tr("No. PO / Kontrak")} <span style={{ color: 'var(--rust-500)' }}>*</span>
             </label>
             <input type="text" autoFocus value={noPo} onChange={(e) => setNoPo(e.target.value)} placeholder={tr("cth. PO-2026-00123")} />
+          </div>
+        </div>
+      )}
+      {loseDateShown && (
+        <div className="form-grid" style={{ marginBottom: 12 }}>
+          <div>
+            <label>
+              {tr("Tgl. Lose Order")} <span style={{ color: 'var(--rust-500)' }}>*</span>
+            </label>
+            <input type="date" value={tglLose} max={jakartaDate()} min={record.tglPenawaran || undefined} onChange={(e) => setTglLose(e.target.value)} />
+            <div className="field-note">{tr("Tanggal customer memutuskan tidak order — dipakai laporan Lose per bulan.")}</div>
           </div>
         </div>
       )}

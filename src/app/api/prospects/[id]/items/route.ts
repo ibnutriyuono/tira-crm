@@ -5,6 +5,7 @@ import { isPurchasingRole } from '@/lib/auth';
 import { getProspectMaterials } from '@/lib/format';
 import { logItemEvent } from '@/lib/item-events';
 import { itemLabel, type ItemEventLine } from '@/lib/item-flow';
+import { cleanItemQcd, itemOutcome, itemQcdMissing, type ItemQcd } from '@/lib/item-qcd';
 import { prisma } from '@/lib/prisma';
 import { assertProspectInScope } from '@/lib/prospect-access';
 import { emitCrmEvent } from '@/lib/socket';
@@ -16,9 +17,33 @@ import { guard } from '@/lib/permissions-server';
  *   GET  -> { prospect, events }   (old rows get their itemId on first open)
  *   POST { action: 'po', noPo?, tglPO?, qty: { [itemId]: n } }
  *   POST { action: 'kirim', noDo, tgl, qty: { [itemId]: n } }
+ *   POST { action: 'qcd', qcd: { [itemId]: ItemQcd } }   (PO/DO/Lose)
+ * 'po' juga menerima `qcd` -- QCD per item ikut disimpan bersama qty PO.
  */
 
-type Row = Material & { itemId: string; qtyPo?: number; qtyKirim?: number; fabNama?: string };
+type Row = Material & { itemId: string; qtyPo?: number; qtyKirim?: number; fabNama?: string; qcd?: ItemQcd };
+
+/**
+ * Terapkan QCD per item dari body ke baris. Item yang ada di `qcd` wajib
+ * lengkap (Q/C/D + faktor; kompetitor pemenang bila ada qty yang lepas).
+ * Mengembalikan pesan galat atau null.
+ */
+function applyItemQcd(rows: Row[], input: unknown, lost: boolean): string | null {
+  if (!input || typeof input !== 'object') return null;
+  const map = input as Record<string, unknown>;
+  for (const r of rows) {
+    if (!(r.itemId in map)) continue;
+    const q = cleanItemQcd(map[r.itemId]);
+    const outcome = itemOutcome(Number(r.qty) || 0, typeof r.qtyPo === 'number' ? r.qtyPo : null, lost);
+    if (outcome) {
+      const miss = itemQcdMissing(q, outcome);
+      if (miss.length) return `QCD item "${itemLabel(r)}" belum lengkap: ${miss.join(', ')}.`;
+    }
+    if (q) r.qcd = q;
+    else delete r.qcd;
+  }
+  return null;
+}
 
 const qtyOf = (v: unknown): number => {
   const n = Number(String(v ?? '').replace(',', '.'));
@@ -76,6 +101,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const action = String(body?.action || '');
   const qtyIn = (body?.qty && typeof body.qty === 'object' ? body.qty : {}) as Record<string, unknown>;
   const status = Number(existing.status);
+
+  if (action === 'qcd') {
+    if (status !== 4 && status !== 5 && status !== 6) {
+      return NextResponse.json({ error: 'QCD per item diisi setelah prospek PO / DO / Lose.' }, { status: 400 });
+    }
+    const { rows } = await loadRows(existing);
+    const err = applyItemQcd(rows, body?.qcd, status === 6);
+    if (err) return NextResponse.json({ error: err }, { status: 400 });
+    const prospect = await prisma.prospect.update({ where: { id }, data: { materials: rows as unknown as object } });
+    emitCrmEvent('prospect:updated', prospect);
+    const n = Object.keys(body?.qcd && typeof body.qcd === 'object' ? body.qcd : {}).length;
+    await logActivity({ user, action: 'update', entity: 'prospect', entityId: id, summary: `Mengisi QCD per item (${n} item) prospek "${prospect.customer}"` });
+    return NextResponse.json({ prospect, events: await eventsOf(id) });
+  }
+
   if (status !== 4 && status !== 5) {
     return NextResponse.json({ error: 'Pindahkan status prospek ke PO / Kontrak dulu (No. PO & QCD wajib), lalu konfirmasi qty per item.' }, { status: 400 });
   }
@@ -105,6 +145,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (q > 0) poLines.push({ itemId: r.itemId, label: name(r), qty: q, of: offered });
       if (offered - q > 0) noLines.push({ itemId: r.itemId, label: name(r), qty: Math.round((offered - q) * 100) / 100, of: offered });
     });
+    const qcdErr = applyItemQcd(rows, body?.qcd, false);
+    if (qcdErr) return NextResponse.json({ error: qcdErr }, { status: 400 });
     data.materials = rows;
     data.noPo = noPo;
     data.tglPO = tglPO;

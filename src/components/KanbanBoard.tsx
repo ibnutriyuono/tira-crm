@@ -1,5 +1,6 @@
 'use client';
 
+import { lostDateOf } from '@/lib/lose-date';
 import { promptItemFlow } from '@/lib/item-flow-prompt';
 import { flowItems, flowTotals } from '@/lib/item-flow';
 import { FlowBar } from './modals/ItemFlowModal';
@@ -73,6 +74,11 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         <span className={`badge ${r.penawaranTerkirim ? 'green' : 'rust pending-dot'}`}>{r.penawaranTerkirim ? tr("Penawaran Terkirim") : tr("Penawaran Pending")}</span>
         <IssueBadge prospectId={r.id} />
       </div>
+      {num(r.status) === 6 && (
+        <div className="kc-meta-row">
+          <span className="kc-lose-date">{tr("Lose")} {formatDateID(lostDateOf(r))}{r.qcdKompetitor ? ` · ${r.qcdKompetitor}` : ''}</span>
+        </div>
+      )}
       {num(r.status) === 5 && (
         <div className="kc-meta-row">
           <span className={`badge ${r.terfaktur ? 'green' : 'amber'}`}>
@@ -81,6 +87,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         </div>
       )}
       {klas === 'Won' && <ItemFlowChip r={r} />}
+      {klas === 'Lost' && <ItemQcdChip r={r} />}
       <div className="kc-actions">
         {canE && (
         <button
@@ -185,6 +192,32 @@ function ItemFlowChip({ r }: { r: Prospect }) {
       >
         <span>{label}</span>
         <FlowBar it={{ offered: items.reduce((s, i) => s + i.offered, 0), po, sent }} />
+      </button>
+    </div>
+  );
+}
+
+/** Kartu Lose dengan beberapa item: kompetitor pemenang & QCD per item. */
+function ItemQcdChip({ r }: { r: Prospect }) {
+  const tr = useT();
+  const items = flowItems(r);
+  if (items.length < 2) return null;
+  const filled = items.filter((i) => i.qcd?.kompetitor).length;
+  const komps = new Set(items.map((i) => (i.qcd?.kompetitor || r.qcdKompetitor || '').trim()).filter(Boolean));
+  return (
+    <div className="kc-meta-row">
+      <button
+        type="button"
+        className="kc-item-btn"
+        title={tr("QCD & kompetitor pemenang per item")}
+        onClick={(e) => {
+          e.stopPropagation();
+          useUiStore.setState({ itemFlowCtx: { prospectId: r.id, mode: 'qcd' }, modal: 'itemFlow' });
+        }}
+      >
+        <span>
+          {filled ? `${tr("Kompetitor per item")}: ${komps.size}` : `${tr("QCD per item")} (${items.length} ${tr("item")})`}
+        </span>
       </button>
     </div>
   );

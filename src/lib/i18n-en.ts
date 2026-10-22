@@ -1969,3 +1969,70 @@ Object.assign(EN, {
  "Gagal mengirim email": "Failed to send email",
  "Gagal membuat PDF": "Failed to create PDF"
 });
+
+// Surat penawaran atas nama Sales (Admin Sales / BM)
+Object.assign(EN, {
+  'Atas nama': 'On behalf of',
+  'saya': 'me',
+  'Sales prospek ini': "this prospect's Sales",
+  'Surat dibuat atas nama': 'This letter is made on behalf of',
+  ': nama, jabatan, email, dan tanda tangannya dipakai di surat; balasan customer masuk ke emailnya, dan surat tercatat di Aktivitas Harian-nya. Log mencatat Anda sebagai pembuat.':
+    ": their name, title, email and signature are used on the letter; customer replies go to their email, and the letter is logged in their Daily Activity. The log records you as the author.",
+  'Tanda tangan': 'Signature',
+  'dipasang otomatis di surat.': 'is placed on the letter automatically.',
+  'belum menyimpan tanda tangan di Akun Saya — surat dibuat tanpa gambar tanda tangan (bisa ditandatangani basah setelah dicetak).':
+    'has not saved a signature in My Account — the letter is made without a signature image (it can be wet-signed after printing).',
+  'Catat ke Aktivitas Harian': 'Log to the Daily Activity of',
+  'sebagai "Kirim penawaran / dokumen" saat diunduh / dikirim': 'as "Send quotation / document" when downloaded / sent',
+  'Sales Engineer': 'Sales Engineer',
+  'Branch Manager': 'Branch Manager',
+  'Admin Sales': 'Sales Admin',
+});
+
+// QCD per item
+Object.assign(EN, {
+  'Sebagian': 'Partial',
+  'sebagian': 'partial',
+  'Salin ke item lain': 'Copy to other items',
+  'Salin isian baris ini ke item lain dengan hasil yang sama': 'Copy this row to the other items with the same outcome',
+  'Pemenang *': 'Winner *',
+  'Jika ada': 'If any',
+  'QCD per item': 'QCD per item',
+  'QCD & kompetitor pemenang per item': 'QCD & winning competitor per item',
+  'Kompetitor per item': 'Competitors per item',
+  'item': 'items',
+  'ditawarkan': 'quoted',
+  'Quality · Cost · Delivery dan kompetitor per item': 'Quality · Cost · Delivery and competitor per item',
+  'Item yang di-PO terisi dari QCD prospek. Item yang tidak / sebagian di-PO: isi alasan dan': 'Ordered items are prefilled from the prospect QCD. For items not / partly ordered, fill in the reason and',
+  'kompetitor pemenangnya': 'the winning competitor',
+  'Semua item kalah. Bila kompetitor pemenang atau alasannya berbeda per item, ubah di baris itemnya.': 'All items were lost. If the winning competitor or the reason differs per item, change it on that item row.',
+  'Isi Quality · Cost · Delivery per item. Item yang tidak / sebagian di-PO wajib diisi kompetitor pemenangnya.': 'Fill in Quality · Cost · Delivery per item. Items not / partly ordered require the winning competitor.',
+  'Simpan QCD': 'Save QCD',
+  'QCD / Kompetitor': 'QCD / Competitor',
+  'Belum diisi per item — ikut QCD prospek': 'Not filled per item — follows the prospect QCD',
+  'ikut QCD prospek': 'follows prospect QCD',
+  'Rincian di bawah dihitung': 'The breakdowns below are counted',
+  'per item': 'per item',
+  'deal yang memiliki QCD per item': 'deals with QCD per item',
+  'item/deal menang': 'items/deals won',
+  'item/deal kalah': 'items/deals lost',
+  '; deal lain dihitung sekali dari QCD prospek.': '; other deals count once from the prospect QCD.',
+  'Pada item/deal MENANG': 'On WON items/deals',
+  'Pada item/deal KALAH': 'On LOST items/deals',
+  'Item yang lepas ke kompetitor (': 'Items lost to competitors (',
+  'Kompetitor pemenang': 'Winning competitor',
+  'Faktor': 'Factor',
+  'Nilai lepas': 'Value lost',
+  'item lainnya.': 'more items.',
+});
+
+// Tanggal Lose Order
+Object.assign(EN, {
+  'Tgl. Lose Order': 'Lose Order Date',
+  'Tanggal customer memutuskan tidak order — dipakai laporan Lose per bulan.': 'The date the customer decided not to order — used for monthly Lose reports.',
+  'Lose': 'Lost',
+  'Tgl. Tutup': 'Close Date',
+  'Tanggal Lose Order wajib diisi.': 'Lose Order date is required.',
+  'Tanggal Lose Order tidak boleh di masa depan.': 'Lose Order date cannot be in the future.',
+  'Tanggal Lose Order tidak boleh sebelum tanggal penawaran.': 'Lose Order date cannot be before the quotation date.',
+});

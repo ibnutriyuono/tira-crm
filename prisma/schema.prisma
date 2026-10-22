@@ -291,6 +291,9 @@ model Prospect {
   /// Tanggal & nomor faktur — diisi Admin Sales / BM saat DO ditandai terfaktur.
   tglFaktur         String?
   noFaktur          String?
+  /// Tanggal Lose Order (YYYY-MM-DD) — diisi saat prospek dipindah ke Lose
+  /// (status 6); dipakai laporan untuk bulan kekalahan. Lihat lib/lose-date.ts.
+  tglLose           String?
   /// Bumped only when `status` actually changes — aging measures time without
   /// progress, so a note edit must not reset the clock.
   statusChangedAt   DateTime @default(now())

@@ -1,3 +1,4 @@
+import { lostDateOf } from './lose-date';
 import { num } from './format';
 import { qcdMissing } from './qcd';
 import { countUrgentFollowUps, daysSince } from './reports';
@@ -23,7 +24,7 @@ export function buildPersonalTicker(user: Pick<SafeUser, 'role' | 'se'> | null, 
   const closedThisMonth = prospects.filter((r) => {
     const st = num(r.status);
     if (st === 4 || st === 5) return (r.tglPO || r.tglDelivery || r.tglPenawaran || '').slice(0, 7) === periode;
-    if (st === 6) return String(r.statusChangedAt || '').slice(0, 7) === periode;
+    if (st === 6) return lostDateOf(r).slice(0, 7) === periode;
     return false;
   });
   const git = prospects.filter((r) => {

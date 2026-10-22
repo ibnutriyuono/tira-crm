@@ -154,11 +154,36 @@ export async function buildQuotePdf(d: QuoteData, o: QuoteOpts, logo: LogoImage 
   para(tx.intro, { justify: true, after: 3 });
 
   // ------------------------------------------------------------------ tabel material
-  const wsum = cols.reduce((s, c) => s + c.w, 0);
-  const widths = cols.map((c) => (CW * c.w) / wsum);
-  const xs = widths.reduce<number[]>((a, w, i) => [...a, i === 0 ? ML : a[i - 1] + widths[i - 1]], []);
   const PAD = 1.6;
   const cellLH = 3.9;
+  const wsum = cols.reduce((s, c) => s + c.w, 0);
+  const widths = cols.map((c) => (CW * c.w) / wsum);
+  // Angka (harga, berat, qty) tidak boleh terpotong ke baris baru: kolom
+  // selain uraian / grade minimal selebar isi terpanjangnya; kelebihannya
+  // diambil dari kolom uraian.
+  {
+    const textW = (t: string, size: number, bold: boolean) => {
+      font(size, bold ? 'bold' : 'normal', INK);
+      return doc.getTextWidth(clean(t));
+    };
+    const iU = cols.findIndex((c) => c.key === 'uraian');
+    let need = 0;
+    cols.forEach((c, i) => {
+      if (c.key === 'uraian' || c.key === 'grade') return;
+      const cells = items.map((it, r) => c.cell(it, r));
+      if (i === cols.length - 1) tot.rows.forEach((t) => cells.push(t.value));
+      const head = Math.max(...String(c.label).split(/\s+/).map((w) => textW(w, 8.5, true)));
+      const min = Math.max(head, ...cells.map((t) => textW(t, 9, i === cols.length - 1))) + PAD * 2 + 0.6;
+      if (min > widths[i]) {
+        need += min - widths[i];
+        widths[i] = min;
+      }
+    });
+    if (need > 0 && iU >= 0) widths[iU] = Math.max(28, widths[iU] - need);
+    const scale = CW / widths.reduce((a, b) => a + b, 0);
+    if (scale < 1) widths.forEach((_, i) => (widths[i] *= scale));
+  }
+  const xs = widths.reduce<number[]>((a, w, i) => [...a, i === 0 ? ML : a[i - 1] + widths[i - 1]], []);
 
   const drawRow = (cells: string[], opt: { head?: boolean; fill?: RGB; bold?: boolean; aligns: ('left' | 'center' | 'right')[]; spans?: number[] }) => {
     const size = opt.head ? 8.5 : 9;

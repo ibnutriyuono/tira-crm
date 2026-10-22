@@ -18,10 +18,13 @@ import {
 } from '@/lib/item-flow';
 import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
+import { ItemQcdTable, initialItemQcd, itemQcdError, type ItemQcdDraft, type ItemQcdRow } from '../ItemQcdTable';
+import { ITEM_OUTCOME_META, itemOutcome, type ItemOutcome } from '@/lib/item-qcd';
+import { QCD_FAKTOR_LABEL } from '@/lib/qcd';
 import { useUiStore } from '@/store/useUiStore';
 
 import { useT } from '@/store/useLangStore';
-type Mode = 'po' | 'kirim' | null;
+type Mode = 'po' | 'kirim' | 'qcd' | null;
 
 /** Three-part bar: terkirim · PO belum kirim · tidak di-PO (or one "ditawarkan" segment before PO). */
 export function FlowBar({ it }: { it: Pick<FlowItem, 'offered' | 'po' | 'sent'> }) {
@@ -84,6 +87,9 @@ export function ItemFlowModal() {
   const [noDo, setNoDo] = useState('');
   const [tglDo, setTglDo] = useState('');
   const [doDraft, setDoDraft] = useState<Record<string, string>>({});
+  const [qcdDraft, setQcdDraft] = useState<ItemQcdDraft>({});
+  // Item yang QCD-nya sudah diubah di layar ini (tidak di-reset saat qty PO berubah).
+  const [qcdTouched, setQcdTouched] = useState<Record<string, boolean>>({});
 
   const items = useMemo(() => (record ? flowItems(record) : []), [record]);
   const totals = useMemo(() => flowTotals(items), [items]);
@@ -92,11 +98,51 @@ export function ItemFlowModal() {
   const allConfirmed = items.length > 0 && items.every((i) => i.poConfirmed);
   const outstanding = items.some((i) => i.poConfirmed && (i.po || 0) > (i.sentConfirmed ? i.sent : 0));
   const canEdit = !!currentUser && !isPurchasingRoleClient(currentUser.role);
+  const lostDeal = status === 6;
+  const qcdReady = lostDeal || (won && allConfirmed);
+
+  /** Hasil item menurut qty PO di form (mode PO) atau data tersimpan. */
+  const outcomeOf = (it: FlowItem): ItemOutcome | null =>
+    mode === 'po' ? itemOutcome(it.offered, Math.min(it.offered, Math.max(0, num(poDraft[it.itemId]))), false) : it.outcome;
+  const qtyDetail = (it: FlowItem, po: number | null) =>
+    lostDeal ? `${formatQty(it.offered)} ${it.satuan} ${tr("ditawarkan")}` : `PO ${formatQty(po ?? 0)} ${tr("dari")} ${formatQty(it.offered)} ${it.satuan}`;
+  const qcdRows: ItemQcdRow[] = items.flatMap((it) => {
+    const outcome = outcomeOf(it);
+    const po = mode === 'po' ? Math.min(it.offered, Math.max(0, num(poDraft[it.itemId]))) : it.po;
+    return outcome ? [{ itemId: it.itemId, label: it.label, outcome, detail: qtyDetail(it, po) }] : [];
+  });
+  // Saat PO: tabel QCD tampil bila ada lebih dari satu item atau ada qty yang lepas.
+  const showPoQcd = mode === 'po' && (items.length > 1 || qcdRows.some((r) => r.outcome !== 'menang'));
+
+  function seedQcd(list: FlowItem[], p: Prospect | null, outcomes?: Record<string, ItemOutcome>) {
+    if (!p) return;
+    setQcdDraft(initialItemQcd(p, list.map((it) => ({ itemId: it.itemId, outcome: outcomes?.[it.itemId] || it.outcome || 'menang', qcd: it.qcd }))));
+    setQcdTouched({});
+  }
+  function onQcdChange(next: ItemQcdDraft) {
+    const touched = { ...qcdTouched };
+    Object.keys(next).forEach((k) => {
+      if (next[k] !== qcdDraft[k]) touched[k] = true;
+    });
+    setQcdTouched(touched);
+    setQcdDraft(next);
+  }
+  /** Qty PO berubah: item yang hasilnya berubah dan belum disentuh diisi ulang sesuai hasil barunya. */
+  function onPoQty(it: FlowItem, v: string) {
+    const before = outcomeOf(it);
+    setPoDraft((d) => ({ ...d, [it.itemId]: v }));
+    const after = itemOutcome(it.offered, Math.min(it.offered, Math.max(0, num(v))), false);
+    if (record && after && after !== before && !qcdTouched[it.itemId] && !it.qcd) {
+      const seeded = initialItemQcd(record, [{ itemId: it.itemId, outcome: after, qcd: null }]);
+      setQcdDraft((d) => ({ ...d, ...seeded }));
+    }
+  }
 
   function startPo(list: FlowItem[] = items, p: Prospect | null = record) {
     setPoDraft(Object.fromEntries(list.map((i) => [i.itemId, String(i.poConfirmed ? i.po : i.offered)])));
     setNoPo(p?.noPo || '');
     setTglPO(p?.tglPO || todayStr());
+    seedQcd(list, p, Object.fromEntries(list.map((i) => [i.itemId, itemOutcome(i.offered, i.poConfirmed ? i.po : i.offered, false) || 'menang'])));
     setMode('po');
   }
   function startKirim(list: FlowItem[] = items) {
@@ -104,6 +150,11 @@ export function ItemFlowModal() {
     setNoDo('');
     setTglDo(todayStr());
     setMode('kirim');
+  }
+
+  function startQcd(list: FlowItem[] = items, p: Prospect | null = record) {
+    seedQcd(list, p);
+    setMode('qcd');
   }
 
   useEffect(() => {
@@ -122,6 +173,7 @@ export function ItemFlowModal() {
         const list = flowItems(prospect);
         if (ctx.mode === 'po') startPo(list, prospect);
         if (ctx.mode === 'kirim') startKirim(list);
+        if (ctx.mode === 'qcd') startQcd(list, prospect);
       })
       .catch((err) => alive && toast(err instanceof Error ? err.message : 'Gagal memuat status item', 'error'))
       .finally(() => alive && setLoading(false));
@@ -151,7 +203,13 @@ export function ItemFlowModal() {
 
   async function savePo() {
     if (!noPo.trim()) return toast('No. PO wajib diisi', 'error');
-    const p = await save({ action: 'po', noPo: noPo.trim(), tglPO, qty: poDraft }, 'Qty PO per item tersimpan');
+    const body: Record<string, unknown> = { action: 'po', noPo: noPo.trim(), tglPO, qty: poDraft };
+    if (showPoQcd) {
+      const err = itemQcdError(qcdRows, qcdDraft);
+      if (err) return toast(err, 'error');
+      body.qcd = Object.fromEntries(qcdRows.map((r) => [r.itemId, qcdDraft[r.itemId] || {}]));
+    }
+    const p = await save(body, showPoQcd ? 'Qty PO & QCD per item tersimpan' : 'Qty PO per item tersimpan');
     if (!p) return;
     setMode(null);
     // Already at DO: go straight on to what was delivered.
@@ -159,6 +217,12 @@ export function ItemFlowModal() {
       const list = flowItems(p);
       if (list.some((i) => !i.sentConfirmed && (i.po || 0) > 0)) startKirim(list);
     }
+  }
+  async function saveQcd() {
+    const err = itemQcdError(qcdRows, qcdDraft);
+    if (err) return toast(err, 'error');
+    const p = await save({ action: 'qcd', qcd: Object.fromEntries(qcdRows.map((r) => [r.itemId, qcdDraft[r.itemId] || {}])) }, 'QCD per item tersimpan');
+    if (p) setMode(null);
   }
   async function saveKirim() {
     if (!noDo.trim()) return toast('No. DO / surat jalan wajib diisi', 'error');
@@ -193,8 +257,10 @@ export function ItemFlowModal() {
               {record.cabang || '-'} {tr("· SE")} {record.se || '-'} {tr("· Penawaran")} {record.tglPenawaran ? formatDateID(record.tglPenawaran) : '-'}
               {record.noPo && <> {tr("· PO")} <b>{record.noPo}</b>{record.tglPO ? ` (${formatDateID(record.tglPO)})` : ''}</>}
             </div>
-            {canEdit && won && (
+            {canEdit && (won || lostDeal) && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {won && (
+                <>
                 <button type="button" className="btn btn-primary btn-sm" disabled={busy || loading} onClick={() => startPo()}>
                   {allConfirmed ? tr("Koreksi qty PO") : tr("Konfirmasi qty PO per item")}
                 </button>
@@ -206,6 +272,17 @@ export function ItemFlowModal() {
                   onClick={() => startKirim()}
                 >
                   {tr("Catat Pengiriman (DO)")}
+                </button>
+                </>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  disabled={busy || loading || !qcdReady}
+                  title={!qcdReady ? tr("Konfirmasi qty PO per item dulu") : tr("Quality · Cost · Delivery dan kompetitor per item")}
+                  onClick={() => startQcd()}
+                >
+                  {tr("QCD per item")}
                 </button>
               </div>
             )}
@@ -251,7 +328,7 @@ export function ItemFlowModal() {
                           <td>{it.label}</td>
                           <td className="mono" style={{ textAlign: 'right' }}>{qtyText(it.offered, it)}</td>
                           <td>
-                            <input type="number" min={0} max={it.offered} step="any" aria-label={`Qty PO ${it.label}`} value={v} onChange={(e) => setPoDraft((d) => ({ ...d, [it.itemId]: e.target.value }))} style={{ width: 110, textAlign: 'right' }} />
+                            <input type="number" min={0} max={it.offered} step="any" aria-label={`Qty PO ${it.label}`} value={v} onChange={(e) => onPoQty(it, e.target.value)} style={{ width: 110, textAlign: 'right' }} />
                           </td>
                           <td className="mono" style={{ textAlign: 'right', color: diff > 0 ? 'var(--rust-600)' : 'var(--text-soft)', fontWeight: diff > 0 ? 700 : 400 }}>{diff > 0 ? qtyText(diff, it) : '–'}</td>
                         </tr>
@@ -260,11 +337,41 @@ export function ItemFlowModal() {
                   </tbody>
                 </table>
               </div>
+              {showPoQcd && (
+                <>
+                  <div className="if-panel-head" style={{ marginTop: 14 }}>
+                    <b>{tr("QCD per item")}</b>
+                    <span>{tr("Item yang di-PO terisi dari QCD prospek. Item yang tidak / sebagian di-PO: isi alasan dan")} <b>{tr("kompetitor pemenangnya")}</b>.</span>
+                  </div>
+                  <ItemQcdTable rows={qcdRows} value={qcdDraft} onChange={onQcdChange} />
+                </>
+              )}
               <div className="if-panel-foot">
                 <span>{totals.offKg > 0 && <>PO <b className="mono">{formatTon(poSumKg)}</b> {tr("dari ditawarkan")} <b className="mono">{formatTon(totals.offKg)}</b></>}</span>
                 <span style={{ display: 'flex', gap: 8 }}>
                   <button type="button" className="btn btn-outline btn-sm" onClick={() => setMode(null)}>{tr("Batal")}</button>
                   <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={savePo}>{busy ? tr("Menyimpan…") : tr("Simpan PO")}</button>
+                </span>
+              </div>
+            </div>
+          )}
+
+          {mode === 'qcd' && (
+            <div className="if-panel po">
+              <div className="if-panel-head">
+                <b>{tr("QCD per item")}</b>
+                <span>
+                  {lostDeal
+                    ? tr("Semua item kalah. Bila kompetitor pemenang atau alasannya berbeda per item, ubah di baris itemnya.")
+                    : tr("Isi Quality · Cost · Delivery per item. Item yang tidak / sebagian di-PO wajib diisi kompetitor pemenangnya.")}
+                </span>
+              </div>
+              <ItemQcdTable rows={qcdRows} value={qcdDraft} onChange={onQcdChange} />
+              <div className="if-panel-foot">
+                <span />
+                <span style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setMode(null)}>{tr("Batal")}</button>
+                  <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={saveQcd}>{busy ? tr("Menyimpan…") : tr("Simpan QCD")}</button>
                 </span>
               </div>
             </div>
@@ -331,7 +438,7 @@ export function ItemFlowModal() {
               <div className="table-wrap" style={{ borderTop: 'none' }}>
                 <table className="simple-table if-nowrap" style={{ minWidth: 560 }}>
                   <thead>
-                    <tr><th>{tr("Material")}</th><th style={{ textAlign: 'right' }}>{tr("Ditawarkan")}</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>{tr("Terkirim")}</th><th style={{ width: 120 }}>{tr("Alur")}</th><th>{tr("Status")}</th></tr>
+                    <tr><th>{tr("Material")}</th><th style={{ textAlign: 'right' }}>{tr("Ditawarkan")}</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>{tr("Terkirim")}</th><th style={{ width: 120 }}>{tr("Alur")}</th><th>{tr("Status")}</th><th>{tr("QCD / Kompetitor")}</th></tr>
                   </thead>
                   <tbody>
                     {items.map((it) => (
@@ -345,6 +452,19 @@ export function ItemFlowModal() {
                           <span className={`badge ${ITEM_STATE_META[it.state].color}`}>{ITEM_STATE_META[it.state].label}</span>
                           {it.estimated && <span className="if-est" title={tr("Belum dikonfirmasi per item — dihitung penuh dari status prospek")}>{tr("perkiraan")}</span>}
                         </td>
+                        <td className="if-qcd">
+                          {it.outcome && <span className={`badge ${ITEM_OUTCOME_META[it.outcome].color}`}>{tr(ITEM_OUTCOME_META[it.outcome].label)}</span>}{' '}
+                          {it.qcd ? (
+                            <>
+                              {it.qcd.kompetitor && <b>{it.qcd.kompetitor}</b>}
+                              {it.qcd.faktor && <span className="if-qcd-f"> · {QCD_FAKTOR_LABEL[it.qcd.faktor] || it.qcd.faktor}</span>}
+                            </>
+                          ) : it.outcome ? (
+                            <span className="if-qcd-f" title={tr("Belum diisi per item — ikut QCD prospek")}>{tr("ikut QCD prospek")}</span>
+                          ) : (
+                            '–'
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -355,7 +475,7 @@ export function ItemFlowModal() {
                         <td className="mono" style={{ textAlign: 'right' }}><b>{formatTon(totals.offKg)}</b></td>
                         <td className="mono" style={{ textAlign: 'right' }}><b>{won ? formatTon(totals.poKg) : '–'}</b></td>
                         <td className="mono" style={{ textAlign: 'right' }}><b>{won ? formatTon(totals.sentKg) : '–'}</b></td>
-                        <td colSpan={2} style={{ fontSize: 12, color: 'var(--text-soft)' }}>
+                        <td colSpan={3} style={{ fontSize: 12, color: 'var(--text-soft)' }}>
                           {won ? `PO ${Math.round((totals.poKg / totals.offKg) * 100)}% dari penawaran · terkirim ${totals.poKg ? Math.round((totals.sentKg / totals.poKg) * 100) : 0}% dari PO` : tr("Menunggu PO")}
                         </td>
                       </tr>

@@ -1,5 +1,6 @@
 import { getProspectMaterials, num } from './format';
 import { LINE_FABRIKASI } from './doc-lines';
+import { itemOutcome, type ItemOutcome, type ItemQcd } from './item-qcd';
 import type { Material, Prospect } from './types';
 
 /**
@@ -16,6 +17,7 @@ export interface ItemTrack {
   itemId?: string;
   qtyPo?: number;
   qtyKirim?: number;
+  qcd?: ItemQcd;
 }
 
 export type ItemState = 'ditawarkan' | 'tidak-po' | 'po' | 'sebagian' | 'terkirim' | 'batal';
@@ -46,6 +48,10 @@ export interface FlowItem {
   /** Angka PO/kirim diperkirakan dari status prospek (belum dikonfirmasi per item). */
   estimated: boolean;
   state: ItemState;
+  /** Menang / sebagian / kalah (null = belum diputuskan). */
+  outcome: ItemOutcome | null;
+  /** QCD khusus item ini (null = ikut QCD prospek). */
+  qcd: ItemQcd | null;
 }
 
 export type EventType = 'tawar' | 'revisi' | 'po' | 'nopo' | 'kirim';
@@ -134,6 +140,8 @@ export function flowItems(p: Pick<Prospect, 'materials' | 'qty' | 'value' | 'lin
       sentConfirmed,
       estimated,
       state,
+      outcome: itemOutcome(offered, po, status === 6),
+      qcd: m.qcd && typeof m.qcd === 'object' ? m.qcd : null,
     };
   });
 }

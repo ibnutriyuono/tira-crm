@@ -317,6 +317,8 @@ td.center{text-align:center;}
 .sig-empty{padding:14px; border:1px dashed var(--border); border-radius:8px; color:var(--text-soft); font-size:13px}
 .q-sigrow{display:flex; align-items:center; gap:14px}
 .q-sigrow img{max-height:54px; max-width:200px; border:1px solid var(--border); border-radius:6px; padding:4px 8px; background:#fff}
+.q-onbehalf select{width:100%; max-width:620px}
+.q-onbehalf .field-note{margin-top:6px}
 .qp-sig{height:64px; display:flex; align-items:flex-end}
 .qp-sig img{max-height:64px; max-width:200px}
 /* Surat Penawaran */
@@ -1269,3 +1271,16 @@ body:has(.chat-fab) .modal-foot{padding-right:88px}
 .qm-ptitle{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--slate-600);padding:8px 12px;background:#fff;border-bottom:1px solid var(--line,#dfe5eb)}
 .qm-preview iframe{display:block;width:100%;height:640px;border:0;background:#eef1f4}
 @media (max-width:900px){.qm{grid-template-columns:1fr}.qm-preview iframe{height:520px}}
+
+/* QCD per item (Status Item) */
+.iq-table{min-width:880px}
+.iq-table td{vertical-align:top}
+.iq-table select,.iq-table input[type=text]{width:100%; min-width:96px; font-size:12.5px; padding:5px 6px}
+.iq-table td:last-child input{min-width:150px}
+.iq-mat{min-width:200px; max-width:280px; white-space:normal}
+.iq-sub{font-size:11.5px; color:var(--text-soft); margin-top:2px}
+.iq-copy{background:none; border:0; padding:0; margin-top:4px; font-size:11.5px; color:var(--steel-600); cursor:pointer; text-decoration:underline}
+.iq-miss td:first-child{box-shadow:inset 3px 0 0 var(--rust-500)}
+.if-qcd{white-space:normal; font-size:12px; min-width:150px}
+.if-qcd-f{color:var(--text-soft)}
+.kc-lose-date{font-size:11.5px; color:var(--rust-600); font-weight:600}

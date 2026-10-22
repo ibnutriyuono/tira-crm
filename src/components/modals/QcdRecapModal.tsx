@@ -6,7 +6,8 @@ import { QcdDashboard } from '../QcdDashboard';
 import { IconEdit } from '../icons';
 import { CABANG_LIST, STATUS_META } from '@/lib/constants';
 import { execScopeFor } from '@/lib/exec-analysis';
-import { formatRupiah, num, todayStr } from '@/lib/format';
+import { formatDateID, formatRupiah, num, todayStr } from '@/lib/format';
+import { lostDateOf } from '@/lib/lose-date';
 import { QCD_DIMS, QCD_FAKTOR_LABEL } from '@/lib/qcd';
 import { buildQcdRecap } from '@/lib/reports';
 import type { Prospect } from '@/lib/types';
@@ -15,6 +16,9 @@ import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
 
 import { useT } from '@/store/useLangStore';
+
+/** Tanggal deal ditutup: Tgl. PO (Won) atau Tgl. Lose Order (Lose). */
+const closeDate = (r: Prospect): string => (num(r.status) === 6 ? lostDateOf(r) : String(r.tglPO || r.tglDelivery || '').slice(0, 10));
 /** "Lebih murah — selisih 5%" from the level dropdown plus the optional note. */
 function dimText(r: Prospect, key: 'quality' | 'cost' | 'delivery'): string {
   const dim = QCD_DIMS.find((d) => d.key === key)!;
@@ -97,18 +101,18 @@ export function QcdRecapModal() {
   async function exportExcel() {
     if (list.length === 0) return toast('Tidak ada data QCD untuk diexport', 'error');
     const XLSX = await import('xlsx');
-    const header = ['CUSTOMER', 'CABANG', 'SE', 'STATUS', 'LINE', 'MATERIAL', 'QTY', 'NILAI', 'QUALITY', 'COST', 'DELIVERY', 'FAKTOR PENENTU', 'KOMPETITOR', 'CATATAN'];
+    const header = ['CUSTOMER', 'CABANG', 'SE', 'STATUS', 'TGL TUTUP (PO / LOSE)', 'LINE', 'MATERIAL', 'QTY', 'NILAI', 'QUALITY', 'COST', 'DELIVERY', 'FAKTOR PENENTU', 'KOMPETITOR', 'CATATAN'];
     const aoa: unknown[][] = [header];
     list.forEach((r) =>
       aoa.push([
-        r.customer || '', r.cabang || '', r.se || '', STATUS_META[r.status]?.label || '',
+        r.customer || '', r.cabang || '', r.se || '', STATUS_META[r.status]?.label || '', closeDate(r),
         r.line || '', r.uraian || '', r.qty || 0, r.value || 0,
         dimText(r, 'quality'), dimText(r, 'cost'), dimText(r, 'delivery'),
         QCD_FAKTOR_LABEL[r.qcdFaktor || ''] || '', r.qcdKompetitor || '', r.qcdCatatan || '',
       ]),
     );
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 28 }, { wch: 8 }, { wch: 8 }, { wch: 16 }, { wch: 6 }, { wch: 26 }, { wch: 6 }, { wch: 15 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 30 }];
+    ws['!cols'] = [{ wch: 28 }, { wch: 8 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 6 }, { wch: 26 }, { wch: 6 }, { wch: 15 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 30 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'QCD');
     XLSX.writeFile(wb, `CRM_QCD_Rekap_${todayStr()}.xlsx`);
@@ -202,7 +206,7 @@ export function QcdRecapModal() {
               <table className="simple-table">
                 <thead>
                   <tr>
-                    <th>{tr("Customer")}</th><th>{tr("Cabang")}</th><th>SE</th><th>{tr("Status")}</th><th>{tr("Nilai")}</th><th>{tr("Quality")}</th><th>{tr("Cost")}</th><th>{tr("Delivery")}</th><th>{tr("Faktor Penentu")}</th><th>{tr("Kompetitor")}</th><th>{tr("Catatan")}</th><th>{tr("Aksi")}</th>
+                    <th>{tr("Customer")}</th><th>{tr("Cabang")}</th><th>SE</th><th>{tr("Status")}</th><th>{tr("Tgl. Tutup")}</th><th>{tr("Nilai")}</th><th>{tr("Quality")}</th><th>{tr("Cost")}</th><th>{tr("Delivery")}</th><th>{tr("Faktor Penentu")}</th><th>{tr("Kompetitor")}</th><th>{tr("Catatan")}</th><th>{tr("Aksi")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -214,6 +218,7 @@ export function QcdRecapModal() {
                         <td>{r.cabang || '-'}</td>
                         <td>{r.se || '-'}</td>
                         <td><span className={`badge ${meta?.color || 'slate'}`}>{meta?.label || '-'}</span></td>
+                        <td className="mono">{closeDate(r) ? formatDateID(closeDate(r)) : '-'}</td>
                         <td className="mono">{formatRupiah(r.value)}</td>
                         <td>{dimCell(r, 'quality')}</td>
                         <td>{dimCell(r, 'cost')}</td>

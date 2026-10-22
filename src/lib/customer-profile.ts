@@ -8,6 +8,7 @@
  * siklus order, profil pembelian & tender, pembanding antar customer
  * sejenis, dan perbandingan antar SE yang pernah menangani customer.
  */
+import { lostDateOf } from './lose-date';
 import { ACTIVITY_TYPES } from './constants';
 import { liveLabels } from './i18n';
 import { classify, materialsWithValue, normalizeLine, num } from './format';
@@ -45,7 +46,7 @@ const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'O
 const CUSTOMER_TIPE = new Set<string>(ACTIVITY_TYPES.map((t) => t.key));
 
 export const wonDate = (r: Prospect) => (r.tglPO || r.tglDelivery || r.tglPenawaran || String(r.createdAt || '').slice(0, 10)) || '';
-const lostDate = (r: Prospect) => String(r.statusChangedAt || r.updatedAt || '').slice(0, 10);
+const lostDate = (r: Prospect) => lostDateOf(r);
 const dayNum = (iso: string) => Math.floor(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / 86400000);
 const diffDays = (from: string, to: string) => dayNum(to) - dayNum(from);
 const ymOf = (iso: string) => iso.slice(0, 7);

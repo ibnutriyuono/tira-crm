@@ -1,3 +1,4 @@
+import { lostDateOf } from './lose-date';
 import { CABANG_LIST, STAGE_PROBABILITY } from './constants';
 import { classify, num } from './format';
 import { buildAgingList, buildCustomerIntel, buildForecast, buildForecastBySe, buildForecastByReg, buildForecastNasional, customerKey, daysSince, periodeList } from './reports';
@@ -193,8 +194,8 @@ export function buildExecAnalysis(
   const weighted = open.reduce((s, r) => s + num(r.value) * (STAGE_PROBABILITY[num(r.status)] ?? 0), 0);
   const coverage = gap > 0 ? Math.round((weighted / gap) * 100) / 100 : null;
 
-  // Lost in period: dated by when the deal moved to Lose (statusChangedAt).
-  const lostInPeriod = prospects.filter((r) => classify(r) === 'Lost' && inMonths(String(r.statusChangedAt || '')));
+  // Lost in period: dated by Tanggal Lose Order (old rows: when it moved to Lose).
+  const lostInPeriod = prospects.filter((r) => classify(r) === 'Lost' && inMonths(lostDateOf(r)));
   const decided = wonInPeriod.length + lostInPeriod.length;
   const compCount = new Map<string, { name: string; count: number }>();
   lostInPeriod.forEach((r) => {

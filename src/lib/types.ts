@@ -58,6 +58,8 @@ export interface Prospect {
   /** Tanggal faktur (YYYY-MM-DD) — omzet dibukukan di bulan ini. */
   tglFaktur?: string | null;
   noFaktur?: string | null;
+  /** Tanggal Lose Order (YYYY-MM-DD) — status 6. */
+  tglLose?: string | null;
   statusChangedAt: string;
   qcdQuality: string | null;
   qcdCost: string | null;

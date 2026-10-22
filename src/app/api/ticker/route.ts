@@ -27,7 +27,7 @@ export async function GET() {
     prisma.prospect.findMany({
       select: {
         status: true, value: true, customer: true, se: true, cabang: true, reg: true, noPo: true, tglPO: true, tglDelivery: true, tglPenawaran: true,
-        createdAt: true, updatedAt: true, statusChangedAt: true, qcdKompetitor: true, qcdFaktor: true, materials: true, line: true, uraian: true, qty: true, terfaktur: true,
+        createdAt: true, updatedAt: true, statusChangedAt: true, tglLose: true, qcdKompetitor: true, qcdFaktor: true, materials: true, line: true, uraian: true, qty: true, terfaktur: true,
       },
     }),
     prisma.budgetTarget.findMany(),

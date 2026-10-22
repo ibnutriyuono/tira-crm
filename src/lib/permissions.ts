@@ -44,7 +44,7 @@ export type Perms = Record<string, ModPerm>;
 /** Role bawaan yang bisa dipakai sebagai tipe dasar role tambahan. */
 export const BASE_ROLES: { key: string; label: string; scope: string; note: string }[] = [
   { key: 'sales', label: 'Sales', scope: 'Milik sendiri (Kode SE)', note: 'Melihat prospek/aktivitas dengan Kode SE miliknya; perjalanan dinas ke cabangnya disetujui BM.' },
-  { key: 'salesadmin', label: 'Admin Sales', scope: 'Satu cabang', note: 'Seluruh data satu cabang; mengisi atas nama Sales, faktur; notifikasi Antrian Admin.' },
+  { key: 'salesadmin', label: 'Admin Sales', scope: 'Satu cabang', note: 'Seluruh data satu cabang; mengisi atas nama Sales, surat penawaran atas nama Sales/BM, faktur; notifikasi Antrian Admin.' },
   { key: 'bm', label: 'BM (Branch Manager)', scope: 'Satu cabang', note: 'Seluruh data satu cabang; membagi target ke Sales; perjalanan dinas; menyetujui perjalanan Sales cabangnya.' },
   { key: 'rm', label: 'RM (Regional Manager)', scope: 'Satu regional', note: 'Semua cabang di regionalnya; menyetujui perjalanan BM.' },
   { key: 'gm', label: 'GM (General Manager)', scope: 'Nasional', note: 'Seluruh data perusahaan; menetapkan target cabang.' },

@@ -102,6 +102,12 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
         </div>
       </div>
 
+      {d.units.itemBased > 0 && (
+        <div className="field-note" style={{ margin: '10px 0 0' }}>
+          {tr("Rincian di bawah dihitung")} <b>{tr("per item")}</b> {tr("untuk")} {d.units.itemBased} {tr("deal yang memiliki QCD per item")} ({d.units.won} {tr("item/deal menang")}, {d.units.lost} {tr("item/deal kalah")}){tr("; deal lain dihitung sekali dari QCD prospek.")}
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 18 }}>
         <div>
           <Title>{tr("Posisi kita dibanding kompetitor")}</Title>
@@ -110,8 +116,8 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
               <thead>
                 <tr>
                   <th style={{ width: '22%' }}>{tr("Aspek")}</th>
-                  <th>{tr("Pada deal MENANG")}</th>
-                  <th>{tr("Pada deal KALAH")}</th>
+                  <th>{d.units.itemBased ? tr("Pada item/deal MENANG") : tr("Pada deal MENANG")}</th>
+                  <th>{d.units.itemBased ? tr("Pada item/deal KALAH") : tr("Pada deal KALAH")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -194,6 +200,44 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
             </tbody>
           </table>
         </div>
+      )}
+
+      {d.lostItems.length > 0 && (
+        <>
+          <Title>{tr("Item yang lepas ke kompetitor (")}{d.lostItems.length})</Title>
+          <div className="table-wrap" style={{ borderTop: 'none' }}>
+            <table className="simple-table" style={{ minWidth: 0 }}>
+              <thead>
+                <tr>
+                  <th>{tr("Material")}</th>
+                  <th>{tr("Customer")}</th>
+                  <th>{tr("Cabang")}</th>
+                  <th>{tr("Kompetitor pemenang")}</th>
+                  <th>{tr("Faktor")}</th>
+                  <th>{tr("Nilai lepas")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.lostItems.slice(0, 25).map((x, i) => (
+                  <tr key={`${x.prospectId}-${i}`}>
+                    <td>
+                      {x.item}
+                      {x.partial && <span className="badge amber" style={{ marginLeft: 6 }}>{tr("sebagian")}</span>}
+                    </td>
+                    <td>{x.customer}</td>
+                    <td>{x.cabang}</td>
+                    <td>
+                      <b>{x.kompetitor}</b>
+                    </td>
+                    <td>{x.faktor}</td>
+                    <td>{formatRupiah(x.value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {d.lostItems.length > 25 && <div className="field-note">+{d.lostItems.length - 25} {tr("item lainnya.")}</div>}
+        </>
       )}
 
       {d.cabang.length > 1 && (

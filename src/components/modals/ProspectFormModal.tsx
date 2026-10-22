@@ -18,6 +18,7 @@ import { EMPTY_QCD, useUiStore } from '@/store/useUiStore';
 import { useCan } from '@/hooks/useCan';
 import { qcdMissing, qcdRequiredOnMove } from '@/lib/qcd';
 import { QcdFields } from '../QcdFields';
+import { loseDateProblem } from '@/lib/lose-date';
 import type { Prospect } from '@/lib/types';
 import { canSetFaktur } from '@/lib/roles';
 
@@ -86,6 +87,7 @@ export function ProspectFormModal() {
   const [noPo, setNoPo] = useState('');
   const [tglPO, setTglPO] = useState('');
   const [tglDelivery, setTglDelivery] = useState('');
+  const [tglLose, setTglLose] = useState('');
   const [keterangan, setKeterangan] = useState('');
   const [busy, setBusy] = useState(false);
   // Jadwal follow-up — wajib saat status dipindah ke tahap pipeline aktif.
@@ -115,6 +117,7 @@ export function ProspectFormModal() {
       setNoPo(editing.noPo || '');
       setTglPO(editing.tglPO || '');
       setTglDelivery(editing.tglDelivery || '');
+      setTglLose(editing.tglLose || '');
       setKeterangan(editing.keterangan || '');
       useUiStore.setState({
         pendingProspectQCD: {
@@ -146,6 +149,7 @@ export function ProspectFormModal() {
       setNoPo('');
       setTglPO('');
       setTglDelivery('');
+      setTglLose('');
       setKeterangan('');
       useUiStore.setState({ pendingProspectQCD: { ...EMPTY_QCD } });
     }
@@ -217,6 +221,11 @@ export function ProspectFormModal() {
         return;
       }
     }
+    if (Number(status) === 6) {
+      const ld = tglLose || jakartaDate();
+      const loseErr = ld !== editing?.tglLose ? loseDateProblem(ld, tglPenawaran) : null;
+      if (loseErr) return toast(loseErr, 'error');
+    }
     if (fuNeeded && followUpDateProblem(fuDate)) {
       setFuErr(true);
       toast(followUpDateProblem(fuDate)!, 'error');
@@ -234,6 +243,7 @@ export function ProspectFormModal() {
       noPo: noPo.trim(),
       tglPO: tglPO || '',
       tglDelivery: tglDelivery || '',
+      ...(Number(status) === 6 ? { tglLose: tglLose || jakartaDate() } : {}),
       materials,
       kondisiStock,
       keterangan,
@@ -419,6 +429,15 @@ export function ProspectFormModal() {
           <label>{tr("Tgl. Delivery")}</label>
           <input type="date" value={tglDelivery} onChange={(e) => setTglDelivery(e.target.value)} />
         </div>
+        {Number(status) === 6 && (
+          <div>
+            <label>
+              {tr("Tgl. Lose Order")} <span style={{ color: 'var(--rust-500)' }}>*</span>
+            </label>
+            <input type="date" value={tglLose || jakartaDate()} max={jakartaDate()} onChange={(e) => setTglLose(e.target.value)} />
+            <div className="field-note">{tr("Tanggal customer memutuskan tidak order — dipakai laporan Lose per bulan.")}</div>
+          </div>
+        )}
         <div className="full">
           <label>{tr("Keterangan")}</label>
           <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder={tr("Catatan / progres terbaru")} />

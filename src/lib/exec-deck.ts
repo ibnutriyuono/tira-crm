@@ -7,6 +7,7 @@
  * Setiap slide = satu pesan: judul berupa kesimpulan, grafik, lalu Temuan dan
  * Rekomendasi yang dihitung dari angka (bukan teks tetap).
  */
+import { lostDateOf } from './lose-date';
 import { ACTIVITY_TYPES, STAGE_PROBABILITY, STATUS_META } from './constants';
 import { classify, materialsWithValue, normalizeLine, num } from './format';
 import { buildActivityKpi } from './activity-kpi';
@@ -363,8 +364,8 @@ export function buildDeck(inp: DeckInput): DeckModel {
 
   // ============================================================ 6. Win / loss & kompetitor & QCD
   {
-    const decided = prospects.filter((r) => (classify(r) === 'Won' && inPeriod(wonDate(r))) || (classify(r) === 'Lost' && inPeriod(String(r.statusChangedAt || ''))));
-    const closed12 = prospects.filter((r) => (classify(r) === 'Won' && trend.includes(wonDate(r).slice(0, 7))) || (classify(r) === 'Lost' && trend.includes(String(r.statusChangedAt || '').slice(0, 7))));
+    const decided = prospects.filter((r) => (classify(r) === 'Won' && inPeriod(wonDate(r))) || (classify(r) === 'Lost' && inPeriod(lostDateOf(r))));
+    const closed12 = prospects.filter((r) => (classify(r) === 'Won' && trend.includes(wonDate(r).slice(0, 7))) || (classify(r) === 'Lost' && trend.includes(lostDateOf(r).slice(0, 7))));
     const lost12 = closed12.filter((r) => classify(r) === 'Lost');
     const wr12 = closed12.length ? pct(closed12.length - lost12.length, closed12.length) : null;
     const faktor = new Map<string, { n: number; v: number }>();

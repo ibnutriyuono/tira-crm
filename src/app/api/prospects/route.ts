@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { loseDateProblem, resolveTglLose } from '@/lib/lose-date';
 import { ensureCustomerFromProspect } from '@/lib/customer-sync';
 import { prospectScopeWhere } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
@@ -48,6 +49,11 @@ export async function POST(req: Request) {
   if (poErr) return poErr;
   const qcdErr = requireQcdOnClose(null, status, body || {});
   if (qcdErr) return qcdErr;
+  if (status === 6 && String(body?.tglLose ?? '').trim()) {
+    const loseErr = loseDateProblem(body.tglLose, body?.tglPenawaran);
+    if (loseErr) return NextResponse.json({ error: loseErr }, { status: 400 });
+  }
+  const tglLose = resolveTglLose(null, status, body?.tglLose, null);
 
   // Locked scope fields come from the account, not the request — see
   // api-helpers.ts#prospectScopeLocks.
@@ -68,6 +74,7 @@ export async function POST(req: Request) {
       kondisiStock: String(body?.kondisiStock || '').trim(),
       keterangan: String(body?.keterangan || '').trim(),
       status,
+      ...(tglLose ? { tglLose } : {}),
       penawaranTerkirim: !!body?.penawaranTerkirim,
       ...resolveFaktur(user.role, body, null),
       qcdQuality: body?.qcdQuality || '',

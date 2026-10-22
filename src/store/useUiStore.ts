@@ -82,7 +82,7 @@ export interface QcdCtx {
 
 export interface ItemFlowCtx {
   prospectId: string;
-  mode?: 'po' | 'kirim' | null;
+  mode?: 'po' | 'kirim' | 'qcd' | null;
   returnTo?: ModalKey;
 }
 

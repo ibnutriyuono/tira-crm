@@ -1,5 +1,6 @@
 'use client';
 
+import { lostDateOf } from '@/lib/lose-date';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { IconDownload, IconWa } from '../icons';
@@ -303,7 +304,7 @@ export function MarketingModal() {
         if (r.tglPenawaran) evs.push({ ...base, tanggal: r.tglPenawaran, jenis: 'Penawaran Dikirim', warna: 'amber', catatan: r.uraian || '' });
         if (r.tglPO) evs.push({ ...base, tanggal: r.tglPO, jenis: 'Dapat PO', warna: 'green', catatan: r.uraian || '' });
         if (r.tglDelivery) evs.push({ ...base, tanggal: r.tglDelivery, jenis: 'Delivery', warna: 'green', catatan: r.uraian || '' });
-        if (classify(r) === 'Lost') evs.push({ ...base, tanggal: (r.statusChangedAt || r.createdAt || '').slice(0, 10), jenis: 'Lose Order', warna: 'rust', catatan: r.qcdKompetitor ? `Kalah dari ${r.qcdKompetitor}` : r.keterangan || '' });
+        if (classify(r) === 'Lost') evs.push({ ...base, tanggal: lostDateOf(r) || (r.createdAt || '').slice(0, 10), jenis: 'Lose Order', warna: 'rust', catatan: r.qcdKompetitor ? `Kalah dari ${r.qcdKompetitor}` : r.keterangan || '' });
       }
     });
     return evs.filter((e) => e.tanggal).sort((a, b) => b.tanggal.localeCompare(a.tanggal));

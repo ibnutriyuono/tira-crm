@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { loseDateProblem, resolveTglLose } from '@/lib/lose-date';
 import { closeIssuesOnLose } from '@/lib/issues-server';
 import { ensureCustomerFromProspect } from '@/lib/customer-sync';
 import { syncFollowUpPlan } from '@/lib/followup-activity';
@@ -60,6 +61,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (fuErr) return NextResponse.json({ error: fuErr }, { status: 400 });
   }
 
+  // Tanggal Lose Order: wajib sah saat diisi untuk prospek Lose (lib/lose-date.ts).
+  const tglLose = resolveTglLose(Number(scoped.existing.status), status, body?.tglLose, scoped.existing.tglLose);
+  if (status === 6 && String(body?.tglLose ?? '').trim()) {
+    const loseErr = loseDateProblem(body.tglLose, body?.tglPenawaran ?? scoped.existing.tglPenawaran);
+    if (loseErr && body.tglLose !== scoped.existing.tglLose) return NextResponse.json({ error: loseErr }, { status: 400 });
+  }
+
   // Locked scope fields come from the account, not the request — see
   // api-helpers.ts#prospectScopeLocks.
   const { reg, cabang, se } = await resolveProspectScope(user, body);
@@ -80,6 +88,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       kondisiStock: String(body?.kondisiStock || '').trim(),
       keterangan: String(body?.keterangan || '').trim(),
       status,
+      ...(tglLose !== undefined ? { tglLose } : {}),
       penawaranTerkirim: !!body?.penawaranTerkirim,
       ...resolveFaktur(user.role, body, scoped.existing),
       qcdQuality: body?.qcdQuality ?? undefined,
@@ -139,7 +148,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const body = await req.json().catch(() => null);
   const data: Record<string, unknown> = {};
-  const allowed = ['status', 'noPo', 'penawaranTerkirim', 'terfaktur', 'tglFaktur', 'noFaktur', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan', 'qcdQualityLevel', 'qcdCostLevel', 'qcdDeliveryLevel', 'qcdFaktor', 'followUpAt', 'followUpNote'];
+  const allowed = ['status', 'noPo', 'penawaranTerkirim', 'terfaktur', 'tglFaktur', 'noFaktur', 'phone', 'qcdQuality', 'qcdCost', 'qcdDelivery', 'qcdKompetitor', 'qcdCatatan', 'qcdQualityLevel', 'qcdCostLevel', 'qcdDeliveryLevel', 'qcdFaktor', 'followUpAt', 'followUpNote', 'tglLose'];
   for (const key of allowed) {
     if (body && Object.prototype.hasOwnProperty.call(body, key)) data[key] = body[key];
   }
@@ -173,6 +182,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       const fuErr = followUpDateProblem(data.followUpAt);
       if (fuErr) return NextResponse.json({ error: fuErr }, { status: 400 });
     }
+  }
+  // Tanggal Lose Order: diisi / dikoreksi untuk prospek Lose; dikosongkan saat keluar dari Lose.
+  {
+    const nextStatus = 'status' in data ? Number(data.status) : Number(scoped.existing.status);
+    const given = 'tglLose' in data ? String(data.tglLose ?? '').trim() : '';
+    if (nextStatus === 6 && given && given !== scoped.existing.tglLose) {
+      const loseErr = loseDateProblem(given, scoped.existing.tglPenawaran);
+      if (loseErr) return NextResponse.json({ error: loseErr }, { status: 400 });
+    }
+    const resolved = resolveTglLose(Number(scoped.existing.status), nextStatus, given, scoped.existing.tglLose);
+    delete data.tglLose;
+    if (resolved !== undefined) data.tglLose = resolved;
   }
   if (typeof data.followUpAt === 'string') data.followUpAt = data.followUpAt.trim() || null;
   if (typeof data.followUpNote === 'string') data.followUpNote = data.followUpNote.trim() || null;

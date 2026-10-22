@@ -1,3 +1,4 @@
+import { lostDateOf } from './lose-date';
 import { CABANG_LIST } from './constants';
 import { classify, getProspectMaterials, normalizeLine, num } from './format';
 import { QCD_FAKTOR_LABEL } from './qcd';
@@ -122,7 +123,7 @@ export function workingDaysLeftInMonth(today: string): number {
 
 type Row = Pick<
   Prospect,
-  'status' | 'value' | 'customer' | 'se' | 'cabang' | 'reg' | 'noPo' | 'tglPO' | 'tglDelivery' | 'tglPenawaran' | 'createdAt' | 'updatedAt' | 'statusChangedAt' | 'qcdKompetitor' | 'qcdFaktor' | 'materials' | 'line' | 'uraian' | 'qty' | 'terfaktur'
+  'status' | 'value' | 'customer' | 'se' | 'cabang' | 'reg' | 'noPo' | 'tglPO' | 'tglDelivery' | 'tglPenawaran' | 'createdAt' | 'updatedAt' | 'statusChangedAt' | 'tglLose' | 'qcdKompetitor' | 'qcdFaktor' | 'materials' | 'line' | 'uraian' | 'qty' | 'terfaktur'
 >;
 
 const wonDate = (r: Pick<Prospect, 'tglPO' | 'tglDelivery' | 'tglPenawaran'>) => r.tglPO || r.tglDelivery || r.tglPenawaran || '';
@@ -196,7 +197,7 @@ export function buildTickerExtras(rows: Row[], targets: BudgetTarget[], periode:
   const topSeDeals = Array.from(bySe.values()).sort((a, b) => b.count - a.count || b.value - a.value)[0] || null;
 
   // Competitor that beat us most often this month (Lose, dated by status change).
-  const lost = rows.filter((r) => classify(r) === 'Lost' && String(r.statusChangedAt || '').slice(0, 7) === periode);
+  const lost = rows.filter((r) => classify(r) === 'Lost' && lostDateOf(r).slice(0, 7) === periode);
   const comp = new Map<string, { name: string; count: number; faktor: Map<string, number> }>();
   lost.forEach((r) => {
     const n = (r.qcdKompetitor || '').trim();

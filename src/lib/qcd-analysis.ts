@@ -1,4 +1,7 @@
-import { num } from './format';
+import { lostDateOf } from './lose-date';
+import { materialsWithValue, num } from './format';
+import { flowItems } from './item-flow';
+import type { ItemQcd } from './item-qcd';
 import { QCD_DIMS, QCD_FAKTOR, QCD_FAKTOR_LABEL, qcdMissing, type QcdLevel } from './qcd';
 import { customerKey } from './reports';
 import type { Prospect } from './types';
@@ -7,7 +10,15 @@ import type { Prospect } from './types';
  * Dashboard QCD (menu Hasil QCD): why deals are won and lost, from the structured
  * QCD captured when a deal closes. A deal belongs to the period it CLOSED in:
  * Won by Tgl PO (then delivery, then offer -- the forecast rule), Lost by the
- * date it moved to Lose (statusChangedAt).
+ * Tanggal Lose Order (tglLose; old rows: the date it moved to Lose).
+ *
+ * Deal counts (menang / kalah / win rate / kelengkapan) are per prospect.
+ * The breakdowns (posisi Q/C/D, faktor, kompetitor) are per ITEM when the deal
+ * carries QCD per item (lib/item-qcd.ts): a quotation of 5 items where 2 were
+ * ordered and 3 went to competitors counts 2 wins and 3 losses, each with its
+ * own reasons and winning competitor. Deals without item QCD count once, from
+ * the prospect QCD. An item ordered only partly counts as a loss for the part
+ * that was not ordered.
  */
 
 type Counts = Record<QcdLevel | 'kosong', number>;
@@ -26,10 +37,21 @@ export interface QcdDashboard {
   kompetitor: { name: string; lost: number; lostValue: number; won: number; winRate: number | null; topFaktor: string; weakDim: string }[];
   cabang: { cabang: string; won: number; lost: number; winRate: number | null; topFaktorKalah: string; completeness: number | null }[];
   incomplete: { id: string; customer: string; cabang: string; se: string; status: number; value: number }[];
+  /** Jumlah unit analisa (item ber-QCD + deal tanpa QCD item). */
+  units: { won: number; lost: number; itemBased: number };
+  /** Item yang lepas (kalah / sebagian), dari deal ber-QCD per item, nilai terbesar dulu. */
+  lostItems: { prospectId: string; customer: string; cabang: string; item: string; partial: boolean; kompetitor: string; faktor: string; value: number }[];
+}
+
+/** One thing the breakdowns count: an item with its own QCD, or a whole deal. */
+interface Unit {
+  won: boolean;
+  value: number;
+  q: { qcdQualityLevel?: string | null; qcdCostLevel?: string | null; qcdDeliveryLevel?: string | null; qcdFaktor?: string | null; qcdKompetitor?: string | null };
 }
 
 const wonDate = (r: Prospect) => r.tglPO || r.tglDelivery || r.tglPenawaran || '';
-const lostDate = (r: Prospect) => String(r.statusChangedAt || '').slice(0, 10);
+const lostDate = (r: Prospect) => lostDateOf(r);
 
 /** `periode` = "YYYY" (whole year) or "YYYY-MM". */
 export function buildQcdDashboard(prospects: Prospect[], cabangs: string[], periode: string): QcdDashboard {
@@ -42,34 +64,72 @@ export function buildQcdDashboard(prospects: Prospect[], cabangs: string[], peri
   const isComplete = (r: Prospect) => qcdMissing(num(r.status) === 6 ? 6 : 4, r) === null;
 
   const sum = (l: Prospect[]) => l.reduce((s, r) => s + num(r.value), 0);
+  const usum = (l: Unit[]) => l.reduce((s, u) => s + u.value, 0);
   const level = (v: unknown): QcdLevel | 'kosong' => (v === 'unggul' || v === 'setara' || v === 'kalah' ? v : 'kosong');
+
+  // ---- units: items with their own QCD, else the deal itself
+  const units: Unit[] = [];
+  const lostItems: QcdDashboard['lostItems'] = [];
+  let itemBased = 0;
+  const fromItem = (q: ItemQcd) => ({ qcdQualityLevel: q.qualityLevel, qcdCostLevel: q.costLevel, qcdDeliveryLevel: q.deliveryLevel, qcdFaktor: q.faktor, qcdKompetitor: q.kompetitor });
+  closed.forEach((r) => {
+    const items = flowItems(r);
+    if (!items.some((i) => i.qcd)) {
+      units.push({ won: num(r.status) !== 6, value: num(r.value), q: r });
+      return;
+    }
+    itemBased++;
+    const vals = materialsWithValue(r);
+    items.forEach((it) => {
+      if (!it.outcome) return;
+      const q = it.qcd ? fromItem(it.qcd) : r;
+      const price = it.offered > 0 ? num(vals[it.idx]?.nilai) / it.offered : 0;
+      const po = it.po ?? 0;
+      if (it.outcome !== 'kalah') units.push({ won: true, value: price * po, q });
+      if (it.outcome !== 'menang') {
+        const value = price * (it.outcome === 'kalah' ? it.offered : Math.max(0, it.offered - po));
+        units.push({ won: false, value, q });
+        lostItems.push({
+          prospectId: r.id,
+          customer: r.customer,
+          cabang: r.cabang || '-',
+          item: it.label,
+          partial: it.outcome === 'sebagian',
+          kompetitor: (q.qcdKompetitor || '').trim() || '-',
+          faktor: QCD_FAKTOR_LABEL[q.qcdFaktor || ''] || '-',
+          value,
+        });
+      }
+    });
+  });
+  const wonU = units.filter((u) => u.won);
+  const lostU = units.filter((u) => !u.won);
 
   const dims = QCD_DIMS.map((d) => {
     const won = emptyCounts();
     const lost = emptyCounts();
-    wonList.forEach((r) => won[level(r[d.field])]++);
-    lostList.forEach((r) => lost[level(r[d.field])]++);
+    wonU.forEach((u) => won[level(u.q[d.field])]++);
+    lostU.forEach((u) => lost[level(u.q[d.field])]++);
     return { key: d.key, label: d.label, options: d.options, won, lost };
   });
 
   const faktor = QCD_FAKTOR.map((f) => {
-    const lostF = lostList.filter((r) => r.qcdFaktor === f.key);
-    return { key: f.key, label: f.label, won: wonList.filter((r) => r.qcdFaktor === f.key).length, lost: lostF.length, lostValue: sum(lostF) };
+    const lostF = lostU.filter((u) => u.q.qcdFaktor === f.key);
+    return { key: f.key, label: f.label, won: wonU.filter((u) => u.q.qcdFaktor === f.key).length, lost: lostF.length, lostValue: usum(lostF) };
   }).filter((f) => f.won || f.lost);
 
-  // Competitors: lost deals name the winner; won deals may name who we beat.
-  const comp = new Map<string, { name: string; lost: Prospect[]; won: number }>();
-  const add = (r: Prospect, won: boolean) => {
-    const n = (r.qcdKompetitor || '').trim();
+  // Competitors: lost items/deals name the winner; won ones may name who we beat.
+  const comp = new Map<string, { name: string; lost: Unit[]; won: number }>();
+  const add = (u: Unit) => {
+    const n = (u.q.qcdKompetitor || '').trim();
     if (!n) return;
     const k = customerKey(n);
     const e = comp.get(k) || { name: n, lost: [], won: 0 };
-    if (won) e.won++;
-    else e.lost.push(r);
+    if (u.won) e.won++;
+    else e.lost.push(u);
     comp.set(k, e);
   };
-  wonList.forEach((r) => add(r, true));
-  lostList.forEach((r) => add(r, false));
+  units.forEach(add);
   const mostCommon = (vals: (string | null | undefined)[]) => {
     const m = new Map<string, number>();
     vals.forEach((v) => v && m.set(v, (m.get(v) || 0) + 1));
@@ -85,17 +145,17 @@ export function buildQcdDashboard(prospects: Prospect[], cabangs: string[], peri
   };
   const kompetitor = Array.from(comp.values())
     .map((e) => {
-      const weak = QCD_DIMS.map((d) => ({ label: d.label, n: e.lost.filter((r) => r[d.field] === 'kalah').length }))
+      const weak = QCD_DIMS.map((d) => ({ label: d.label, n: e.lost.filter((u) => u.q[d.field] === 'kalah').length }))
         .filter((x) => x.n > 0)
         .sort((a, b) => b.n - a.n)[0];
       const decided = e.won + e.lost.length;
       return {
         name: e.name,
         lost: e.lost.length,
-        lostValue: sum(e.lost),
+        lostValue: usum(e.lost),
         won: e.won,
         winRate: decided ? Math.round((e.won / decided) * 100) : null,
-        topFaktor: QCD_FAKTOR_LABEL[mostCommon(e.lost.map((r) => r.qcdFaktor))] || '-',
+        topFaktor: QCD_FAKTOR_LABEL[mostCommon(e.lost.map((u) => u.q.qcdFaktor))] || '-',
         weakDim: weak ? weak.label : '-',
       };
     })
@@ -134,5 +194,7 @@ export function buildQcdDashboard(prospects: Prospect[], cabangs: string[], peri
       .filter((r) => !isComplete(r))
       .sort((a, b) => num(b.value) - num(a.value))
       .map((r) => ({ id: r.id, customer: r.customer, cabang: r.cabang || '-', se: r.se || '-', status: num(r.status), value: num(r.value) })),
+    units: { won: wonU.length, lost: lostU.length, itemBased },
+    lostItems: lostItems.sort((a, b) => b.value - a.value),
   };
 }

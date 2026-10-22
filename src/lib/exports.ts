@@ -1,3 +1,4 @@
+import { lostDateOf } from './lose-date';
 import { classify, formatDateID, formatRupiah, materialUnitPrice, num } from './format';
 import { WORKFLOW_META, fupaAsWorkflowDoc, rfqAsWorkflowDoc, workflowStage } from './purchasing-workflow';
 import { ACTIVITY_LABEL, CUSTOMER_APLIKASI_LABEL, PIC_PERAN_LABEL, STATUS_META } from './constants';
@@ -34,7 +35,7 @@ export function buildProspectSheet(list: Prospect[]): SheetSpec {
   const header = [
     'REG', 'CABANG', 'SE', 'CUSTOMER', 'NO. WHATSAPP', 'TGL. PENAWARAN', 'NO. PO', 'TGL. PO', 'TGL. DELIVERY', 'LINE', 'URAIAN PRODUCT', 'QTY (Pcs)', 'VALUE (Rp)',
     'NO. MATERIAL', 'LINE MATERIAL', 'URAIAN MATERIAL', 'QTY MATERIAL (Pcs)', 'BERAT/PC (Kg)', 'HARGA/KG (Rp)', 'HARGA SATUAN (Rp)', 'SUBTOTAL MATERIAL (Rp)',
-    'KONDISI STOCK', 'KETERANGAN', 'STATUS', 'KLASIFIKASI', 'STATUS PENAWARAN', 'STATUS FAKTUR',
+    'KONDISI STOCK', 'KETERANGAN', 'STATUS', 'KLASIFIKASI', 'STATUS PENAWARAN', 'STATUS FAKTUR', 'TGL. LOSE ORDER',
   ];
   const rows: unknown[][] = [];
   list.forEach((r) => {
@@ -51,6 +52,7 @@ export function buildProspectSheet(list: Prospect[]): SheetSpec {
       // at its default false, so this reads as blank rather than a misleading
       // "GIT" for a deal that was never billed because it isn't Won yet.
       klas === 'Won' ? (r.terfaktur ? 'Omzet (Terfaktur)' : 'GIT (Belum Terfaktur)') : '',
+      klas === 'Lost' ? lostDateOf(r) : '',
     ];
     const mats = (Array.isArray(r.materials) ? r.materials : []).filter((m) => (m.uraian || '').trim() || num(m.qty) || materialUnitPrice(m));
     const lines = mats.length
@@ -67,7 +69,7 @@ export function buildProspectSheet(list: Prospect[]): SheetSpec {
   const colWidths = [
     { wch: 5 }, { wch: 8 }, { wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 13 }, { wch: 16 }, { wch: 12 }, { wch: 13 }, { wch: 6 }, { wch: 32 }, { wch: 8 }, { wch: 16 },
     { wch: 6 }, { wch: 8 }, { wch: 34 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 17 },
-    { wch: 14 }, { wch: 24 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 20 },
+    { wch: 14 }, { wch: 24 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 20 }, { wch: 14 },
   ];
   const rp = '#,##0';
   const numFormats: Record<number, string> = { 11: rp, 12: rp, 16: '#,##0.##', 17: '#,##0.###', 18: rp, 19: rp, 20: rp };

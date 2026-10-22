@@ -48,6 +48,7 @@ export function carryItemTracking(before: unknown, after: Record<string, unknown
     if (!p) return;
     if (typeof p.qtyPo === 'number') m.qtyPo = p.qtyPo;
     if (typeof p.qtyKirim === 'number') m.qtyKirim = p.qtyKirim;
+    if (p.qcd && typeof p.qcd === 'object' && !m.qcd) m.qcd = p.qcd;
   });
 }
 

@@ -12,6 +12,7 @@ import type { Prospect } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
 import { signatureUrl } from '../SignatureSection';
 import { activityOwner } from '@/lib/sales-activity';
+import { canQuoteOnBehalf } from '@/lib/roles';
 import {
   QUOTE_DEFAULTS,
   QUOTE_OPT_GROUPS,
@@ -59,6 +60,20 @@ const lsSet = (k: string, v: string) => {
   }
 };
 
+/** Penanda tangan yang boleh dipilih (lihat /api/quotations/signers). */
+interface Signer {
+  id: string;
+  name: string;
+  role: string;
+  se: string | null;
+  email: string | null;
+  jabatan: string;
+  hasSignature: boolean;
+  self: boolean;
+  kind: 'self' | 'sales' | 'bm';
+}
+const telpKey = (s: Signer | null) => (!s || s.self ? LS.telp : `${LS.telp}.${s.id}`);
+
 const blankItem = (): QuoteItem => ({ line: '', uraian: '', grade: '', satuan: 'pcs', qty: 1, beratPc: 0, hargaKg: 0, harga: 0 });
 
 type Tab = 'isi' | 'tampilan' | 'pratinjau';
@@ -96,6 +111,12 @@ export function QuotationModal() {
   const [mail, setMail] = useState({ to: '', cc: '', ccSelf: true, subject: '', message: '', docx: false });
   const [mailServer, setMailServer] = useState<boolean | null>(null);
   const [sending, setSending] = useState(false);
+  // Admin Sales / BM: surat atas nama Sales pemilik prospek atau BM cabang.
+  const onBehalfRole = canQuoteOnBehalf(currentUser?.role);
+  const [signers, setSigners] = useState<Signer[]>([]);
+  const [signerId, setSignerId] = useState('');
+  const signer = signers.find((s) => s.id === signerId) || null;
+  const otherSigner = signer && !signer.self ? signer : null;
 
   useEffect(() => {
     if (!show || !record) return;
@@ -147,11 +168,44 @@ export function QuotationModal() {
       kopText: lsGet(LS.kop) || '',
     });
     setEmail(primary?.email || '');
+    setSigners([]);
+    setSignerId('');
+    if (onBehalfRole) {
+      let alive = true;
+      api
+        .get<{ signers: Signer[]; defaultId: string | null }>(`/api/quotations/signers?prospectId=${encodeURIComponent(record.id)}`)
+        .then((r) => {
+          if (!alive) return;
+          setSigners(r.signers);
+          const def = r.signers.find((x) => x.id === r.defaultId);
+          if (def) applySigner(def);
+        })
+        .catch(() => {
+          /* tetap bisa memakai nama sendiri */
+        });
+      return () => {
+        alive = false;
+      };
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, prospectId]);
 
+  /** Pakai nama, jabatan, email (dan telepon yang pernah diisi di browser ini) penanda tangan terpilih. */
+  function applySigner(s: Signer) {
+    setSignerId(s.id);
+    setD((x) =>
+      x
+        ? { ...x, signer: { nama: s.name, jabatan: s.jabatan, email: s.email || '', telp: lsGet(telpKey(s)) || '' } }
+        : x,
+    );
+  }
+
   const totals = useMemo(() => (d ? quoteTotals(d, opts) : null), [d, opts]);
-  const sigSrc = signatureUrl(currentUser?.signatureAt);
+  const sigSrc = otherSigner
+    ? otherSigner.hasSignature && record
+      ? `/api/quotations/signers/signature?prospectId=${encodeURIComponent(record.id)}&userId=${encodeURIComponent(otherSigner.id)}`
+      : ''
+    : signatureUrl(currentUser?.signatureAt);
   const preview = useMemo(() => (d && tab === 'pratinjau' ? quoteHtml(d, opts, '/logo.png', sigSrc) : ''), [d, opts, tab, sigSrc]);
 
   if (!record || !d) return null;
@@ -187,16 +241,16 @@ export function QuotationModal() {
     if (!d) return;
     lsSet(LS.kop, d.kopText);
     lsSet(LS.kota, d.kota);
-    lsSet(LS.telp, d.signer.telp);
+    lsSet(telpKey(signer), d.signer.telp);
   }
 
-  const canLogAkt = !!currentUser && !!activityOwner(currentUser) && canNow('aktivitas', 'e');
+  const canLogAkt = !!currentUser && (!!otherSigner || !!activityOwner(currentUser)) && canNow('aktivitas', 'e');
 
   /** Satu nomor surat = satu baris Aktivitas Harian (unduh ulang memperbarui baris yang sama). */
   async function logToActivity(kanal: 'email' | null) {
     if (!d || !record || !logAkt || !canLogAkt) return;
     try {
-      const r = await api.post<{ created: boolean }>('/api/sales-activities/quotation', {
+      const r = await api.post<{ created: boolean; owner: string }>('/api/sales-activities/quotation', {
         prospectId: record.id,
         nomor: d.nomor,
         tanggal: d.tanggal,
@@ -205,8 +259,9 @@ export function QuotationModal() {
         ringkas: d.items.filter((it) => it.uraian.trim()).map((it) => it.uraian.trim()).join(', '),
         total: totals ? rupiah(totals.grand).replace(/\u00A0/g, ' ') : '',
         kanal,
+        ...(otherSigner ? { signerId: otherSigner.id } : {}),
       });
-      if (r.created) toast('Tercatat di Aktivitas Harian (Kirim penawaran / dokumen)', 'success');
+      if (r.created) toast(otherSigner ? `Tercatat di Aktivitas Harian ${r.owner} (Kirim penawaran / dokumen)` : 'Tercatat di Aktivitas Harian (Kirim penawaran / dokumen)', 'success');
     } catch (err) {
       toast(err instanceof Error ? `Aktivitas Harian: ${err.message}` : 'Gagal mencatat ke Aktivitas Harian', 'error');
     }
@@ -312,7 +367,9 @@ export function QuotationModal() {
   function onSendEmail() {
     if (!d || !validate()) return;
     remember();
-    setMail({ to: email, cc: '', ccSelf: !!currentUser?.email, subject: defaultEmailSubject(d), message: defaultEmailMessage(d), docx: false });
+    // Atas nama orang lain: ia ikut menerima salinan (balasan customer juga ke emailnya).
+    const ccSigner = otherSigner && d.signer.email && validEmail(d.signer.email) ? d.signer.email : '';
+    setMail({ to: email, cc: ccSigner, ccSelf: !!currentUser?.email, subject: defaultEmailSubject(d), message: defaultEmailMessage(d), docx: false });
     setMailMode(true);
     if (mailServer === null) {
       api
@@ -600,15 +657,40 @@ export function QuotationModal() {
           </div>
 
           <div className="full q-section">{tr("Penanda tangan")}</div>
+          {signers.length > 1 && (
+            <div className="full q-onbehalf">
+              <label>{tr("Atas nama")}</label>
+              <select value={signerId} onChange={(e) => { const s = signers.find((x) => x.id === e.target.value); if (s) applySigner(s); }}>
+                {signers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} — {tr(s.jabatan || s.role)}{s.se && s.kind === 'sales' ? ` · ${s.se}` : ''}{s.self ? ` (${tr("saya")})` : s.kind === 'sales' ? ` (${tr("Sales prospek ini")})` : ''}
+                  </option>
+                ))}
+              </select>
+              {otherSigner && (
+                <div className="field-note">
+                  {tr("Surat dibuat atas nama")} <b>{otherSigner.name}</b>{tr(": nama, jabatan, email, dan tanda tangannya dipakai di surat; balasan customer masuk ke emailnya, dan surat tercatat di Aktivitas Harian-nya. Log mencatat Anda sebagai pembuat.")}
+                </div>
+              )}
+            </div>
+          )}
           <div className="full q-sigrow">
             {sigSrc ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={sigSrc} alt={tr("Tanda tangan Anda")} />
+                <img src={sigSrc} alt={otherSigner ? `${tr("Tanda tangan")} ${otherSigner.name}` : tr("Tanda tangan Anda")} />
                 <span className="field-note" style={{ margin: 0 }}>
-                  {opts.ttdGambar ? tr("Tanda tangan Anda dipasang otomatis di surat.") : tr("Tanda tangan tidak dipasang (dimatikan di tab \"Data yang ditampilkan\").")}
+                  {!opts.ttdGambar
+                    ? tr("Tanda tangan tidak dipasang (dimatikan di tab \"Data yang ditampilkan\").")
+                    : otherSigner
+                      ? `${tr("Tanda tangan")} ${otherSigner.name} ${tr("dipasang otomatis di surat.")}`
+                      : tr("Tanda tangan Anda dipasang otomatis di surat.")}
                 </span>
               </>
+            ) : otherSigner ? (
+              <span className="field-note" style={{ margin: 0 }}>
+                <b>{otherSigner.name}</b> {tr("belum menyimpan tanda tangan di Akun Saya — surat dibuat tanpa gambar tanda tangan (bisa ditandatangani basah setelah dicetak).")}
+              </span>
             ) : (
               <span className="field-note" style={{ margin: 0 }}>
                 {tr("Belum ada tanda tangan. Tambahkan lewat tombol")} <b>{tr("Akun Saya")}</b> {tr("di atas — selanjutnya otomatis terpasang di setiap surat penawaran Anda.")}
@@ -640,7 +722,9 @@ export function QuotationModal() {
             <div className="full">
               <label className="q-ppn">
                 <input type="checkbox" checked={logAkt} onChange={(e) => setLogAkt(e.target.checked)} />
-                {tr("Catat ke Aktivitas Harian saya sebagai \"Kirim penawaran / dokumen\" saat diunduh / dikirim")}
+                {otherSigner
+                  ? `${tr("Catat ke Aktivitas Harian")} ${otherSigner.name} ${tr("sebagai \"Kirim penawaran / dokumen\" saat diunduh / dikirim")}`
+                  : tr("Catat ke Aktivitas Harian saya sebagai \"Kirim penawaran / dokumen\" saat diunduh / dikirim")}
               </label>
               <div className="field-note">{tr("Satu nomor surat dicatat sekali — unduh ulang atau kirim email memperbarui catatan yang sama.")}</div>
             </div>

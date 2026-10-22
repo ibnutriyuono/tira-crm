@@ -113,7 +113,7 @@ export async function POST(req: Request) {
     action: 'update',
     entity: 'prospect',
     entityId: prospectId || summary.nomor,
-    summary: `Mengirim surat penawaran No. ${summary.nomor} via email ke ${to.join(', ')}${cc.length ? ` (cc ${cc.join(', ')})` : ''}`,
+    summary: `Mengirim surat penawaran No. ${summary.nomor} via email ke ${to.join(', ')}${cc.length ? ` (cc ${cc.join(', ')})` : ''}${summary.signer.nama && summary.signer.nama !== user.name ? ` atas nama ${summary.signer.nama}` : ''}`,
   });
   return NextResponse.json({ ok: true, to, cc });
 }
