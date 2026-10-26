@@ -2450,3 +2450,9 @@ Object.assign(EN, {
   'Profil': 'Profile',
   'Dokumen': 'Documents',
 });
+
+Object.assign(EN, {
+  'Jawaban RFQ dan catatan dikirim ke Sales (harga jual)': 'RFQ answer and notes sent to Sales (selling price)',
+  'Jawaban dan catatan Purchasing disimpan': 'Purchasing answer and notes saved',
+  'Kedua catatan ini ikut tersimpan saat menekan Simpan Jawaban atau Kirim Jawaban ke Sales di bawah.': 'Both notes are saved together when you press Save Answer or Send Answer to Sales below.',
+});

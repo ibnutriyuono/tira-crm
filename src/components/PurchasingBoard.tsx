@@ -881,6 +881,13 @@ function PurchDetail({
  * then
  * "Kirim Jawaban". Ported from the single-file app's RFQ answer table.
  */
+/**
+ * Unsaved text in the Catatan internal / Jawaban ke Sales boxes, per document.
+ * "Simpan Jawaban" and "Kirim Jawaban ke Sales" send it along, so Purchasing
+ * does not have to press "Simpan Catatan" first.
+ */
+const purchNoteDrafts = new Map<string, { notes: string; jawaban: string }>();
+
 function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean }) {
   const tr = useT();
   const rfqs = useDataStore((s) => s.rfqs);
@@ -939,9 +946,11 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
     if (missingKurs) return toast(`Isi kurs untuk "${missingKurs.material || 'item'}" (${missingKurs.hppCur})`, 'error');
     setBusy(true);
     try {
-      const res = await api.patch<{ rfq: Rfq }>(`/api/rfqs/${rfqId}`, { action, items });
+      const draft = purchNoteDrafts.get(rfqId);
+      const res = await api.patch<{ rfq: Rfq }>(`/api/rfqs/${rfqId}`, { action, items, ...(draft ? { purchNotes: draft.notes, purchJawaban: draft.jawaban } : {}) });
+      purchNoteDrafts.delete(rfqId);
       upsertRfq(res.rfq);
-      toast(action === 'send-jawaban' ? 'Jawaban RFQ dikirim ke Sales (harga jual)' : 'Jawaban Purchasing disimpan', 'success');
+      toast(action === 'send-jawaban' ? tr('Jawaban RFQ dan catatan dikirim ke Sales (harga jual)') : tr('Jawaban dan catatan Purchasing disimpan'), 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal menyimpan jawaban', 'error');
     } finally {
@@ -1141,11 +1150,11 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
       </div>
       {canAnswer && items.length > 0 && (
         <div className="toolbar-row" style={{ marginTop: 8 }}>
-          <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => save('answer')}>
+          <button type="button" className="btn btn-outline" disabled={busy} onClick={() => save('answer')}>
             {tr("Simpan Jawaban")}
           </button>
-          <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => save('send-jawaban')}>
-            {tr("Kirim Jawaban ke Sales")}
+          <button type="button" className="btn btn-primary purch-send-btn" disabled={busy} onClick={() => save('send-jawaban')}>
+            {busy ? tr('Mengirim…') : tr("Kirim Jawaban ke Sales")}
           </button>
           {seeHpp && <span className="muted">{tr("Yang dikirim ke Sales: harga jual Rupiah saja.")}</span>}
         </div>
@@ -1176,7 +1185,15 @@ function PurchNotes({ doc, readOnly }: { doc: PurchDoc; readOnly: boolean }) {
   useEffect(() => {
     setNotes(record?.purchNotes ?? '');
     setJawaban(record?.purchJawaban ?? '');
-  }, [record?.id, record?.purchNotes, record?.purchJawaban]);
+    purchNoteDrafts.delete(doc.id);
+  }, [doc.id, record?.id, record?.purchNotes, record?.purchJawaban]);
+  const edit = (n: string, j: string) => {
+    setNotes(n);
+    setJawaban(j);
+    purchNoteDrafts.set(doc.id, { notes: n, jawaban: j });
+  };
+  // RFQ with material rows: the answer panel's buttons save these texts too.
+  const savedWithAnswer = doc.jenis === 'RFQ' && ((record as Rfq | undefined)?.items?.length ?? 0) > 0;
 
   async function save() {
     setBusy(true);
@@ -1188,6 +1205,7 @@ function PurchNotes({ doc, readOnly }: { doc: PurchDoc; readOnly: boolean }) {
         const res = await api.patch<{ fupa: Fupa }>(`/api/fupas/${doc.id}`, { purchNotes: notes, purchJawaban: jawaban });
         upsertFupa(res.fupa);
       }
+      purchNoteDrafts.delete(doc.id);
       toast('Catatan Purchasing disimpan', 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal menyimpan catatan', 'error');
@@ -1204,7 +1222,7 @@ function PurchNotes({ doc, readOnly }: { doc: PurchDoc; readOnly: boolean }) {
           value={notes}
           readOnly={readOnly}
           placeholder={tr("Catatan proses pembelian...")}
-          onChange={(e) => setNotes(e.target.value)}
+          onChange={(e) => edit(e.target.value, jawaban)}
         />
       </div>
       <div style={{ gridColumn: '1 / -1' }}>
@@ -1213,7 +1231,7 @@ function PurchNotes({ doc, readOnly }: { doc: PurchDoc; readOnly: boolean }) {
           value={jawaban}
           readOnly={readOnly}
           placeholder={tr("cth. Sudah PO ke vendor X, estimasi barang datang 10 hari...")}
-          onChange={(e) => setJawaban(e.target.value)}
+          onChange={(e) => edit(notes, e.target.value)}
         />
         {/* RFQ tracks its answer through the Harga/Keterangan panel below; FUP A has no
             such columns, so the written reply is what marks it answered. */}
@@ -1229,11 +1247,16 @@ function PurchNotes({ doc, readOnly }: { doc: PurchDoc; readOnly: boolean }) {
           {tr("Kolom ini terlihat oleh Sales yang mengajukan permintaan, berbeda dari catatan internal di atas.")}
         </div>
       </div>
-      {!readOnly && (
+      {!readOnly && !savedWithAnswer && (
         <div style={{ gridColumn: '1 / -1' }}>
           <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={save}>
             {tr("Simpan Catatan")}
           </button>
+        </div>
+      )}
+      {!readOnly && savedWithAnswer && (
+        <div className="text-muted" style={{ gridColumn: '1 / -1', fontSize: 11.5 }}>
+          {tr("Kedua catatan ini ikut tersimpan saat menekan Simpan Jawaban atau Kirim Jawaban ke Sales di bawah.")}
         </div>
       )}
     </div>

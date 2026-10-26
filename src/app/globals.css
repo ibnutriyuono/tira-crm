@@ -1492,6 +1492,10 @@ body:has(.chat-fab) .modal-foot{padding-right:88px}
 .vt-pi .icon-btn{position:absolute;top:2px;right:2px}
 .vt-board{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:14px}
 @media (max-width:1000px){.vt-board{grid-template-columns:1fr}}
+/* Global tables are min-width 1240px and sticky-head popups let them overflow; keep the board tables inside their own column. */
+.vt-board > *{min-width:0}
+.modal.sticky-head .vt-board .table-wrap{overflow-x:auto}
+.vt-board table{min-width:0}
 .vt-focus td{background:#FFF7E8}
 .vt-cancel{display:inline-flex;gap:4px}
 .vt-cancel input{width:130px}
@@ -1504,3 +1508,6 @@ body:has(.chat-fab) .modal-foot{padding-right:88px}
 .vt-chips{display:flex;flex-wrap:wrap;gap:2px}
 .vd-table td{white-space:normal}
 .vd-split.has .vd-table th:nth-child(4),.vd-split.has .vd-table td:nth-child(4){display:none}
+
+/* Purchasing RFQ: the main action, sends the price answer plus both notes. */
+.btn.purch-send-btn{padding:11px 22px;font-size:14.5px;font-weight:700;min-width:240px}
