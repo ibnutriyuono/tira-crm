@@ -1,5 +1,6 @@
 'use client';
 
+import { quotePermAct } from '@/lib/roles';
 import { useMemo } from 'react';
 import { classify, formatDateID, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
 import { STATUS_META } from '@/lib/constants';
@@ -39,7 +40,8 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
   const role = useDataStore((s) => s.currentUser?.role);
   const canE = useCan('prospek', 'e');
   const canD = useCan('prospek', 'd') && (role === 'gm' || role === 'admin');
-  const canX = useCan('prospek', 'x');
+  // Ikon Surat Penawaran (Admin Sales: hak Tambah/Ubah, lainnya: Download).
+  const canX = useCan('prospek', quotePermAct(role));
   const canRfq = useCan('rfq', 'e');
   // Above the empty-list early return — hooks cannot run conditionally.
   const purchCounts = useProspectPurchasingCounts(true);
@@ -56,7 +58,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
             <button
               className="btn btn-primary"
               onClick={() => {
-                useUiStore.setState({ editProspectId: null });
+                useUiStore.setState({ editProspectId: null, prospectFormQuote: false });
                 openModal('prospectForm');
               }}
             >

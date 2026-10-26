@@ -1,4 +1,15 @@
 'use client';
+import { PoIndentTab } from './purchasing/PoIndentTab';
+import { isPurchasingRoleClient } from '@/lib/doc-lines';
+import { canEditPoIndent, canSeeHpp, canSeePoIndent, canSeeVendors } from '@/lib/roles';
+import { actualMargin, hasHpp, hppIdr, sellPrice, type RfqHppFields } from '@/lib/rfq-price';
+import { avlOf, suggestVendors } from '@/lib/vendor-profile';
+import { VendorRequestPanel } from './purchasing/VendorRequestPanel';
+import { RfqQcdTab } from './purchasing/RfqQcdTab';
+import { PurchIssueModal } from './purchasing/PurchIssueModal';
+import { VendorDirectory } from './purchasing/VendorDirectory';
+
+type HppItem = RfqItem & RfqHppFields;
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { IssueBoard } from './issues/IssueBoard';
@@ -16,7 +27,7 @@ import type { Fupa, PurchDocType, Rfq, RfqItem } from '@/lib/types';
 import { canNow, useCan } from '@/hooks/useCan';
 
 import { useT } from '@/store/useLangStore';
-type Tab = 'dashboard' | 'masuk' | 'vendor' | 'masalah';
+type Tab = 'dashboard' | 'masuk' | 'vendor' | 'masalah' | 'indent' | 'qcd';
 
 /** One row in the combined RFQ + FUP A worklist. */
 interface PurchDoc {
@@ -250,6 +261,14 @@ export function PurchasingBoard({
   const issueCount = issues.filter((i) => isOpenIssue(i) && i.pjIds.includes(myId)).length;
   const issueFocus = useUiStore((s) => s.issueFocus);
   if (standalone && issueFocus && tab !== 'masalah') setTab('masalah');
+  // Dari notifikasi target kedatangan.
+  const purchTabFocus = useUiStore((s) => s.purchTabFocus);
+  useEffect(() => {
+    if (purchTabFocus !== 'indent') return;
+    useUiStore.setState({ purchTabFocus: null });
+    setTab('indent');
+  }, [purchTabFocus]);
+  const seePoIndent = canSeePoIndent(useDataStore.getState().currentUser?.role);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [jenisFilter, setJenisFilter] = useState('');
@@ -422,6 +441,12 @@ export function PurchasingBoard({
       <div className={`purch-tabs${standalone ? ' pagebar' : ''}`}>
         <button type="button" className={tab === 'dashboard' ? 'active' : ''} onClick={() => setTab('dashboard')}>{tr("Dashboard")}</button>
         <button type="button" className={tab === 'masuk' ? 'active' : ''} onClick={() => setTab('masuk')}>{tr("Permintaan Masuk")}</button>
+        {standalone && seePoIndent && (
+          <button type="button" className={tab === 'indent' ? 'active' : ''} onClick={() => setTab('indent')}>{tr("PO Indent")}</button>
+        )}
+        {standalone && seePoIndent && (
+          <button type="button" className={tab === 'qcd' ? 'active' : ''} onClick={() => setTab('qcd')}>{tr("Hasil QCD")}</button>
+        )}
         {standalone && !isPic05 && canNow('masalah', 'v') && (
           <button type="button" className={tab === 'masalah' ? 'active' : ''} onClick={() => setTab('masalah')}>
             {tr("⚑ Masalah")}{issueCount > 0 && <span className="item-chat-bubble">{issueCount > 9 ? '9+' : issueCount}</span>}
@@ -674,94 +699,20 @@ export function PurchasingBoard({
       )}
 
       {tab === 'masalah' && standalone && <IssueBoard variant="purchasing" />}
+      {tab === 'qcd' && standalone && seePoIndent && <RfqQcdTab />}
+      {tab === 'indent' && standalone && seePoIndent && <PoIndentTab readOnly={readOnly || !canEditPoIndent(useDataStore.getState().currentUser?.role)} />}
 
       {tab === 'vendor' && (
-        <>
-          {!readOnly && (
-            <div className="toolbar-row">
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => {
-                  useUiStore.setState({ vendorEditId: null });
-                  openModal('vendorForm');
-                }}
-              >
-                {tr("+ Tambah Vendor")}
-              </button>
-              <button
-                className="btn btn-outline btn-sm"
-                onClick={() => {
-                  useUiStore.setState({ importTarget: 'vendor' });
-                  openModal('import');
-                }}
-              >
-                {tr("Import Excel")}
-              </button>
-              {canNow('purch', 'x') && (
-                <button className="btn btn-outline btn-sm" onClick={exportVendors}>{tr("Export Excel")}</button>
-              )}
-              {canNow('purch', 'x') && (
-                <button className="btn btn-outline btn-sm" onClick={vendorTemplate}>{tr("Unduh Template")}</button>
-              )}
-              <span className="hint">{tr("Menampilkan")} {vendors.length} {tr("dari")} {vendors.length} {tr("vendor")}</span>
-            </div>
-          )}
-          <div className="table-wrap" style={{ borderTop: 'none' }}>
-            {vendors.length === 0 ? (
-              <div className="empty-state" style={{ padding: '34px 10px' }}>
-                <h3>{tr("Belum ada vendor")}</h3>
-                <p>{tr("Klik \"Tambah Vendor\" untuk mulai membangun database vendor.")}</p>
-              </div>
-            ) : (
-              <table className="simple-table">
-                <thead>
-                  <tr><th>{tr("Nama Vendor")}</th><th>PIC</th><th>{tr("WhatsApp")}</th><th>{tr("Email")}</th><th>{tr("Kategori")}</th><th></th></tr>
-                </thead>
-                <tbody>
-                  {vendors.map((v) => (
-                    <tr key={v.id}>
-                      <td style={{ fontWeight: 600 }}>{v.nama}</td>
-                      <td>{v.pic || '-'}</td>
-                      <td className="mono">{v.wa || '-'}</td>
-                      <td>{v.email || '-'}</td>
-                      <td>{v.kategori || '-'}</td>
-                      <td>
-                        {!readOnly && (
-                          <div className="row-actions">
-                            <button
-                              className="icon-btn"
-                              title={tr("Edit")}
-                              onClick={() => {
-                                useUiStore.setState({ vendorEditId: v.id });
-                                openModal('vendorForm');
-                              }}
-                            >
-                              <IconEdit />
-                            </button>
-                            {purchD && (
-                            <button
-                              className="icon-btn danger"
-                              title={tr("Hapus")}
-                              onClick={() => {
-                                useUiStore.setState({
-                                  deleteCtx: { mode: 'vendor', id: v.id, title: 'Hapus Vendor', message: `Yakin ingin menghapus vendor "${v.nama}"?` },
-                                });
-                                openModal('delete');
-                              }}
-                            >
-                              <IconTrash />
-                            </button>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
+        <VendorDirectory
+          readOnly={readOnly}
+          canDelete={purchD}
+          onImport={() => {
+            useUiStore.setState({ importTarget: 'vendor' });
+            openModal('import');
+          }}
+          onExport={canNow('purch', 'x') ? exportVendors : undefined}
+          onTemplate={canNow('purch', 'x') ? vendorTemplate : undefined}
+        />
       )}
 
       {detail && <PurchDetail doc={detail} readOnly={readOnly} onClose={() => setDetail(null)} />}
@@ -781,16 +732,40 @@ function PurchDetail({
 }) {
   const tr = useT();
   const toast = useDataStore((s) => s.toast);
+  const [report, setReport] = useState(false);
+  const me = useDataStore((s) => s.currentUser);
+  const canReportIssue = !!me && (isPurchasingRoleClient(me.role) || me.role === 'admin');
+  const src = useDataStore((s) => (doc.jenis === 'RFQ' ? s.rfqs.find((r) => r.id === doc.id) : s.fupas.find((f) => f.id === doc.id)));
 
   return (
     <div className="dialog-backdrop" role="dialog" aria-modal="true" onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(17,22,28,.45)', display: 'grid', placeItems: 'center', zIndex: 60, padding: 16 }}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 8, width: 'min(860px, 100%)', maxHeight: '86vh', overflow: 'auto', padding: 18 }}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 8, width: 'min(1180px, 100%)', maxHeight: '90vh', overflow: 'auto', padding: 18 }}>
         <div className="panel-head" style={{ paddingLeft: 0, paddingRight: 0 }}>
           <h2 style={{ margin: 0 }}>
             {doc.jenis === 'RFQ' ? 'RFQ' : 'FUP A'} {doc.noDoc || tr("(tanpa nomor)")}
           </h2>
-          <button type="button" className="close-x" onClick={onClose}>×</button>
+          <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+            {canReportIssue && (
+              <button type="button" className="btn btn-outline btn-sm btn-flag" onClick={() => setReport(true)}>⚑ {tr("Laporkan masalah")}</button>
+            )}
+            <button type="button" className="close-x" onClick={onClose}>×</button>
+          </span>
         </div>
+        {report && (
+          <PurchIssueModal
+            target={{
+              rfqId: doc.jenis === 'RFQ' ? doc.id : undefined,
+              fupaId: doc.jenis === 'FUPA' ? doc.id : undefined,
+              noDoc: doc.noDoc || (doc.jenis === 'RFQ' ? 'RFQ' : 'FUP A'),
+              cabang: doc.cabang,
+              customer: doc.customer,
+              sales: doc.requestedBy,
+              hasProspect: !!src?.prospectId,
+              items: doc.items.map((it) => [it.grade, it.material].filter(Boolean).join(' ') + ([it.thick, it.width, it.length].some(Boolean) ? ` ${[it.dia && `Ø${it.dia}`, it.thick, it.width, it.length].filter(Boolean).join('×')}` : '')),
+            }}
+            onClose={() => setReport(false)}
+          />
+        )}
         <div className="form-grid" style={{ marginBottom: 16 }}>
           <div><label>{tr("No.")} {doc.jenis === 'RFQ' ? 'RFQ' : 'FUP A'}</label><div className="mono">{doc.noDoc || '-'}</div></div>
           <div><label>{tr("Tanggal")}</label><div>{formatDateID(doc.tglDoc)}</div></div>
@@ -826,6 +801,10 @@ function PurchDetail({
         </div>
 
         <PurchNotes doc={doc} readOnly={readOnly} />
+
+        {canSeeVendors(useDataStore.getState().currentUser?.role) && (
+          <VendorRequestPanel jenis={doc.jenis} docId={doc.id} noDoc={doc.noDoc || (doc.jenis === 'RFQ' ? 'RFQ' : 'FUP A')} cabang={doc.cabang} items={doc.items} readOnly={readOnly} />
+        )}
 
         {doc.jenis === 'FUPA' && (
           <>
@@ -905,34 +884,64 @@ function PurchDetail({
 function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean }) {
   const tr = useT();
   const rfqs = useDataStore((s) => s.rfqs);
+  const vendors = useDataStore((s) => s.vendors);
   const upsertRfq = useDataStore((s) => s.upsertRfq);
   const currentUser = useDataStore((s) => s.currentUser);
   const toast = useDataStore((s) => s.toast);
 
   const rfq = rfqs.find((r) => r.id === rfqId);
-  const [items, setItems] = useState<RfqItem[]>(rfq?.items ?? []);
+  const [items, setItems] = useState<HppItem[]>((rfq?.items as HppItem[]) ?? []);
   const [busy, setBusy] = useState(false);
+  const [kurs, setKurs] = useState<{ usd: number | null; eur: number | null; source?: string } | null>(null);
+  const [bulkMargin, setBulkMargin] = useState('');
+  const seeHpp = canSeeHpp(currentUser?.role);
 
   useEffect(() => {
-    setItems(rfq?.items ?? []);
+    setItems((rfq?.items as HppItem[]) ?? []);
   }, [rfq?.id, rfq?.items]);
+  useEffect(() => {
+    if (!seeHpp) return;
+    api.get<{ kurs: { usd: number | null; eur: number | null; source?: string } | null }>('/api/kurs').then((r) => setKurs(r.kurs)).catch(() => {});
+  }, [seeHpp]);
 
   if (!rfq) return null;
   // Mirrors auth.ts#canEditRfqAnswer, which the PATCH route enforces. Deliberately
   // NOT gated on `readOnly`: gm reaches this panel through the monitor modal, which
   // is read-only for vendors/quotations/status, yet gm may still fill in the answer.
   const canAnswer = canNow('rfq', 'e') && !!currentUser && ['purchasing', 'purchasing05', 'admin', 'gm'].includes(currentUser.role);
+  void readOnly;
 
-  function setItem(idx: number, patch: Partial<RfqItem>) {
-    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  const defKurs = (cur: string) => (cur === 'USD' ? kurs?.usd || undefined : cur === 'EUR' ? kurs?.eur || undefined : undefined);
+  function setItem(idx: number, patch: Partial<HppItem>) {
+    setItems((prev) =>
+      prev.map((it, i) => {
+        if (i !== idx) return it;
+        const n = { ...it, ...patch };
+        // Ganti mata uang HPP → kurs acuan otomatis (bisa diketik ulang).
+        if (patch.hppCur !== undefined) n.kurs = patch.hppCur === 'IDR' ? 1 : defKurs(patch.hppCur) ?? n.kurs;
+        if (patch.vendorId !== undefined) n.vendorNama = vendors.find((v) => v.id === patch.vendorId)?.nama || undefined;
+        if (hasHpp(n)) {
+          n.hargaPurchasing = sellPrice(n) || n.hargaPurchasing;
+          n.currency = 'IDR';
+        }
+        return n;
+      }),
+    );
+  }
+  function applyMarginAll() {
+    const m = Number(bulkMargin);
+    if (!Number.isFinite(m)) return;
+    setItems((prev) => prev.map((it) => (hasHpp(it) && !it.noQuote ? { ...it, margin: m, hargaPurchasing: sellPrice({ ...it, margin: m }), currency: 'IDR' } : it)));
   }
 
   async function save(action: 'answer' | 'send-jawaban') {
+    const missingKurs = items.find((it) => hasHpp(it) && (it.hppCur || 'IDR') !== 'IDR' && !(Number(it.kurs) > 0));
+    if (missingKurs) return toast(`Isi kurs untuk "${missingKurs.material || 'item'}" (${missingKurs.hppCur})`, 'error');
     setBusy(true);
     try {
       const res = await api.patch<{ rfq: Rfq }>(`/api/rfqs/${rfqId}`, { action, items });
       upsertRfq(res.rfq);
-      toast(action === 'send-jawaban' ? 'Jawaban RFQ dikirim ke Sales' : 'Jawaban Purchasing disimpan', 'success');
+      toast(action === 'send-jawaban' ? 'Jawaban RFQ dikirim ke Sales (harga jual)' : 'Jawaban Purchasing disimpan', 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal menyimpan jawaban', 'error');
     } finally {
@@ -940,71 +949,143 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
     }
   }
 
+  const priced = items.filter((it) => hasHpp(it) && !it.noQuote);
+  const sumHpp = priced.reduce((s, it) => s + hppIdr(it), 0);
+  const sumSell = priced.reduce((s, it) => s + num(it.hargaPurchasing), 0);
+  const edit = canAnswer;
+
   return (
     <div style={{ marginTop: 16 }}>
       <h4 style={{ marginBottom: 6 }}>{tr("Jawaban Purchasing")}</h4>
       <div className="import-summary" style={{ marginTop: 0 }}>
         {tr("Jawaban RFQ ke Sales:")}{' '}
         {rfq.jawabanRfqDikirim ? (
-          <span className="badge green">{tr("Terkirim")} {formatDateID(rfq.jawabanRfqAt)}</span>
+          <span className="badge green">{tr("Terkirim")} {formatDateID((rfq.jawabanRfqAt || '').slice(0, 10))}</span>
         ) : (
           <span className="badge slate">{tr("Belum Dikirim")}</span>
         )}
+        {seeHpp && <span className="muted"> · {tr("Sales, Admin Sales & BM hanya menerima harga jual Rupiah. HPP, kurs, margin & vendor hanya terlihat RM, GM, Admin & Purchasing.")}</span>}
       </div>
-      <table className="simple-table" style={{ marginTop: 8 }}>
+      {seeHpp && edit && items.length > 0 && (
+        <div className="hpp-bar">
+          <span>
+            {tr("Kurs acuan:")} <b className="mono">USD {kurs?.usd ? Math.round(kurs.usd).toLocaleString('id-ID') : '–'}</b> · <b className="mono">EUR {kurs?.eur ? Math.round(kurs.eur).toLocaleString('id-ID') : '–'}</b>
+            {kurs?.source ? <span className="muted"> ({kurs.source})</span> : <span className="muted"> {tr("(isi manual bila kosong)")}</span>}
+          </span>
+          <span className="hpp-bulk">
+            {tr("Margin semua item")}
+            <input type="number" step="any" value={bulkMargin} onChange={(e) => setBulkMargin(e.target.value)} placeholder="%" style={{ width: 70 }} />
+            <button type="button" className="btn btn-outline btn-sm" onClick={applyMarginAll} disabled={bulkMargin === ''}>{tr("Samakan")}</button>
+          </span>
+        </div>
+      )}
+      <div style={{ overflowX: 'auto' }}>
+      <table className="simple-table hpp-table" style={{ marginTop: 8 }}>
         <thead>
           <tr>
-            <th>{tr("Line")}</th><th>{tr("Grade")}</th><th>{tr("Material")}</th><th>{tr("Dimensi")}</th><th>PCS</th>
-            <th>{tr("Berat (KGS)")}</th><th>{tr("Lokal/Import")}</th><th>{tr("Est. Kebutuhan")}</th>
-            <th>{tr("Harga")}</th><th>{tr("Currency")}</th><th>UOM</th><th>{tr("Delivery Time")}</th><th>{tr("Origin")}</th><th>{tr("Note")}</th><th>{tr("No Quote")}</th>
+            <th>{tr("Material")}</th>
+            {seeHpp && <><th>{tr("Vendor")}</th><th>{tr("HPP / satuan")}</th><th>{tr("Mata uang")}</th><th>{tr("Kurs")}</th><th>{tr("Margin %")}</th></>}
+            <th>{seeHpp ? tr("Harga jual (Rp)") : tr("Harga")}</th>{!seeHpp && <th>{tr("Currency")}</th>}<th>UOM</th><th>{tr("Delivery Time")}</th><th>{tr("Origin")}</th><th>{tr("Note")}</th><th>{tr("No Quote")}</th>
           </tr>
         </thead>
         <tbody>
           {items.length === 0 ? (
-            <tr><td colSpan={15} className="text-muted">{tr("Tidak ada rincian material.")}</td></tr>
+            <tr><td colSpan={13} className="text-muted">{tr("Tidak ada rincian material.")}</td></tr>
           ) : (
             items.map((it, idx) => {
               const dims = [it.dia && `D${it.dia}`, it.thick && `T${it.thick}`, it.width && `W${it.width}`, it.length && `L${it.length}`]
                 .filter(Boolean)
                 .join(' x ');
+              const hp = hasHpp(it);
+              const nq = !!it.noQuote;
+              const m = actualMargin(it);
               return (
-              <tr key={idx}>
-                <td>{it.line || '-'}</td>
-                <td>{it.grade || '-'}</td>
-                <td>{it.material || '-'}</td>
-                <td>{dims || '-'}</td>
-                <td className="center">{it.pcs || 0}</td>
-                <td className="center">{it.berat || 0}</td>
-                <td>{it.lokal || '-'}</td>
-                <td>{it.estimasi ? formatDateID(String(it.estimasi)) : '-'}</td>
-                {/* Marking a material No Quote disables its pricing fields —
-                    except Note, which is exactly where the reason belongs. */}
+              <tr key={idx} className={nq ? 'hpp-nq' : ''}>
+                <td className="hpp-mat">
+                  <b>{[it.grade, it.material].filter(Boolean).join(' · ') || '-'}</b>
+                  <div className="muted">{[it.line && `Line ${it.line}`, dims, `${it.pcs || 0} pcs`, it.berat ? `${it.berat} kg` : '', it.lokal, it.estimasi ? `butuh ${formatDateID(String(it.estimasi))}` : ''].filter(Boolean).join(' · ')}</div>
+                </td>
+                {seeHpp && (
+                  <>
+                    <td>
+                      {edit ? (
+                        <select value={it.vendorId || ''} disabled={nq} onChange={(e) => setItem(idx, { vendorId: e.target.value || undefined })} style={{ width: 150 }}>
+                          <option value="">{tr("— vendor —")}</option>
+                          {(() => {
+                            const sug = suggestVendors([it], vendors).slice(0, 4);
+                            const ids = new Set(sug.map((x) => x.vendor.id));
+                            return (
+                              <>
+                                {sug.length > 0 && (
+                                  <optgroup label={tr("Disarankan")}>
+                                    {sug.map((x) => <option key={x.vendor.id} value={x.vendor.id}>{x.vendor.nama} — {x.why[0]}</option>)}
+                                  </optgroup>
+                                )}
+                                <optgroup label={tr("Semua vendor")}>
+                                  {vendors.filter((v) => !ids.has(v.id) && (avlOf(v) !== 'diblokir' || v.id === it.vendorId)).map((v) => <option key={v.id} value={v.id}>{v.nama}</option>)}
+                                </optgroup>
+                              </>
+                            );
+                          })()}
+                        </select>
+                      ) : (
+                        it.vendorNama || '-'
+                      )}
+                    </td>
+                    <td>
+                      {edit ? (
+                        <input type="number" min="0" step="any" className="mono" value={it.hpp ?? ''} placeholder="0" disabled={nq} onChange={(e) => setItem(idx, { hpp: e.target.value === '' ? undefined : num(e.target.value) })} style={{ width: 105 }} />
+                      ) : (
+                        <span className="mono">{hp ? Number(it.hpp).toLocaleString('id-ID') : '-'}</span>
+                      )}
+                    </td>
+                    <td>
+                      {edit ? (
+                        <select value={it.hppCur || 'IDR'} disabled={nq} style={{ width: 74 }} onChange={(e) => setItem(idx, { hppCur: e.target.value })}>
+                          {CURRENCY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      ) : (
+                        it.hppCur || '-'
+                      )}
+                    </td>
+                    <td>
+                      {(it.hppCur || 'IDR') === 'IDR' ? (
+                        <span className="muted">1</span>
+                      ) : edit ? (
+                        <input type="number" min="0" step="any" className="mono" value={it.kurs ?? ''} placeholder={tr("Rp")} disabled={nq} onChange={(e) => setItem(idx, { kurs: e.target.value === '' ? undefined : num(e.target.value) })} style={{ width: 90 }} />
+                      ) : (
+                        <span className="mono">{it.kurs ? Number(it.kurs).toLocaleString('id-ID') : '-'}</span>
+                      )}
+                    </td>
+                    <td>
+                      {edit ? (
+                        <input type="number" step="any" className="mono" value={it.margin ?? ''} placeholder="%" disabled={nq || !hp} onChange={(e) => setItem(idx, { margin: e.target.value === '' ? undefined : num(e.target.value) })} style={{ width: 64 }} />
+                      ) : (
+                        <span className="mono">{m == null ? '-' : `${m.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`}</span>
+                      )}
+                    </td>
+                  </>
+                )}
                 <td>
-                  {canAnswer ? (
-                    <input
-                      type="number" min="0" className="mono"
-                      value={it.hargaPurchasing ?? ''}
-                      placeholder="0"
-                      disabled={!!it.noQuote}
-                      onChange={(e) => setItem(idx, { hargaPurchasing: num(e.target.value) })}
-                      style={{ width: 110 }}
-                    />
+                  {edit && !hp ? (
+                    <span style={{ display: 'inline-flex', gap: 4 }}>
+                      <input type="number" min="0" className="mono" value={it.hargaPurchasing ?? ''} placeholder="0" disabled={nq} onChange={(e) => setItem(idx, { hargaPurchasing: num(e.target.value) })} style={{ width: 110 }} />
+                      {seeHpp && (
+                        <select value={it.currency ?? 'IDR'} disabled={nq} style={{ width: 70 }} onChange={(e) => setItem(idx, { currency: e.target.value })}>
+                          {CURRENCY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      )}
+                    </span>
                   ) : (
-                    <span className="mono">{it.hargaPurchasing ? formatRupiah(it.hargaPurchasing) : '-'}</span>
+                    <span className={`mono ${hp ? 'hpp-sell' : ''}`} title={hp ? tr("HPP × kurs × (1 + margin%)") : undefined}>
+                      {(hp ? sellPrice(it) || it.hargaPurchasing : it.hargaPurchasing) ? `${hp || (it.currency || 'IDR') === 'IDR' ? 'Rp ' : `${it.currency} `}${Math.round((hp ? sellPrice(it) || it.hargaPurchasing : it.hargaPurchasing) || 0).toLocaleString('id-ID')}` : '-'}
+                    </span>
                   )}
                 </td>
+                {!seeHpp && <td>{it.currency || '-'}</td>}
                 <td>
-                  {canAnswer ? (
-                    <select value={it.currency ?? 'IDR'} disabled={!!it.noQuote} style={{ width: 82 }} onChange={(e) => setItem(idx, { currency: e.target.value })}>
-                      {CURRENCY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  ) : (
-                    it.currency || '-'
-                  )}
-                </td>
-                <td>
-                  {canAnswer ? (
-                    <select value={it.uom ?? 'KG'} disabled={!!it.noQuote} style={{ width: 90 }} onChange={(e) => setItem(idx, { uom: e.target.value })}>
+                  {edit ? (
+                    <select value={it.uom ?? 'KG'} disabled={nq} style={{ width: 84 }} onChange={(e) => setItem(idx, { uom: e.target.value })}>
                       {UOM_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
                     </select>
                   ) : (
@@ -1012,30 +1093,30 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
                   )}
                 </td>
                 <td>
-                  {canAnswer ? (
-                    <input type="text" value={it.deliveryTime ?? ''} placeholder={tr("cth. 10 hari")} disabled={!!it.noQuote} style={{ width: 110 }} onChange={(e) => setItem(idx, { deliveryTime: e.target.value })} />
+                  {edit ? (
+                    <input type="text" value={it.deliveryTime ?? ''} placeholder={tr("cth. 10 hari")} disabled={nq} style={{ width: 100 }} onChange={(e) => setItem(idx, { deliveryTime: e.target.value })} />
                   ) : (
                     it.deliveryTime || '-'
                   )}
                 </td>
                 <td>
-                  {canAnswer ? (
-                    <input type="text" value={it.coo ?? ''} placeholder={tr("cth. China")} disabled={!!it.noQuote} style={{ width: 110 }} onChange={(e) => setItem(idx, { coo: e.target.value })} />
+                  {edit ? (
+                    <input type="text" value={it.coo ?? ''} placeholder={tr("cth. China")} disabled={nq} style={{ width: 90 }} onChange={(e) => setItem(idx, { coo: e.target.value })} />
                   ) : (
                     it.coo || '-'
                   )}
                 </td>
                 <td>
-                  {canAnswer ? (
-                    <input type="text" value={it.note ?? ''} placeholder={tr("cth. stok ready")} style={{ width: 170 }} onChange={(e) => setItem(idx, { note: e.target.value })} />
+                  {edit ? (
+                    <input type="text" value={it.note ?? ''} placeholder={tr("cth. stok ready")} style={{ width: 150 }} onChange={(e) => setItem(idx, { note: e.target.value })} />
                   ) : (
                     it.note || '-'
                   )}
                 </td>
                 <td className="center">
-                  {canAnswer ? (
-                    <input type="checkbox" checked={!!it.noQuote} onChange={(e) => setItem(idx, { noQuote: e.target.checked })} />
-                  ) : it.noQuote ? (
+                  {edit ? (
+                    <input type="checkbox" checked={nq} onChange={(e) => setItem(idx, { noQuote: e.target.checked })} />
+                  ) : nq ? (
                     <span className="badge rust">{tr("No Quote")}</span>
                   ) : (
                     '-'
@@ -1046,7 +1127,18 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
             })
           )}
         </tbody>
+        {seeHpp && priced.length > 0 && (
+          <tfoot>
+            <tr>
+              <td colSpan={13} className="hpp-foot">
+                {tr("Item ber-HPP:")} <b>{priced.length}</b> · {tr("HPP (Rp/satuan, dijumlah)")} <b className="mono">{Math.round(sumHpp).toLocaleString('id-ID')}</b> · {tr("Harga jual")} <b className="mono">{Math.round(sumSell).toLocaleString('id-ID')}</b> · {tr("Margin rata-rata")}{' '}
+                <b className="mono">{sumHpp > 0 ? `${(((sumSell - sumHpp) / sumHpp) * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : '-'}</b>
+              </td>
+            </tr>
+          </tfoot>
+        )}
       </table>
+      </div>
       {canAnswer && items.length > 0 && (
         <div className="toolbar-row" style={{ marginTop: 8 }}>
           <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => save('answer')}>
@@ -1055,6 +1147,7 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
           <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => save('send-jawaban')}>
             {tr("Kirim Jawaban ke Sales")}
           </button>
+          {seeHpp && <span className="muted">{tr("Yang dikirim ke Sales: harga jual Rupiah saja.")}</span>}
         </div>
       )}
     </div>

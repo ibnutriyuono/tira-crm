@@ -3,6 +3,7 @@ import path from 'node:path';
 import { NextResponse } from 'next/server';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { guard } from '@/lib/permissions-server';
+import { quotePermAct } from '@/lib/roles';
 import { assertProspectInScope } from '@/lib/prospect-access';
 import { mailConfigured, sendCustomerMail } from '@/lib/email-notify';
 import { validEmail } from '@/lib/notif-prefs';
@@ -43,7 +44,7 @@ async function logo(): Promise<Buffer | null> {
 export async function POST(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
-  const denied = await guard(user, 'prospek', 'x');
+  const denied = await guard(user, 'prospek', quotePermAct(user.role));
   if (denied) return denied;
   if (!mailConfigured()) return NextResponse.json({ error: 'Server email belum diatur.', code: 'NO_SMTP' }, { status: 503 });
 

@@ -7,13 +7,13 @@ import { api } from '@/lib/api-client';
 import { appendSheet } from '@/lib/exports';
 import { formatDateID, num } from '@/lib/format';
 import { EVENT_META, flowItems, flowTotals, formatQty, formatTon, type ItemEvent } from '@/lib/item-flow';
-import { monthsEnding } from '@/lib/material-trend';
 import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
 
 import { useT } from '@/store/useLangStore';
+import { PeriodRange, normRange, rangeMonths, type PeriodRangeValue } from './PeriodRange';
 type Kondisi = '' | 'belum' | 'sisa' | 'lunas' | 'tidakpo';
 
 const KONDISI: { v: Kondisi; l: string }[] = [
@@ -37,7 +37,11 @@ export function PipelineTab({ prospects, scopeLabel, cabangs, thisMonth }: { pro
   const tr = useT();
   const toast = useDataStore((s) => s.toast);
   const [cabang, setCabang] = useState('');
-  const [period, setPeriod] = useState(6);
+  const [range, setRange] = useState<PeriodRangeValue>(() => {
+    const y = Number(thisMonth.slice(0, 4));
+    const d = new Date(y, Number(thisMonth.slice(5, 7)) - 6, 1);
+    return normRange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, thisMonth);
+  });
   const [kondisi, setKondisi] = useState<Kondisi>('');
   const [q, setQ] = useState('');
   const [feed, setFeed] = useState<FeedEvent[] | null>(null);
@@ -53,7 +57,11 @@ export function PipelineTab({ prospects, scopeLabel, cabangs, thisMonth }: { pro
     };
   }, [prospects]);
 
-  const months = useMemo(() => (period ? new Set(monthsEnding(thisMonth, period)) : null), [period, thisMonth]);
+  const sixBack = useMemo(() => {
+    const d = new Date(Number(thisMonth.slice(0, 4)), Number(thisMonth.slice(5, 7)) - 6, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, [thisMonth]);
+  const months = useMemo(() => (range.from ? new Set(rangeMonths(range)) : null), [range]);
   const rows = useMemo(() => {
     const ql = q.trim().toLowerCase();
     return prospects
@@ -104,7 +112,7 @@ export function PipelineTab({ prospects, scopeLabel, cabangs, thisMonth }: { pro
       colWidths: [{ wch: 28 }, { wch: 8 }, { wch: 8 }, { wch: 18 }, { wch: 11 }, { wch: 40 }, { wch: 7 }, { wch: 10 }, { wch: 9 }, { wch: 11 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 13 }],
       numFormats: { 11: '#,##0', 12: '#,##0', 13: '#,##0' },
     });
-    XLSX.writeFile(wb, `Pipeline_Item_${scopeText.replace(/[^\w-]+/g, '_')}_${thisMonth}.xlsx`);
+    XLSX.writeFile(wb, `Pipeline_Item_${scopeText.replace(/[^\w-]+/g, '_')}_${range.from ? (range.from === range.to ? range.to : `${range.from}_sd_${range.to}`) : 'semua'}.xlsx`);
     toast(`Export berhasil: ${body.length} item`, 'success');
   }
 
@@ -119,12 +127,7 @@ export function PipelineTab({ prospects, scopeLabel, cabangs, thisMonth }: { pro
             ))}
           </select>
         )}
-        <select value={period} onChange={(e) => setPeriod(Number(e.target.value))} style={{ maxWidth: 170 }} aria-label={tr("Periode PO")}>
-          <option value={3}>{tr("PO 3 bulan terakhir")}</option>
-          <option value={6}>{tr("PO 6 bulan terakhir")}</option>
-          <option value={12}>{tr("PO 12 bulan terakhir")}</option>
-          <option value={0}>{tr("Semua PO")}</option>
-        </select>
+        <PeriodRange value={range} onChange={setRange} thisMonth={thisMonth} label="Periode PO" allowAll extra={[{ label: '6 bln', from: sixBack, to: thisMonth }]} />
         <select value={kondisi} onChange={(e) => setKondisi(e.target.value as Kondisi)} style={{ maxWidth: 230 }} aria-label={tr("Kondisi")}>
           {KONDISI.map((k) => (
             <option key={k.v} value={k.v}>{k.l}</option>

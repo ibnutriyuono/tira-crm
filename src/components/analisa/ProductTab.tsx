@@ -18,6 +18,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { canNow } from '@/hooks/useCan';
 
 import { tNow, useT } from '@/store/useLangStore';
+import { PeriodRange, normRange, quickRanges, type PeriodRangeValue } from './PeriodRange';
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const mLabel = (m: string) => `${BULAN[Number(m.slice(5, 7)) - 1]} ${m.slice(2, 4)}`;
 const pct = (v: number | null) => (v == null ? '-' : `${Math.round(v * 100)}%`);
@@ -47,15 +48,14 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
   const tr = useT();
   const toast = useDataStore((s) => s.toast);
   const [cabang, setCabang] = useState('');
-  const [period, setPeriod] = useState(12);
-  const [end, setEnd] = useState(thisMonth);
+  const [range, setRange] = useState<PeriodRangeValue>(() => normRange(quickRanges(thisMonth).find((q) => q.label === '12 bln')!.from, thisMonth));
   const [group, setGroup] = useState('');
   const [basis, setBasis] = useState<Basis>('off');
   const [measure, setMeasure] = useState<Measure>('kg');
   const [sel, setSel] = useState('');
 
   const rows = useMemo(() => buildTrendRows(cabang ? prospects.filter((p) => (p.cabang || '').trim().toUpperCase() === cabang) : prospects), [prospects, cabang]);
-  const t = useMemo(() => analyzeTrend(rows, { end: end || thisMonth, period, group, basis, measure }), [rows, end, thisMonth, period, group, basis, measure]);
+  const t = useMemo(() => analyzeTrend(rows, { end: range.to || thisMonth, start: range.from || thisMonth, period: 12, group, basis, measure }), [rows, range, thisMonth, group, basis, measure]);
   const selKey = sel && t.grades.some((g) => g.key === sel) ? sel : t.grades[0]?.key || '';
   const selGrade = t.grades.find((g) => g.key === selKey);
   const monthly = useMemo(() => (selKey ? t.monthly(selKey) : []), [t, selKey]);
@@ -64,7 +64,7 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
   const fmt = (v: number) => (measure === 'kg' ? formatTon(v, 1) : measure === 'nilai' ? rpShort(v) : v.toLocaleString('id-ID', { maximumFractionDigits: 0 }));
   const label = `${MEASURE_LABEL[measure]} ${BASIS_LABEL[basis]}`;
   const periodText = `${mLabel(t.months[0])} – ${mLabel(t.months[t.months.length - 1])}`;
-  const fromIdx = 12 - period;
+  const fromIdx = t.series12.length - t.months.length;
   const scopeText = cabang ? `Cabang ${cabang}` : scopeLabel;
 
   async function exportExcel() {
@@ -121,13 +121,7 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
             ))}
           </select>
         )}
-        <select value={period} onChange={(e) => setPeriod(Number(e.target.value))} style={{ maxWidth: 160 }} aria-label={tr("Periode")}>
-          <option value={3}>{tr("3 bulan")}</option>
-          <option value={6}>{tr("6 bulan")}</option>
-          <option value={12}>{tr("12 bulan")}</option>
-        </select>
-        <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>{tr("s/d")}</span>
-        <input type="month" value={end} onChange={(e) => setEnd(e.target.value || thisMonth)} style={{ maxWidth: 160 }} aria-label={tr("Sampai bulan")} />
+        <PeriodRange value={range} onChange={(v) => v.from && setRange(v)} thisMonth={thisMonth} />
         <select value={group} onChange={(e) => setGroup(e.target.value)} style={{ maxWidth: 230 }} aria-label={tr("Bentuk")}>
           <option value="">{tr("Bentuk: otomatis (terbesar)")}</option>
           {SHAPE_GROUPS.map((g) => (
@@ -198,7 +192,7 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
                 <tr>
                   <th>#</th><th>{tr("Grade")}</th><th style={{ textAlign: 'right' }}>{tr("Penawaran")}</th><th style={{ textAlign: 'right' }}>{tr("Customer")}</th><th style={{ textAlign: 'right' }}>{tr("Pcs")}</th>
                   <th style={{ textAlign: 'right' }}>{tr("Permintaan")}</th><th style={{ textAlign: 'right' }}>{tr("Ditawarkan")}</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>{tr("Terkirim")}</th><th style={{ textAlign: 'right' }}>{tr("Rp/kg PO")}</th>
-                  <th>{tr("Konversi")}</th><th>{tr("Tren 3 bln")}</th><th>{tr("12 bulan")}</th>
+                  <th>{tr("Konversi")}</th><th>{tr("Tren 3 bln")}</th><th>{t.series12.length} {tr("bulan")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -274,7 +268,7 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
           )}
         </Sec>
 
-        <Sec title={`Bulanan — ${selGrade?.grade || '-'}`} note={`${MEASURE_LABEL[measure]} permintaan, ditawarkan & PO, 12 bulan s/d ${mLabel(t.series12[11])}.`}>
+        <Sec title={`Bulanan — ${selGrade?.grade || '-'}`} note={`${MEASURE_LABEL[measure]} permintaan, ditawarkan & PO, ${t.series12.length} bulan s/d ${mLabel(t.series12[t.series12.length - 1])}.`}>
           <div className="if-legend" style={{ marginBottom: 6 }}>
             <span><i style={{ background: '#D6DEE6', border: '1px solid #9FB7CC' }} />{tr("Permintaan")}</span>
             <span><i style={{ background: '#9FB7CC' }} />{tr("Ditawarkan")}</span>

@@ -5,6 +5,40 @@ import { canEditPurchasing } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { guard } from '@/lib/permissions-server';
+import { cleanVendorProfile, AVL_META } from '@/lib/vendor-profile';
+import { notify } from '@/lib/notify';
+
+/**
+ * Approved Vendor List. { action: 'avl', status: aktif|evaluasi|diblokir, alasan }
+ *  - Purchasing: menandai "Dalam evaluasi" / mengusulkan aktif atau blokir (GM diberi tahu);
+ *  - GM / Admin: menetapkan Aktif atau Diblokir (alasan wajib untuk blokir).
+ */
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  if (isResponse(user)) return user;
+  const { id } = await params;
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  if (body.action !== 'avl') return NextResponse.json({ error: 'Aksi tidak dikenal' }, { status: 400 });
+  const v = await prisma.vendor.findUnique({ where: { id } });
+  if (!v) return NextResponse.json({ error: 'Vendor tidak ditemukan' }, { status: 404 });
+  const status = String(body.status || '');
+  const alasan = String(body.alasan || '').trim().slice(0, 300);
+  const boss = user.role === 'gm' || user.role === 'admin';
+  if (!(status in AVL_META)) return NextResponse.json({ error: 'Status tidak valid' }, { status: 400 });
+  if (!boss && !canEditPurchasing(user)) return NextResponse.json({ error: 'Tidak berhak' }, { status: 403 });
+  if (status === 'diblokir' && alasan.length < 5) return NextResponse.json({ error: 'Alasan blokir wajib diisi.' }, { status: 400 });
+  // Purchasing tidak bisa langsung mengaktifkan / memblokir: jadi usulan ke GM.
+  const finalStatus = boss ? status : 'evaluasi';
+  const note = boss ? alasan || null : `${status === 'aktif' ? 'Usul aktif' : status === 'diblokir' ? 'Usul blokir' : 'Evaluasi'}: ${alasan || '-'}`;
+  const vendor = await prisma.vendor.update({ where: { id }, data: { statusAvl: finalStatus, statusAlasan: note, statusOleh: user.name, statusAt: new Date() } });
+  emitCrmEvent('vendor:updated', vendor);
+  if (!boss) {
+    const gms = await prisma.user.findMany({ where: { role: 'gm' }, select: { id: true } });
+    await notify({ userIds: gms.map((g) => g.id), type: 'announcement', entity: 'announcement', entityId: vendor.id, title: `Approved Vendor List: ${vendor.nama}`, message: `${user.name} — ${note}. Tetapkan status di Database Vendor.` });
+  }
+  await logActivity({ user, action: 'status_change', entity: 'vendor', entityId: id, summary: `Status vendor "${v.nama}": ${AVL_META[finalStatus as keyof typeof AVL_META].label}${note ? ` — ${note}` : ''}` });
+  return NextResponse.json({ vendor });
+}
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -33,6 +67,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       kategori: String(body?.kategori || '').trim(),
       alamat: String(body?.alamat || '').trim(),
       catatan: String(body?.catatan || '').trim(),
+      ...cleanVendorProfile(body || {}),
     },
   });
 

@@ -1,3 +1,4 @@
+import { docForRole } from '@/lib/rfq-price';
 import { normalizeItemLines } from '@/lib/format';
 import type { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
@@ -16,7 +17,7 @@ export async function GET() {
   const denied = await guard(user, 'rfq', 'v');
   if (denied) return denied;
   const rfqs = await prisma.rfq.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } });
-  return NextResponse.json({ rfqs });
+  return NextResponse.json({ rfqs: rfqs.map((r) => docForRole(r, user.role)) });
 }
 
 /**
@@ -134,5 +135,5 @@ export async function POST(req: Request) {
       message: `${rfq.noRfq || '(tanpa nomor)'} dari ${rfq.cabang || '-'} — ${rfq.customer || '-'}`,
     });
   }
-  return NextResponse.json({ rfq }, { status: 201 });
+  return NextResponse.json({ rfq: docForRole(rfq, user.role) }, { status: 201 });
 }

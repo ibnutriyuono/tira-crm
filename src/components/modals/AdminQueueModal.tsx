@@ -7,6 +7,7 @@ import { formatDateID, formatRupiah, num } from '@/lib/format';
 import { canSeeAdminQueue, canSetFaktur } from '@/lib/roles';
 import { localToday } from '@/lib/sales-activity';
 import type { Prospect } from '@/lib/types';
+import { buildPoIndent, type PoIndentItem } from '@/lib/po-indent';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
@@ -29,7 +30,15 @@ export function missingDocs(p: Prospect): string[] {
 
 /** Jumlah tugas terbuka (untuk badge tombol Antrian Admin). */
 export function adminTaskCount(prospects: Prospect[]): number {
-  return prospects.filter((p) => (num(p.status) === 5 && !p.terfaktur) || missingDocs(p).length > 0 || (num(p.status) >= 1 && num(p.status) <= 3 && !p.penawaranTerkirim)).length;
+  return prospects.filter((p) => (num(p.status) === 5 && !p.terfaktur) || missingDocs(p).length > 0 || (num(p.status) >= 1 && num(p.status) <= 3 && !p.penawaranTerkirim) || arrivedItems(p).length > 0).length;
+}
+
+/** Item Indent/Import yang sudah tiba di gudang (status dari Purchasing) tapi belum terkirim. */
+export function arrivedItems(p: Prospect): PoIndentItem[] {
+  const s = num(p.status);
+  if (s !== 4 && s !== 5) return [];
+  const [g] = buildPoIndent([p]);
+  return g ? g.items.filter((it) => it.stat === 'tiba') : [];
 }
 
 /**
@@ -49,7 +58,7 @@ export function AdminQueueModal() {
   const toast = useDataStore((s) => s.toast);
   const today = localToday();
 
-  const [tab, setTab] = useState<'faktur' | 'dokumen' | 'penawaran'>('faktur');
+  const [tab, setTab] = useState<'faktur' | 'dokumen' | 'penawaran' | 'tiba'>('faktur');
   const [se, setSe] = useState('');
   const [picked, setPicked] = useState<string[]>([]);
   const [tglFaktur, setTglFaktur] = useState(today);
@@ -76,6 +85,14 @@ export function AdminQueueModal() {
         .map((p) => ({ p, age: daysSince(p.tglPenawaran || p.createdAt, today) }))
         .sort((a, b) => (b.age ?? 0) - (a.age ?? 0)),
     [list, today],
+  );
+  const arrived = useMemo(
+    () =>
+      list
+        .map((p) => ({ p, items: arrivedItems(p), at: '' }))
+        .filter((x) => x.items.length)
+        .map((x) => ({ ...x, at: x.items.flatMap((it) => it.log.filter((e) => e.sTo === 'tiba').map((e) => e.at)).sort().pop() || '' })),
+    [list],
   );
   const month = today.slice(0, 7);
   const fakturMonth = list.filter((p) => num(p.status) === 5 && p.terfaktur && (p.tglFaktur || '').startsWith(month));
@@ -126,6 +143,7 @@ export function AdminQueueModal() {
         <div className="kpi lost"><div className="label">{tr("GIT > 30 hari")}</div><div className="value">{gitOld}</div><div className="foot">{tr("percepat faktur / penagihan")}</div></div>
         <div className="kpi rate"><div className="label">{tr("Dokumen belum lengkap")}</div><div className="value">{docs.length}</div><div className="foot">{tr("PO / DO tanpa No PO, tanggal")}</div></div>
         <div className="kpi pending"><div className="label">{tr("Penawaran pending")}</div><div className="value">{pending.length}</div><div className="foot">{tr("belum dikirim ke customer")}</div></div>
+        {arrived.length > 0 && <div className="kpi aktif"><div className="label">{tr("Barang tiba")}</div><div className="value">{arrived.length}</div><div className="foot">{tr("siap dicatat DO")}</div></div>}
         <div className="kpi won"><div className="label">{tr("Terfaktur bulan ini")}</div><div className="value">{fakturMonth.length}</div><div className="foot">{formatRupiah(fakturMonth.reduce((s, p) => s + num(p.value), 0))}</div></div>
       </div>
 
@@ -136,6 +154,7 @@ export function AdminQueueModal() {
               ['faktur', `Faktur (${git.length})`],
               ['dokumen', `Dokumen PO/DO (${docs.length})`],
               ['penawaran', `Penawaran pending (${pending.length})`],
+              ['tiba', `Barang tiba (${arrived.length})`],
             ] as const
           ).map(([k, l]) => (
             <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
@@ -208,6 +227,32 @@ export function AdminQueueModal() {
                   <td>{miss.map((m) => <span key={m} className="badge amber" style={{ marginRight: 4 }}>{m}</span>)}</td>
                   <td className="mono">{formatRupiah(num(p.value))}</td>
                   <td><button type="button" className="btn btn-outline btn-sm" onClick={() => openProspect(p.id)}>{tr("Lengkapi")}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'tiba' && (
+        <div className="table-wrap" style={{ borderTop: 'none' }}>
+          <table className="simple-table">
+            <thead><tr><th>{tr("PO · Customer")}</th><th>SE</th><th>{tr("Item tiba")}</th><th>{tr("Tiba")}</th><th></th></tr></thead>
+            <tbody>
+              {arrived.length === 0 && <tr><td colSpan={5} className="field-note">{tr("Belum ada barang Indent / Import yang tiba di gudang.")}</td></tr>}
+              {arrived.map(({ p, items, at }) => (
+                <tr key={p.id}>
+                  <td><b className="mono">{p.noPo || '-'}</b><div style={{ fontWeight: 600 }}>{p.customer}</div></td>
+                  <td>{p.se || '-'}</td>
+                  <td>{items.map((it) => <div key={it.itemId}>{it.label} · <b>{it.sisa}</b> {it.satuan}</div>)}</td>
+                  <td>{at ? formatDateID(at.slice(0, 10)) : '-'}</td>
+                  <td>
+                    {canNow('prospek', 'e') && (
+                      <button type="button" className="btn btn-primary btn-sm" onClick={() => useUiStore.setState({ itemFlowCtx: { prospectId: p.id, mode: 'kirim', returnTo: 'adminQueue' }, modal: 'itemFlow' })}>
+                        {tr("Catat Pengiriman (DO)")}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -30,6 +30,8 @@ export async function proxy(req: NextRequest) {
   if (pathname.startsWith('/api/auth/')) return NextResponse.next();
   // Penjadwal ringkasan email (server.js) — rute ini memeriksa kuncinya sendiri.
   if (pathname === '/api/notifications/digest') return NextResponse.next();
+  // Tautan daftar item untuk vendor (WhatsApp) — rute ini memeriksa tokennya sendiri.
+  if (pathname.startsWith('/api/vendor-file/')) return NextResponse.next();
 
   if (pathname.startsWith('/api/')) {
     if (!authed) return NextResponse.json({ error: 'Sesi tidak valid. Silakan login kembali.' }, { status: 401 });

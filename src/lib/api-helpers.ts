@@ -1,5 +1,7 @@
 import { normalizeItemLines, normalizeLine } from './format';
 import { pickSpecExtra } from './material-extra';
+import { PURCH_ITEM_KEYS } from './item-stock';
+import { carryHpp } from './rfq-price';
 import { CUSTOMER_APLIKASI_LABEL, PIC_PERAN_LABEL } from './constants';
 import { qcdMissing, qcdRequiredOnMove, type QcdInput } from './qcd';
 import { randomUUID } from 'crypto';
@@ -49,6 +51,8 @@ export function carryItemTracking(before: unknown, after: Record<string, unknown
     if (typeof p.qtyPo === 'number') m.qtyPo = p.qtyPo;
     if (typeof p.qtyKirim === 'number') m.qtyKirim = p.qtyKirim;
     if (p.qcd && typeof p.qcd === 'object' && !m.qcd) m.qcd = p.qcd;
+    // Target kedatangan hanya ditulis Purchasing (api/po-indent).
+    for (const k of PURCH_ITEM_KEYS) if (p[k] !== undefined) m[k] = p[k];
   });
 }
 
@@ -93,6 +97,7 @@ export function deriveFromMaterials(materials: Material[]) {
     r.itemId = id;
     delete r.qtyPo;
     delete r.qtyKirim;
+    for (const k of PURCH_ITEM_KEYS) delete r[k];
   });
   // Same unit-price rule as the client (see materialUnitPrice).
   const unit = (m: { beratPc: number; hargaKg: number; harga: number }) =>
@@ -137,18 +142,23 @@ export function deriveFromSalesPlanItems(items: { line?: unknown; uraian?: unkno
  */
 export function mergeRfqItemsPreservingAnswer(existing: RfqItem[] | null | undefined, incoming: RfqItem[]): RfqItem[] {
   const prev = Array.isArray(existing) ? existing : [];
-  const keyOf = (it: RfqItem) => `${normalizeLine(it.line).toLowerCase()}|${(it.material || '').trim().toLowerCase()}`;
+  // line + grade + material; rows with the same key are matched in order
+  // (two "PLATE" rows of different grades no longer share one answer).
+  const keyOf = (it: RfqItem) => `${normalizeLine(it.line).toLowerCase()}|${(it.grade || '').trim().toLowerCase()}|${(it.material || '').trim().toLowerCase()}`;
 
-  const byKey = new Map<string, RfqItem>();
+  const byKey = new Map<string, RfqItem[]>();
   prev.forEach((it) => {
     const k = keyOf(it);
-    if (k !== '|' && !byKey.has(k)) byKey.set(k, it);
+    if (k === '||') return;
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k)!.push(it);
   });
 
   return incoming.map((item) => {
-    const match = byKey.get(keyOf(item));
+    const match = byKey.get(keyOf(item))?.shift();
     return {
-      ...item,
+      // HPP / kurs / margin / vendor: selalu dari data tersimpan (lib/rfq-price.ts).
+      ...carryHpp(match, item),
       hargaPurchasing: item.hargaPurchasing ?? match?.hargaPurchasing,
       currency: item.currency ?? match?.currency,
       uom: item.uom ?? match?.uom,

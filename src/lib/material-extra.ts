@@ -4,6 +4,7 @@
  * server sanitizers and lib/format.ts can use it without an import cycle.
  */
 import { cleanItemQcd } from './item-qcd';
+import { pickStockExtra } from './item-stock';
 
 const DIM_KEYS = ['dia', 'tebal', 'lebar', 'panjang', 'sisi', 'od', 'h', 'b', 't1', 't2'] as const;
 const str = (v: unknown, max = 200) => String(v ?? '').slice(0, max);
@@ -41,6 +42,8 @@ export function pickSpecExtra(m: unknown): Record<string, unknown> {
   // QCD per item (lib/item-qcd.ts).
   const qcd = cleanItemQcd(o.qcd);
   if (qcd) out.qcd = qcd;
+  // Kondisi stok & target kedatangan per item (lib/item-stock.ts).
+  Object.assign(out, pickStockExtra(o));
   if (o.beratPc !== undefined && o.uraian === undefined) {
     // RFQ / FUP A items carry berat per pc next to the total `berat`.
     const n = Number(o.beratPc);

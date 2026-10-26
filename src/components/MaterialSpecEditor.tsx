@@ -22,6 +22,7 @@ import {
 } from '@/lib/material-spec';
 
 import { useT } from '@/store/useLangStore';
+import { STOK_KEYS, STOK_META, needsArrival, type StokKond } from '@/lib/item-stock';
 interface Props {
   /** 'prospek' shows Harga/kg + Total; 'doc' (RFQ / FUP A) shows Lokal/Import + tanggal butuh. */
   variant: 'prospek' | 'doc';
@@ -248,6 +249,26 @@ export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hi
                 </>
               )}
             </div>
+            {prospek && (
+              <div className="msr-stock">
+                <div className="msr-f" style={{ width: 190 }}>
+                  <label>{tr("Kondisi stok")}</label>
+                  <select value={r.stok} onChange={(e) => update(idx, { stok: e.target.value })} className={r.stok ? `msr-stok-${STOK_META[r.stok as StokKond]?.cls || ''}` : ''}>
+                    <option value="">{tr("— belum diisi —")}</option>
+                    {STOK_KEYS.map((k) => (
+                      <option key={k} value={k}>{tr(STOK_META[k].label)}</option>
+                    ))}
+                  </select>
+                </div>
+                {needsArrival(r.stok as StokKond) && (
+                  <div className="msr-f" style={{ width: 150 }}>
+                    <label>{tr("Perkiraan lama")}</label>
+                    <input type="text" value={r.stokLama} placeholder={tr("cth. 6–8 mgg / 3 bln")} onChange={(e) => update(idx, { stokLama: e.target.value })} />
+                  </div>
+                )}
+                {needsArrival(r.stok as StokKond) && <span className="field-note" style={{ margin: '0 0 8px' }}>{tr("Setelah PO, item ini masuk tab PO Indent Purchasing untuk diisi target kedatangan.")}</span>}
+              </div>
+            )}
             {renderRowExtra?.(r, idx)}
           </div>
         );

@@ -1,3 +1,4 @@
+import { periodeList } from './reports';
 import { getProspectMaterials, materialUnitPrice, num } from './format';
 import { flowItems } from './item-flow';
 import { GRADE_SUGGESTIONS, autoWeight, parseMaterialText, roundUpKg, type Dims } from './material-spec';
@@ -213,9 +214,10 @@ export interface TrendResult {
 /** Trend label threshold and the minimum volume (kg, pcs or Rp) for a mover to count. */
 export const TREND_THRESHOLD = 0.15;
 
-export function analyzeTrend(all: TrendRow[], opts: { end: string; period: number; group?: string; basis: Basis; measure: Measure }): TrendResult {
-  const months = monthsEnding(opts.end, opts.period);
-  const series12 = monthsEnding(opts.end, 12);
+export function analyzeTrend(all: TrendRow[], opts: { end: string; period: number; /** Awal periode (YYYY-MM); bila diisi, periode = start … end (maks. 24 bulan). */ start?: string; group?: string; basis: Basis; measure: Measure }): TrendResult {
+  const months = opts.start && opts.start <= opts.end ? periodeList(opts.start, opts.end).slice(-24) : monthsEnding(opts.end, opts.period);
+  // Grafik tren: minimal 12 bulan, atau sepanjang periode bila lebih panjang.
+  const series12 = monthsEnding(opts.end, Math.max(12, months.length));
   const last3 = new Set(monthsEnding(opts.end, 3));
   const prev3 = new Set(monthsEnding(opts.end, 6).slice(0, 3));
   const inPeriod = new Set(months);

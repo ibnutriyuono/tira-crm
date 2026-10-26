@@ -13,6 +13,8 @@ interface Props {
   fupaId?: string | null;
   /** Gambar kerja Line 05 on a prospect (Edit Prospek). */
   prospectId?: string | null;
+  /** Dokumen vendor (MTC, ISO, NPWP, price list) — Purchasing / GM / Admin. */
+  vendorId?: string | null;
   /** RFQ / FUP A: also list (read-only) the files attached to the source prospect. */
   withProspect?: boolean;
   readOnly?: boolean;
@@ -28,15 +30,15 @@ interface Props {
  * object storage through /api/attachments; downloads go through a redirect to a
  * short-lived presigned URL, so the bucket never has to be public.
  */
-export function AttachmentList({ rfqId, fupaId, prospectId, withProspect, readOnly: readOnlyProp, ensureParentId }: Props) {
+export function AttachmentList({ rfqId, fupaId, prospectId, vendorId, withProspect, readOnly: readOnlyProp, ensureParentId }: Props) {
   const tr = useT();
   // Kelola Role: unggah butuh hak Tambah/Ubah, hapus butuh hak Hapus pada modul pemilik lampiran.
-  const permMod = rfqId || fupaId ? 'rfq' : 'prospek';
+  const permMod = vendorId ? 'purch' : rfqId || fupaId ? 'rfq' : 'prospek';
   const permE = useCan(permMod, 'e');
   const permD = useCan(permMod, 'd');
   const readOnly = !!readOnlyProp || !permE;
-  const parentId = rfqId || fupaId || prospectId || null;
-  const query = (rfqId ? `rfqId=${rfqId}` : fupaId ? `fupaId=${fupaId}` : `prospectId=${prospectId}`) + (withProspect && !prospectId ? '&withProspect=1' : '');
+  const parentId = vendorId || rfqId || fupaId || prospectId || null;
+  const query = vendorId ? `vendorId=${vendorId}` : (rfqId ? `rfqId=${rfqId}` : fupaId ? `fupaId=${fupaId}` : `prospectId=${prospectId}`) + (withProspect && !prospectId ? '&withProspect=1' : '');
 
   const toast = useDataStore((s) => s.toast);
   const [items, setItems] = useState<Attachment[]>([]);
@@ -69,7 +71,7 @@ export function AttachmentList({ rfqId, fupaId, prospectId, withProspect, readOn
     if (!target) return;
     // Which column to file it under is decided by the prop the caller passed,
     // not by its value — a brand-new document has a null id either way.
-    const field = prospectId !== undefined ? 'prospectId' : fupaId !== undefined ? 'fupaId' : 'rfqId';
+    const field = vendorId !== undefined ? 'vendorId' : prospectId !== undefined ? 'prospectId' : fupaId !== undefined ? 'fupaId' : 'rfqId';
     setBusy(true);
     for (const file of Array.from(files)) {
       const body = new FormData();

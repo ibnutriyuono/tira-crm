@@ -4,7 +4,8 @@ import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { deleteObject, isS3Configured, presignGet } from '@/lib/s3';
 import { emitCrmEvent } from '@/lib/socket';
-import { docScopeWhere, docVisibleTo, prospectScopeWhere } from '@/lib/auth';
+import { canEditPurchasing, docScopeWhere, docVisibleTo, prospectScopeWhere } from '@/lib/auth';
+import { canSeeVendors } from '@/lib/roles';
 import { guard } from '@/lib/permissions-server';
 import type { SafeUser } from '@/lib/types';
 
@@ -12,7 +13,9 @@ import type { SafeUser } from '@/lib/types';
  * Lampiran hanya boleh dibuka / dihapus oleh user yang dapat melihat dokumen
  * pemiliknya (cakupan role) dan memiliki hak modulnya (Kelola Role).
  */
-async function attachmentDenied(user: SafeUser, a: { rfqId: string | null; fupaId: string | null; prospectId: string | null }, act: 'v' | 'd') {
+async function attachmentDenied(user: SafeUser, a: { rfqId: string | null; fupaId: string | null; prospectId: string | null; vendorId?: string | null }, act: 'v' | 'd') {
+  // Dokumen vendor: lihat = Purchasing / PIC 05 / GM / Admin; hapus = Purchasing / Admin.
+  if (a.vendorId) return (act === 'v' ? canSeeVendors(user.role) : canEditPurchasing(user)) ? null : NextResponse.json({ error: 'Lampiran tidak ditemukan' }, { status: 404 });
   const doc = !!(a.rfqId || a.fupaId);
   const denied = await guard(user, doc ? 'rfq' : 'prospek', act);
   if (denied) return denied;

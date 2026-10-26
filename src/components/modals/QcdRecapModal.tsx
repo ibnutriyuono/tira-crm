@@ -46,7 +46,6 @@ export function QcdRecapModal() {
   const toast = useDataStore((s) => s.toast);
 
   const [view, setView] = useState<'dashboard' | 'rekap'>('dashboard');
-  const [year, setYear] = useState(String(new Date().getFullYear()));
   const [scopeKey, setScopeKey] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -144,12 +143,6 @@ export function QcdRecapModal() {
       </div>
 
       <div className="form-grid" style={{ marginBottom: 10 }}>
-        {view === 'dashboard' && (
-          <div>
-            <label>{tr("Tahun")}</label>
-            <input type="number" value={year} onChange={(e) => setYear(e.target.value)} style={{ maxWidth: 110 }} />
-          </div>
-        )}
         <div>
           <label>{tr("Lingkup")}</label>
           {canPick ? (
@@ -174,7 +167,7 @@ export function QcdRecapModal() {
       </div>
 
       {view === 'dashboard' ? (
-        <QcdDashboard cabangList={cabangList} year={year} scopeLabel={scopeLabel} returnTo="qcdRecap" />
+        <QcdDashboard cabangList={cabangList} scopeLabel={scopeLabel} returnTo="qcdRecap" />
       ) : (
         <>
           <div className="toolbar-row">

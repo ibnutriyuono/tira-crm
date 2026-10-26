@@ -53,11 +53,12 @@ interface Unit {
 const wonDate = (r: Prospect) => r.tglPO || r.tglDelivery || r.tglPenawaran || '';
 const lostDate = (r: Prospect) => lostDateOf(r);
 
-/** `periode` = "YYYY" (whole year) or "YYYY-MM". */
-export function buildQcdDashboard(prospects: Prospect[], cabangs: string[], periode: string): QcdDashboard {
+/** `periode` = "YYYY" (whole year), "YYYY-MM", or a list of "YYYY-MM" months (range); empty list = all. */
+export function buildQcdDashboard(prospects: Prospect[], cabangs: string[], periode: string | string[]): QcdDashboard {
   const inCabang = new Set(cabangs.map((c) => c.toUpperCase()));
   const scoped = prospects.filter((r) => inCabang.has((r.cabang || '').trim().toUpperCase()));
-  const inPeriod = (d: string) => d.startsWith(periode);
+  const monthSet = Array.isArray(periode) ? new Set(periode) : null;
+  const inPeriod = (d: string) => (monthSet ? !monthSet.size || monthSet.has((d || '').slice(0, 7)) : d.startsWith(periode as string));
   const wonList = scoped.filter((r) => (num(r.status) === 4 || num(r.status) === 5) && inPeriod(wonDate(r)));
   const lostList = scoped.filter((r) => num(r.status) === 6 && inPeriod(lostDate(r)));
   const closed = [...wonList, ...lostList];

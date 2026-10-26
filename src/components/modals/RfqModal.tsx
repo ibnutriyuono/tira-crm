@@ -14,6 +14,7 @@ import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Rfq, RfqItem } from '@/lib/types';
+import { actualMargin, hasHpp, type RfqHppFields } from '@/lib/rfq-price';
 import { canNow } from '@/hooks/useCan';
 
 
@@ -34,6 +35,15 @@ function PurchasingAnswer({ it }: { it?: RfqItem }) {
           {it.deliveryTime ? ` · Delivery: ${it.deliveryTime}` : ''}
           {it.coo ? ` · Origin: ${it.coo}` : ''}
           {it.note ? ` · ${it.note}` : ''}
+          {/* HPP & margin: hanya sampai ke RM / GM / Admin (server membuangnya untuk role lain). */}
+          {hasHpp(it as RfqItem & RfqHppFields) && (
+            <span className="hpp-info">
+              {' '}· HPP {(it as RfqHppFields).hppCur || 'IDR'} {Number((it as RfqHppFields).hpp).toLocaleString('id-ID')}
+              {(it as RfqHppFields).hppCur && (it as RfqHppFields).hppCur !== 'IDR' ? ` × ${Number((it as RfqHppFields).kurs || 0).toLocaleString('id-ID')}` : ''}
+              {' '}· margin {(actualMargin(it as RfqItem & RfqHppFields) ?? 0).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%
+              {(it as RfqHppFields).vendorNama ? ` · ${(it as RfqHppFields).vendorNama}` : ''}
+            </span>
+          )}
         </>
       )}
     </div>

@@ -1,3 +1,5 @@
+import { docForRole } from '@/lib/rfq-price';
+import { canSeeVendors } from '@/lib/roles';
 import { NextResponse } from 'next/server';
 import { budgetTargetScopeWhere, seTargetScopeWhere, customerScopeWhere, docScopeWhere, prospectScopeWhere, salesPlanScopeWhere } from '@/lib/auth';
 import { isResponse, requireUser } from '@/lib/api-helpers';
@@ -21,12 +23,10 @@ export async function GET() {
     prisma.customer.findMany({ where: await customerScopeWhere(user), orderBy: { createdAt: 'desc' } }),
     prisma.rfq.findMany({ where: await docScopeWhere(user), orderBy: { createdAt: 'desc' } }),
     prisma.fupa.findMany({ where: await docScopeWhere(user, { table: 'fupa' }), orderBy: { createdAt: 'desc' } }),
-    // Vendor deliberately stays company-wide read for every role — it has
-    // no cabang/reg field at all (vendors quote nationally, not per branch),
-    // and sales/managers need to see which vendors were asked to quote on
-    // their own RFQs regardless of which branch originally added that
-    // vendor. Only write is role-gated (see POST /api/vendors).
-    prisma.vendor.findMany({ orderBy: { nama: 'asc' } }),
+    // Vendor list is Purchasing data (lib/roles.ts#canSeeVendors): Sales,
+    // Admin Sales, BM and RM get an empty list. Write stays role-gated too
+    // (see POST /api/vendors).
+    canSeeVendors(user.role) ? prisma.vendor.findMany({ orderBy: { nama: 'asc' } }) : Promise.resolve([]),
     prisma.budgetTarget.findMany({ where: await budgetTargetScopeWhere(user), orderBy: [{ periode: 'desc' }, { cabang: 'asc' }] }),
     // Unscoped by periode, same convention as budgetTargets above — the
     // client filters by month locally (see ForecastModal), so bootstrap just
@@ -60,8 +60,9 @@ export async function GET() {
     perms,
     prospects: see('prospek') ? prospects : [],
     customers: see('customer') ? customers : [],
-    rfqs: see(purch ? 'purch' : 'rfq') ? rfqs : [],
-    fupas: see(purch ? 'purch' : 'rfq') ? fupas : [],
+    // HPP / margin / vendor & catatan internal Purchasing hanya untuk role ber-hak (lib/rfq-price.ts).
+    rfqs: see(purch ? 'purch' : 'rfq') ? rfqs.map((r) => docForRole(r, user.role)) : [],
+    fupas: see(purch ? 'purch' : 'rfq') ? fupas.map((f) => docForRole(f, user.role)) : [],
     vendors,
     budgetTargets,
     salesPlans: see('rencana') ? salesPlans : [],

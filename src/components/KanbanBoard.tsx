@@ -1,5 +1,8 @@
 'use client';
+import { arrivalChip } from '@/lib/po-indent';
+import { jakartaDate } from '@/lib/followup-rule';
 
+import { quotePermAct } from '@/lib/roles';
 import { lostDateOf } from '@/lib/lose-date';
 import { promptItemFlow } from '@/lib/item-flow-prompt';
 import { flowItems, flowTotals } from '@/lib/item-flow';
@@ -34,7 +37,8 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
   // Mirrors auth.ts#canDeleteProspect, which the DELETE route still enforces —
   // this only hides a button that would 403 for everyone else.
   const canE = useCan('prospek', 'e');
-  const canX = useCan('prospek', 'x');
+  // Ikon Surat Penawaran (Admin Sales: hak Tambah/Ubah, lainnya: Download).
+  const canX = useCan('prospek', quotePermAct(currentUser?.role));
   const canRfq = useCan('rfq', 'e');
   const canDelete = useCan('prospek', 'd') && (currentUser?.role === 'gm' || currentUser?.role === 'admin');
   const [dragging, setDragging] = useState(false);
@@ -87,6 +91,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         </div>
       )}
       {klas === 'Won' && <ItemFlowChip r={r} />}
+      {klas === 'Won' && <ArrivalChip r={r} />}
       {klas === 'Lost' && <ItemQcdChip r={r} />}
       <div className="kc-actions">
         {canE && (
@@ -449,5 +454,17 @@ export function KanbanBoard({ filtered }: { filtered: Prospect[] }) {
         />
       )}
     </>
+  );
+}
+
+/** Target kedatangan barang Indent / Import (diisi Purchasing). */
+function ArrivalChip({ r }: { r: Prospect }) {
+  const tr = useT();
+  const c = arrivalChip(r, jakartaDate());
+  if (!c) return null;
+  return (
+    <div className="kc-meta-row">
+      <span className={`kc-eta ${c.cls}`} title={tr("Target kedatangan dari Purchasing (PO Indent)")}>{c.text}</span>
+    </div>
   );
 }

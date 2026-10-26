@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { NotifSettingsPanel } from '../NotifSettingsPanel';
-import { IconBag, IconCalendar, IconChat, IconCheck, IconFlag, IconRfq, IconTarget, IconTrash } from '../icons';
+import { IconBag, IconCalendar, IconChat, IconCheck, IconFlag, IconMail, IconRfq, IconTarget, IconTrash } from '../icons';
 import { api } from '@/lib/api-client';
 import { openPurchDoc } from '@/hooks/useCrmSocket';
 import { useDataStore } from '@/store/useDataStore';
@@ -38,6 +38,12 @@ const NOTIF_META: Record<NotificationType, { icon: () => React.JSX.Element; colo
   issue_new: { icon: IconFlag, color: 'rust' },
   issue_update: { icon: IconCheck, color: 'steel' },
   issue_escalated: { icon: IconFlag, color: 'rust' },
+  announcement: { icon: IconMail, color: 'amber' },
+  po_eta: { icon: IconCalendar, color: 'amber' },
+  po_arrived: { icon: IconBag, color: 'green' },
+  visit_assigned: { icon: IconFlag, color: 'steel' },
+  visit_update: { icon: IconCheck, color: 'green' },
+  visit_plan: { icon: IconCalendar, color: 'violet' },
 };
 
 function timeAgo(iso: string): string {
@@ -62,6 +68,20 @@ export function openNotification(n: AppNotification) {
   if (!n.readAt) {
     useDataStore.getState().markNotificationRead(n.id);
     api.patch(`/api/notifications/${n.id}`, {}).catch(() => {});
+  }
+  // Pengumuman dari Admin / GM: cukup ditandai dibaca, isinya sudah tampil di daftar.
+  if (n.entity === 'announcement') return;
+  if (n.entity === 'prospect' && (n.type === 'po_eta' || n.type === 'po_arrived')) {
+    const role = useDataStore.getState().currentUser?.role;
+    // Purchasing membuka tab PO Indent; role lain Status Item prospek itu.
+    if (role === 'purchasing' || role === 'purchasing05') useUiStore.setState({ purchTabFocus: 'indent' });
+    else useUiStore.setState({ itemFlowCtx: { prospectId: n.entityId }, modal: 'itemFlow' });
+    return;
+  }
+  if (n.entity === 'visitTask' || n.entity === 'visitPlan') {
+    useUiStore.setState({ visitFocus: { kind: n.entity === 'visitTask' ? 'task' : 'plan', id: n.entityId } });
+    useUiStore.getState().openModal('visitTasks');
+    return;
   }
   if (n.entity === 'prospect') {
     useUiStore.setState({ editProspectId: n.entityId });

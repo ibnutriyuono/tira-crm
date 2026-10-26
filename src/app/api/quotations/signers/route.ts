@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { guard } from '@/lib/permissions-server';
+import { quotePermAct } from '@/lib/roles';
 import { assertProspectInScope } from '@/lib/prospect-access';
 import { defaultQuoteSigner, quoteSignersFor } from '@/lib/quote-signers';
 
@@ -12,7 +13,7 @@ import { defaultQuoteSigner, quoteSignersFor } from '@/lib/quote-signers';
 export async function GET(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
-  const denied = await guard(user, 'prospek', 'x');
+  const denied = await guard(user, 'prospek', quotePermAct(user.role));
   if (denied) return denied;
   const prospectId = new URL(req.url).searchParams.get('prospectId') || '';
   if (!prospectId) return NextResponse.json({ error: 'prospectId wajib diisi' }, { status: 400 });

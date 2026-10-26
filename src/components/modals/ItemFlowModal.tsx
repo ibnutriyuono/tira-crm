@@ -18,13 +18,16 @@ import {
 } from '@/lib/item-flow';
 import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
+import { canSetFaktur } from '@/lib/roles';
 import { ItemQcdTable, initialItemQcd, itemQcdError, type ItemQcdDraft, type ItemQcdRow } from '../ItemQcdTable';
 import { ITEM_OUTCOME_META, itemOutcome, type ItemOutcome } from '@/lib/item-qcd';
 import { QCD_FAKTOR_LABEL } from '@/lib/qcd';
+import { jakartaDate } from '@/lib/followup-rule';
+import { ETA_FLAG_META, ETA_STAT_META, STOK_META, etaFlag, etaLogText, fmtYmd, itemStock, needsArrival, type ItemStock } from '@/lib/item-stock';
 import { useUiStore } from '@/store/useUiStore';
 
 import { useT } from '@/store/useLangStore';
-type Mode = 'po' | 'kirim' | 'qcd' | null;
+type Mode = 'po' | 'kirim' | 'qcd' | 'koreksi' | null;
 
 /** Three-part bar: terkirim · PO belum kirim · tidak di-PO (or one "ditawarkan" segment before PO). */
 export function FlowBar({ it }: { it: Pick<FlowItem, 'offered' | 'po' | 'sent'> }) {
@@ -87,17 +90,36 @@ export function ItemFlowModal() {
   const [noDo, setNoDo] = useState('');
   const [tglDo, setTglDo] = useState('');
   const [doDraft, setDoDraft] = useState<Record<string, string>>({});
+  // Koreksi / batalkan catatan pengiriman (Admin Sales, BM, RM, GM, Admin).
+  const [fixEv, setFixEv] = useState<ItemEvent | null>(null);
+  const [fixDraft, setFixDraft] = useState<Record<string, string>>({});
+  const [fixNoDo, setFixNoDo] = useState('');
+  const [fixTgl, setFixTgl] = useState('');
+  const [fixAlasan, setFixAlasan] = useState('');
+  const [cancelId, setCancelId] = useState('');
+  const [cancelAlasan, setCancelAlasan] = useState('');
   const [qcdDraft, setQcdDraft] = useState<ItemQcdDraft>({});
   // Item yang QCD-nya sudah diubah di layar ini (tidak di-reset saat qty PO berubah).
   const [qcdTouched, setQcdTouched] = useState<Record<string, boolean>>({});
 
   const items = useMemo(() => (record ? flowItems(record) : []), [record]);
+  // Kondisi stok & target kedatangan dari Purchasing (PO Indent).
+  const stockOf = (idx: number) => itemStock(((record?.materials as unknown as Record<string, unknown>[]) || [])[idx], record?.kondisiStock);
+  const showStock = !!record && items.some((it) => stockOf(it.idx).kond);
+  const janji = record && num(record.status) === 4 ? record.tglDelivery || '' : '';
+  const todayYmd = jakartaDate();
+  const etaLogs = items
+    .flatMap((it) => stockOf(it.idx).log.map((e) => ({ ...e, label: it.label })))
+    .sort((a, b) => (a.at < b.at ? 1 : -1));
+  const [showEtaLog, setShowEtaLog] = useState(false);
   const totals = useMemo(() => flowTotals(items), [items]);
   const status = record ? num(record.status) : 0;
   const won = status === 4 || status === 5;
   const allConfirmed = items.length > 0 && items.every((i) => i.poConfirmed);
   const outstanding = items.some((i) => i.poConfirmed && (i.po || 0) > (i.sentConfirmed ? i.sent : 0));
   const canEdit = !!currentUser && !isPurchasingRoleClient(currentUser.role);
+  const canFixRole = !!currentUser && canSetFaktur(currentUser.role);
+  const fixLocked = !!record?.terfaktur;
   const lostDeal = status === 6;
   const qcdReady = lostDeal || (won && allConfirmed);
 
@@ -223,6 +245,33 @@ export function ItemFlowModal() {
     if (err) return toast(err, 'error');
     const p = await save({ action: 'qcd', qcd: Object.fromEntries(qcdRows.map((r) => [r.itemId, qcdDraft[r.itemId] || {}])) }, 'QCD per item tersimpan');
     if (p) setMode(null);
+  }
+  function startKoreksi(e: ItemEvent) {
+    setFixEv(e);
+    setFixDraft(Object.fromEntries(e.items.map((x) => [x.itemId, String(x.qty ?? 0)])));
+    setFixNoDo(e.docNo || '');
+    setFixTgl(e.tgl || todayStr());
+    setFixAlasan('');
+    setCancelId('');
+    setMode('koreksi');
+  }
+  async function saveKoreksi() {
+    if (!fixEv) return;
+    if (!fixNoDo.trim()) return toast('No. DO / surat jalan wajib diisi', 'error');
+    if (fixAlasan.trim().length < 3) return toast('Alasan koreksi wajib diisi', 'error');
+    const p = await save({ action: 'kirim-koreksi', eventId: fixEv.id, noDo: fixNoDo.trim(), tgl: fixTgl, qty: fixDraft, alasan: fixAlasan.trim() }, 'Catatan pengiriman dikoreksi');
+    if (p) {
+      setMode(null);
+      setFixEv(null);
+    }
+  }
+  async function cancelKirim(e: ItemEvent) {
+    if (cancelAlasan.trim().length < 3) return toast('Alasan pembatalan wajib diisi', 'error');
+    const p = await save({ action: 'kirim-batal', eventId: e.id, alasan: cancelAlasan.trim() }, `Pengiriman ${e.docNo || ''} dibatalkan`);
+    if (p) {
+      setCancelId('');
+      setCancelAlasan('');
+    }
   }
   async function saveKirim() {
     if (!noDo.trim()) return toast('No. DO / surat jalan wajib diisi', 'error');
@@ -377,6 +426,65 @@ export function ItemFlowModal() {
             </div>
           )}
 
+          {mode === 'koreksi' && fixEv && (
+            <div className="if-panel kirim">
+              <div className="if-panel-head">
+                <b>{tr("Koreksi Pengiriman")} — {fixEv.docNo || '-'}</b>
+                <span>{tr("Ubah No. DO, tanggal, atau qty yang tercatat di pengiriman ini. Qty 0 = item tidak ikut DO ini. Alasan wajib dan tercatat di riwayat.")}</span>
+              </div>
+              <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 260px))', marginBottom: 10 }}>
+                <div>
+                  <label>{tr("No. DO / Surat Jalan")}</label>
+                  <input type="text" value={fixNoDo} onChange={(e) => setFixNoDo(e.target.value)} />
+                </div>
+                <div>
+                  <label>{tr("Tgl. Kirim")}</label>
+                  <input type="date" value={fixTgl} onChange={(e) => setFixTgl(e.target.value)} />
+                </div>
+              </div>
+              <div className="table-wrap" style={{ borderTop: 'none' }}>
+                <table className="simple-table if-nowrap" style={{ minWidth: 640 }}>
+                  <thead>
+                    <tr><th>{tr("Material")}</th><th style={{ textAlign: 'right' }}>{tr("Qty PO")}</th><th style={{ textAlign: 'right' }}>{tr("Di DO lain")}</th><th style={{ width: 130 }}>{tr("Qty di DO ini")}</th><th style={{ textAlign: 'right' }}>{tr("Sisa")}</th></tr>
+                  </thead>
+                  <tbody>
+                    {items.filter((it) => (it.po || 0) > 0).map((it) => {
+                      const before = fixEv.items.find((x) => x.itemId === it.itemId)?.qty ?? 0;
+                      const other = Math.max(0, (it.sentConfirmed ? it.sent : 0) - before);
+                      const max = Math.max(0, (it.po || 0) - other);
+                      const v = fixDraft[it.itemId] ?? '0';
+                      const rest = (it.po || 0) - other - Math.min(max, Math.max(0, num(v)));
+                      return (
+                        <tr key={it.itemId}>
+                          <td>{it.label}</td>
+                          <td className="mono" style={{ textAlign: 'right' }}>{qtyText(it.po, it)}</td>
+                          <td className="mono" style={{ textAlign: 'right' }}>{qtyText(other, it)}</td>
+                          <td>
+                            <input type="number" min={0} max={max} step="any" aria-label={`Qty di DO ini ${it.label}`} value={v} onChange={(e) => setFixDraft((d) => ({ ...d, [it.itemId]: e.target.value }))} style={{ width: 110, textAlign: 'right' }} />
+                          </td>
+                          <td className="mono" style={{ textAlign: 'right', color: rest > 0 ? 'var(--amber-600)' : 'var(--green-600)', fontWeight: rest > 0 ? 700 : 400 }}>{rest > 0 ? qtyText(rest, it) : tr("Lunas")}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="form-grid" style={{ marginTop: 10 }}>
+                <div className="full">
+                  <label>{tr("Alasan koreksi")} <span style={{ color: 'var(--rust-500)' }}>*</span></label>
+                  <input type="text" value={fixAlasan} onChange={(e) => setFixAlasan(e.target.value)} placeholder={tr("cth. Tanggal surat jalan salah ketik / qty sebenarnya 2 pcs")} />
+                </div>
+              </div>
+              <div className="if-panel-foot">
+                <span>{tr("Bila semua qty menjadi 0, status prospek kembali ke PO / Kontrak.")}</span>
+                <span style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => { setMode(null); setFixEv(null); }}>{tr("Batal")}</button>
+                  <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={saveKoreksi}>{busy ? tr("Menyimpan…") : tr("Simpan Koreksi")}</button>
+                </span>
+              </div>
+            </div>
+          )}
+
           {mode === 'kirim' && (
             <div className="if-panel kirim">
               <div className="if-panel-head">
@@ -438,7 +546,7 @@ export function ItemFlowModal() {
               <div className="table-wrap" style={{ borderTop: 'none' }}>
                 <table className="simple-table if-nowrap" style={{ minWidth: 560 }}>
                   <thead>
-                    <tr><th>{tr("Material")}</th><th style={{ textAlign: 'right' }}>{tr("Ditawarkan")}</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>{tr("Terkirim")}</th><th style={{ width: 120 }}>{tr("Alur")}</th><th>{tr("Status")}</th><th>{tr("QCD / Kompetitor")}</th></tr>
+                    <tr><th>{tr("Material")}</th><th style={{ textAlign: 'right' }}>{tr("Ditawarkan")}</th><th style={{ textAlign: 'right' }}>PO</th><th style={{ textAlign: 'right' }}>{tr("Terkirim")}</th><th style={{ width: 120 }}>{tr("Alur")}</th><th>{tr("Status")}</th>{showStock && <th>{tr("Kondisi · target tiba")}</th>}<th>{tr("QCD / Kompetitor")}</th></tr>
                   </thead>
                   <tbody>
                     {items.map((it) => (
@@ -452,6 +560,7 @@ export function ItemFlowModal() {
                           <span className={`badge ${ITEM_STATE_META[it.state].color}`}>{ITEM_STATE_META[it.state].label}</span>
                           {it.estimated && <span className="if-est" title={tr("Belum dikonfirmasi per item — dihitung penuh dari status prospek")}>{tr("perkiraan")}</span>}
                         </td>
+                        {showStock && <td><StockCell st={stockOf(it.idx)} sent={it.po !== null && it.po > 0 && it.sent >= it.po} janji={janji} today={todayYmd} /></td>}
                         <td className="if-qcd">
                           {it.outcome && <span className={`badge ${ITEM_OUTCOME_META[it.outcome].color}`}>{tr(ITEM_OUTCOME_META[it.outcome].label)}</span>}{' '}
                           {it.qcd ? (
@@ -484,6 +593,24 @@ export function ItemFlowModal() {
                 </table>
               </div>
             </div>
+
+            {etaLogs.length > 0 && (
+              <div className="if-eta-log">
+                <button type="button" className="link-btn" onClick={() => setShowEtaLog((v) => !v)}>
+                  {showEtaLog ? tr("Sembunyikan riwayat target kedatangan") : `${tr("Riwayat target kedatangan")} (${etaLogs.length})`}
+                </button>
+                {showEtaLog &&
+                  etaLogs.map((e, i) => (
+                    <div key={i} className="if-eta-row">
+                      <span className="mono">{new Date(e.at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}</span>
+                      <span>
+                        <b>{e.by}</b> · {e.label}: {etaLogText(e)}
+                        {e.note && <> — <i>{e.note}</i></>}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            )}
 
             <div>
               <div className="if-sec-head">
@@ -520,8 +647,10 @@ export function ItemFlowModal() {
                           {lines.map((x, i) => (
                             <div key={i} className="if-line">
                               {x.label}:{' '}
-                              {e.type === 'revisi'
+                              {e.type === 'revisi' || e.type === 'koreksi'
                                 ? `${formatQty(x.from ?? 0)} → ${formatQty(x.to ?? 0)}`
+                                : e.type === 'kirim-batal'
+                                  ? <s>{formatQty(x.qty ?? 0)}</s>
                                 : e.type === 'po'
                                   ? `${formatQty(x.qty ?? 0)} dari ${formatQty(x.of ?? 0)}`
                                   : e.type === 'kirim'
@@ -529,6 +658,24 @@ export function ItemFlowModal() {
                                     : formatQty(x.qty ?? 0)}
                             </div>
                           ))}
+                          {e.type === 'kirim' && canFixRole && (
+                            <div className="if-fix">
+                              {fixLocked ? (
+                                <span className="if-fix-note">{tr("Terfaktur — koreksi pengiriman dikunci")}</span>
+                              ) : cancelId === e.id ? (
+                                <div className="if-fix-cancel">
+                                  <input type="text" value={cancelAlasan} onChange={(ev) => setCancelAlasan(ev.target.value)} placeholder={tr("Alasan pembatalan (wajib)")} aria-label={tr("Alasan pembatalan")} />
+                                  <button type="button" className="btn btn-sm btn-danger-soft" disabled={busy} onClick={() => cancelKirim(e)}>{tr("Ya, batalkan")}</button>
+                                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setCancelId('')}>{tr("Tidak jadi")}</button>
+                                </div>
+                              ) : (
+                                <>
+                                  <button type="button" className="if-fix-btn" disabled={busy || mode === 'koreksi'} onClick={() => startKoreksi(e)}>{tr("Koreksi")}</button>
+                                  <button type="button" className="if-fix-btn danger" disabled={busy} onClick={() => { setCancelId(e.id); setCancelAlasan(''); }}>{tr("Batalkan")}</button>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </li>
                     );
@@ -540,5 +687,33 @@ export function ItemFlowModal() {
         </>
       )}
     </Modal>
+  );
+}
+
+/** Kondisi stok + target kedatangan satu item (diisi Purchasing di tab PO Indent). */
+function StockCell({ st, sent, janji, today }: { st: ItemStock; sent: boolean; janji: string; today: string }) {
+  const tr = useT();
+  if (!st.kond) return <span className="muted">–</span>;
+  const need = needsArrival(st.kond);
+  const f = etaFlag(st.eta, st.stat, janji, today);
+  return (
+    <span className="if-stock">
+      <span className={`pi-kond ${st.kond}`}>{tr(STOK_META[st.kond].short)}</span>
+      {need && st.lama && <span className="muted"> {st.lama}</span>}
+      {need && !sent && (
+        <span className="if-eta">
+          {st.stat === 'tiba' ? (
+            <span className="pi-flag ok">{tr("Tiba di gudang")}</span>
+          ) : st.eta ? (
+            <>
+              {tr("tiba")} <b>{fmtYmd(st.eta)}</b> · {tr(ETA_STAT_META[st.stat].label)}
+              {(f === 'lewat' || f === 'janji') && <span className={`pi-flag ${ETA_FLAG_META[f].cls}`}>{f === 'janji' ? `${tr("Melewati janji")} ${fmtYmd(janji)}` : tr(ETA_FLAG_META[f].label)}</span>}
+            </>
+          ) : (
+            <span className="muted">{tr("belum ada target dari Purchasing")}</span>
+          )}
+        </span>
+      )}
+    </span>
   );
 }

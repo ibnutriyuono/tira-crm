@@ -1,11 +1,14 @@
 'use client';
 
+import { canComposeMail } from '@/lib/compose-email';
+import { quotePermAct } from '@/lib/roles';
 import { isPurchasingRoleClient } from '@/lib/doc-lines';
 import { isOpenIssue } from '@/lib/issues';
 import { can, type PermAct } from '@/lib/permissions';
 import { adminTaskCount } from './modals/AdminQueueModal';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { getSocket } from '@/lib/socket-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { api } from '@/lib/api-client';
@@ -13,8 +16,8 @@ import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { todayStr } from '@/lib/format';
 import { countNewPurchasingItems } from '@/lib/purchasing-workflow';
 import { countUrgentFollowUps } from '@/lib/reports';
-import { appendSheet, buildBudgetTargetSheet, buildCustomerSheet, buildFupaSheet, buildProspectSheet, buildRfqSheet, buildSalesActivitySheet, buildSalesPlanSheet, buildVendorSheet, STATUS_LEGEND } from '@/lib/exports';
-import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconDownload, IconExport, IconImport, IconPlus, IconPresentation, IconRfq, IconSave, IconSearch, IconTarget, IconTemplate, IconUsers } from './icons';
+import { appendSheet, buildBudgetTargetSheet, buildCustomerSheet, buildFupaSheet, buildProspectSheet, buildRfqSheet, buildSalesActivitySheet, buildSalesPlanSheet, STATUS_LEGEND } from '@/lib/exports';
+import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconDoc, IconMail, IconDownload, IconExport, IconFlag, IconImport, IconPlus, IconPresentation, IconRfq, IconSave, IconSearch, IconTarget, IconTemplate, IconUsers } from './icons';
 import type { SalesActivity } from '@/lib/types';
 
 import { useT } from '@/store/useLangStore';
@@ -55,6 +58,27 @@ export function TopBar() {
   const urgentFollowUpCount = countUrgentFollowUps(prospects);
   const notifications = useDataStore((s) => s.notifications);
   const unreadNotifCount = notifications.filter((n) => !n.readAt).length;
+  // Badge Tugas Kunjungan (dihitung server; diperbarui saat ada perubahan tugas / rencana).
+  const [visitBadge, setVisitBadge] = useState(0);
+  const myRole = currentUser?.role;
+  useEffect(() => {
+    if (!myRole || !['sales', 'bm', 'rm', 'gm', 'admin', 'salesadmin'].includes(myRole)) return;
+    let alive = true;
+    const load = () =>
+      api
+        .get<{ open: number; late: number; plans: number }>('/api/visit-tasks?count=1')
+        .then((r) => alive && setVisitBadge(myRole === 'sales' ? r.open : r.late + r.plans))
+        .catch(() => {});
+    load();
+    const s = getSocket();
+    s.on('visitTask:updated', load);
+    s.on('visitPlan:updated', load);
+    return () => {
+      alive = false;
+      s.off('visitTask:updated', load);
+      s.off('visitPlan:updated', load);
+    };
+  }, [myRole]);
   const openModal = useUiStore((s) => s.openModal);
   const [savedLabel, setSavedLabel] = useState('');
 
@@ -91,7 +115,9 @@ export function TopBar() {
   // One workbook, one sheet per entity — everything the CURRENT user's
   // store already holds, which is exactly what they're each individually
   // scoped to see (prospects/rfqs/fupas/salesPlans server-scoped by role;
-  // customers/vendors/budgetTargets are company-wide for everyone already).
+  // customers/budgetTargets are company-wide for everyone already). The vendor
+  // list is Purchasing data and is never part of this export — Purchasing
+  // exports it from its own Database Vendor tab.
   // Reuses the exact same builders as every per-module export button above,
   // so a sheet in here never drifts from what "Export Excel" on that
   // module's own screen produces.
@@ -110,7 +136,6 @@ export function TopBar() {
       s.rfqs.length && buildRfqSheet(s.rfqs),
       s.fupas.length && buildFupaSheet(s.fupas),
       s.customers.length && buildCustomerSheet(s.customers),
-      s.vendors.length && buildVendorSheet(s.vendors),
       s.salesPlans.length && buildSalesPlanSheet(s.salesPlans),
       s.budgetTargets.length && buildBudgetTargetSheet(s.budgetTargets),
       activities.length && buildSalesActivitySheet(activities, s.prospects),
@@ -317,6 +342,17 @@ export function TopBar() {
               )}
             </button>
           )}
+          {['sales', 'bm', 'rm', 'gm', 'admin', 'salesadmin'].includes(currentUser.role) && (
+            <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('visitTasks')} title={tr("Tugas kunjungan dari BM / GM dan rencana kunjungan mingguan")}>
+              <IconFlag />
+              {tr("Tugas Kunjungan")}
+              {visitBadge > 0 && (
+                <span className="topbar-badge" title={currentUser.role === 'sales' ? `${visitBadge} tugas kunjungan terbuka` : `${visitBadge} terlambat / rencana menunggu persetujuan`}>
+                  {visitBadge > 9 ? '9+' : visitBadge}
+                </span>
+              )}
+            </button>
+          )}
           <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('notifications')}>
             <IconBell />
             {tr("Notifikasi")}
@@ -362,7 +398,7 @@ export function TopBar() {
             </button>
           )}
           {c('prospek', 'x') && (
-            <button className="btn btn-ghost-dark" onClick={exportAllExcel} title={tr("Satu file Excel berisi semua data (Prospek, RFQ, FUP A, Customer, Vendor, Rencana Penjualan, Target), tiap jenis di sheet terpisah")}>
+            <button className="btn btn-ghost-dark" onClick={exportAllExcel} title={tr("Satu file Excel berisi semua data (Prospek, RFQ, FUP A, Customer, Rencana Penjualan, Target, Aktivitas Harian), tiap jenis di sheet terpisah")}>
               <IconDownload />
               {tr("Export Semua")}
             </button>
@@ -379,17 +415,36 @@ export function TopBar() {
             <IconSave />
             {tr("Simpan Perubahan")}
           </button>
+          {canComposeMail(currentUser?.role) && (
+            <button className="btn btn-outline" onClick={() => openModal('mailCompose')} title={tr("Kirim pengumuman ke user CRM atau email ke customer")}>
+              <IconMail />
+              {tr("Kirim Email")}
+            </button>
+          )}
           {c('aktivitas') && (
             <button className="btn btn-activity" onClick={() => openModal('salesActivity')}>
               <IconCalendar />
               {tr("Aktivitas Harian")}
             </button>
           )}
+          {c('prospek', 'e') && c('prospek', quotePermAct(currentUser?.role)) && (
+            <button
+              className="btn btn-quote"
+              title={tr("Prospek baru di tahap Penawaran Harga, lalu langsung buat surat penawarannya")}
+              onClick={() => {
+                useUiStore.setState({ editProspectId: null, prospectFormQuote: true });
+                openModal('prospectForm');
+              }}
+            >
+              <IconDoc />
+              {tr("Buat Penawaran")}
+            </button>
+          )}
           {c('prospek', 'e') && (
             <button
               className="btn btn-primary"
               onClick={() => {
-                useUiStore.setState({ editProspectId: null });
+                useUiStore.setState({ editProspectId: null, prospectFormQuote: false });
                 openModal('prospectForm');
               }}
             >

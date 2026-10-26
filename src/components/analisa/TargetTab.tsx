@@ -6,12 +6,21 @@ import { appendSheet } from '@/lib/exports';
 import { BULAN_LIST } from '@/lib/constants';
 import { achSignal, buildTargetAchievement } from '@/lib/target-achievement';
 import { localToday } from '@/lib/sales-activity';
+import { workingDays } from '@/lib/activity-kpi';
 import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { canNow } from '@/hooks/useCan';
+import { periodeLabel } from '@/lib/exec-analysis';
+import { PeriodRange, type PeriodRangeValue } from './PeriodRange';
 
 import { useT } from '@/store/useLangStore';
 const BLN3 = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+/** Laju hari kerja bulan berjalan s.d. hari ini. */
+function workPace(today: string): number {
+  const d = workingDays(today.slice(0, 7));
+  return d.length ? d.filter((x) => x <= today).length / d.length : 0;
+}
 
 /** Rp ringkas: 6,22 M / 850 jt. */
 function rpShort(v: number): string {
@@ -55,25 +64,31 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
   const budgetTargets = useDataStore((s) => s.budgetTargets);
   const toast = useDataStore((s) => s.toast);
   const today = localToday();
-  const [year, setYear] = useState(today.slice(0, 4));
-  const [month, setMonth] = useState(Number(today.slice(5, 7)));
+  const thisMonth = today.slice(0, 7);
+  const [range, setRange] = useState<PeriodRangeValue>({ from: thisMonth, to: thisMonth });
+  const year = range.to.slice(0, 4);
+  const month = Number(range.to.slice(5, 7));
+  const from = range.from;
+  const setMonth = (m: number) => {
+    const p = `${year}-${String(m).padStart(2, '0')}`;
+    setRange({ from: p, to: p });
+  };
   const [cabang, setCabang] = useState('');
   const [showGit, setShowGit] = useState(true);
 
   const t = useMemo(
-    () => buildTargetAchievement(prospects, budgetTargets, cabang ? [cabang] : cabangs, { year, month, today, allProspects: isSe }),
-    [prospects, budgetTargets, cabang, cabangs, year, month, today, isSe],
+    () => buildTargetAchievement(prospects, budgetTargets, cabang ? [cabang] : cabangs, { year, month, from, today, allProspects: isSe }),
+    [prospects, budgetTargets, cabang, cabangs, year, month, from, today, isSe],
   );
   // Rincian per cabang selalu atas seluruh cakupan, tidak terpengaruh filter cabang.
   const all = useMemo(
-    () => (isSe || cabangs.length < 2 ? null : buildTargetAchievement(prospects, budgetTargets, cabangs, { year, month, today })),
-    [isSe, cabangs, prospects, budgetTargets, year, month, today],
+    () => (isSe || cabangs.length < 2 ? null : buildTargetAchievement(prospects, budgetTargets, cabangs, { year, month, from, today })),
+    [isSe, cabangs, prospects, budgetTargets, year, month, from, today],
   );
 
-  const curYear = today.slice(0, 4);
-  const years = [String(Number(curYear) - 1), curYear];
-  const maxMonth = year === curYear ? Number(today.slice(5, 7)) : 12;
-  const monthName = `${BULAN_LIST[month - 1].l} ${year}`;
+  const single = t.periodes.length === 1;
+  const monthName = single ? `${BULAN_LIST[month - 1].l} ${year}` : periodeLabel(t.from, t.to);
+  const inRange = new Set(t.periodes);
   const scopeText = isSe ? scopeLabel : cabang ? `Cabang ${cabang}` : scopeLabel;
 
   // kartu bulan
@@ -88,11 +103,12 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
   // kartu YTD
   const yAch = ratio(t.ytdReal, t.ytdTarget);
   const ySig = achSignal(yAch);
-  const closedMonths = t.months.slice(0, t.isCurrent ? month - 1 : month);
+  const endIsCurrent = thisMonth === range.to;
+  const closedMonths = t.months.slice(0, endIsCurrent ? month - 1 : month);
   const hitMonths = closedMonths.filter((m) => m.target > 0 && m.real >= m.target).length;
   const proj = ratio(t.runRate, t.yearTarget);
   const shown = t.months.slice(0, month);
-  const maxV = Math.max(1, ...shown.map((m) => Math.max(m.target, m.real + (showGit && m.month === month ? m.git : 0))));
+  const maxV = Math.max(1, ...shown.map((m) => Math.max(m.target, m.real + (showGit && inRange.has(`${year}-${String(m.month).padStart(2, '0')}`) ? m.git : 0))));
 
   const rows = (all?.rows || [])
     .map((r) => {
@@ -115,13 +131,13 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
     if (rows.length) {
       appendSheet(XLSX, wb, {
         sheetName: 'Per Cabang',
-        header: ['CABANG', `TARGET ${BLN3[month - 1].toUpperCase()}`, 'TERFAKTUR', 'GIT', 'CAPAIAN', 'TARGET YTD', 'TERFAKTUR YTD', 'CAPAIAN YTD'],
+        header: ['CABANG', single ? `TARGET ${BLN3[month - 1].toUpperCase()}` : 'TARGET PERIODE', 'TERFAKTUR', 'GIT', 'CAPAIAN', 'TARGET YTD', 'TERFAKTUR YTD', 'CAPAIAN YTD'],
         rows: rows.map((r) => [r.cabang, Math.round(r.target), Math.round(r.real), Math.round(r.git), r.a ?? '', Math.round(r.ytdTarget), Math.round(r.ytdReal), r.ya ?? '']),
         colWidths: [{ wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 12 }],
         numFormats: { 1: '#,##0', 2: '#,##0', 3: '#,##0', 4: '0%', 5: '#,##0', 6: '#,##0', 7: '0%' },
       });
     }
-    XLSX.writeFile(wb, `Target_vs_Pencapaian_${scopeText.replace(/[^\w-]+/g, '_')}_${year}-${String(month).padStart(2, '0')}.xlsx`);
+    XLSX.writeFile(wb, `Target_vs_Pencapaian_${scopeText.replace(/[^\w-]+/g, '_')}_${single ? t.to : `${t.from}_sd_${t.to}`}.xlsx`);
     toast('Excel target vs pencapaian diunduh', 'success');
   }
 
@@ -134,20 +150,7 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
             {cabangs.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
-        <select value={month} onChange={(e) => setMonth(Number(e.target.value))} style={{ maxWidth: 150 }} aria-label={tr("Bulan")}>
-          {BULAN_LIST.slice(0, maxMonth).map((b, i) => <option key={b.v} value={i + 1}>{b.l}</option>)}
-        </select>
-        <select
-          value={year}
-          onChange={(e) => {
-            setYear(e.target.value);
-            if (e.target.value === curYear) setMonth((m) => Math.min(m, Number(today.slice(5, 7))));
-          }}
-          style={{ maxWidth: 100 }}
-          aria-label={tr("Tahun")}
-        >
-          {years.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+        <PeriodRange value={range} onChange={(v) => v.from && setRange(v)} thisMonth={thisMonth} max={thisMonth} />
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
           <input type="checkbox" checked={showGit} onChange={(e) => setShowGit(e.target.checked)} /> {tr("Tampilkan GIT sebagai potensi")}
         </label>
@@ -162,7 +165,7 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
       <div className="tg-grid">
         <div className="tg-card">
           <div className="tg-card-head">
-            <span>{tr("Target bulan ini ·")} {monthName}</span>
+            <span>{single ? tr("Target bulan ini ·") : tr("Target periode ·")} {monthName}{single ? '' : ` (${t.periodes.length} bln)`}</span>
             <Chip sig={mSig} done={!t.isCurrent} ach={ach} />
           </div>
           {t.target > 0 ? (
@@ -175,7 +178,7 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
               </div>
               <Bar ach={ach} git={showGit ? t.git / t.target : 0} pace={t.isCurrent ? t.pace : null} sig={mSig} />
               {t.isCurrent && (
-                <div className="tg-pace" style={{ paddingLeft: `${Math.min(80, t.pace * 100)}%` }}>
+                <div className="tg-pace" style={{ paddingLeft: `${Math.min(55, t.pace * 100)}%` }}>
                   {tr("seharusnya")} {pct(t.pace)} {tr("· hari kerja ke-")}{t.elapsed}/{t.workdays}
                 </div>
               )}
@@ -187,7 +190,7 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
                   </>
                 ) : (
                   <>
-                    <Fact label={sisa > 0 ? tr("Kurang dari target") : tr("Lebih dari target")} value={rpShort(Math.abs(sisa))} sub={tr("bulan sudah selesai")} tone={sisa > 0 ? 'bad' : 'ok'} />
+                    <Fact label={sisa > 0 ? tr("Kurang dari target") : tr("Lebih dari target")} value={rpShort(Math.abs(sisa))} sub={single ? tr("bulan sudah selesai") : tr("periode sudah selesai")} tone={sisa > 0 ? 'bad' : 'ok'} />
                     <Fact label={tr("Rata-rata per hari kerja")} value={rpShort(t.workdays ? t.real / t.workdays : 0)} sub={`${t.workdays} hari kerja`} />
                   </>
                 )}
@@ -204,25 +207,28 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
 
         <div className="tg-card">
           <div className="tg-card-head">
-            <span>{tr("YTD · Januari –")} {monthName}</span>
+            <span>{tr("YTD · Januari –")} {BULAN_LIST[month - 1].l} {year}</span>
             <Chip sig={ySig} />
           </div>
           <div className="tg-big">
             <span className={`num ${ySig || ''}`}>{pct(yAch)}</span>
             <span>
               <b>{rpShort(t.ytdReal)}</b> {tr("dari target")} <b>{rpShort(t.ytdTarget)}</b>
-              {t.isCurrent && t.ytdTargetFull !== t.ytdTarget && <small> {tr("(s.d. hari ini; penuh s.d.")} {BLN3[month - 1]} {rpShort(t.ytdTargetFull)})</small>}
+              {endIsCurrent && t.ytdTargetFull !== t.ytdTarget && <small> {tr("(s.d. hari ini; penuh s.d.")} {BLN3[month - 1]} {rpShort(t.ytdTargetFull)})</small>}
             </span>
           </div>
           <div className="tg-chart" role="group" aria-label={tr("Target dan terfaktur per bulan")}>
             {shown.map((m) => {
               const a = ratio(m.real, m.target);
-              const live = t.isCurrent && m.month === month;
-              const sig = achSignal(a == null ? null : live ? (t.pace ? a / t.pace : null) : a);
-              const g = showGit && m.month === month ? m.git : 0;
+              const mp = `${year}-${String(m.month).padStart(2, '0')}`;
+              const sel = inRange.has(mp);
+              const live = mp === thisMonth;
+              const mDays = live ? workPace(today) : 1;
+              const sig = achSignal(a == null ? null : live ? (mDays ? a / mDays : null) : a);
+              const g = showGit && sel ? m.git : 0;
               const label = `${BULAN_LIST[m.month - 1].l}: ${rpShort(m.real)} dari target ${rpShort(m.target)} (${pct(a)})`;
               return (
-                <button key={m.month} type="button" className={`col ${m.month === month ? 'on' : ''}`} onClick={() => setMonth(m.month)} title={label} aria-label={label}>
+                <button key={m.month} type="button" className={`col ${sel ? 'on' : ''}`} onClick={() => setMonth(m.month)} title={label} aria-label={label}>
                   <span className={`p ${sig || ''}`}>{pct(a)}</span>
                   <span className="area">
                     {m.target > 0 && <span className="t" style={{ height: `${(m.target / maxV) * 100}%` }} />}
@@ -242,7 +248,7 @@ export function TargetTab({ prospects, scopeLabel, cabangs, isSe }: { prospects:
               tone={t.ytdReal >= t.ytdTarget ? 'ok' : 'bad'}
             />
             <Fact label={tr("Proyeksi akhir tahun")} value={rpShort(t.runRate)} sub={`run-rate · ${pct(proj)} target ${year}`} tone={achSignal(proj) || ''} />
-            <Fact label={`Target ${year}`} value={rpShort(t.yearTarget)} sub={`sisa ${rpShort(Math.max(0, t.yearTarget - t.ytdReal))} · ${12 - month + (t.isCurrent ? 1 : 0)} bln`} />
+            <Fact label={`Target ${year}`} value={rpShort(t.yearTarget)} sub={`sisa ${rpShort(Math.max(0, t.yearTarget - t.ytdReal))} · ${12 - month + (endIsCurrent ? 1 : 0)} bln`} />
           </div>
         </div>
       </div>

@@ -1,10 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { MONTH_LABELS } from '@/lib/kpi';
+import { localToday } from '@/lib/sales-activity';
+import { PeriodRange, rangeMonths, type PeriodRangeValue } from './analisa/PeriodRange';
 import { STATUS_META } from '@/lib/constants';
 import { formatRupiah } from '@/lib/format';
-import { buildQcdDashboard } from '@/lib/qcd-analysis';
+import { buildQcdDashboard, type QcdDashboard as QcdData } from '@/lib/qcd-analysis';
+import { filterByRfq, type RfqFilter } from '@/lib/qcd-rfq';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore, type ModalKey } from '@/store/useUiStore';
 
@@ -46,12 +48,23 @@ function StackBar({ counts, options }: { counts: Record<string, number>; options
  * per-branch, and the closed deals whose QCD is still incomplete (each one
  * opens the QCD form and comes back here).
  */
-export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdRecap' }: { cabangList: string[]; year: string; scopeLabel: string; returnTo?: ModalKey }) {
+export function QcdDashboard({ cabangList, scopeLabel, returnTo = 'qcdRecap' }: { cabangList: string[]; scopeLabel: string; returnTo?: ModalKey }) {
   const tr = useT();
   const prospects = useDataStore((s) => s.prospects);
-  const [month, setMonth] = useState('');
-  const periode = month ? `${year}-${month}` : year;
-  const d = useMemo(() => buildQcdDashboard(prospects, cabangList, periode), [prospects, cabangList, periode]);
+  const thisMonth = localToday().slice(0, 7);
+  const [range, setRange] = useState<PeriodRangeValue>({ from: `${thisMonth.slice(0, 4)}-01`, to: thisMonth });
+  const months = useMemo(() => rangeMonths(range), [range]);
+  const rfqs = useDataStore((s) => s.rfqs);
+  // Dengan RFQ = prospek dengan RFQ yang sudah dijawab Purchasing (lib/qcd-rfq.ts).
+  const [rfqF, setRfqF] = useState<RfqFilter>('semua');
+  const d = useMemo(() => buildQcdDashboard(filterByRfq(prospects, rfqs, rfqF), cabangList, months), [prospects, rfqs, rfqF, cabangList, months]);
+  const cmp = useMemo(
+    () => ({
+      dengan: buildQcdDashboard(filterByRfq(prospects, rfqs, 'dengan'), cabangList, months),
+      tanpa: buildQcdDashboard(filterByRfq(prospects, rfqs, 'tanpa'), cabangList, months),
+    }),
+    [prospects, rfqs, cabangList, months],
+  );
   const maxF = Math.max(1, ...d.faktor.map((f) => Math.max(f.won, f.lost)));
 
   function openQcd(id: string, status: number) {
@@ -63,15 +76,14 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
   return (
     <>
       <div className="toolbar-row" style={{ alignItems: 'center', marginBottom: 12 }}>
-        <label style={{ margin: 0 }}>{tr("Bulan")}</label>
-        <select value={month} onChange={(e) => setMonth(e.target.value)} style={{ maxWidth: 170 }}>
-          <option value="">{tr("Sepanjang")} {year}</option>
-          {MONTH_LABELS.map((m, i) => (
-            <option key={m} value={String(i + 1).padStart(2, '0')}>
-              {m} {year}
-            </option>
+        <PeriodRange value={range} onChange={setRange} thisMonth={thisMonth} allowAll />
+        <span className="qr-seg" role="group" aria-label={tr("Dengan / tanpa RFQ")}>
+          {(['semua', 'dengan', 'tanpa'] as const).map((k) => (
+            <button key={k} type="button" className={rfqF === k ? 'on' : ''} onClick={() => setRfqF(k)}>
+              {k === 'semua' ? tr('Semua deal') : k === 'dengan' ? tr('Dengan RFQ') : tr('Tanpa RFQ')}
+            </button>
           ))}
-        </select>
+        </span>
         <span className="field-note" style={{ margin: 0 }}>
           {tr("Lingkup:")} <b>{scopeLabel}</b> {tr("· deal dihitung pada bulan ditutup (Won: Tgl PO, Lose: tanggal pindah status)")}
         </span>
@@ -101,6 +113,8 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
           </div>
         </div>
       </div>
+
+      <RfqCompare dengan={cmp.dengan} tanpa={cmp.tanpa} />
 
       {d.units.itemBased > 0 && (
         <div className="field-note" style={{ margin: '10px 0 0' }}>
@@ -320,5 +334,52 @@ export function QcdDashboard({ cabangList, year, scopeLabel, returnTo = 'qcdReca
         </>
       )}
     </>
+  );
+}
+
+/** Perbandingan deal dengan RFQ terjawab vs tanpa RFQ (berdampingan). */
+function RfqCompare({ dengan, tanpa }: { dengan: QcdData; tanpa: QcdData }) {
+  const tr = useT();
+  if (!dengan.won && !dengan.lost) return null;
+  const pctKalah = (x: QcdData, key: string) => {
+    const dim = x.dims.find((d) => d.key === key);
+    if (!dim) return '-';
+    const n = dim.lost.unggul + dim.lost.setara + dim.lost.kalah;
+    return n ? `${Math.round((dim.lost.kalah / n) * 100)}%` : '-';
+  };
+  const topLost = (x: QcdData) => [...x.faktor].sort((a, b) => b.lost - a.lost)[0]?.label || '-';
+  const col = (x: QcdData) => [
+    `${x.won} / ${x.lost}`,
+    x.winRate == null ? '-' : `${x.winRate}%`,
+    pctKalah(x, 'quality'),
+    pctKalah(x, 'cost'),
+    pctKalah(x, 'delivery'),
+    topLost(x),
+    x.kompetitor[0]?.name || '-',
+  ];
+  const a = col(dengan);
+  const b = col(tanpa);
+  const rows = [tr('Menang / kalah'), tr('Win rate'), tr('Kalah di Quality (dari deal kalah)'), tr('Kalah di Cost'), tr('Kalah di Delivery'), tr('Faktor utama kalah'), tr('Kompetitor terbanyak')];
+  return (
+    <div className="qr-cmp">
+      <div className="qr-cmp-head">
+        <b>{tr("Dengan RFQ vs tanpa RFQ")}</b>
+        <span className="field-note" style={{ margin: 0 }}>{tr("Dengan RFQ = harga dari Purchasing sudah dijawab. RFQ draft / batal / belum dijawab / No Quote dihitung tanpa RFQ.")}</span>
+      </div>
+      <table className="simple-table" style={{ minWidth: 0 }}>
+        <thead>
+          <tr><th></th><th>{tr("Dengan RFQ")}</th><th>{tr("Tanpa RFQ")}</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r}>
+              <td>{r}</td>
+              <td className={i === 1 ? 'mono qr-strong' : 'mono'}>{a[i]}</td>
+              <td className={i === 1 ? 'mono qr-strong' : 'mono'}>{b[i]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

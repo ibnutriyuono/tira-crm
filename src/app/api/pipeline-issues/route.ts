@@ -5,7 +5,10 @@ import { prospectScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { guard } from '@/lib/permissions-server';
-import { SARAN_META, issueCatLabel, issueInputError, urgensiLabel, type PipelineIssue } from '@/lib/issues';
+import { PURCH_ISSUE_CATS, SARAN_META, issueCatLabel, issueInputError, urgensiLabel, type PipelineIssue } from '@/lib/issues';
+import { isPurchasingRole } from '@/lib/auth';
+import { itemsHaveLine } from '@/lib/doc-lines';
+import type { SafeUser } from '@/lib/types';
 import { bmsOf, canPropose, canReport, cleanPjIds, existingUserIds, issueScopeWhere, issueSnapshot, notifyIssue, pjText, postSystemMessage, salesOf } from '@/lib/issues-server';
 
 /**
@@ -49,6 +52,7 @@ export async function POST(req: Request) {
   if (denied) return denied;
   const b = ((await req.json().catch(() => null)) || {}) as Record<string, unknown>;
   const mode = String(b.mode || '');
+  if (mode === 'purch') return purchReport(user, b);
   if (!['lapor', 'usulan', 'abaikan'].includes(mode)) return NextResponse.json({ error: 'Mode tidak valid' }, { status: 400 });
 
   const prospect = await prisma.prospect.findFirst({ where: { AND: [prospectScopeWhere(user), { id: String(b.prospectId || '') }] } });
@@ -104,5 +108,91 @@ export async function POST(req: Request) {
     await notifyIssue(issue, await bmsOf(p.cabang), user, 'issue_proposed', `⚑ Usulan masalah dari ${user.name}: ${p.customer}`, `${cat}. ${issue.keterangan}`);
   }
   await logActivity({ user, action: 'create', entity: 'prospect', entityId: p.id, summary: `${mode === 'lapor' ? 'Melaporkan' : 'Mengajukan'} masalah pipeline "${cat}" untuk ${p.customer}` });
+  return NextResponse.json({ issue }, { status: 201 });
+}
+
+/**
+ * mode "purch" — Purchasing melaporkan masalah dari detail RFQ / FUP A atau
+ * item PO Indent. Masuk sebagai USULAN ke BM cabang dokumen (BM menunjuk PJ
+ * atau menolak); Sales pemilik prospek diberi tahu. RFQ tanpa prospek tetap
+ * masuk ke BM cabang pengirim, diskusinya di thread RFQ.
+ */
+async function purchReport(user: SafeUser, b: Record<string, unknown>) {
+  if (!isPurchasingRole(user.role) && user.role !== 'admin') return NextResponse.json({ error: 'Hanya Purchasing.' }, { status: 403 });
+  const kategori = String(b.kategori || '');
+  if (!PURCH_ISSUE_CATS.some((c) => c.key === kategori)) return NextResponse.json({ error: 'Pilih kategori masalah.' }, { status: 400 });
+  const ket = String(b.keterangan || '').trim();
+  if (ket.length < 10) return NextResponse.json({ error: 'Isi uraian masalah (min. 10 karakter).' }, { status: 400 });
+  const solusi = String(b.solusi || '').trim().slice(0, 500);
+  const itemsTxt = (Array.isArray(b.items) ? b.items : []).map((x) => String(x).trim()).filter(Boolean).slice(0, 20);
+  const urgensi = ['tinggi', 'sedang', 'rendah'].includes(String(b.urgensi)) ? String(b.urgensi) : 'sedang';
+
+  let docJenis: 'rfq' | 'fupa' | 'po' = 'rfq';
+  let docId = '';
+  let noDoc = '';
+  let cabang: string | null = null;
+  let customer = '';
+  let prospectId: string | null = null;
+  if (b.rfqId) {
+    const d = await prisma.rfq.findUnique({ where: { id: String(b.rfqId) } });
+    if (!d) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
+    if (user.role === 'purchasing05' && !itemsHaveLine(d.items)) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
+    docJenis = 'rfq';
+    docId = d.id;
+    noDoc = d.noRfq || 'RFQ';
+    cabang = d.cabang;
+    customer = d.customer || '';
+    prospectId = d.prospectId;
+  } else if (b.fupaId) {
+    const d = await prisma.fupa.findUnique({ where: { id: String(b.fupaId) } });
+    if (!d) return NextResponse.json({ error: 'FUP A tidak ditemukan' }, { status: 404 });
+    if (user.role === 'purchasing05' && !itemsHaveLine(d.items)) return NextResponse.json({ error: 'FUP A tidak ditemukan' }, { status: 404 });
+    docJenis = 'fupa';
+    docId = d.id;
+    noDoc = d.noFupa || 'FUP A';
+    cabang = d.cabang;
+    customer = d.customer || '';
+    prospectId = d.prospectId;
+  } else if (b.prospectId) {
+    docJenis = 'po';
+    prospectId = String(b.prospectId);
+  } else return NextResponse.json({ error: 'Dokumen wajib.' }, { status: 400 });
+
+  const p = prospectId ? await prisma.prospect.findUnique({ where: { id: prospectId } }) : null;
+  if (docJenis === 'po') {
+    if (!p) return NextResponse.json({ error: 'PO tidak ditemukan' }, { status: 404 });
+    docId = p.id;
+    noDoc = p.noPo || 'PO';
+  }
+  const active = p ? await prisma.prospectIssue.findFirst({ where: { prospectId: p.id, status: { in: ['usulan', 'open', 'proses'] } } }) : null;
+  if (active) return NextResponse.json({ error: 'Prospek ini sudah punya masalah aktif — lanjutkan lewat diskusi masalah itu.', issueId: active.id }, { status: 409 });
+  const snap = p
+    ? issueSnapshot(p as unknown as { id: string; se: string | null; cabang: string | null; reg: number | null; customer: string; status: number })
+    : { prospectId: `doc:${docJenis}:${docId}`, se: null, cabang, reg: null, customer: customer || noDoc };
+  if (!snap.cabang) return NextResponse.json({ error: 'Cabang dokumen tidak diketahui — tidak ada BM tujuan.' }, { status: 400 });
+
+  const keterangan = [`[${noDoc}] ${ket}`, itemsTxt.length ? `Item: ${itemsTxt.join('; ')}` : '', solusi ? `Usulan solusi: ${solusi}` : ''].filter(Boolean).join('\n').slice(0, 2000);
+  const issue = (await prisma.prospectIssue.create({
+    data: {
+      ...snap,
+      status: 'usulan',
+      kategori,
+      urgensi,
+      keterangan,
+      pjIds: [],
+      diajukanOleh: user.id,
+      diajukanNama: user.name,
+      sumber: 'purchasing',
+      docJenis,
+      docId,
+      noDoc,
+    },
+  })) as unknown as PipelineIssue;
+  emitCrmEvent('issue:updated', issue);
+  const cat = issueCatLabel(kategori);
+  await postSystemMessage(issue.prospectId, `⚑ Purchasing (${user.name}) melaporkan masalah ${noDoc}: ${cat}. ${ket}`);
+  await notifyIssue(issue, await bmsOf(snap.cabang), user, 'issue_proposed', `⚑ Laporan Purchasing: ${snap.customer}`, `${noDoc} · ${cat}. ${ket}`);
+  if (snap.se) await notifyIssue(issue, await salesOf(snap.se), user, 'issue_update', `⚑ Purchasing melaporkan masalah: ${snap.customer}`, `${noDoc} · ${cat}. ${ket}`);
+  await logActivity({ user, action: 'create', entity: docJenis === 'po' ? 'prospect' : docJenis, entityId: docId, summary: `Purchasing melaporkan masalah "${cat}" pada ${noDoc}` });
   return NextResponse.json({ issue }, { status: 201 });
 }

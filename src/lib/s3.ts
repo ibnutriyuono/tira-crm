@@ -40,7 +40,7 @@ function s3() {
  * together in the console, and prefixed with a UUID so two uploads of the same
  * filename never collide.
  */
-export function buildKey(entity: 'rfq' | 'fupa' | 'trip' | 'prospect', entityId: string, filename: string) {
+export function buildKey(entity: 'rfq' | 'fupa' | 'trip' | 'prospect' | 'vendor', entityId: string, filename: string) {
   const safe = filename.replace(/[^\w.\- ]+/g, '_').slice(-120);
   return `${prefix}/${entity}/${entityId}/${randomUUID()}-${safe}`;
 }
@@ -67,4 +67,11 @@ export async function presignGet(key: string, filename?: string, expiresIn = 300
 
 export async function deleteObject(key: string) {
   await s3().send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+}
+
+/** Isi satu objek sebagai Buffer (lampiran email, mis. gambar kerja ke vendor). */
+export async function getObjectBuffer(key: string): Promise<Buffer> {
+  const res = await s3().send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const bytes = await res.Body?.transformToByteArray();
+  return Buffer.from(bytes || []);
 }

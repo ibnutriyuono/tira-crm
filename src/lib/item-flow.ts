@@ -54,7 +54,7 @@ export interface FlowItem {
   qcd: ItemQcd | null;
 }
 
-export type EventType = 'tawar' | 'revisi' | 'po' | 'nopo' | 'kirim';
+export type EventType = 'tawar' | 'revisi' | 'po' | 'nopo' | 'kirim' | 'kirim-batal' | 'koreksi';
 
 export const EVENT_META: Record<EventType, { label: string; color: string }> = {
   tawar: { label: 'Penawaran', color: 'steel' },
@@ -62,6 +62,10 @@ export const EVENT_META: Record<EventType, { label: string; color: string }> = {
   po: { label: 'PO', color: 'amber' },
   nopo: { label: 'Tidak di-PO', color: 'rust' },
   kirim: { label: 'Kirim', color: 'green' },
+  /** Catatan kirim yang dibatalkan (baris aslinya tetap ada, dicoret). */
+  'kirim-batal': { label: 'Kirim · dibatalkan', color: 'slate' },
+  /** Koreksi / pembatalan catatan pengiriman, dengan alasan. */
+  koreksi: { label: 'Koreksi kirim', color: 'rust' },
 };
 
 export interface ItemEventLine {

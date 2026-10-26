@@ -1,3 +1,5 @@
+import { docForRole, normalizeHppItems } from '@/lib/rfq-price';
+import { docScopeWhere } from '@/lib/auth';
 import { normalizeItemLines } from '@/lib/format';
 import { logRfqAnswer } from '@/lib/purchasing-activity';
 import { NextResponse } from 'next/server';
@@ -11,6 +13,18 @@ import { notify, purchasingUserIds, requesterUserIds } from '@/lib/notify';
 import type { Prisma } from '@prisma/client';
 import type { RfqItem } from '@/lib/types';
 import { guard } from '@/lib/permissions-server';
+
+/** Satu RFQ (versi sesuai role) — dipakai client ber-hak saat event socket membawa versi tanpa HPP. */
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  if (isResponse(user)) return user;
+  const denied = await guard(user, 'rfq', 'v');
+  if (denied) return denied;
+  const { id } = await params;
+  const rfq = await prisma.rfq.findFirst({ where: { AND: [{ id }, await docScopeWhere(user)] } });
+  if (!rfq) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
+  return NextResponse.json({ rfq: docForRole(rfq, user.role) });
+}
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -87,7 +101,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       message: `${rfq.noRfq || '(tanpa nomor)'} dari ${rfq.cabang || '-'} — ${rfq.customer || '-'}`,
     });
   }
-  return NextResponse.json({ rfq });
+  return NextResponse.json({ rfq: docForRole(rfq, user.role) });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -114,7 +128,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (prev.openedByPurchasingAt) return NextResponse.json({ ok: true });
     const rfq = await prisma.rfq.update({ where: { id }, data: { openedByPurchasingAt: new Date() } });
     emitCrmEvent('rfq:updated', rfq);
-    return NextResponse.json({ rfq });
+    return NextResponse.json({ rfq: docForRole(rfq, user.role) });
   }
 
   // "No Quote" — the one Purchasing stage that is set by hand.
@@ -131,7 +145,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       entityId: id,
       summary: `${body.noQuote ? 'Menandai' : 'Membatalkan tanda'} No Quote pada RFQ ${rfq.noRfq || '(tanpa nomor)'}`,
     });
-    return NextResponse.json({ rfq });
+    return NextResponse.json({ rfq: docForRole(rfq, user.role) });
   }
 
   // Purchasing fills the per-material answer onto the RFQ's items and sends it back
@@ -143,7 +157,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const prev = await prisma.rfq.findUnique({ where: { id } });
     if (!prev) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
 
-    const items = Array.isArray(body?.items) ? normalizeItemLines(body.items as RfqItem[]) : ((prev.items as unknown as RfqItem[]) ?? []);
+    // HPP × kurs × (1 + margin%) → harga jual dihitung ulang di server (lib/rfq-price.ts).
+    const items = Array.isArray(body?.items) ? normalizeHppItems(normalizeItemLines(body.items as RfqItem[])) : ((prev.items as unknown as RfqItem[]) ?? []);
 
     if (body.action === 'send-jawaban') {
       // An answer counts as given once a material is resolved either way —
@@ -189,7 +204,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         message: `${rfq.noRfq || '(tanpa nomor)'} untuk "${rfq.customer || '-'}" sudah dijawab`,
       });
     }
-    return NextResponse.json({ rfq });
+    return NextResponse.json({ rfq: docForRole(rfq, user.role) });
   }
 
   // Purchasing-side status ladder, gated separately from the sales status.
@@ -208,7 +223,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       summary: `Mengubah status pembelian RFQ ${rfq.noRfq || '(tanpa nomor)'}`,
       changes: prev ? diffFields(prev, rfq, RFQ_FIELD_LABELS) : null,
     });
-    return NextResponse.json({ rfq });
+    return NextResponse.json({ rfq: docForRole(rfq, user.role) });
   }
 
   if (typeof body?.status !== 'string') return NextResponse.json({ error: 'Tidak ada perubahan' }, { status: 400 });
@@ -234,7 +249,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       message: `${rfq.noRfq || '(tanpa nomor)'} untuk "${rfq.customer || '-'}"`,
     });
   }
-  return NextResponse.json({ rfq });
+  return NextResponse.json({ rfq: docForRole(rfq, user.role) });
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {

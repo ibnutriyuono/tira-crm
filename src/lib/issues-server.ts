@@ -15,7 +15,7 @@ export function issueScopeWhere(user: SafeUser): Record<string, unknown> {
   if (user.role === 'sales') return { OR: [{ se: { equals: user.se || '__none__', mode: 'insensitive' } }, mine] };
   if (isBranchRole(user.role)) return { OR: [{ cabang: { equals: user.cabang || '__none__', mode: 'insensitive' } }, mine] };
   if (user.role === 'rm') return { OR: [{ reg: user.reg ?? -1 }, mine] };
-  if (user.role === 'purchasing05') return mine;
+  if (user.role === 'purchasing05') return { OR: [mine, { diajukanOleh: user.id }] };
   return {}; // gm, admin, purchasing
 }
 
@@ -64,8 +64,9 @@ export const bmsOf = (cabang: string | null) => (cabang ? ids({ role: 'bm', caba
 /** Catatan otomatis di thread Diskusi kartu prospek (thread yang sama dengan Purchasing). */
 export async function postSystemMessage(prospectId: string, text: string): Promise<void> {
   try {
+    const m = /^doc:(rfq|fupa):(.+)$/.exec(prospectId || '');
     const message = await prisma.itemMessage.create({
-      data: { entity: 'prospect', entityId: prospectId, author: 'Sistem', authorUsername: 'system', role: 'system', text: text.slice(0, 1000) },
+      data: { entity: m ? m[1] : 'prospect', entityId: m ? m[2] : prospectId, author: 'Sistem', authorUsername: 'system', role: 'system', text: text.slice(0, 1000) },
     });
     emitCrmEvent('itemchat:message', message);
   } catch (err) {

@@ -39,12 +39,17 @@ export interface PipelineIssue {
   hasil: IssueHasil | null;
   alasanTolak: string | null;
   eskalasi: number;
+  /** "purchasing" bila dilaporkan Purchasing; dokumen asal (RFQ / FUP A / PO). */
+  sumber?: string | null;
+  docJenis?: string | null;
+  docId?: string | null;
+  noDoc?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 /** Kategori + role user yang diusulkan otomatis sebagai penanggung jawab. */
-export const ISSUE_CATS: { key: string; label: string; pjRoles: string[] }[] = [
+export const ISSUE_CATS: { key: string; label: string; pjRoles: string[]; purch?: boolean }[] = [
   { key: 'harga', label: 'Harga kalah', pjRoles: ['bm', 'kam'] },
   { key: 'kompetitor', label: 'Kompetitor', pjRoles: ['bm'] },
   { key: 'stok', label: 'Stok / indent / Kerjasama', pjRoles: ['purchasing'] },
@@ -53,7 +58,21 @@ export const ISSUE_CATS: { key: string; label: string; pjRoles: string[] }[] = [
   { key: 'bayar', label: 'Kredit / pembayaran', pjRoles: ['salesadmin'] },
   { key: 'tunda', label: 'Customer menunda', pjRoles: ['sales'] },
   { key: 'internal', label: 'Internal (dokumen / approval)', pjRoles: ['salesadmin'] },
+  // Kategori khusus laporan Purchasing (dari detail RFQ / FUP A / PO Indent).
+  { key: 'p_spek', label: 'Spesifikasi tidak jelas', pjRoles: ['sales'], purch: true },
+  { key: 'p_noquote', label: 'Tidak ada vendor / No Quote', pjRoles: ['bm'], purch: true },
+  { key: 'p_naik', label: 'Harga vendor naik', pjRoles: ['bm'], purch: true },
+  { key: 'p_lead', label: 'Lead time lebih lama', pjRoles: ['purchasing'], purch: true },
+  { key: 'p_telat', label: 'Barang terlambat / rusak', pjRoles: ['purchasing'], purch: true },
+  { key: 'p_stok', label: 'Stok mill kosong', pjRoles: ['purchasing'], purch: true },
 ];
+export const PURCH_ISSUE_CATS = ISSUE_CATS.filter((c) => c.purch);
+
+/** Thread diskusi masalah: kartu prospek, atau dokumen RFQ / FUP A bila tanpa prospek. */
+export function issueChat(i: Pick<PipelineIssue, 'prospectId'>): { entity: 'prospect' | 'rfq' | 'fupa'; id: string } {
+  const m = /^doc:(rfq|fupa):(.+)$/.exec(i.prospectId || '');
+  return m ? { entity: m[1] as 'rfq' | 'fupa', id: m[2] } : { entity: 'prospect', id: i.prospectId };
+}
 export const ISSUE_CAT_KEYS = ISSUE_CATS.map((c) => c.key);
 export const issueCatLabel = (k: string) => ISSUE_CATS.find((c) => c.key === k)?.label || k;
 

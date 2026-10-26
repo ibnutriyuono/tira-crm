@@ -16,6 +16,8 @@ import { QcdModal } from './modals/QcdModal';
 import { FollowUpModal } from './modals/FollowUpModal';
 import { DeleteConfirmModal } from './modals/DeleteConfirmModal';
 import { QuotationModal } from './modals/QuotationModal';
+import { MailComposeModal } from './modals/MailComposeModal';
+import { VisitTasksModal } from './modals/VisitTasksModal';
 import { RfqModal } from './modals/RfqModal';
 import { RfqManageModal } from './modals/RfqManageModal';
 import { UsersModal } from './modals/UsersModal';
@@ -171,6 +173,8 @@ export function CrmApp() {
       <RfqModal />
       <QcdModal />
       <QuotationModal />
+      <MailComposeModal />
+      <VisitTasksModal />
       <ActivityLogModal />
       <AccountModal />
       <ToastHost />

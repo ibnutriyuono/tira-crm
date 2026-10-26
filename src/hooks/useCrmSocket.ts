@@ -1,5 +1,7 @@
 'use client';
+import { canSeeHpp } from '@/lib/roles';
 
+import { canSeeVendors } from '@/lib/roles';
 import { isPurchasingRoleClient } from '@/lib/doc-lines';
 import { useEffect } from 'react';
 import { getSocket } from '@/lib/socket-client';
@@ -92,10 +94,16 @@ export function useCrmSocket() {
 
     // Compare against the copy already in the store to spot the transitions
     // worth announcing; the update itself happens either way.
-    const onRfqUpsert = (r: Rfq) => {
+    const onRfqUpsert = (r: Rfq & { hppHidden?: boolean }) => {
       if (!allowedInStore('doc', r)) return useDataStore.getState().removeRfq(r.id);
       const prev = useDataStore.getState().rfqs.find((x) => x.id === r.id);
-      useDataStore.getState().upsertRfq(r);
+      // Event socket selalu tanpa HPP / margin / catatan internal; role ber-hak mengambil versi lengkap.
+      if (r.hppHidden && canSeeHpp(useDataStore.getState().currentUser?.role)) {
+        api
+          .get<{ rfq: Rfq }>(`/api/rfqs/${r.id}`)
+          .then((x) => useDataStore.getState().upsertRfq(x.rfq))
+          .catch(() => useDataStore.getState().upsertRfq(r));
+      } else useDataStore.getState().upsertRfq(r);
       if (!prev || !isOwnedByCurrentUser(r.requestedBy)) return;
       const noDoc = r.noRfq || '(tanpa nomor)';
       if (!prev.jawabanRfqDikirim && r.jawabanRfqDikirim) {
@@ -106,10 +114,15 @@ export function useCrmSocket() {
     };
     const onRfqDelete = ({ id }: { id: string }) => useDataStore.getState().removeRfq(id);
 
-    const onFupaUpsert = (f: Fupa) => {
+    const onFupaUpsert = (f: Fupa & { hppHidden?: boolean }) => {
       if (!allowedInStore('doc', f)) return useDataStore.getState().removeFupa(f.id);
       const prev = useDataStore.getState().fupas.find((x) => x.id === f.id);
-      useDataStore.getState().upsertFupa(f);
+      if (f.hppHidden && canSeeHpp(useDataStore.getState().currentUser?.role)) {
+        api
+          .get<{ fupa: Fupa }>(`/api/fupas/${f.id}`)
+          .then((x) => useDataStore.getState().upsertFupa(x.fupa))
+          .catch(() => useDataStore.getState().upsertFupa(f));
+      } else useDataStore.getState().upsertFupa(f);
       if (!prev || !isOwnedByCurrentUser(f.requestedBy)) return;
       const noDoc = f.noFupa || '(tanpa nomor)';
       if (!prev.jawabanFupaDikirim && f.jawabanFupaDikirim) {
@@ -240,9 +253,11 @@ export function useCrmSocket() {
     const onGroupBulk = () => {
       api.get<{ groups: CustomerGroup[] }>('/api/customer-groups').then((r) => useDataStore.getState().setCustomerGroups(r.groups)).catch(() => {});
     };
-    const onVendorUpsert = (v: Vendor) => useDataStore.getState().upsertVendor(v);
+    // Vendor list is Purchasing data: other roles ignore live vendor events.
+    const vendorsAllowed = () => canSeeVendors(useDataStore.getState().currentUser?.role);
+    const onVendorUpsert = (v: Vendor) => vendorsAllowed() && useDataStore.getState().upsertVendor(v);
     const onVendorDelete = ({ id }: { id: string }) => useDataStore.getState().removeVendor(id);
-    const onVendorBulk = () => useDataStore.getState().refetchVendors();
+    const onVendorBulk = () => vendorsAllowed() && useDataStore.getState().refetchVendors();
 
     const onUserUpsert = (u: SafeUser) => useDataStore.getState().upsertUser(u);
     const onUserDelete = ({ id }: { id: string }) => useDataStore.getState().removeUser(id);

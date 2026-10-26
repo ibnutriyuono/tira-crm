@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { syncCustomerPics } from '@/lib/customer-sync';
 import { guard } from '@/lib/permissions-server';
 import { parseActivityExtras, syncActivityFollowUp } from '@/lib/activity-contact-server';
+import { completeTasksFromActivity } from '@/lib/visit-task-server';
 
 export async function GET(req: Request) {
   const user = await requireUser();
@@ -78,5 +79,7 @@ export async function POST(req: Request) {
     summary: `Mengisi aktivitas ${tipe} ke "${customer}" (${tanggal})`,
   });
   await syncCustomerPics(user, [{ customer, pics: picRes.pics, cabang }], 'Aktivitas Harian');
-  return NextResponse.json({ activity: { ...activity, followUpId }, followUpCreated: !!followUpId }, { status: 201 });
+  // Kunjungan ke customer yang sedang ditugaskan → tugas kunjungan otomatis dilaporkan.
+  const tasksDone = await completeTasksFromActivity(activity, user).catch(() => 0);
+  return NextResponse.json({ activity: { ...activity, followUpId }, followUpCreated: !!followUpId, tasksDone }, { status: 201 });
 }

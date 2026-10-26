@@ -43,6 +43,8 @@ export type ModalKey =
   | 'visitTrip'
   | 'itemFlow'
   | 'account'
+  | 'mailCompose'
+  | 'visitTasks'
   | null;
 
 export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq' | 'vendor' | 'fupa';
@@ -133,6 +135,8 @@ interface UiState {
   // modal / context state
   modal: ModalKey;
   editProspectId: string | null;
+  /** Form prospek dibuka dari tombol "Buat Penawaran": tahap Penawaran Harga, lalu surat langsung terbuka. */
+  prospectFormQuote: boolean;
   deleteCtx: DeleteCtx | null;
   cancelDocCtx: CancelDocCtx | null;
   followUpCtx: FollowUpCtx | null;
@@ -164,6 +168,10 @@ interface UiState {
   qcdCtx: QcdCtx | null;
   /** Status Item & Riwayat of one prospect; `mode` opens a form straight away (after a move into PO / DO). */
   itemFlowCtx: ItemFlowCtx | null;
+  /** Purchasing board: buka tab tertentu (cth. 'indent' dari notifikasi target kedatangan). */
+  purchTabFocus: string | null;
+  /** Tugas Kunjungan: sorot satu tugas / rencana mingguan (dari notifikasi). */
+  visitFocus: { kind: 'task' | 'plan'; id: string } | null;
   importTarget: 'prospect' | 'customer' | 'vendor';
   /** Staged QCD answers for a prospect still being created/edited in the form modal — committed together on Save. */
   pendingProspectQCD: PendingQcd;
@@ -230,6 +238,7 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   modal: null,
   editProspectId: null,
+  prospectFormQuote: false,
   deleteCtx: null,
   cancelDocCtx: null,
   followUpCtx: null,
@@ -250,6 +259,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   visitTripOpenId: null,
   qcdCtx: null,
   itemFlowCtx: null,
+  purchTabFocus: null,
+  visitFocus: null,
   importTarget: 'prospect',
   pendingProspectQCD: { ...EMPTY_QCD },
 

@@ -391,6 +391,30 @@ model Vendor {
   kategori  String?
   alamat    String?
   catatan    String?
+  /// Profil vendor (phase49): mill | distributor | fabrikasi | ekspedisi | lainnya.
+  tipe       String?
+  /// lokal | impor
+  asal       String?
+  negara     String?
+  mataUang   String?
+  incoterm   String?
+  /// Tag produk / grade yang dipasok, cth. ["Creusabro 8000","SS 316L"].
+  produk     Json     @default("[]")
+  /// Rentang tebal (mm) yang biasa dipasok.
+  tebalMin   Float?
+  tebalMax   Float?
+  moq        String?
+  leadTime   String?
+  syaratBayar String?
+  /// Kontak tambahan: [{ nama, jabatan, wa, email }].
+  pics       Json     @default("[]")
+  /// Approved Vendor List: aktif | evaluasi | diblokir (diblokir perlu GM).
+  statusAvl  String   @default("aktif")
+  statusAlasan String?
+  statusOleh String?
+  statusAt   DateTime?
+  /// Dokumen vendor: [{ id, jenis, nomor, berlaku, catatan, attachmentId? }].
+  dokumen    Json     @default("[]")
   quotations Quotation[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -469,6 +493,19 @@ model Quotation {
   catatan     String?
   isWinner    Boolean  @default(false)
   requestedBy String?
+  /// Minta harga ke vendor (phase49): menunggu | dibalas | noquote.
+  status      String   @default("menunggu")
+  /// Tenggat balas vendor (YYYY-MM-DD).
+  tenggat     String?
+  /// Harga per item dari vendor: [{ idx, harga, currency, leadTime, note, noQuote }].
+  items       Json     @default("[]")
+  currency    String?
+  sentAt      DateTime?
+  reminders   Int      @default(0)
+  lastReminderAt DateTime?
+  balasAt     DateTime?
+  /// Token tautan unduh lampiran untuk WhatsApp (tanpa login).
+  token       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -676,6 +713,8 @@ model Attachment {
   fupaId     String?
   /// Gambar kerja Line 05 yang dilampirkan di Edit Prospek; ikut terlihat di RFQ / FUP A dari prospek itu.
   prospectId String?
+  /// Dokumen vendor (MTC, ISO, NPWP, kontrak, price list).
+  vendorId   String?
   name       String
   type       String?
   size       Int      @default(0)
@@ -686,6 +725,7 @@ model Attachment {
   @@index([rfqId])
   @@index([fupaId])
   @@index([prospectId])
+  @@index([vendorId])
 }
 
 // Small key/value bag for app-wide settings — currently just the
@@ -843,9 +883,80 @@ model ProspectIssue {
   alasanTolak    String?
   /// 0 = belum, 1 = sudah ke RM, 2 = sudah ke GM
   eskalasi       Int       @default(0)
+  /// Laporan dari Purchasing (phase49): sumber "purchasing" + dokumen asal.
+  /// RFQ tanpa prospek: prospectId = "doc:rfq:<id>" (lihat lib/issues.ts issueChat).
+  sumber         String?
+  docJenis       String?
+  docId          String?
+  noDoc          String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   @@index([prospectId, status])
   @@index([status, cabang])
+}
+
+/// Tugas Kunjungan (phase49): BM / GM menugaskan Sales mengunjungi customer.
+/// Status: ditugaskan → dilaporkan (atau jadwal_ulang / dibatalkan);
+/// "terlambat" dihitung dari dueDate. Laporan = SalesActivity kunjungan.
+model VisitTask {
+  id             String    @id @default(cuid())
+  customer       String
+  customerId     String?
+  prospectId     String?
+  /// Sales yang ditugaskan.
+  assigneeId     String
+  assigneeName   String
+  se             String?
+  cabang         String?
+  reg            Int?
+  assignedById   String
+  assignedByName String
+  assignedByRole String
+  tujuan         String
+  catatan        String?
+  dueDate        String
+  status         String    @default("ditugaskan")
+  /// Riwayat jadwal ulang: [{ at, from, to, alasan, by }].
+  reschedules    Json      @default("[]")
+  activityId     String?
+  hasil          String?
+  reportedAt     DateTime?
+  cancelReason   String?
+  /// Asal saran otomatis (dingin | kam | prospek | masalah) bila dibuat dari saran.
+  saran          String?
+  /// Rencana mingguan asal (bila tugas berasal dari rencana yang disetujui).
+  planId         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([assigneeId, status])
+  @@index([cabang, status])
+  @@index([dueDate])
+}
+
+/// Rencana kunjungan mingguan Sales yang disetujui BM (phase49).
+model VisitPlan {
+  id           String    @id @default(cuid())
+  userId       String
+  userName     String
+  se           String?
+  cabang       String?
+  reg          Int?
+  /// Senin minggu itu (YYYY-MM-DD).
+  weekStart    String
+  /// [{ id, date, customer, customerId?, prospectId?, tujuan }]
+  items        Json      @default("[]")
+  /// draft | diajukan | disetujui | ditolak
+  status       String    @default("draft")
+  submittedAt  DateTime?
+  reviewedById String?
+  reviewedByName String?
+  reviewedAt   DateTime?
+  reviewNote   String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([userId, weekStart])
+  @@index([cabang, weekStart])
 }

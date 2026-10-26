@@ -13,7 +13,8 @@ export function formatRupiah(n: unknown): string {
 
 export function formatDateID(iso?: string | null): string {
   if (!iso) return '-';
-  const d = new Date(iso + 'T00:00:00');
+  // Timestamp penuh (cth. jawabanRfqAt) → tanggal lokal; "YYYY-MM-DD" → tengah malam lokal.
+  const d = /^\d{4}-\d{2}-\d{2}T/.test(iso) ? new Date(iso) : new Date(iso + 'T00:00:00');
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString(localeOf(getLang()), { day: '2-digit', month: 'short', year: 'numeric' });
 }

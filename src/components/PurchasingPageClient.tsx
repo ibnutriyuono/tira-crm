@@ -10,6 +10,8 @@ import { ROLE_LABELS } from '@/lib/constants';
 import { api } from '@/lib/api-client';
 import { ToastHost } from './ToastHost';
 import { CancelDocModal } from './modals/CancelDocModal';
+import { ImportModal } from './modals/ImportModal';
+import { DeleteConfirmModal } from './modals/DeleteConfirmModal';
 import { NotificationsModal } from './modals/NotificationsModal';
 import { AccountModal } from './modals/AccountModal';
 import { SalesActivityModal } from './modals/SalesActivityModal';
@@ -109,6 +111,8 @@ export function PurchasingPageClient() {
         <PurchasingBoard readOnly={!canEdit} standalone />
       </div>
       <CancelDocModal />
+      <ImportModal />
+      <DeleteConfirmModal />
       <NotificationsModal />
       <AccountModal />
       <SalesActivityModal />

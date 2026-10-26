@@ -1,3 +1,4 @@
+import { docForRole } from '@/lib/rfq-price';
 import { normalizeItemLines } from '@/lib/format';
 import type { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
@@ -15,7 +16,7 @@ export async function GET() {
   const denied = await guard(user, 'rfq', 'v');
   if (denied) return denied;
   const fupas = await prisma.fupa.findMany({ where: await docScopeWhere(user, { table: 'fupa' }), orderBy: { createdAt: 'desc' } });
-  return NextResponse.json({ fupas });
+  return NextResponse.json({ fupas: fupas.map((f) => docForRole(f, user.role)) });
 }
 
 export async function POST(req: Request) {
@@ -81,5 +82,5 @@ export async function POST(req: Request) {
       message: `${fupa.noFupa || '(tanpa nomor)'} dari ${fupa.cabang || '-'} — ${fupa.customer || '-'}`,
     });
   }
-  return NextResponse.json({ fupa }, { status: 201 });
+  return NextResponse.json({ fupa: docForRole(fupa, user.role) }, { status: 201 });
 }

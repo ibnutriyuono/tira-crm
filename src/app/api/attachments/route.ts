@@ -8,6 +8,8 @@ import { ATTACHMENT_MAX_BYTES } from '@/lib/constants';
 import { buildKey, isS3Configured, putObject } from '@/lib/s3';
 import { emitCrmEvent } from '@/lib/socket';
 import { guard } from '@/lib/permissions-server';
+import { canSeeVendors } from '@/lib/roles';
+import { canEditPurchasing } from '@/lib/auth';
 
 // Bytes go straight to object storage, so this is generous compared with the
 // prototype's 1.5MB base64 ceiling — but still bounded, since the upload is
@@ -27,6 +29,12 @@ export async function GET(req: Request) {
   const rfqId = searchParams.get('rfqId');
   const fupaId = searchParams.get('fupaId');
   const prospectId = searchParams.get('prospectId');
+  const vendorId = searchParams.get('vendorId');
+  if (vendorId) {
+    if (!canSeeVendors(user.role)) return NextResponse.json({ attachments: [] });
+    const attachments = await prisma.attachment.findMany({ where: { vendorId }, orderBy: { createdAt: 'asc' } });
+    return NextResponse.json({ attachments });
+  }
   if (!rfqId && !fupaId && !prospectId) return NextResponse.json({ error: 'rfqId, fupaId atau prospectId wajib diisi.' }, { status: 400 });
   const denied = await guard(user, prospectId && !rfqId && !fupaId ? 'prospek' : 'rfq', 'v');
   if (denied) return denied;
@@ -81,8 +89,24 @@ export async function POST(req: Request) {
   const rfqId = (form.get('rfqId') as string) || null;
   const fupaId = (form.get('fupaId') as string) || null;
   const prospectId = !rfqId && !fupaId ? (form.get('prospectId') as string) || null : null;
+  const vendorId = !rfqId && !fupaId && !prospectId ? (form.get('vendorId') as string) || null : null;
 
   if (!(file instanceof File)) return NextResponse.json({ error: 'File tidak ditemukan.' }, { status: 400 });
+  // Dokumen vendor: hanya Purchasing / Admin.
+  if (vendorId) {
+    if (!canEditPurchasing(user)) return NextResponse.json({ error: 'Hanya Purchasing yang mengunggah dokumen vendor.' }, { status: 403 });
+    if (!(await prisma.vendor.findUnique({ where: { id: vendorId }, select: { id: true } }))) return NextResponse.json({ error: 'Vendor tidak ditemukan.' }, { status: 404 });
+    if (file.size > MAX_BYTES) return NextResponse.json({ error: `File "${file.name}" melebihi batas ${Math.round(MAX_BYTES / 1024 / 1024)}MB.` }, { status: 413 });
+    const key = buildKey('vendor', vendorId, file.name);
+    try {
+      await putObject(key, Buffer.from(await file.arrayBuffer()), file.type);
+    } catch {
+      return NextResponse.json({ error: 'Gagal mengunggah file ke penyimpanan. Coba lagi.' }, { status: 502 });
+    }
+    const attachment = await prisma.attachment.create({ data: { vendorId, name: file.name, type: file.type || null, size: file.size, key, uploadedBy: user.name } });
+    await logActivity({ user, action: 'create', entity: 'vendor', entityId: vendorId, summary: `Mengunggah dokumen vendor "${file.name}"` });
+    return NextResponse.json({ attachment }, { status: 201 });
+  }
   if (!rfqId && !fupaId && !prospectId) return NextResponse.json({ error: 'rfqId, fupaId atau prospectId wajib diisi.' }, { status: 400 });
   const deniedE = await guard(user, prospectId ? 'prospek' : 'rfq', 'e');
   if (deniedE) return deniedE;

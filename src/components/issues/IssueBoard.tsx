@@ -64,6 +64,8 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
   const purch = variant === 'purchasing';
   const [st, setSt] = useState<StFilter>('aktif');
   const [mine, setMine] = useState(purch);
+  // Halaman Purchasing: ditugaskan ke saya (PJ) / dilaporkan oleh saya / semua.
+  const [pview, setPview] = useState<'pj' | 'lapor' | 'semua'>('pj');
   const [purchCat, setPurchCat] = useState(false);
   const [cat, setCat] = useState('');
   const [cabang, setCabang] = useState('');
@@ -79,6 +81,7 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
       setSelId(i.id);
       setSt(isOpenIssue(i) ? 'aktif' : i.status === 'usulan' ? 'usulan' : 'semua');
       setMine(false);
+      setPview('semua');
       setPurchCat(false);
       setCat('');
     } else {
@@ -102,7 +105,7 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
 
   const list = scoped
     .filter((i) => (st === 'aktif' ? isOpenIssue(i) : st === 'usulan' ? i.status === 'usulan' : st === 'selesai' ? i.status === 'selesai' || i.status === 'ditolak' : true))
-    .filter((i) => !mine || (me && i.pjIds.includes(me.id)))
+    .filter((i) => (purch ? pview === 'semua' || (me && (pview === 'pj' ? i.pjIds.includes(me.id) : i.diajukanOleh === me.id)) : !mine || (me && i.pjIds.includes(me.id))))
     .filter((i) => !purchCat || PURCH_CATS.includes(i.kategori))
     .filter((i) => !cat || i.kategori === cat)
     .sort((a, b) => Number(lewatSla(b, today)) - Number(lewatSla(a, today)) || daysSince(b.dilaporAt || b.createdAt, today) - daysSince(a.dilaporAt || a.createdAt, today));
@@ -169,7 +172,7 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
 
   const chips: [StFilter, string, number][] = [
     ['aktif', 'Aktif', open.length],
-    ...(purch ? [] : ([['usulan', 'Usulan ke BM', usulan.length]] as [StFilter, string, number][])),
+    ['usulan', purch ? 'Menunggu BM' : 'Usulan ke BM', usulan.length],
     ['selesai', 'Selesai / ditolak', scoped.filter((i) => i.status === 'selesai' || i.status === 'ditolak').length],
     ['semua', 'Semua', scoped.length],
   ];
@@ -231,7 +234,17 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
             </button>
           ))}
         </div>
-        <label className="issue-check"><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> {tr("Ditugaskan ke saya")}</label>
+        {purch ? (
+          <span className="qr-seg" role="group" aria-label={tr("Tampilan")}>
+            {([['pj', 'Ditugaskan ke saya'], ['lapor', 'Dilaporkan oleh saya'], ['semua', 'Semua']] as const).map(([k, l]) => (
+              <button key={k} type="button" className={pview === k ? 'on' : ''} onClick={() => setPview(k)}>
+                {tr(l)} · {real.filter((i) => k === 'semua' || (me && (k === 'pj' ? i.pjIds.includes(me.id) : i.diajukanOleh === me.id))).length}
+              </button>
+            ))}
+          </span>
+        ) : (
+          <label className="issue-check"><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> {tr("Ditugaskan ke saya")}</label>
+        )}
         {purch && <label className="issue-check"><input type="checkbox" checked={purchCat} onChange={(e) => setPurchCat(e.target.checked)} /> {tr("Hanya stok & lead time")}</label>}
         {cat && <button type="button" className="btn btn-outline btn-sm" onClick={() => setCat('')}>{tr("Kategori:")} {issueCatLabel(cat)} ×</button>}
         {!purch && cabangs.length > 1 && (
@@ -256,7 +269,7 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
             return (
               <button key={i.id} type="button" className={`issue-item${i.id === selId ? ' on' : ''}`} onClick={() => { setSelId(i.id); setLapor(null); }}>
                 <div className="r1"><b>{i.customer}</b><span className={`badge ${meta.badge}`}>{meta.label}</span></div>
-                <div className="r2">{issueCatLabel(i.kategori)} · {i.se || '-'} · {i.cabang || '-'} · <span className="mono">{formatRupiah(valueOf(i))}</span></div>
+                <div className="r2">{issueCatLabel(i.kategori)}{i.noDoc ? ` · ${i.noDoc}` : ''} · {i.se || '-'} · {i.cabang || '-'}{!purch && <> · <span className="mono">{formatRupiah(valueOf(i))}</span></>}</div>
                 <div className="r3">
                   <span>{tr("PJ:")} {i.pjIds.length ? i.pjIds.map((id, k) => `${nameOf(roster, id)}${k === 0 && i.pjIds.length > 1 ? '*' : ''}`).join(', ') : i.status === 'usulan' ? `menunggu BM (dari ${i.diajukanNama || 'Sales'})` : '-'}</span>
                   <span className={late ? 'late' : ''}>{issueAgeText(i, today)}{i.eskalasi ? ` · ↑ ${i.eskalasi >= 2 ? 'RM & GM' : 'BM'}` : ''}</span>

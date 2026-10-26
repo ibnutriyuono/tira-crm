@@ -10,6 +10,7 @@ import { localToday } from '@/lib/sales-activity';
 import {
   HASIL_META,
   ISSUE_CATS,
+  issueChat,
   ISSUE_STATUS_META,
   URGENSI,
   daysSince,
@@ -227,7 +228,7 @@ export function IssueForm({ mode, prospect, issue, kategoriAwal, saran, onDone, 
       </div>
       <label>{tr("Kategori masalah *")}</label>
       <div className="sa-pills">
-        {ISSUE_CATS.map((c) => (
+        {ISSUE_CATS.filter((c) => !c.purch || c.key === kategori).map((c) => (
           <button key={c.key} type="button" className={kategori === c.key ? 'on' : ''} aria-pressed={kategori === c.key} onClick={() => pickKategori(c.key)}>
             {c.label}
           </button>
@@ -286,7 +287,10 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
   const tr = useT();
   const roster = useRoster();
   const me = useDataStore((s) => s.currentUser);
-  const prospect = useDataStore((s) => s.prospects.find((p) => p.id === issue.prospectId)) || null;
+  const realProspect = useDataStore((s) => s.prospects.find((p) => p.id === issue.prospectId)) || null;
+  // Laporan Purchasing atas RFQ tanpa prospek: kartu pengganti (hanya untuk tampilan & proses usulan).
+  const chat = issueChat(issue);
+  const prospect = realProspect || (chat.entity !== 'prospect' ? ({ id: issue.prospectId, customer: issue.customer, value: 0, se: issue.se, cabang: issue.cabang, status: 2, uraian: '' } as unknown as Prospect) : null);
   const rfqs = useDataStore((s) => s.rfqs);
   const fupas = useDataStore((s) => s.fupas);
   const toast = useDataStore((s) => s.toast);
@@ -297,13 +301,13 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
   const [terima, setTerima] = useState(false);
   const canE = useCan('masalah', 'e');
 
-  const docs = useMemo(
-    () => [
-      ...rfqs.filter((r) => r.prospectId === issue.prospectId).map((r) => ({ kind: 'RFQ' as const, id: r.id, no: r.noRfq || 'RFQ' })),
-      ...fupas.filter((f) => f.prospectId === issue.prospectId).map((f) => ({ kind: 'FUPA' as const, id: f.id, no: f.noFupa || 'FUP A' })),
-    ],
-    [rfqs, fupas, issue.prospectId],
-  );
+  const docs = useMemo(() => {
+    const list = [
+      ...rfqs.filter((r) => r.prospectId === issue.prospectId || (issue.docJenis === 'rfq' && r.id === issue.docId)).map((r) => ({ kind: 'RFQ' as const, id: r.id, no: r.noRfq || 'RFQ' })),
+      ...fupas.filter((f) => f.prospectId === issue.prospectId || (issue.docJenis === 'fupa' && f.id === issue.docId)).map((f) => ({ kind: 'FUPA' as const, id: f.id, no: f.noFupa || 'FUP A' })),
+    ];
+    return list.filter((d, i) => list.findIndex((x) => x.id === d.id) === i);
+  }, [rfqs, fupas, issue.prospectId, issue.docJenis, issue.docId]);
   const isBm = !!me && (me.role === 'admin' || (me.role === 'bm' && up(me.cabang) === up(issue.cabang)));
   const isPj = !!me && issue.pjIds.includes(me.id);
   const canHandle = canE && (isPj || isBm);
@@ -330,13 +334,17 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
         <div className="issue-detail-head">
           <div>
             <div className="kam-title" style={{ fontSize: 22 }}>{issue.customer}</div>
-            <div className="field-note" style={{ margin: 0 }}>{tr("Prospek · hanya baca")}{prospect?.uraian ? ` · ${prospect.uraian}` : ''}</div>
+            <div className="field-note" style={{ margin: 0 }}>
+              {realProspect ? tr("Prospek · hanya baca") : tr("Dokumen tanpa prospek")}
+              {realProspect?.uraian ? ` · ${realProspect.uraian}` : ''}
+              {issue.sumber === 'purchasing' && <span className="badge violet" style={{ marginLeft: 6 }}>{tr("Laporan Purchasing")} · {issue.noDoc}</span>}
+            </div>
           </div>
           <span className={`badge ${st.badge}`}>{st.label}</span>
         </div>
         <div className="issue-facts">
-          <div><span className="kam-role">{tr("NILAI PROSPEK")}</span><b className="mono">{prospect ? formatRupiah(Number(prospect.value) || 0) : '-'}</b></div>
-          <div><span className="kam-role">TAHAP</span><b>{prospect ? stageLabel(prospect.status) : '-'}</b></div>
+          <div><span className="kam-role">{tr("NILAI PROSPEK")}</span><b className="mono">{realProspect ? formatRupiah(Number(realProspect.value) || 0) : '-'}</b></div>
+          <div><span className="kam-role">TAHAP</span><b>{realProspect ? stageLabel(realProspect.status) : '-'}</b></div>
           <div><span className="kam-role">{tr("SALES · CABANG")}</span><b>{issue.se || '-'} · {issue.cabang || '-'}</b></div>
           <div><span className="kam-role">{tr("TARGET SELESAI")}</span><b>{issue.targetDate || '-'}</b></div>
         </div>
@@ -370,9 +378,9 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
       <div className="issue-card">
         <div className="issue-detail-head" style={{ marginBottom: 6 }}>
           <b>{tr("Diskusi")}</b>
-          <span className="field-note" style={{ margin: 0 }}>{tr("thread yang sama dengan Diskusi di kartu prospek")}</span>
+          <span className="field-note" style={{ margin: 0 }}>{chat.entity === 'prospect' ? tr("thread yang sama dengan Diskusi di kartu prospek") : tr("thread Diskusi dokumen")}</span>
         </div>
-        <ItemChat entity="prospect" entityId={issue.prospectId} />
+        <ItemChat entity={chat.entity} entityId={chat.id} />
       </div>
 
       {issue.status === 'usulan' && isBm && canE && (

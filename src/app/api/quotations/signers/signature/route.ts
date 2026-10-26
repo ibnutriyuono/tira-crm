@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { guard } from '@/lib/permissions-server';
+import { quotePermAct } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { assertProspectInScope } from '@/lib/prospect-access';
 import { quoteSignersFor } from '@/lib/quote-signers';
@@ -14,7 +15,7 @@ import { quoteSignersFor } from '@/lib/quote-signers';
 export async function GET(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
-  const denied = await guard(user, 'prospek', 'x');
+  const denied = await guard(user, 'prospek', quotePermAct(user.role));
   if (denied) return denied;
   const sp = new URL(req.url).searchParams;
   const prospectId = sp.get('prospectId') || '';

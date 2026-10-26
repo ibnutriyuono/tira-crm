@@ -35,12 +35,18 @@ export type NotifType =
   | 'issue_proposed'
   | 'issue_new'
   | 'issue_update'
-  | 'issue_escalated';
+  | 'issue_escalated'
+  | 'announcement'
+  | 'po_eta'
+  | 'po_arrived'
+  | 'visit_assigned'
+  | 'visit_update'
+  | 'visit_plan';
 
 interface NotifyInput {
   userIds: string[];
   type: NotifType;
-  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target' | 'activity' | 'issue';
+  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target' | 'activity' | 'issue' | 'visitTask' | 'visitPlan' | 'announcement';
   entityId: string;
   title: string;
   message: string;

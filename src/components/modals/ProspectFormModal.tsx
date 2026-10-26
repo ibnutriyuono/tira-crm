@@ -12,12 +12,14 @@ import { CABANG_LIST, STATUS_META } from '@/lib/constants';
 import { formatFileSize, formatRupiah, getProspectMaterials, materialUnitPrice, num } from '@/lib/format';
 import { ATTACHMENT_MAX_BYTES } from '@/lib/constants';
 import { emptyRow, isFabRow, materialToRow, rowToMaterial, type SpecRow } from '@/lib/material-spec';
+import { isStokKond, legacyStok, stockSummary } from '@/lib/item-stock';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { EMPTY_QCD, useUiStore } from '@/store/useUiStore';
 import { useCan } from '@/hooks/useCan';
 import { qcdMissing, qcdRequiredOnMove } from '@/lib/qcd';
 import { QcdFields } from '../QcdFields';
+import { useRoster } from '../issues/shared';
 import { loseDateProblem } from '@/lib/lose-date';
 import type { Prospect } from '@/lib/types';
 import { canSetFaktur } from '@/lib/roles';
@@ -32,7 +34,12 @@ export function ProspectFormModal() {
   // Kelola Role: tanpa hak Tambah/Ubah, form dibuka hanya-baca.
   const readOnly = !useCan('prospek', 'e');
   const editId = useUiStore((s) => s.editProspectId);
-  const closeModal = useUiStore((s) => s.closeModal);
+  const closeModalRaw = useUiStore((s) => s.closeModal);
+  const quoteFlag = useUiStore((s) => s.prospectFormQuote);
+  const closeModal = () => {
+    useUiStore.setState({ prospectFormQuote: false });
+    closeModalRaw();
+  };
   const openModal = useUiStore((s) => s.openModal);
   const pendingQCD = useUiStore((s) => s.pendingProspectQCD);
 
@@ -44,6 +51,8 @@ export function ProspectFormModal() {
 
   const isSales = currentUser?.role === 'sales';
   const editing = editId ? records.find((r) => r.id === editId) || null : null;
+  // "Buat Penawaran": prospek baru langsung di tahap Penawaran Harga; setelah disimpan surat penawaran terbuka.
+  const quoteMode = !editId && quoteFlag;
 
   // Mirrors api-helpers.ts#prospectScopeLocks, which the write routes enforce —
   // this only saves the user from filling in a field that would be overridden.
@@ -111,7 +120,13 @@ export function ProspectFormModal() {
     setTerfaktur(!!editing.terfaktur);
       setTglFaktur(editing.tglFaktur || '');
       setNoFaktur(editing.noFaktur || '');
-      setRows(getProspectMaterials(editing).map(materialToRow));
+      // Prospek lama: teks "Kondisi Stock" dipetakan ke semua item yang belum punya kondisi.
+      const legacy = legacyStok(editing.kondisiStock);
+      setRows(
+        getProspectMaterials(editing)
+          .map(materialToRow)
+          .map((r) => (r.stok || !legacy ? r : { ...r, stok: legacy.kond, stokLama: legacy.lama })),
+      );
       setKondisiStock(editing.kondisiStock || '');
       setTglPenawaran(editing.tglPenawaran || '');
       setNoPo(editing.noPo || '');
@@ -135,8 +150,9 @@ export function ProspectFormModal() {
     } else {
       setReg(lockedReg ?? '1');
       setCabang(locks.cabang ? currentUser?.cabang || '' : '');
-      setSe(locks.se ? currentUser?.se || '' : '');
-      setStatus('0');
+      // Default: kode SE akun yang login (Sales selalu; BM / lainnya bila punya kode SE).
+      setSe((currentUser?.se || '').trim().toUpperCase());
+      setStatus(quoteFlag ? '2' : '0');
       setCustomer('');
       setPhone('');
       setPenawaranTerkirim(false);
@@ -155,6 +171,26 @@ export function ProspectFormModal() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, editId]);
+
+  // Daftar Sales (akun dengan kode SE) untuk dropdown; disaring ke cabang yang dipilih.
+  const roster = useRoster();
+  const seOptions = useMemo(() => {
+    const cab = cabang.trim().toUpperCase();
+    const list = roster
+      .filter((u) => (u.se || '').trim() && ['sales', 'bm', 'rm', 'gm'].includes(u.role))
+      .filter((u) => !cab || (u.cabang || '').trim().toUpperCase() === cab)
+      .map((u) => ({ se: (u.se || '').trim().toUpperCase(), label: `${u.name} (${(u.se || '').trim().toUpperCase()})${cab ? '' : u.cabang ? ` · ${u.cabang}` : ''}` }));
+    const seen = new Set<string>();
+    const uniq = list.filter((o) => (seen.has(o.se) ? false : (seen.add(o.se), true))).sort((a, b) => a.label.localeCompare(b.label));
+    // Kode SE lama yang tidak (lagi) punya akun di cabang ini tetap bisa dipertahankan.
+    const cur = se.trim().toUpperCase();
+    if (cur && !seen.has(cur)) {
+      const other = roster.find((u) => (u.se || '').trim().toUpperCase() === cur);
+      uniq.unshift({ se: cur, label: other ? `${other.name} (${cur}) · ${other.cabang || '-'}` : `${cur} ${tr('(tanpa akun)')}` });
+    }
+    return uniq;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roster, cabang, se]);
 
   const cabangOptions = useMemo(() => Array.from(new Set([...CABANG_LIST, ...records.map((r) => r.cabang).filter(Boolean)])) as string[], [records]);
 
@@ -231,6 +267,10 @@ export function ProspectFormModal() {
       toast(followUpDateProblem(fuDate)!, 'error');
       return;
     }
+    if (quoteMode && !se.trim()) {
+      toast('Pilih Sales yang menangani penawaran ini', 'error');
+      return;
+    }
     setBusy(true);
     const payload = {
       ...(fuNeeded ? { followUpAt: fuDate, followUpNote: fuNote.trim() } : {}),
@@ -245,7 +285,8 @@ export function ProspectFormModal() {
       tglDelivery: tglDelivery || '',
       ...(Number(status) === 6 ? { tglLose: tglLose || jakartaDate() } : {}),
       materials,
-      kondisiStock,
+      // Ringkasan dari kondisi per item; teks lama dipakai bila belum ada yang diisi per item.
+      kondisiStock: stockSummary(rows.map((r) => (isStokKond(r.stok) ? r.stok : null))) || kondisiStock,
       keterangan,
       status: Number(status),
       penawaranTerkirim,
@@ -267,6 +308,12 @@ export function ProspectFormModal() {
         ? await api.put<{ prospect: Prospect }>(`/api/prospects/${editId}`, payload)
         : await api.post<{ prospect: Prospect }>('/api/prospects', payload);
       upsertProspect(prospect);
+      if (quoteMode) {
+        // Lanjut langsung ke Surat Penawaran prospek yang baru dibuat.
+        useUiStore.setState({ prospectFormQuote: false, quotationProspectId: prospect.id, modal: 'quotation' });
+        toast('Prospek dibuat di tahap Penawaran Harga — lengkapi surat penawarannya', 'success');
+        return;
+      }
       closeModal();
       toast(editId ? 'Perubahan prospek disimpan' : 'Prospek baru ditambahkan', 'success');
       promptItemFlow(prevStatus, prospect);
@@ -281,7 +328,7 @@ export function ProspectFormModal() {
     <Modal
       show={show} wide2
       onClose={closeModal}
-      title={readOnly ? tr("Lihat Prospek") : editId ? tr("Edit Prospek") : tr("Tambah Prospek Baru")}
+      title={readOnly ? tr("Lihat Prospek") : editId ? tr("Edit Prospek") : quoteMode ? tr("Buat Penawaran Baru") : tr("Tambah Prospek Baru")}
       onSubmit={onSubmit}
       footer={
         <>
@@ -291,12 +338,17 @@ export function ProspectFormModal() {
           </button>
           {!readOnly && (
             <button type="submit" className="btn btn-primary" disabled={busy}>
-              {tr("Simpan Prospek")}
+              {quoteMode ? tr("Simpan & Buat Surat Penawaran") : tr("Simpan Prospek")}
             </button>
           )}
         </>
       }
     >
+      {quoteMode && (
+        <div className="import-summary" style={{ marginTop: 0, marginBottom: 12 }}>
+          {tr("Isi customer, Sales yang menangani, dan material. Setelah disimpan, prospek masuk tahap")} <b>{tr("Penawaran Harga")}</b> {tr("dan Surat Penawaran langsung terbuka (atas nama Sales tersebut).")}
+        </div>
+      )}
       <fieldset disabled={readOnly} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="form-grid">
         <div>
@@ -310,7 +362,7 @@ export function ProspectFormModal() {
         </div>
         <div>
           <label>{tr("Cabang")}</label>
-          <input list="cabangList" value={cabang} readOnly={locks.cabang} onChange={(e) => setCabang(e.target.value)} placeholder={tr("cth. DKI")} />
+          <input type="text" list="cabangList" value={cabang} readOnly={locks.cabang} onChange={(e) => setCabang(e.target.value)} placeholder={tr("cth. DKI")} />
           <datalist id="cabangList">
             {cabangOptions.map((c) => (
               <option key={c} value={c} />
@@ -319,8 +371,15 @@ export function ProspectFormModal() {
           {locks.cabang && <div className="field-note">{tr("Terkunci sesuai akun Anda")}</div>}
         </div>
         <div>
-          <label>{tr("Sales Engineer (SE)")}</label>
-          <input type="text" value={se} readOnly={locks.se} onChange={(e) => setSe(e.target.value)} placeholder={tr("Inisial SE")} />
+          <label>{tr("Sales Engineer (SE)")}{quoteMode && <span style={{ color: 'var(--rust-500)' }}> *</span>}</label>
+          <select value={se.trim().toUpperCase()} disabled={locks.se} onChange={(e) => setSe(e.target.value)}>
+            <option value="">{tr("— pilih Sales —")}</option>
+            {seOptions.map((o) => (
+              <option key={o.se} value={o.se}>
+                {o.label}
+              </option>
+            ))}
+          </select>
           {locks.se && <div className="field-note">{tr("Terkunci sesuai akun Anda")}</div>}
         </div>
         <div>
@@ -406,7 +465,13 @@ export function ProspectFormModal() {
         </div>
         <div>
           <label>{tr("Kondisi Stock")}</label>
-          <input type="text" value={kondisiStock} onChange={(e) => setKondisiStock(e.target.value)} placeholder={tr("cth. Ready / Indent")} />
+          <input
+            type="text"
+            readOnly
+            value={stockSummary(rows.map((r) => (isStokKond(r.stok) ? r.stok : null))) || kondisiStock || '-'}
+            title={tr("Diisi per item di Daftar Material")}
+            style={{ background: 'var(--steel-100)' }}
+          />
         </div>
         <div>
           <label>{tr("Tgl. Penawaran")}</label>

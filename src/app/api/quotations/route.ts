@@ -6,6 +6,7 @@ import { PSTATUS_DIMINTA } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { guard } from '@/lib/permissions-server';
+import { canSeeVendors } from '@/lib/roles';
 
 export async function GET(req: Request) {
   const user = await requireUser();
@@ -13,6 +14,8 @@ export async function GET(req: Request) {
   const denied = await guard(user, 'purch', 'v');
   if (denied) return denied;
 
+  // Nama vendor & harga beli: hanya Purchasing, PIC Line 05, GM, Admin.
+  if (!canSeeVendors(user.role)) return NextResponse.json({ quotations: [] });
   const { searchParams } = new URL(req.url);
   const rfqId = searchParams.get('rfqId');
   const fupaId = searchParams.get('fupaId');

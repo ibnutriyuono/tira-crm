@@ -230,6 +230,24 @@ export interface Vendor {
   kategori: string | null;
   alamat: string | null;
   catatan: string | null;
+  /** Profil vendor (lib/vendor-profile.ts). Baris lama: kosong / default. */
+  tipe?: string | null;
+  asal?: string | null;
+  negara?: string | null;
+  mataUang?: string | null;
+  incoterm?: string | null;
+  produk?: string[];
+  tebalMin?: number | null;
+  tebalMax?: number | null;
+  moq?: string | null;
+  leadTime?: string | null;
+  syaratBayar?: string | null;
+  pics?: { nama: string; jabatan?: string; wa?: string; email?: string }[];
+  statusAvl?: string;
+  statusAlasan?: string | null;
+  statusOleh?: string | null;
+  statusAt?: string | null;
+  dokumen?: { id: string; jenis: string; nomor?: string; berlaku?: string; catatan?: string; attachmentId?: string }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -346,13 +364,19 @@ export type NotificationType =
   | 'issue_proposed'
   | 'issue_new'
   | 'issue_update'
-  | 'issue_escalated';
+  | 'issue_escalated'
+  | 'announcement'
+  | 'po_eta'
+  | 'po_arrived'
+  | 'visit_assigned'
+  | 'visit_update'
+  | 'visit_plan';
 
 export interface AppNotification {
   id: string;
   userId: string;
   type: NotificationType;
-  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target' | 'activity' | 'issue';
+  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target' | 'activity' | 'issue' | 'announcement' | 'visitTask' | 'visitPlan';
   entityId: string;
   title: string;
   message: string;

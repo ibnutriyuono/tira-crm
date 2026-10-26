@@ -716,6 +716,10 @@ export function SalesActivityModal() {
                         <div style={{ marginTop: 4 }}>
                           <span className="badge slate" title={tr("Tercatat otomatis dari pekerjaan Purchasing (jawab RFQ / FUP A, diskusi kartu)")}>{tr("Otomatis · Purchasing")}</span>
                         </div>
+                      ) : a.sumber === 'tugas' ? (
+                        <div style={{ marginTop: 4 }}>
+                          <span className="badge violet" title={tr("Laporan Tugas Kunjungan dari BM / GM")}>{tr("Ditugaskan oleh BM")}</span>
+                        </div>
                       ) : a.sumber === 'penawaran' ? (
                         <div style={{ marginTop: 4 }}>
                           <span className="badge steel" title={`Tercatat otomatis dari Surat Penawaran${a.refNo ? ` No. ${a.refNo}` : ''}`}>{tr("Surat penawaran")}</span>

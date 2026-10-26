@@ -77,7 +77,9 @@ export function buildProspectSheet(list: Prospect[]): SheetSpec {
 }
 
 export function buildRfqSheet(list: Rfq[]): SheetSpec {
-  const header = ['NO', 'NO RFQ', 'TANGGAL', 'CABANG', 'CUSTOMER', 'LINE', 'GRADE', 'MATERIAL', 'DIA (mm)', 'THICK (mm)', 'WIDTH (mm)', 'LENGTH (mm)', 'PCS', 'BERAT (KGS)', 'LOKAL/IMPORT', 'ESTIMASI KEBUTUHAN', 'HARGA (PURCHASING)', 'CURRENCY', 'UOM', 'DELIVERY TIME', 'ORIGIN', 'NOTE', 'NO QUOTE', 'STATUS', 'STATUS PURCHASING', 'TERKIRIM KE PURCHASING', 'JAWABAN RFQ', 'DIBUAT OLEH'];
+  // Kolom HPP hanya bila datanya ada — server tidak pernah mengirim HPP ke role Sales-side.
+  const withHpp = list.some((r) => (r.items || []).some((it) => (it as RfqItem & { hpp?: number }).hpp));
+  const header = ['NO', 'NO RFQ', 'TANGGAL', 'CABANG', 'CUSTOMER', 'LINE', 'GRADE', 'MATERIAL', 'DIA (mm)', 'THICK (mm)', 'WIDTH (mm)', 'LENGTH (mm)', 'PCS', 'BERAT (KGS)', 'LOKAL/IMPORT', 'ESTIMASI KEBUTUHAN', 'HARGA (PURCHASING)', 'CURRENCY', 'UOM', 'DELIVERY TIME', 'ORIGIN', 'NOTE', 'NO QUOTE', ...(withHpp ? ['VENDOR', 'HPP', 'MATA UANG HPP', 'KURS', 'MARGIN %'] : []), 'STATUS', 'STATUS PURCHASING', 'TERKIRIM KE PURCHASING', 'JAWABAN RFQ', 'DIBUAT OLEH'];
   const rows: unknown[][] = [];
   let no = 1;
   list.forEach((r) => {
@@ -89,6 +91,12 @@ export function buildRfqSheet(list: Rfq[]): SheetSpec {
         it.line || '', it.grade || '', it.material || '', it.dia || '', it.thick || '', it.width || '', it.length || '',
         it.pcs || '', it.berat || '', it.lokal || '', it.estimasi || '',
         it.hargaPurchasing || '', it.currency || '', it.uom || '', it.deliveryTime || '', it.coo || '', it.note || '', it.noQuote ? 'Ya' : '',
+        ...(withHpp
+          ? (() => {
+              const h = it as RfqItem & { hpp?: number; hppCur?: string; kurs?: number; margin?: number; vendorNama?: string };
+              return [h.vendorNama || '', h.hpp || '', h.hpp ? h.hppCur || 'IDR' : '', h.hpp ? h.kurs || '' : '', h.hpp ? h.margin ?? '' : ''];
+            })()
+          : []),
         idx === 0 ? r.status || 'Draft' : '',
         idx === 0 ? WORKFLOW_META[workflowStage(rfqAsWorkflowDoc(r))].label : '',
         idx === 0 ? (r.sentToPurchasingAt ? formatDateID(r.sentToPurchasingAt) : 'Belum') : '',

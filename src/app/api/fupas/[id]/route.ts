@@ -1,15 +1,28 @@
+import { docForRole } from '@/lib/rfq-price';
 import { normalizeItemLines } from '@/lib/format';
 import type { Prisma } from '@prisma/client';
 import { logFupaAnswer } from '@/lib/purchasing-activity';
 import { NextResponse } from 'next/server';
 import { diffFields, FUPA_FIELD_LABELS, logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
-import { canEditPurchasing } from '@/lib/auth';
+import { canEditPurchasing, docScopeWhere } from '@/lib/auth';
 import { itemsHaveLine } from '@/lib/doc-lines';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { notify, purchasingUserIds, requesterUserIds } from '@/lib/notify';
 import { guard } from '@/lib/permissions-server';
+
+/** Satu FUP A (versi sesuai role) — untuk client ber-hak saat event socket membawa versi tanpa catatan internal. */
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  if (isResponse(user)) return user;
+  const denied = await guard(user, 'rfq', 'v');
+  if (denied) return denied;
+  const { id } = await params;
+  const fupa = await prisma.fupa.findFirst({ where: { AND: [{ id }, await docScopeWhere(user, { table: 'fupa' })] } });
+  if (!fupa) return NextResponse.json({ error: 'FUP A tidak ditemukan' }, { status: 404 });
+  return NextResponse.json({ fupa: docForRole(fupa, user.role) });
+}
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -57,7 +70,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       message: `${fupa.noFupa || '(tanpa nomor)'} dari ${fupa.cabang || '-'} — ${fupa.customer || '-'}`,
     });
   }
-  return NextResponse.json({ fupa });
+  return NextResponse.json({ fupa: docForRole(fupa, user.role) });
 }
 
 /** Purchasing-side status moves (the PSTATUS ladder). */
@@ -80,7 +93,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (existing.openedByPurchasingAt) return NextResponse.json({ ok: true });
     const fupa = await prisma.fupa.update({ where: { id }, data: { openedByPurchasingAt: new Date() } });
     emitCrmEvent('fupa:updated', fupa);
-    return NextResponse.json({ fupa });
+    return NextResponse.json({ fupa: docForRole(fupa, user.role) });
   }
 
   // "No Quote" — the one Purchasing stage that is set by hand.
@@ -97,7 +110,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       entityId: id,
       summary: `${body.noQuote ? 'Menandai' : 'Membatalkan tanda'} No Quote pada FUP A ${fupa.noFupa || '(tanpa nomor)'}`,
     });
-    return NextResponse.json({ fupa });
+    return NextResponse.json({ fupa: docForRole(fupa, user.role) });
   }
 
   if (typeof body?.purchStatus === 'number') {
@@ -114,7 +127,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       summary: `Mengubah status pembelian FUP A ${fupa.noFupa || '(tanpa nomor)'}`,
       changes: diffFields(existing, fupa, FUPA_FIELD_LABELS),
     });
-    return NextResponse.json({ fupa });
+    return NextResponse.json({ fupa: docForRole(fupa, user.role) });
   }
 
   if (typeof body?.purchNotes === 'string' || typeof body?.purchJawaban === 'string') {
@@ -155,7 +168,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         message: `${fupa.noFupa || '(tanpa nomor)'} untuk "${fupa.customer || '-'}" sudah dijawab`,
       });
     }
-    return NextResponse.json({ fupa });
+    return NextResponse.json({ fupa: docForRole(fupa, user.role) });
   }
 
   if (typeof body?.status === 'string') {
@@ -178,7 +191,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         message: `${fupa.noFupa || '(tanpa nomor)'} untuk "${fupa.customer || '-'}"`,
       });
     }
-    return NextResponse.json({ fupa });
+    return NextResponse.json({ fupa: docForRole(fupa, user.role) });
   }
 
   return NextResponse.json({ error: 'Tidak ada perubahan' }, { status: 400 });

@@ -192,6 +192,9 @@ export interface SpecRow {
   noGambar: string;
   satuan: string;
   hargaUnit: string;
+  /** Prospek: kondisi stok per item (lib/item-stock.ts) + perkiraan lama. */
+  stok: string;
+  stokLama: string;
   /** The stored record this row came from — keeps fields the form doesn't edit (e.g. Purchasing's answer). */
   src?: Record<string, unknown>;
 }
@@ -218,7 +221,7 @@ export function isFabRow(r: Pick<SpecRow, 'line'>): boolean {
 export function emptyRow(over: Partial<SpecRow> = {}): SpecRow {
   return {
     key: newKey(), line: '', bentuk: 'Round Bar', grade: '', dim: {}, pcs: '1', beratManual: '', uraianManual: '',
-    hargaKg: '', lokal: 'LOKAL ATAU IMPORT', estimasi: '', fabNama: '', noGambar: '', satuan: 'unit', hargaUnit: '',
+    hargaKg: '', lokal: 'LOKAL ATAU IMPORT', estimasi: '', fabNama: '', noGambar: '', satuan: 'unit', hargaUnit: '', stok: '', stokLama: '',
     ...over,
   };
 }
@@ -240,7 +243,12 @@ export function rowTotal(r: SpecRow): number {
   return pcs * rowBeratPc(r) * num(r.hargaKg);
 }
 
-function extraOf(r: SpecRow): SpecExtra {
+function extraOf(r: SpecRow): SpecExtra & { stok?: string; stokLama?: string } {
+  const st = { stok: r.stok || undefined, stokLama: r.stok === 'indent' || r.stok === 'import' ? r.stokLama.trim() || undefined : undefined };
+  return { ...extraOfSpec(r), ...st };
+}
+
+function extraOfSpec(r: SpecRow): SpecExtra {
   if (isFabRow(r)) return { fabNama: r.fabNama, noGambar: r.noGambar, satuan: r.satuan, hargaUnit: num(r.hargaUnit) };
   return { bentuk: r.bentuk, dim: r.dim, beratPcAuto: r.beratManual.trim() === '', uraianAuto: r.uraianManual.trim() === '' };
 }
@@ -263,7 +271,11 @@ function fromExtra(x: SpecExtra & Record<string, unknown>, base: Partial<SpecRow
 }
 
 export function materialToRow(m: Material & SpecExtra): SpecRow {
-  const base: Partial<SpecRow> = { line: m.line || '', grade: String((m as { grade?: string }).grade || ''), pcs: String(m.qty ?? 1), hargaKg: m.hargaKg ? String(m.hargaKg) : '', src: m as unknown as Record<string, unknown> };
+  const mx = m as unknown as { grade?: string; stok?: string; stokLama?: string };
+  const base: Partial<SpecRow> = {
+    line: m.line || '', grade: String(mx.grade || ''), pcs: String(m.qty ?? 1), hargaKg: m.hargaKg ? String(m.hargaKg) : '',
+    stok: mx.stok || '', stokLama: mx.stokLama || '', src: m as unknown as Record<string, unknown>,
+  };
   const r = fromExtra(m as unknown as SpecExtra & Record<string, unknown>, base, m.uraian || '', num(m.beratPc));
   // A legacy line priced as a flat unit price (no berat/harga per kg).
   if (r.bentuk === 'Lainnya' && !isFabRow(r) && !num(m.hargaKg) && num(m.harga) > 0) r.hargaUnit = String(m.harga);
@@ -327,7 +339,7 @@ export function rowToItem(r: SpecRow): RfqItem & SpecExtra & { beratPc?: number 
     beratPc: fab ? undefined : beratPc || undefined,
     lokal: r.lokal,
     estimasi: r.estimasi,
-    ...extraOf(r),
+    ...extraOfSpec(r),
   } as RfqItem & SpecExtra & { beratPc?: number };
 }
 

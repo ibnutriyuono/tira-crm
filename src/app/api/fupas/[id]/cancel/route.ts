@@ -1,3 +1,4 @@
+import { docForRole } from '@/lib/rfq-price';
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
@@ -47,7 +48,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       entityId: id,
       summary: `Mengaktifkan kembali FUP A ${existing.noFupa || '(tanpa nomor)'} yang sebelumnya dibatalkan`,
     });
-    return NextResponse.json({ fupa });
+    return NextResponse.json({ fupa: docForRole(fupa, user.role) });
   }
 
   const reason = String(body?.reason || '').trim();
@@ -77,5 +78,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     title: 'FUP A dibatalkan',
     message: `${fupa.noFupa || '(tanpa nomor)'} untuk "${fupa.customer || '-'}" — alasan: ${reason}`,
   });
-  return NextResponse.json({ fupa });
+  return NextResponse.json({ fupa: docForRole(fupa, user.role) });
 }

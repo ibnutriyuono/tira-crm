@@ -1,3 +1,4 @@
+import { docForRole } from '@/lib/rfq-price';
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
@@ -47,7 +48,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       entityId: id,
       summary: `Mengaktifkan kembali RFQ ${existing.noRfq || '(tanpa nomor)'} yang sebelumnya dibatalkan`,
     });
-    return NextResponse.json({ rfq });
+    return NextResponse.json({ rfq: docForRole(rfq, user.role) });
   }
 
   const reason = String(body?.reason || '').trim();
@@ -77,5 +78,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     title: 'RFQ dibatalkan',
     message: `${rfq.noRfq || '(tanpa nomor)'} untuk "${rfq.customer || '-'}" — alasan: ${reason}`,
   });
-  return NextResponse.json({ rfq });
+  return NextResponse.json({ rfq: docForRole(rfq, user.role) });
 }
