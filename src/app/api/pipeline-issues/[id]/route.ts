@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { guard } from '@/lib/permissions-server';
 import { HASIL_META, URGENSI, issueCatLabel, issueInputError, urgensiLabel, type PipelineIssue } from '@/lib/issues';
-import { bmsOf, canHandle, canReport, cleanPjIds, closeText, existingUserIds, notifyIssue, pjText, postSystemMessage, salesOf } from '@/lib/issues-server';
+import { canHandle, canReport, issueLeadIds, cleanPjIds, closeText, existingUserIds, notifyIssue, pjText, postSystemMessage, salesOf } from '@/lib/issues-server';
 
 /**
  * Tindak lanjut satu masalah. action:
@@ -25,7 +25,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!i) return NextResponse.json({ error: 'Masalah tidak ditemukan' }, { status: 404 });
   const b = ((await req.json().catch(() => null)) || {}) as Record<string, unknown>;
   const action = String(b.action || '');
-  const isBm = canReport(user, { cabang: i.cabang });
+  const isBm = canReport(user, { cabang: i.cabang, sumber: i.sumber });
+  const purch = i.sumber === 'purchasing';
+  const leadLabel = purch ? 'GM Operation' : 'BM cabang';
   const cat = issueCatLabel(i.kategori);
   const sales = await salesOf(i.se);
   let data: Record<string, unknown> = {};
@@ -36,13 +38,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   let type: 'issue_new' | 'issue_update' = 'issue_update';
 
   if (action === 'terima' || action === 'tolak') {
-    if (!isBm) return NextResponse.json({ error: 'Hanya BM cabang yang memproses usulan masalah.' }, { status: 403 });
+    if (!isBm) return NextResponse.json({ error: `Hanya ${leadLabel} yang memproses usulan masalah ini.` }, { status: 403 });
     if (i.status !== 'usulan') return NextResponse.json({ error: 'Usulan ini sudah diproses.' }, { status: 409 });
     if (action === 'tolak') {
       const alasan = String(b.alasan || '').trim();
       if (alasan.length < 5) return NextResponse.json({ error: 'Tulis alasan penolakan.' }, { status: 400 });
       data = { status: 'ditolak', alasanTolak: alasan.slice(0, 500), dilaporOleh: user.id, dilaporNama: user.name };
-      sys = `✕ Usulan masalah ditolak BM (${user.name}): ${alasan}`;
+      sys = `✕ Usulan masalah ditolak ${purch ? 'GM Operation' : 'BM'} (${user.name}): ${alasan}`;
       notifyTo = i.diajukanOleh ? [i.diajukanOleh] : sales;
       title = `Usulan masalah ditolak: ${i.customer}`;
       msg = `${cat} — ${alasan}`;
@@ -63,22 +65,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         dilaporAt: new Date(),
       };
       const pjs = await pjText(pjIds);
-      sys = `⚑ Masalah dilaporkan BM (${user.name}) dari usulan ${i.diajukanNama || 'Sales'}: ${issueCatLabel(String(merged.kategori))} · urgensi ${urgensiLabel(String(merged.urgensi))} — PJ: ${pjs}`;
+      sys = `⚑ Masalah dilaporkan ${purch ? 'GM Operation' : 'BM'} (${user.name}) dari usulan ${i.diajukanNama || 'Sales'}: ${issueCatLabel(String(merged.kategori))} · urgensi ${urgensiLabel(String(merged.urgensi))} — PJ: ${pjs}`;
       notifyTo = [...pjIds, ...(i.diajukanOleh ? [i.diajukanOleh] : sales)];
       type = 'issue_new';
       title = `⚑ Masalah baru: ${i.customer}`;
       msg = `${issueCatLabel(String(merged.kategori))} · PJ: ${pjs}. ${String(merged.keterangan)}`;
     }
   } else if (action === 'tangani') {
-    if (!canHandle(user, i)) return NextResponse.json({ error: 'Hanya penanggung jawab atau BM yang menangani masalah ini.' }, { status: 403 });
+    if (!canHandle(user, i)) return NextResponse.json({ error: `Hanya penanggung jawab atau ${leadLabel} yang menangani masalah ini.` }, { status: 403 });
     if (i.status !== 'open') return NextResponse.json({ error: 'Masalah ini tidak berstatus Terbuka.' }, { status: 409 });
     data = { status: 'proses', ditanganiAt: new Date(), ditanganiNama: user.name };
     sys = `Status → Ditangani (${user.name})`;
-    notifyTo = [...sales, ...(await bmsOf(i.cabang)), ...i.pjIds];
+    notifyTo = [...sales, ...(await issueLeadIds(i)), ...i.pjIds];
     title = `Masalah ditangani: ${i.customer}`;
     msg = `${cat} — ditangani ${user.name}.`;
   } else if (action === 'selesai') {
-    if (!canHandle(user, i)) return NextResponse.json({ error: 'Hanya penanggung jawab atau BM yang menutup masalah ini.' }, { status: 403 });
+    if (!canHandle(user, i)) return NextResponse.json({ error: `Hanya penanggung jawab atau ${leadLabel} yang menutup masalah ini.` }, { status: 403 });
     if (i.status !== 'open' && i.status !== 'proses') return NextResponse.json({ error: 'Masalah ini sudah ditutup.' }, { status: 409 });
     const solusi = String(b.solusi || '').trim();
     const hasil = String(b.hasil || '');
@@ -86,11 +88,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!(hasil in HASIL_META)) return NextResponse.json({ error: 'Pilih hasil: Done/Deal, Masih berjalan, atau Lose.' }, { status: 400 });
     data = { status: 'selesai', solusi: solusi.slice(0, 1000), hasil, selesaiAt: new Date(), selesaiNama: user.name, ...(i.ditanganiAt ? {} : { ditanganiAt: new Date(), ditanganiNama: user.name }) };
     sys = `${closeText(solusi, hasil)} (${user.name})`;
-    notifyTo = [...sales, ...(await bmsOf(i.cabang)), ...i.pjIds];
+    notifyTo = [...sales, ...(await issueLeadIds(i)), ...i.pjIds];
     title = `✓ Masalah selesai: ${i.customer}`;
     msg = `${cat} — ${solusi} · ${HASIL_META[hasil as keyof typeof HASIL_META]}`;
   } else if (action === 'ubah') {
-    if (!isBm) return NextResponse.json({ error: 'Hanya BM cabang yang mengubah laporan masalah.' }, { status: 403 });
+    if (!isBm) return NextResponse.json({ error: `Hanya ${leadLabel} yang mengubah laporan masalah ini.` }, { status: 403 });
     if (i.status !== 'open' && i.status !== 'proses') return NextResponse.json({ error: 'Masalah ini sudah ditutup.' }, { status: 409 });
     if ('pjIds' in b) {
       const pjIds = await existingUserIds(cleanPjIds(b.pjIds));

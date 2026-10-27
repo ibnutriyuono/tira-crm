@@ -1,7 +1,7 @@
 import { prisma } from './prisma';
 import { emitCrmEvent } from './socket';
-import { notify } from './notify';
-import { isBranchRole } from './roles';
+import { canManagePurchIssue, isBranchRole } from './roles';
+import { notify, opsLeadIds, vpIds } from './notify';
 import { ESKALASI_ATAS_HARI, ESKALASI_BM_HARI, HASIL_META, issueCatLabel, type PipelineIssue } from './issues';
 import type { SafeUser } from './types';
 
@@ -19,9 +19,14 @@ export function issueScopeWhere(user: SafeUser): Record<string, unknown> {
   return {}; // gm, admin, purchasing
 }
 
-/** BM cabang prospek (atau Admin) membuat laporan resmi / menerima usulan. */
-export function canReport(user: SafeUser, p: { cabang: string | null }): boolean {
+/**
+ * BM cabang prospek (atau Admin) membuat laporan resmi / menerima usulan.
+ * Masalah yang dilaporkan Purchasing (sumber 'purchasing') diproses GM
+ * Operation (dan VP / Admin), bukan BM.
+ */
+export function canReport(user: SafeUser, p: { cabang: string | null; sumber?: string | null }): boolean {
   if (user.role === 'admin') return true;
+  if (p.sumber === 'purchasing') return canManagePurchIssue(user.role);
   return user.role === 'bm' && !!user.cabang && up(user.cabang) === up(p.cabang);
 }
 
@@ -30,9 +35,14 @@ export function canPropose(user: SafeUser, p: { se: string | null }): boolean {
   return user.role === 'sales' && !!user.se && up(user.se) === up(p.se);
 }
 
-/** PJ, BM cabangnya, atau Admin menangani & menutup masalah. */
-export function canHandle(user: SafeUser, i: Pick<PipelineIssue, 'pjIds' | 'cabang'>): boolean {
-  return (Array.isArray(i.pjIds) && i.pjIds.includes(user.id)) || canReport(user, { cabang: i.cabang });
+/** PJ, BM cabangnya (GM Operation untuk laporan Purchasing), atau Admin menangani & menutup masalah. */
+export function canHandle(user: SafeUser, i: Pick<PipelineIssue, 'pjIds' | 'cabang' | 'sumber'>): boolean {
+  return (Array.isArray(i.pjIds) && i.pjIds.includes(user.id)) || canReport(user, { cabang: i.cabang, sumber: i.sumber });
+}
+
+/** Atasan yang memproses masalah: BM cabangnya, atau GM Operation untuk laporan Purchasing. */
+export async function issueLeadIds(i: { cabang: string | null; sumber?: string | null }): Promise<string[]> {
+  return i.sumber === 'purchasing' ? opsLeadIds() : bmsOf(i.cabang);
 }
 
 export function cleanPjIds(v: unknown): string[] {
@@ -124,17 +134,19 @@ export async function sweepIssueEscalation(opts: { force?: boolean; now?: Date }
     const rows = (await prisma.prospectIssue.findMany({ where: { status: { in: ['open', 'proses'] }, eskalasi: { lt: 2 } } })) as unknown as PipelineIssue[];
     for (const i of rows) {
       const a = age(i.dilaporAt || i.createdAt);
+      const purch = i.sumber === 'purchasing';
       if (a > ESKALASI_ATAS_HARI) {
-        const to = [...(i.reg != null ? await ids({ role: 'rm', reg: i.reg }) : []), ...(await ids({ role: 'gm' }))];
+        // Laporan Purchasing naik ke VP (GM Operation sudah memprosesnya); masalah Sales ke RM & GM.
+        const to = purch ? [...(await opsLeadIds()), ...(await vpIds())] : [...(i.reg != null ? await ids({ role: 'rm', reg: i.reg }) : []), ...(await ids({ role: 'gm' }))];
         const fresh = (await prisma.prospectIssue.update({ where: { id: i.id }, data: { eskalasi: 2 } })) as unknown as PipelineIssue;
         emitCrmEvent('issue:updated', fresh);
         await notifyIssue(fresh, to, null, 'issue_escalated', `Eskalasi: masalah ${i.customer} belum selesai ${Math.floor(a)} hari`, `${issueCatLabel(i.kategori)} · ${i.cabang || '-'} · PJ: ${await pjText(i.pjIds)}`);
-        await postSystemMessage(i.prospectId, `↑ Dieskalasi ke RM & GM — belum selesai lebih dari ${ESKALASI_ATAS_HARI} hari`);
+        await postSystemMessage(i.prospectId, `↑ Dieskalasi ke ${purch ? 'GM Operation & VP' : 'RM & GM'} — belum selesai lebih dari ${ESKALASI_ATAS_HARI} hari`);
       } else if (i.status === 'open' && i.eskalasi < 1 && a > ESKALASI_BM_HARI) {
         const fresh = (await prisma.prospectIssue.update({ where: { id: i.id }, data: { eskalasi: 1 } })) as unknown as PipelineIssue;
         emitCrmEvent('issue:updated', fresh);
-        await notifyIssue(fresh, await bmsOf(i.cabang), null, 'issue_escalated', `Eskalasi: masalah ${i.customer} belum ditangani ${Math.floor(a)} hari`, `${issueCatLabel(i.kategori)} · PJ: ${await pjText(i.pjIds)} belum menangani.`);
-        await postSystemMessage(i.prospectId, `↑ Dieskalasi ke BM — belum ditangani lebih dari ${ESKALASI_BM_HARI} hari`);
+        await notifyIssue(fresh, await issueLeadIds(i), null, 'issue_escalated', `Eskalasi: masalah ${i.customer} belum ditangani ${Math.floor(a)} hari`, `${issueCatLabel(i.kategori)} · PJ: ${await pjText(i.pjIds)} belum menangani.`);
+        await postSystemMessage(i.prospectId, `↑ Dieskalasi ke ${purch ? 'GM Operation' : 'BM'} — belum ditangani lebih dari ${ESKALASI_BM_HARI} hari`);
       }
     }
   } catch (err) {

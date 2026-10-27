@@ -17,6 +17,8 @@ import { VR_STATUS_META, fmtDate, type VendorRequest } from '@/lib/vendor-reques
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { useT } from '@/store/useLangStore';
+import { canApproveVendor } from '@/lib/roles';
+import type { VendorScore } from '@/lib/vendor-scorecard';
 import { AttachmentList } from '../AttachmentList';
 import { IconEdit, IconPlus, IconSearch, IconTrash } from '../icons';
 
@@ -34,9 +36,9 @@ const emptyDraft = (): Draft => ({
 });
 
 /**
- * Database Vendor (Purchasing · GM · Admin): profil vendor, grade yang
+ * Database Vendor (Purchasing · GM · GM Operation · VP · Admin): profil vendor, grade yang
  * dipasok, syarat dagang, dokumen + masa berlaku, kinerja, dan Approved
- * Vendor List (Aktif / Dalam evaluasi / Diblokir — diblokir perlu GM).
+ * Vendor List (Aktif / Dalam evaluasi / Diblokir — diputuskan GM Operation).
  */
 export function VendorDirectory({ readOnly, canDelete, onImport, onExport, onTemplate }: { readOnly: boolean; canDelete: boolean; onImport: () => void; onExport?: () => void; onTemplate?: () => void }) {
   const tr = useT();
@@ -44,7 +46,7 @@ export function VendorDirectory({ readOnly, canDelete, onImport, onExport, onTem
   const upsertVendor = useDataStore((s) => s.upsertVendor);
   const toast = useDataStore((s) => s.toast);
   const role = useDataStore((s) => s.currentUser?.role);
-  const boss = role === 'gm' || role === 'admin';
+  const boss = canApproveVendor(role);
   const today = new Date().toISOString().slice(0, 10);
   const [q, setQ] = useState('');
   const [tipe, setTipe] = useState('');
@@ -52,6 +54,19 @@ export function VendorDirectory({ readOnly, canDelete, onImport, onExport, onTem
   const [selId, setSelId] = useState('');
   const [edit, setEdit] = useState<Draft | null>(null);
   const [ptab, setPtab] = useState<'profil' | 'dokumen' | 'kinerja'>('profil');
+  const [urut, setUrut] = useState<'nama' | 'skor-' | 'skor+'>('nama');
+  // Scorecard semua vendor (ketepatan kirim, balasan, menang) — lib/vendor-scorecard.ts.
+  const [scores, setScores] = useState<Record<string, VendorScore>>({});
+  useEffect(() => {
+    let alive = true;
+    api
+      .get<{ scores: VendorScore[] }>('/api/vendors/scorecard')
+      .then((r) => alive && setScores(Object.fromEntries(r.scores.map((x) => [x.vendorId, x]))))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [vendors.length]);
 
   const counts = useMemo(() => {
     const c = { aktif: 0, evaluasi: 0, diblokir: 0, doc: 0 };
@@ -64,13 +79,17 @@ export function VendorDirectory({ readOnly, canDelete, onImport, onExport, onTem
 
   const shown = useMemo(() => {
     const ql = q.trim().toLowerCase();
-    return vendors.filter(
+    const list = vendors.filter(
       (v) =>
         (!tipe || v.tipe === tipe) &&
         (!st || avlOf(v) === st) &&
         (!ql || [v.nama, v.pic, v.kategori, v.negara, ...(v.produk || [])].some((x) => (x || '').toLowerCase().includes(ql))),
     );
-  }, [vendors, q, tipe, st]);
+    if (urut === 'nama') return list;
+    const sk = (id: string) => scores[id]?.skor ?? (urut === 'skor-' ? 999 : -1);
+    return [...list].sort((a, b) => (urut === 'skor-' ? sk(a.id) - sk(b.id) : sk(b.id) - sk(a.id)));
+  }, [vendors, q, tipe, st, urut, scores]);
+
   const sel = vendors.find((v) => v.id === selId) || null;
 
   async function save(d: Draft) {
@@ -80,7 +99,7 @@ export function VendorDirectory({ readOnly, canDelete, onImport, onExport, onTem
       upsertVendor(vendor);
       setEdit(null);
       setSelId(vendor.id);
-      toast(d.id ? 'Vendor diperbarui' : vendor.statusAvl === 'evaluasi' ? 'Vendor ditambahkan — menunggu persetujuan GM' : 'Vendor ditambahkan', 'success');
+      toast(d.id ? 'Vendor diperbarui' : vendor.statusAvl === 'evaluasi' ? 'Vendor ditambahkan — menunggu persetujuan GM Operation' : 'Vendor ditambahkan', 'success');
     } catch (e) {
       toast((e as Error).message, 'error');
     }
@@ -90,11 +109,11 @@ export function VendorDirectory({ readOnly, canDelete, onImport, onExport, onTem
     <div className="vd">
       <div className="pi-intro">
         <b>{tr("Database Vendor")}</b>
-        <span>{tr("Mill, distributor, jasa potong dan ekspedisi — grade yang dipasok, syarat dagang, dokumen dan kinerja.")} <span className="badge slate">🔒 {tr("Hanya Purchasing · GM · Admin")}</span></span>
+        <span>{tr("Mill, distributor, jasa potong dan ekspedisi — grade yang dipasok, syarat dagang, dokumen dan kinerja.")} <span className="badge slate">🔒 {tr("Hanya Purchasing · GM · GM Operation · VP · Admin")}</span></span>
       </div>
       <div className="pi-kpis">
         <button type="button" className={`pi-kpi ok ${st === 'aktif' ? 'on' : ''}`} onClick={() => setSt(st === 'aktif' ? '' : 'aktif')}><span className="lb">{tr("Vendor aktif")}</span><span className="n">{counts.aktif}</span><span className="sub">{tr("dari")} {vendors.length} {tr("vendor")}</span></button>
-        <button type="button" className={`pi-kpi warn ${st === 'evaluasi' ? 'on' : ''}`} onClick={() => setSt(st === 'evaluasi' ? '' : 'evaluasi')}><span className="lb">{tr("Dalam evaluasi")}</span><span className="n">{counts.evaluasi}</span><span className="sub">{tr("menunggu persetujuan GM")}</span></button>
+        <button type="button" className={`pi-kpi warn ${st === 'evaluasi' ? 'on' : ''}`} onClick={() => setSt(st === 'evaluasi' ? '' : 'evaluasi')}><span className="lb">{tr("Dalam evaluasi")}</span><span className="n">{counts.evaluasi}</span><span className="sub">{tr("menunggu persetujuan GM Operation")}</span></button>
         <div className="pi-kpi none"><span className="lb">{tr("Dokumen segera habis")}</span><span className="n">{counts.doc}</span><span className="sub">{tr("price list / sertifikat ≤ 30 hari")}</span></div>
         <button type="button" className={`pi-kpi bad ${st === 'diblokir' ? 'on' : ''}`} onClick={() => setSt(st === 'diblokir' ? '' : 'diblokir')}><span className="lb">{tr("Diblokir")}</span><span className="n">{counts.diblokir}</span><span className="sub">{tr("tidak muncul di saran vendor")}</span></button>
       </div>
@@ -109,6 +128,11 @@ export function VendorDirectory({ readOnly, canDelete, onImport, onExport, onTem
           <option value="">{tr("Semua status")}</option>
           {(Object.keys(AVL_META) as AvlStatus[]).map((k) => <option key={k} value={k}>{tr(AVL_META[k].label)}</option>)}
         </select>
+        <select value={urut} onChange={(e) => setUrut(e.target.value as typeof urut)} style={{ maxWidth: 190 }} aria-label={tr("Urutkan")}>
+          <option value="nama">{tr("Urut: nama")}</option>
+          <option value="skor-">{tr("Urut: skor terendah")}</option>
+          <option value="skor+">{tr("Urut: skor tertinggi")}</option>
+        </select>
         {!readOnly && <button type="button" className="btn btn-primary btn-sm" onClick={() => { setEdit(emptyDraft()); setSelId(''); }}><IconPlus /> {tr("Tambah Vendor")}</button>}
         {!readOnly && <button type="button" className="btn btn-outline btn-sm" onClick={onImport}>{tr("Import Excel")}</button>}
         {onExport && <button type="button" className="btn btn-outline btn-sm" onClick={onExport}>{tr("Export Excel")}</button>}
@@ -122,7 +146,7 @@ export function VendorDirectory({ readOnly, canDelete, onImport, onExport, onTem
             <div className="empty-state" style={{ padding: '34px 10px' }}><h3>{tr("Belum ada vendor")}</h3></div>
           ) : (
             <table className="simple-table vd-table">
-              <thead><tr><th>{tr("Vendor")}</th><th>{tr("Tipe · asal")}</th><th>{tr("Grade dipasok")}</th><th>{tr("Lead time")}</th><th>{tr("Status")}</th></tr></thead>
+              <thead><tr><th>{tr("Vendor")}</th><th>{tr("Tipe · asal")}</th><th>{tr("Grade dipasok")}</th><th>{tr("Lead time")}</th><th title={tr("Skor 0–100: ketepatan kedatangan 40, balasan permintaan harga 30, menang 30")}>{tr("Skor")}</th><th>{tr("Status")}</th></tr></thead>
               <tbody>
                 {shown.map((v) => {
                   const exp = expiringDocs(v, today);
@@ -137,6 +161,7 @@ export function VendorDirectory({ readOnly, canDelete, onImport, onExport, onTem
                       <td>{tr(tipeLabel(v.tipe)) || '-'}{v.asal ? <div className="muted">{v.asal === 'impor' ? tr('Impor') : tr('Lokal')}{v.mataUang ? ` · ${v.mataUang}` : ''}</div> : null}</td>
                       <td>{(v.produk || []).slice(0, 4).map((t) => <span key={t} className="vd-tag">{t}</span>)}{(v.produk || []).length > 4 && <span className="muted"> +{(v.produk || []).length - 4}</span>}</td>
                       <td>{v.leadTime || '-'}</td>
+                      <td><ScoreCell s={scores[v.id]} /></td>
                       <td><span className={`badge ${AVL_META[s].color}`}>{tr(AVL_META[s].label)}</span></td>
                     </tr>
                   );
@@ -154,6 +179,7 @@ export function VendorDirectory({ readOnly, canDelete, onImport, onExport, onTem
             readOnly={readOnly}
             boss={boss}
             canDelete={canDelete}
+            score={scores[sel.id]}
             onEdit={() => setEdit({ ...emptyDraft(), ...sel })}
             onClose={() => setSelId('')}
           />
@@ -163,7 +189,7 @@ export function VendorDirectory({ readOnly, canDelete, onImport, onExport, onTem
   );
 }
 
-function VendorDetail({ v, ptab, setPtab, readOnly, boss, canDelete, onEdit, onClose }: { v: Vendor; ptab: 'profil' | 'dokumen' | 'kinerja'; setPtab: (t: 'profil' | 'dokumen' | 'kinerja') => void; readOnly: boolean; boss: boolean; canDelete: boolean; onEdit: () => void; onClose: () => void }) {
+function VendorDetail({ v, ptab, setPtab, readOnly, boss, canDelete, score, onEdit, onClose }: { v: Vendor; ptab: 'profil' | 'dokumen' | 'kinerja'; setPtab: (t: 'profil' | 'dokumen' | 'kinerja') => void; readOnly: boolean; boss: boolean; canDelete: boolean; score?: VendorScore; onEdit: () => void; onClose: () => void }) {
   const tr = useT();
   const toast = useDataStore((s) => s.toast);
   const upsertVendor = useDataStore((s) => s.upsertVendor);
@@ -181,7 +207,7 @@ function VendorDetail({ v, ptab, setPtab, readOnly, boss, canDelete, onEdit, onC
       const r = await api.patch<{ vendor: Vendor }>(`/api/vendors/${v.id}`, { action: 'avl', status, alasan });
       upsertVendor(r.vendor);
       setAlasan('');
-      toast(boss ? `Status: ${AVL_META[avlOf(r.vendor)].label}` : 'Usulan dikirim ke GM', 'success');
+      toast(boss ? `Status: ${AVL_META[avlOf(r.vendor)].label}` : 'Usulan dikirim ke GM Operation', 'success');
     } catch (e) {
       toast((e as Error).message, 'error');
     }
@@ -245,6 +271,14 @@ function VendorDetail({ v, ptab, setPtab, readOnly, boss, canDelete, onEdit, onC
         <div>
           {!stats ? <div className="field-note">{tr("Memuat…")}</div> : (
             <>
+              {score && (
+                <div className="vd-kpis vd-score">
+                  <div><span>{tr("Skor")}</span><b>{score.skor ?? '–'}</b></div>
+                  <div><span>{tr("Tiba tepat target")}</span><b>{score.tepatPct == null ? '–' : `${score.tepatPct}%`}</b><small>{score.tiba ? `${score.tepat}/${score.tiba} ${tr('item')}${score.telatHari ? ` · ${tr('telat rata²')} ${score.telatHari} ${tr('hr')}` : ''}` : tr('belum ada data')}</small></div>
+                  <div><span>{tr("Menang (RFQ)")}</span><b>{score.winPct == null ? '–' : `${score.winPct}%`}</b><small>{score.menang} {tr('menang')} · {score.kalah} {tr('kalah')}</small></div>
+                  <div><span>{tr("Tren harga")}</span><b className={score.hargaTren != null && score.hargaTren > 0 ? 'up' : ''}>{score.hargaTren == null ? '–' : `${score.hargaTren > 0 ? '+' : ''}${score.hargaTren.toLocaleString('id-ID')}%`}</b><small>{tr('HPP terakhir vs sebelumnya')}</small></div>
+                </div>
+              )}
               <div className="vd-kpis">
                 <div><span>{tr("Diminta harga")}</span><b>{stats.stats.total}</b></div>
                 <div><span>{tr("Dibalas")}</span><b>{stats.stats.total ? `${Math.round((stats.stats.dibalas / stats.stats.total) * 100)}%` : '–'}</b></div>
@@ -280,9 +314,10 @@ function VendorDetail({ v, ptab, setPtab, readOnly, boss, canDelete, onEdit, onC
       <div className="vd-avl">
         <b>{tr("Approved Vendor List:")}</b> <span className={`badge ${AVL_META[s].color}`}>{tr(AVL_META[s].label)}</span>
         {v.statusAlasan && <div className="muted">{v.statusAlasan}{v.statusOleh ? ` — ${v.statusOleh}` : ''}{v.statusAt ? `, ${fmtDate(v.statusAt.slice(0, 10))}` : ''}</div>}
-        {!readOnly && (
+        {/* GM Operation / VP memutuskan status walau tampilannya hanya baca. */}
+        {(!readOnly || boss) && (
           <div className="vd-avl-act">
-            <input type="text" value={alasan} onChange={(e) => setAlasan(e.target.value)} placeholder={boss ? tr('Alasan (wajib untuk blokir)') : tr('Catatan untuk GM')} />
+            <input type="text" value={alasan} onChange={(e) => setAlasan(e.target.value)} placeholder={boss ? tr('Alasan (wajib untuk blokir)') : tr('Catatan untuk GM Operation')} />
             {boss ? (
               <>
                 {s !== 'aktif' && <button type="button" className="btn btn-primary btn-sm" onClick={() => avl('aktif')}>{tr("Setujui (Aktif)")}</button>}
@@ -291,7 +326,7 @@ function VendorDetail({ v, ptab, setPtab, readOnly, boss, canDelete, onEdit, onC
               </>
             ) : (
               <>
-                {s !== 'aktif' && <button type="button" className="btn btn-outline btn-sm" onClick={() => avl('aktif')}>{tr("Ajukan Aktif ke GM")}</button>}
+                {s !== 'aktif' && <button type="button" className="btn btn-outline btn-sm" onClick={() => avl('aktif')}>{tr("Ajukan Aktif ke GM Operation")}</button>}
                 {s !== 'diblokir' && <button type="button" className="btn btn-outline btn-sm btn-flag" onClick={() => avl('diblokir')}>{tr("Usulkan blokir")}</button>}
               </>
             )}
@@ -376,11 +411,26 @@ function VendorEditor({ draft, onCancel, onSave }: { draft: Draft; onCancel: () 
         <label className="full">{tr("Alamat")}<input type="text" value={d.alamat || ''} onChange={(e) => set({ alamat: e.target.value })} /></label>
         <label className="full">{tr("Catatan")}<textarea rows={2} value={d.catatan || ''} onChange={(e) => set({ catatan: e.target.value })} /></label>
       </div>
-      {!d.id && <div className="field-note">{tr("Vendor baru berstatus Dalam evaluasi sampai disetujui GM.")}</div>}
+      {!d.id && <div className="field-note">{tr("Vendor baru berstatus Dalam evaluasi sampai disetujui GM Operation.")}</div>}
       <div className="toolbar-row" style={{ marginTop: 8, marginBottom: 0 }}>
         <button type="button" className="btn btn-outline btn-sm" onClick={onCancel}>{tr("Batal")}</button>
         <button type="button" className="btn btn-primary btn-sm" onClick={() => onSave(d)}>{tr("Simpan")}</button>
       </div>
     </div>
   );
+}
+
+/** Skor vendor di daftar: angka + warna, rincian di title. */
+function ScoreCell({ s }: { s?: VendorScore }) {
+  const tr = useT();
+  if (!s || s.skor == null) return <span className="muted">–</span>;
+  const cls = s.skor >= 80 ? 'green' : s.skor >= 60 ? 'amber' : 'rust';
+  const tip = [
+    s.tepatPct != null ? `${tr('Tiba tepat target')} ${s.tepatPct}% (${s.tepat}/${s.tiba})` : '',
+    s.dibalasPct != null ? `${tr('Dibalas')} ${s.dibalasPct}%${s.lamaBalas != null ? ` · ${s.lamaBalas} ${tr('hr')}` : ''}` : '',
+    s.winPct != null ? `${tr('Menang')} ${s.winPct}%` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return <span className={`badge ${cls}`} title={tip}>{s.skor}</span>;
 }

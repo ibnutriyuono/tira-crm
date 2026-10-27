@@ -44,6 +44,9 @@ const NOTIF_META: Record<NotificationType, { icon: () => React.JSX.Element; colo
   visit_assigned: { icon: IconFlag, color: 'steel' },
   visit_update: { icon: IconCheck, color: 'green' },
   visit_plan: { icon: IconCalendar, color: 'violet' },
+  ops_escalated: { icon: IconFlag, color: 'rust' },
+  margin_request: { icon: IconFlag, color: 'violet' },
+  margin_decided: { icon: IconFlag, color: 'green' },
 };
 
 function timeAgo(iso: string): string {
@@ -71,10 +74,21 @@ export function openNotification(n: AppNotification) {
   }
   // Pengumuman dari Admin / GM: cukup ditandai dibaca, isinya sudah tampil di daftar.
   if (n.entity === 'announcement') return;
+  if (n.type === 'margin_request') {
+    // VP: daftar persetujuan margin di Ruang Pimpinan.
+    useUiStore.getState().openModal('leadDesk');
+    return;
+  }
+  if (n.type === 'margin_decided') {
+    useUiStore.setState({ quotationProspectId: n.entityId });
+    useUiStore.getState().openModal('quotation');
+    return;
+  }
   if (n.entity === 'prospect' && (n.type === 'po_eta' || n.type === 'po_arrived')) {
     const role = useDataStore.getState().currentUser?.role;
-    // Purchasing membuka tab PO Indent; role lain Status Item prospek itu.
-    if (role === 'purchasing' || role === 'purchasing05') useUiStore.setState({ purchTabFocus: 'indent' });
+    // Purchasing (dan pimpinan Operation di ruang kerja Purchasing) membuka tab PO Indent; role lain Status Item prospek itu.
+    const inPurch = typeof window !== 'undefined' && window.location.pathname.startsWith('/purchasing');
+    if (role === 'purchasing' || role === 'purchasing05' || inPurch) useUiStore.setState({ purchTabFocus: 'indent' });
     else useUiStore.setState({ itemFlowCtx: { prospectId: n.entityId }, modal: 'itemFlow' });
     return;
   }

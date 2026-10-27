@@ -15,7 +15,7 @@ export function validTanggal(v: unknown): string | null {
 }
 
 /** Awalan identitas aktivitas untuk role non-lapangan (tanpa Kode SE). */
-const STAFF_PREFIX: Record<string, string> = { gm: 'GM', rm: 'RM', admin: 'ADMIN', salesadmin: 'ADS', purchasing: 'PURCH', purchasing05: 'PURCH' };
+const STAFF_PREFIX: Record<string, string> = { vp: 'VP', gm: 'GM', gmops: 'GMO', rm: 'RM', admin: 'ADMIN', salesadmin: 'ADS', purchasing: 'PURCH', purchasing05: 'PURCH' };
 
 /**
  * The identity an account's activities are recorded under. Every role logs

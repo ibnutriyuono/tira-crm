@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { DEFAULT_OPS_RULES, type OpsRules } from '@/lib/ops-rules';
 import type { Perms } from '@/lib/permissions';
 import type { PipelineIssue } from '@/lib/issues';
 import type { AnnualTarget, SeTarget, AppNotification, BudgetTarget, Customer, CustomerGroup, Fupa, Prospect, PurchasingContact, Rfq, SafeUser, SalesPlan, Vendor } from '@/lib/types';
@@ -28,6 +29,9 @@ interface DataState {
   notifications: AppNotification[];
   users: SafeUser[]; // only populated for admins when Kelola User modal opens
   purchasingContact: PurchasingContact;
+  /** Batas waktu & margin Operation (lib/ops-rules.ts). */
+  opsRules: OpsRules;
+  setOpsRules: (r: OpsRules) => void;
   /** Key Account groups (lib/kam.ts). */
   customerGroups: CustomerGroup[];
   /** Masalah pipeline yang terlihat user (lib/issues.ts). */
@@ -95,6 +99,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   notifications: [],
   users: [],
   purchasingContact: { wa: '', email: '' },
+  opsRules: DEFAULT_OPS_RULES,
   customerGroups: [],
   issues: [],
   loaded: false,
@@ -116,6 +121,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       notifications: [],
       users: [],
       purchasingContact: { wa: '', email: '' },
+      opsRules: DEFAULT_OPS_RULES,
       customerGroups: [],
       issues: [],
       loaded: false,
@@ -140,6 +146,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       salesPlans: data.salesPlans ?? [],
       notifications: data.notifications ?? [],
       purchasingContact: data.purchasingContact,
+      opsRules: data.opsRules ?? DEFAULT_OPS_RULES,
       customerGroups: data.customerGroups ?? [],
       issues: data.issues ?? [],
       loaded: true,
@@ -302,6 +309,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   removeUser: (id) => set((s) => ({ users: s.users.filter((x) => x.id !== id) })),
 
   setPurchasingContact: (c) => set({ purchasingContact: c }),
+  setOpsRules: (r) => set({ opsRules: r }),
 
   refetchProspects: async () => {
     const res = await fetch('/api/prospects');

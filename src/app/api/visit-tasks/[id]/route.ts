@@ -11,6 +11,7 @@ import { activityOwner, normalizeActivityPics, validTanggal } from '@/lib/sales-
 import { emitCrmEvent } from '@/lib/socket';
 import type { VisitReschedule } from '@/lib/visit-task';
 import { bmIdsOf, canAssignTo } from '@/lib/visit-task-server';
+import { isGmLevel } from '@/lib/roles';
 
 /**
  * Satu tugas kunjungan.
@@ -83,7 +84,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const u = await prisma.visitTask.update({ where: { id }, data: { dueDate, reschedules: log as unknown as Prisma.InputJsonValue } });
     emitCrmEvent('visitTask:updated', { id: u.id });
     await notify({
-      userIds: mine ? [t.assignedById, ...(t.assignedByRole === 'gm' ? await bmIdsOf(t.cabang) : [])] : [t.assigneeId],
+      userIds: mine ? [t.assignedById, ...(isGmLevel(t.assignedByRole) ? await bmIdsOf(t.cabang) : [])] : [t.assigneeId],
       type: 'visit_update',
       entity: 'visitTask',
       entityId: id,

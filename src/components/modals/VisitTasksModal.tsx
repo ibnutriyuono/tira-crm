@@ -29,6 +29,7 @@ import { useUiStore } from '@/store/useUiStore';
 import { useT } from '@/store/useLangStore';
 import { useRoster, type RosterUser } from '../issues/shared';
 import { IconPlus, IconSearch } from '../icons';
+import { isGmLevel } from '@/lib/roles';
 
 let planSeq = 0;
 const newPlanId = () => `p${Date.now().toString(36)}${(planSeq++).toString(36)}`;
@@ -519,7 +520,7 @@ function Assign({ tasks, today, onDone }: { tasks: VisitTask[]; today: string; o
         <datalist id="vt-tujuan2">{TUJUAN_PRESET.map((x) => <option key={x} value={x} />)}</datalist>
         <label>{tr("Catatan untuk Sales")}<input type="text" value={catatan} onChange={(e) => setCatatan(e.target.value)} /></label>
         <button type="button" className="btn btn-primary btn-sm" disabled={busy || !assignee || !picked.length} onClick={send}>{tr("Tugaskan")} {picked.length ? `${picked.length} customer` : ''}</button>
-        {me?.role === 'gm' && <div className="field-note" style={{ margin: 0 }}>{tr("Tugas dari GM langsung ke Sales; BM cabangnya ikut diberi tahu.")}</div>}
+        {isGmLevel(me?.role) && <div className="field-note" style={{ margin: 0 }}>{tr("Tugas dari GM langsung ke Sales; BM cabangnya ikut diberi tahu.")}</div>}
       </div>
       <div className="vt-col grow">
         <div className="rq-title">{tr("Saran otomatis")} {sugs ? `(${sugs.length})` : ''}</div>

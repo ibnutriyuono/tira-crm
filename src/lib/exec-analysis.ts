@@ -3,6 +3,7 @@ import { CABANG_LIST, STAGE_PROBABILITY } from './constants';
 import { classify, num } from './format';
 import { buildAgingList, buildCustomerIntel, buildForecast, buildForecastBySe, buildForecastByReg, buildForecastNasional, customerKey, daysSince, periodeList } from './reports';
 import type { BudgetTarget, Prospect, SafeUser, SalesPlan } from './types';
+import { isGmLevel } from './roles';
 
 /**
  * Analisa Eksekutif, open to every sales-side role and scoped to what that
@@ -24,7 +25,7 @@ export interface ExecScope {
 }
 
 export function execScopeFor(user: SafeUser, prospects: Prospect[]): ExecScope | null {
-  if (user.role === 'gm' || user.role === 'admin') return { kind: 'nasional', label: 'Nasional', cabangs: CABANG_LIST };
+  if (isGmLevel(user.role) || user.role === 'gmops' || user.role === 'admin') return { kind: 'nasional', label: 'Nasional', cabangs: CABANG_LIST };
   if (user.role === 'rm') {
     const reg = user.reg ?? -1;
     const set = new Set<string>();

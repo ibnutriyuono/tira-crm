@@ -47,11 +47,13 @@ export const BASE_ROLES: { key: string; label: string; scope: string; note: stri
   { key: 'salesadmin', label: 'Admin Sales', scope: 'Satu cabang', note: 'Seluruh data satu cabang; mengisi atas nama Sales, surat penawaran atas nama Sales/BM, faktur; notifikasi Antrian Admin.' },
   { key: 'bm', label: 'BM (Branch Manager)', scope: 'Satu cabang', note: 'Seluruh data satu cabang; membagi target ke Sales; perjalanan dinas; menyetujui perjalanan Sales cabangnya.' },
   { key: 'rm', label: 'RM (Regional Manager)', scope: 'Satu regional', note: 'Semua cabang di regionalnya; menyetujui perjalanan BM.' },
+  { key: 'vp', label: 'VP (Vice President)', scope: 'Nasional — seluruh divisi', note: 'Semua hak GM dan GM Operation; tingkat eskalasi tertinggi.' },
   { key: 'gm', label: 'GM (General Manager)', scope: 'Nasional', note: 'Seluruh data perusahaan; menetapkan target cabang.' },
+  { key: 'gmops', label: 'GM Operation', scope: 'Nasional — operasional', note: 'Membawahi Purchasing, IPC, gudang: menyetujui status vendor (AVL), memproses masalah dari Purchasing, melihat HPP; pipeline Sales hanya baca.' },
   { key: 'purchasing', label: 'Purchasing', scope: 'Nasional — dokumen RFQ/FUP A', note: 'UI Purchasing; melihat semua RFQ/FUP A dan prospek.' },
 ];
 export const BUILTIN_ROLE_LABEL: Record<string, string> = {
-  admin: 'Admin', gm: 'GM', rm: 'RM', bm: 'BM', salesadmin: 'Admin Sales', sales: 'Sales', purchasing: 'Purchasing', purchasing05: 'PIC Line 05',
+  admin: 'Admin', vp: 'VP', gm: 'GM', gmops: 'GM Operation', rm: 'RM', bm: 'BM', salesadmin: 'Admin Sales', sales: 'Sales', purchasing: 'Purchasing', purchasing05: 'PIC Line 05',
 };
 
 /**
@@ -81,6 +83,19 @@ export const ROLE_LIMITS: Record<string, Partial<Record<string, Limit>>> = {
   bm: { prospek: PROSPEK_D, kam: KAM_ED, purch: PURCH_ED },
   rm: { prospek: PROSPEK_D, rencana: L(['e', 'd'], 'RM hanya melihat rencana penjualan'), kam: L(['d'], 'Hapus grup Key Account hanya GM & Admin'), purch: PURCH_ED },
   gm: { purch: PURCH_ED },
+  vp: { purch: PURCH_ED },
+  gmops: {
+    prospek: L(['e', 'd'], 'Pipeline Sales hanya baca untuk GM Operation'),
+    rencana: L(ALL, 'Rencana penjualan dikelola Sales / BM / GM'),
+    customer: L(['e', 'd'], 'Data customer dikelola tim Sales'),
+    rfq: L(['d'], 'RFQ / FUP A dihapus oleh pengirimnya'),
+    kam: KAM_ED,
+    forecast: TARGET_E,
+    kpi: TARGET_E,
+    faktur: L(ALL, 'Antrian Admin untuk Admin Sales, BM, RM, GM'),
+    trip: L(ALL, 'Perjalanan dinas untuk Sales, BM, RM, GM, VP'),
+    purch: PURCH_ED,
+  },
   purchasing: {
     rfq: L(ALL, 'Untuk Purchasing diatur lewat modul Purchasing'),
     rencana: NOT_IN_PURCH, forecast: NOT_IN_PURCH, kpi: NOT_IN_PURCH, analisa: NOT_IN_PURCH,

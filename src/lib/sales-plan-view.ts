@@ -1,6 +1,7 @@
 import { STATUS_META } from './constants';
 import { num } from './format';
 import type { Prospect, SafeUser, SalesPlan, SalesPlanItem } from './types';
+import { isGmLevel } from './roles';
 
 /**
  * Who may create/edit/delete a given SE's plan: the SE themself, their own BM
@@ -10,7 +11,7 @@ import type { Prospect, SafeUser, SalesPlan, SalesPlanItem } from './types';
  */
 export function canEditSalesPlanFor(user: Pick<SafeUser, 'role' | 'se' | 'cabang'> | null | undefined, targetSe: string, targetCabang: string | null): boolean {
   if (!user) return false;
-  if (user.role === 'admin' || user.role === 'gm') return true;
+  if (user.role === 'admin' || isGmLevel(user.role)) return true;
   if (user.role === 'sales') return (user.se || '').trim().toLowerCase() === (targetSe || '').trim().toLowerCase();
   if (user.role === 'bm') return (user.cabang || '').trim().toLowerCase() === (targetCabang || '').trim().toLowerCase();
   return false;

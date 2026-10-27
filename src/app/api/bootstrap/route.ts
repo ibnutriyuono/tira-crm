@@ -8,6 +8,7 @@ import type { PurchasingContact } from '@/lib/types';
 import { effectivePerms, roleDefs } from '@/lib/permissions-server';
 import { sweepFollowUpNotifications } from '@/lib/followup-notify';
 import { issueScopeWhere, sweepIssueEscalation } from '@/lib/issues-server';
+import { getOpsRules, sweepOpsEscalation } from '@/lib/ops-escalation';
 
 // Single round-trip the client makes right after login / on page load —
 // everything the dashboard needs to render before any modal is opened.
@@ -18,6 +19,8 @@ export async function GET() {
   // Notifikasi follow-up hari H / terlambat (tanpa penjadwal: dicek saat CRM dibuka).
   await sweepFollowUpNotifications();
   await sweepIssueEscalation();
+  await sweepOpsEscalation();
+  const opsRules = await getOpsRules();
   const [prospects, customers, rfqs, fupas, vendors, budgetTargets, salesPlans, notifications, settingRow, customerGroups, annualTargets, seTargets, issues] = await Promise.all([
     prisma.prospect.findMany({ where: prospectScopeWhere(user), orderBy: { createdAt: 'desc' } }),
     prisma.customer.findMany({ where: await customerScopeWhere(user), orderBy: { createdAt: 'desc' } }),
@@ -68,6 +71,7 @@ export async function GET() {
     salesPlans: see('rencana') ? salesPlans : [],
     notifications,
     purchasingContact,
+    opsRules,
     customerGroups: see('kam') ? customerGroups : [],
     annualTargets,
     seTargets,

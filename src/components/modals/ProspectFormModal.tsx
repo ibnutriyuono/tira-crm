@@ -177,7 +177,7 @@ export function ProspectFormModal() {
   const seOptions = useMemo(() => {
     const cab = cabang.trim().toUpperCase();
     const list = roster
-      .filter((u) => (u.se || '').trim() && ['sales', 'bm', 'rm', 'gm'].includes(u.role))
+      .filter((u) => (u.se || '').trim() && ['sales', 'bm', 'rm', 'gm', 'vp'].includes(u.role))
       .filter((u) => !cab || (u.cabang || '').trim().toUpperCase() === cab)
       .map((u) => ({ se: (u.se || '').trim().toUpperCase(), label: `${u.name} (${(u.se || '').trim().toUpperCase()})${cab ? '' : u.cabang ? ` · ${u.cabang}` : ''}` }));
     const seen = new Set<string>();

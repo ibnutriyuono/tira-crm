@@ -7,6 +7,7 @@ import type { TripVisit } from '@/lib/types';
 import { canApproveTrip, finishBlocker } from '@/lib/visit-trip';
 import { guard } from '@/lib/permissions-server';
 import { syncTripActivitiesSafe } from '@/lib/trip-activity-server';
+import { isGmLevel } from '@/lib/roles';
 
 /**
  * Status transitions: submit (owner, draft/ditolak -> diajukan; a GM's own
@@ -35,9 +36,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   switch (action) {
     case 'submit':
       if (!isOwner || (trip.status !== 'draft' && trip.status !== 'ditolak')) return deny('Hanya draft/ditolak milik sendiri yang dapat diajukan.');
-      if (trip.ownerRole === 'gm') {
-        data = { status: 'disetujui', submittedAt: new Date(), approverName: `${trip.ownerName} (GM)`, approvedAt: new Date(), approvalNote: null };
-        summary = `Menetapkan ${label} (GM, tanpa persetujuan)`;
+      if (isGmLevel(trip.ownerRole)) {
+        data = { status: 'disetujui', submittedAt: new Date(), approverName: `${trip.ownerName} (${trip.ownerRole === 'vp' ? 'VP' : 'GM'})`, approvedAt: new Date(), approvalNote: null };
+        summary = `Menetapkan ${label} (${trip.ownerRole === 'vp' ? 'VP' : 'GM'}, tanpa persetujuan)`;
       } else {
         data = { status: 'diajukan', submittedAt: new Date(), approverName: null, approvedAt: null, approvalNote: null };
         summary = `Mengajukan ${label}`;

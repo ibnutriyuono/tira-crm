@@ -6,6 +6,7 @@ import { isPurchasingRoleClient } from '@/lib/doc-lines';
 import { useEffect } from 'react';
 import { getSocket } from '@/lib/socket-client';
 import { matchesBudgetTargetScope, matchesCustomerScope, matchesDocScope, matchesProspectScope, matchesSalesPlanScope, myCabangScope, myRegionCabangs } from '@/lib/client-scope';
+import type { OpsRules } from '@/lib/ops-rules';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Perms } from '@/lib/permissions';
@@ -245,7 +246,7 @@ export function useCrmSocket() {
       const me = st.currentUser;
       if (!me) return;
       const known = st.issues.some((x) => x.id === i.id);
-      const wide = me.role === 'gm' || me.role === 'admin' || me.role === 'purchasing';
+      const wide = me.role === 'gm' || me.role === 'vp' || me.role === 'gmops' || me.role === 'admin' || me.role === 'purchasing';
       const visible = wide || (Array.isArray(i.pjIds) && i.pjIds.includes(me.id)) || st.prospects.some((p) => p.id === i.prospectId);
       if (known || visible) st.upsertIssue(i);
     };
@@ -263,6 +264,7 @@ export function useCrmSocket() {
     const onUserDelete = ({ id }: { id: string }) => useDataStore.getState().removeUser(id);
 
     const onPurchasingContact = (c: PurchasingContact) => useDataStore.getState().setPurchasingContact(c);
+    const onOpsRules = (r: OpsRules) => useDataStore.getState().setOpsRules(r);
     const onDatabaseRestored = () => {
       useDataStore.getState().toast('Database dipulihkan oleh admin. Memuat ulang data...', 'info');
       store.bootstrap();
@@ -312,6 +314,7 @@ export function useCrmSocket() {
     s.on('user:deleted', onUserDelete);
 
     s.on('purchasingContact:updated', onPurchasingContact);
+    s.on('opsRules:updated', onOpsRules);
     s.on('database:restored', onDatabaseRestored);
 
     return () => {
@@ -351,6 +354,7 @@ export function useCrmSocket() {
       s.off('user:deleted', onUserDelete);
       s.off('itemchat:message', onItemChatMessage);
       s.off('purchasingContact:updated', onPurchasingContact);
+      s.off('opsRules:updated', onOpsRules);
       s.off('database:restored', onDatabaseRestored);
     };
   }, []);

@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (denied) return denied;
   // Sejalan dengan hak mengisi jawaban: yang mengerjakan dokumen ini pula
   // yang boleh menghentikannya.
-  if (!['purchasing', 'purchasing05', 'admin', 'gm'].includes(user.role)) {
+  if (!['purchasing', 'purchasing05', 'admin', 'gm', 'gmops', 'vp'].includes(user.role)) {
     return NextResponse.json({ error: 'Hanya Purchasing, GM, atau Admin yang dapat membatalkan RFQ.' }, { status: 403 });
   }
 

@@ -5,6 +5,7 @@ import { canEditBudgetTarget, salesActivityScopeWhere } from '@/lib/auth';
 import { ACTIVITY_TYPES } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { guard } from '@/lib/permissions-server';
+import { isGmLevel } from '@/lib/roles';
 
 export async function GET(req: Request) {
   const user = await requireUser();
@@ -46,7 +47,7 @@ export async function PUT(req: Request) {
   const known =
     (await prisma.prospect.findFirst({ where: { se: { equals: se, mode: 'insensitive' }, cabang: { not: null } }, orderBy: { createdAt: 'desc' }, select: { cabang: true, reg: true } })) ??
     (await prisma.salesActivity.findFirst({ where: { se: { equals: se, mode: 'insensitive' } }, orderBy: { createdAt: 'desc' }, select: { cabang: true, reg: true } }));
-  if (!known?.cabang && user.role !== 'admin' && user.role !== 'gm') {
+  if (!known?.cabang && user.role !== 'admin' && !isGmLevel(user.role)) {
     return NextResponse.json({ error: 'SE ini belum dikenali (belum punya prospek/aktivitas), target belum bisa ditetapkan.' }, { status: 400 });
   }
   const cabang = (known?.cabang || '').toUpperCase();

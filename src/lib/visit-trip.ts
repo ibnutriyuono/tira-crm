@@ -10,7 +10,7 @@ import type { Role, TripHasil, TripStatus, TripVisit, VisitTrip } from './types'
 export const TRIP_PHOTO_MAX_PER_VISIT = 10;
 export const TRIP_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-export const TRIP_ROLES: Role[] = ['gm', 'rm', 'bm', 'sales'];
+export const TRIP_ROLES: Role[] = ['vp', 'gm', 'rm', 'bm', 'sales'];
 
 /** Sales dan BM merencanakan perjalanan di cabangnya sendiri (cabang tujuan terkunci). */
 export const tripCabangLocked = (role: string | null | undefined) => role === 'bm' || role === 'sales';
@@ -67,7 +67,7 @@ export interface TripAuthRow {
 
 export function canApproveTrip(user: Actor, trip: TripAuthRow): boolean {
   if (trip.status !== 'diajukan' || trip.ownerId === user.id) return false;
-  if (user.role === 'gm' || user.role === 'admin') return trip.ownerRole === 'bm' || trip.ownerRole === 'rm' || trip.ownerRole === 'sales';
+  if (user.role === 'gm' || user.role === 'vp' || user.role === 'admin') return trip.ownerRole === 'bm' || trip.ownerRole === 'rm' || trip.ownerRole === 'sales';
   if (user.role === 'rm') return (trip.ownerRole === 'bm' || trip.ownerRole === 'sales') && user.reg != null && trip.ownerReg === user.reg;
   if (user.role === 'bm') {
     const c = (user.cabang || '').trim().toUpperCase();
@@ -179,7 +179,7 @@ export function tripRealisasiRate(visits: TripVisit[]): { planned: number; done:
   };
 }
 
-const ROLE_LABEL: Record<string, string> = { gm: 'General Manager', rm: 'Regional Manager', bm: 'Branch Manager' };
+const ROLE_LABEL: Record<string, string> = { vp: 'Vice President', gm: 'General Manager', rm: 'Regional Manager', bm: 'Branch Manager' };
 
 function esc(v: unknown): string {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
@@ -292,7 +292,7 @@ ${trip.approvalNote ? `<div class="note"><b>Catatan atasan:</b> ${esc(trip.appro
 <div class="decl">Saya menyatakan bahwa kunjungan di atas benar telah dilaksanakan dalam rangka perjalanan dinas sesuai rencana yang disetujui.</div>
 <div class="sign">
 <div><small>Pemohon</small><span><b>${esc(trip.ownerName)}</b><br><small>${esc(ROLE_LABEL[trip.ownerRole] || '')}</small></span></div>
-<div><small>Disetujui atasan (${esc(approverLabel(trip.ownerRole))})</small><span>${trip.ownerRole === 'gm' ? '<small>—</small>' : approved}</span></div>
+<div><small>Disetujui atasan (${esc(approverLabel(trip.ownerRole))})</small><span>${trip.ownerRole === 'gm' || trip.ownerRole === 'vp' ? '<small>—</small>' : approved}</span></div>
 <div><small>Diterima Keuangan</small><span><small>Nama &amp; tanggal</small></span></div>
 </div>
 <div class="foot"><span>Dicetak dari TIRA CRM · ${esc(new Date().toLocaleString('id-ID'))}</span><span>${esc(tripDocNo(trip))}</span></div>

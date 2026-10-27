@@ -114,6 +114,7 @@ export function KpiModal() {
     !!currentUser &&
     (currentUser.role === 'admin' ||
       currentUser.role === 'gm' ||
+      currentUser.role === 'vp' ||
       (currentUser.role === 'bm' && (currentUser.cabang || '').toUpperCase() === cabangList[0]) ||
       (currentUser.role === 'rm' && cabangReg[cabangList[0]] === currentUser.reg));
 

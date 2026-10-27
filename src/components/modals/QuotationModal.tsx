@@ -41,9 +41,18 @@ function generateDefaultNomor(r: Prospect): string {
   return `${seq}/TA-STL-${r.cabang || 'PST'}/${ROMAN[now.getMonth()]}/${now.getFullYear()}`;
 }
 
-const JABATAN: Record<string, string> = { sales: 'Sales Engineer', bm: 'Branch Manager', rm: 'Regional Manager', gm: 'General Manager', salesadmin: 'Admin Sales' };
+const JABATAN: Record<string, string> = { sales: 'Sales Engineer', bm: 'Branch Manager', rm: 'Regional Manager', gm: 'General Manager', vp: 'Vice President', salesadmin: 'Admin Sales' };
 
 // Pilihan tampilan, kop, kota & telepon penanda tangan diingat per browser.
+interface MarginInfo {
+  needs: boolean;
+  minMargin: number;
+  below: number;
+  checked: number;
+  lines: { idx: number; checked: boolean; below: boolean; margin?: number | null }[];
+  approval: { id: string; status: string; decidedByName: string | null; decisionNote: string | null; createdAt: string } | null;
+}
+
 const LS = { opts: 'tira.quote.opts', kop: 'tira.quote.kop', kota: 'tira.quote.kota', telp: 'tira.quote.telp', lang: 'tira.quote.lang' };
 const lsGet = (k: string) => {
   try {
@@ -100,6 +109,10 @@ export function QuotationModal() {
   const picOptions = useMemo(() => (cust?.pics?.length ? cust.pics : cust?.pic ? [{ id: 'legacy', nama: cust.pic, jabatan: null, phone: cust.phone, email: cust.email, isPrimary: true }] : []), [cust]);
 
   const [tab, setTab] = useState<Tab>('isi');
+  // Margin vs HPP jawaban RFQ: di bawah batas → perlu persetujuan VP (lib/margin-check.ts).
+  const [margin, setMargin] = useState<MarginInfo | null>(null);
+  const [marginAlasan, setMarginAlasan] = useState('');
+  const [marginBusy, setMarginBusy] = useState(false);
   const [opts, setOpts] = useState<QuoteOpts>(defaultQuoteOpts());
   const [d, setD] = useState<QuoteData | null>(null);
   const [email, setEmail] = useState('');
@@ -208,6 +221,23 @@ export function QuotationModal() {
     : signatureUrl(currentUser?.signatureAt);
   const preview = useMemo(() => (d && tab === 'pratinjau' ? quoteHtml(d, opts, '/logo.png', sigSrc) : ''), [d, opts, tab, sigSrc]);
 
+  const marginItems = d ? d.items.map((it) => ({ line: it.line, uraian: it.uraian, grade: it.grade, qty: it.qty, beratPc: it.beratPc, hargaKg: it.hargaKg, harga: it.harga })) : [];
+  const marginSig = JSON.stringify(marginItems);
+  useEffect(() => {
+    if (!show || !record) return;
+    let alive = true;
+    const t = setTimeout(() => {
+      api
+        .post<MarginInfo>('/api/quotations/margin', { prospectId: record.id, items: JSON.parse(marginSig) })
+        .then((r) => alive && setMargin(r))
+        .catch(() => alive && setMargin(null));
+    }, 500);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [show, record?.id, marginSig]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!record || !d) return null;
 
   const set = (patch: Partial<QuoteData>) => setD((x) => (x ? { ...x, ...patch } : x));
@@ -247,7 +277,7 @@ export function QuotationModal() {
   const canLogAkt = !!currentUser && (!!otherSigner || !!activityOwner(currentUser)) && canNow('aktivitas', 'e');
 
   /** Satu nomor surat = satu baris Aktivitas Harian (unduh ulang memperbarui baris yang sama). */
-  async function logToActivity(kanal: 'email' | null) {
+  async function logToActivity(kanal: 'email' | 'wa' | null) {
     if (!d || !record || !logAkt || !canLogAkt) return;
     try {
       const r = await api.post<{ created: boolean; owner: string }>('/api/sales-activities/quotation', {
@@ -277,6 +307,40 @@ export function QuotationModal() {
     }
   }
 
+
+  /** Cek terakhir sebelum unduh / kirim. */
+  async function marginOk(): Promise<boolean> {
+    if (!record) return false;
+    try {
+      const r = await api.post<MarginInfo>('/api/quotations/margin', { prospectId: record.id, items: marginItems });
+      setMargin(r);
+      if (r.needs) {
+        setTab('isi');
+        toast(r.approval?.status === 'menunggu' ? tr('Menunggu persetujuan VP untuk harga ini') : `${tr('Margin di bawah')} ${r.minMargin}% — ${tr('ajukan persetujuan VP dulu')}`, 'error');
+        return false;
+      }
+      return true;
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal memeriksa margin', 'error');
+      return false;
+    }
+  }
+
+  async function ajukanMargin() {
+    if (!record || !d) return;
+    setMarginBusy(true);
+    try {
+      const r = await api.post<MarginInfo>('/api/quotations/margin', { prospectId: record.id, items: marginItems, ajukan: true, alasan: marginAlasan, nomor: d.nomor });
+      setMargin(r);
+      setMarginAlasan('');
+      toast(tr('Pengajuan dikirim ke VP'), 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mengajukan', 'error');
+    } finally {
+      setMarginBusy(false);
+    }
+  }
+
   function validate(): boolean {
     if (!d) return false;
     if (!d.kepada.trim()) {
@@ -292,6 +356,7 @@ export function QuotationModal() {
 
   async function onDownload() {
     if (!d || !validate()) return;
+    if (!(await marginOk())) return;
     setBusy(true);
     try {
       remember();
@@ -349,6 +414,7 @@ export function QuotationModal() {
 
   async function onDownloadPdf() {
     if (!d || !validate()) return;
+    if (!(await marginOk())) return;
     setBusy(true);
     try {
       remember();
@@ -363,9 +429,45 @@ export function QuotationModal() {
     }
   }
 
-  /** Buka layar email: isian bawaan disusun dari surat (bahasa ikut bahasa surat). */
-  function onSendEmail() {
+  /**
+   * Kirim lewat WhatsApp: di HP (HTTPS) PDF langsung dibagikan ke WhatsApp;
+   * selain itu PDF diunduh lalu chat WhatsApp PIC dibuka dengan teks pengantar.
+   */
+  async function onSendWa() {
     if (!d || !validate()) return;
+    if (!(await marginOk())) return;
+    setBusy(true);
+    try {
+      remember();
+      const pdf = await makePdf();
+      const name = `${baseName()}.pdf`;
+      const text = `${d.pic ? `Yth. ${d.pic},\n\n` : ''}Bersama ini kami kirimkan Surat Penawaran No. ${d.nomor} untuk ${d.kepada}. Mohon dapat dipelajari, kami siap membantu bila ada pertanyaan.\n\nSalam,\n${d.signer.nama || currentUser?.name || ''}\nPT. TIRA AUSTENITE, Tbk`;
+      const file = new File([pdf], name, { type: 'application/pdf' });
+      const nav = navigator as Navigator & { canShare?: (data: { files: File[] }) => boolean };
+      if (window.isSecureContext && nav.canShare && nav.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], text, title: name });
+      } else {
+        saveBlob(pdf, name);
+        const pic = picOptions.find((x) => x.isPrimary) || picOptions[0];
+        const raw = (pic?.phone || cust?.phone || record?.phone || '').replace(/\D/g, '');
+        const num62 = raw.startsWith('0') ? `62${raw.slice(1)}` : raw;
+        window.open(`https://wa.me/${num62}?text=${encodeURIComponent(text)}`, '_blank');
+        toast(`PDF diunduh (${name}) — lampirkan di chat WhatsApp yang terbuka`, 'success');
+      }
+      void markSent();
+      void logToActivity('wa');
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      toast(err instanceof Error ? err.message : 'Gagal menyiapkan WhatsApp', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Buka layar email: isian bawaan disusun dari surat (bahasa ikut bahasa surat). */
+  async function onSendEmail() {
+    if (!d || !validate()) return;
+    if (!(await marginOk())) return;
     remember();
     // Atas nama orang lain: ia ikut menerima salinan (balasan customer juga ke emailnya).
     const ccSigner = otherSigner && d.signer.email && validEmail(d.signer.email) ? d.signer.email : '';
@@ -389,6 +491,7 @@ export function QuotationModal() {
     const bad = [...to, ...cc].find((x) => !validEmail(x));
     if (bad) return toast(`Alamat email tidak valid: ${bad}`, 'error');
     if (!mail.subject.trim() || !mail.message.trim()) return toast('Subjek dan isi pesan wajib diisi', 'error');
+    if (!(await marginOk())) return;
     setSending(true);
     try {
       const pdf = await makePdf();
@@ -404,7 +507,7 @@ export function QuotationModal() {
       } else {
         const attachments = [{ filename: pdfName, content: await toBase64(pdf) }];
         if (mail.docx) attachments.push({ filename: `${baseName()}.docx`, content: await toBase64(await makeDocx()) });
-        await api.post('/api/quotations/email', { prospectId: record.id, to, cc, subject: mail.subject.trim(), message: mail.message, summary, attachments });
+        await api.post('/api/quotations/email', { prospectId: record.id, to, cc, subject: mail.subject.trim(), message: mail.message, summary, attachments, items: marginItems });
         toast(`Penawaran terkirim ke ${to.join(', ')}`, 'success');
         setMailMode(false);
       }
@@ -442,6 +545,9 @@ export function QuotationModal() {
           <>
             <button type="button" className="btn btn-outline" onClick={closeModal}>
               {tr("Tutup")}
+            </button>
+            <button type="button" className="btn btn-outline" disabled={busy} onClick={onSendWa}>
+              {tr("Kirim via WhatsApp")}
             </button>
             <button type="button" className="btn btn-outline" onClick={onSendEmail}>
               <IconMail /> {tr("Kirim via Email")}
@@ -503,6 +609,36 @@ export function QuotationModal() {
               srcDoc={quoteEmailHtml({ message: mail.message, summary: quoteEmailSummary(d, opts), attachments: [`${baseName()}.pdf`, ...(mail.docx && mailServer !== false ? [`${baseName()}.docx`] : [])], logoSrc: '/logo.png' })}
             />
           </div>
+        </div>
+      )}
+      {!mailMode && margin && margin.below > 0 && (
+        <div className={`qm-margin ${margin.needs ? (margin.approval?.status === 'menunggu' ? 'wait' : 'bad') : 'ok'}`} role="status">
+          <b>
+            {margin.needs
+              ? margin.approval?.status === 'menunggu'
+                ? `⏳ ${tr('Menunggu persetujuan VP')}`
+                : `⚠ ${margin.below} ${tr('item dengan margin di bawah')} ${margin.minMargin}% ${tr('dari HPP')}`
+              : `✓ ${tr('Margin di bawah batas sudah disetujui')}${margin.approval?.decidedByName ? ` — ${margin.approval.decidedByName}` : ''}`}
+          </b>
+          {margin.needs && margin.approval?.status === 'ditolak' && (
+            <span>
+              {tr('Pengajuan sebelumnya ditolak')}
+              {margin.approval.decidedByName ? ` (${margin.approval.decidedByName})` : ''}
+              {margin.approval.decisionNote ? `: ${margin.approval.decisionNote}` : ''} — {tr('ubah harga atau ajukan lagi dengan alasan.')}
+            </span>
+          )}
+          {margin.needs && margin.approval?.status !== 'menunggu' && (
+            <>
+              <span>{tr('Surat belum bisa diunduh atau dikirim. Naikkan harga item yang ditandai, atau ajukan persetujuan VP.')}</span>
+              <span className="qm-margin-act">
+                <input type="text" value={marginAlasan} placeholder={tr('Alasan (mis. customer strategis, harga kompetitor)')} onChange={(e) => setMarginAlasan(e.target.value)} />
+                <button type="button" className="btn btn-primary btn-sm" disabled={marginBusy || marginAlasan.trim().length < 5} onClick={ajukanMargin}>
+                  {tr('Ajukan ke VP')}
+                </button>
+              </span>
+            </>
+          )}
+          {margin.needs && margin.approval?.status === 'menunggu' && <span>{tr('Anda akan diberi notifikasi begitu VP memutuskan. Mengubah harga membatalkan pengajuan ini.')}</span>}
         </div>
       )}
       {!mailMode && (<>
@@ -588,8 +724,9 @@ export function QuotationModal() {
             </div>
             {d.items.map((it, idx) => {
               const perKg = it.beratPc > 0 && it.hargaKg > 0;
+              const ml = margin?.lines.find((l) => l.idx === idx);
               return (
-                <div className="qitem-row" key={idx}>
+                <div className={`qitem-row${ml?.below ? ' qm-low' : ''}`} key={idx} title={ml?.below ? (ml.margin != null ? `${tr('Margin')} ${ml.margin.toLocaleString('id-ID')}% — ${tr('di bawah')} ${margin?.minMargin}%` : `${tr('Di bawah margin minimum')} ${margin?.minMargin}%`) : ml?.checked && ml.margin != null ? `${tr('Margin')} ${ml.margin.toLocaleString('id-ID')}%` : undefined}>
                   <input type="text" aria-label={tr("Line")} placeholder={tr("Line")} value={it.line} onChange={(e) => setItem(idx, { line: e.target.value })} />
                   <input type="text" aria-label={tr("Uraian material")} placeholder={tr("Uraian material")} value={it.uraian} onChange={(e) => setItem(idx, { uraian: e.target.value })} />
                   <input type="number" aria-label={tr("Qty")} min={0} step="any" value={it.qty} onChange={(e) => setItem(idx, { qty: num(e.target.value) })} />

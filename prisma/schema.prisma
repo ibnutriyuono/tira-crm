@@ -9,7 +9,11 @@ datasource db {
 
 enum Role {
   admin
+  /// VP: membawahi seluruh divisi (Sales & Operation) — semua hak GM + GM Operation.
+  vp
   gm
+  /// GM Operation: membawahi Purchasing, IPC, gudang — AVL vendor & masalah Purchasing; pipeline hanya baca.
+  gmops
   rm
   bm
   sales
@@ -959,4 +963,33 @@ model VisitPlan {
 
   @@unique([userId, weekStart])
   @@index([cabang, weekStart])
+}
+
+/// Persetujuan VP untuk Surat Penawaran dengan margin di bawah batas
+/// (lib/margin-check.ts). Berlaku untuk harga surat yang sama (priceKey).
+model MarginApproval {
+  id              String    @id @default(cuid())
+  prospectId      String
+  customer        String
+  cabang          String?
+  se              String?
+  nomor           String?
+  /// Salinan item surat + margin per item (server; tidak dikirim ke Sales).
+  items           Json
+  priceKey        String
+  minMargin       Float
+  alasan          String?
+  /// menunggu | disetujui | ditolak
+  status          String    @default("menunggu")
+  requestedById   String
+  requestedByName String
+  decidedById     String?
+  decidedByName   String?
+  decisionNote    String?
+  decidedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([prospectId])
+  @@index([status])
 }

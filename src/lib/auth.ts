@@ -6,7 +6,7 @@ import { itemsHaveLine } from './doc-lines';
 import { prisma } from './prisma';
 import { activityOwner } from './sales-activity';
 import type { SafeUser } from './types';
-import { isBranchRole } from './roles';
+import { isBranchRole, isGmLevel, isOpsLead } from './roles';
 
 export const SESSION_COOKIE = 'crm_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
@@ -90,7 +90,7 @@ export function prospectScopeWhere(user: SafeUser) {
   if (user.role === 'purchasing') return {};
   // PIC Line 05 works only RFQ / FUP A that contain a Line 05 item, nothing else.
   if (user.role === 'purchasing05') return NONE;
-  return {}; // gm & admin see everything
+  return {}; // gm, vp, gmops (hanya baca) & admin see everything
 }
 
 /**
@@ -236,7 +236,7 @@ export async function docScopeWhere(
  * than inheriting gm/admin's open access by accident.
  */
 export async function salesPlanScopeWhere(user: SafeUser) {
-  if (user.role === 'admin' || user.role === 'gm') return {};
+  if (user.role === 'admin' || isGmLevel(user.role)) return {};
   if (user.role === 'sales') {
     return { se: { equals: user.se || '', mode: 'insensitive' as const } };
   }
@@ -272,7 +272,7 @@ export function canEditSalesPlan(user: SafeUser, targetSe: string, targetCabang:
  * app's canDeleteProspect().
  */
 export function canDeleteProspect(user: SafeUser) {
-  return user.role === 'gm' || user.role === 'admin';
+  return isGmLevel(user.role) || user.role === 'admin';
 }
 
 /**
@@ -311,7 +311,7 @@ export function canWorkDoc(user: SafeUser, items: unknown) {
 /** Who may fill in the purchasing answer on an RFQ / FUP A. */
 export function canEditRfqAnswer(user: SafeUser, items?: unknown) {
   if (user.role === 'purchasing05') return itemsHaveLine(items);
-  return user.role === 'purchasing' || user.role === 'admin' || user.role === 'gm';
+  return user.role === 'purchasing' || user.role === 'admin' || user.role === 'gm' || isOpsLead(user.role);
 }
 
 /**
@@ -335,7 +335,7 @@ export async function docVisibleTo(user: SafeUser, ref: { rfqId?: string | null;
  */
 export async function canEditBudgetTarget(user: SafeUser, cabang: string): Promise<boolean> {
   const target = (cabang || '').toUpperCase();
-  if (user.role === 'admin' || user.role === 'gm') return true;
+  if (user.role === 'admin' || isGmLevel(user.role)) return true;
   if (user.role === 'rm') {
     // Resolved here rather than taken as an optional argument: the previous
     // signature defaulted to "allowed" when the caller omitted the map, which
@@ -377,7 +377,7 @@ export function canWriteSalesActivity(user: SafeUser): boolean {
  * Sales see their own trips; everyone also sees the trips they join as peserta.
  */
 export function visitTripScopeWhere(user: SafeUser) {
-  if (user.role === 'admin' || user.role === 'gm') return {};
+  if (user.role === 'admin' || isGmLevel(user.role)) return {};
   // Peserta perjalanan selalu bisa melihat perjalanan yang diikutinya.
   const peserta = { pesertaIds: { array_contains: [user.id] } };
   if (user.role === 'rm') {

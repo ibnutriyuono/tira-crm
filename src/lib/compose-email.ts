@@ -82,7 +82,7 @@ export function composeEmailText(input: ComposeEmailInput): string {
 
 /** Siapa yang boleh memakai menu Kirim Email. */
 export function canComposeMail(role: string | null | undefined): boolean {
-  return role === 'gm' || role === 'admin';
+  return role === 'gm' || role === 'vp' || role === 'admin';
 }
 
 export const MAIL_MAX_RECIPIENTS = 300;

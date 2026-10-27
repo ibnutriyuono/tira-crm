@@ -8,6 +8,7 @@ import { assertProspectInScope } from '@/lib/prospect-access';
 import { mailConfigured, sendCustomerMail } from '@/lib/email-notify';
 import { validEmail } from '@/lib/notif-prefs';
 import { logActivity } from '@/lib/activity';
+import { cleanQuoteItems, marginStatus } from '@/lib/margin-server';
 import { quoteEmailHtml, quoteEmailText, type QuoteEmailSummary } from '@/lib/quotation-email';
 
 const MAX_ATTACH_BYTES = 12 * 1024 * 1024;
@@ -55,6 +56,11 @@ export async function POST(req: Request) {
   if (prospectId) {
     const scoped = await assertProspectInScope(user, prospectId);
     if (scoped.error) return scoped.error;
+  }
+  // Margin di bawah batas tanpa persetujuan VP: surat tidak boleh dikirim.
+  if (prospectId && Array.isArray(body.items)) {
+    const m = await marginStatus(user, prospectId, cleanQuoteItems(body.items));
+    if (m.needs) return NextResponse.json({ error: `Margin ${m.below} item di bawah ${m.minMargin}% — perlu persetujuan VP sebelum surat dikirim.`, code: 'MARGIN' }, { status: 409 });
   }
 
   const to = emails(body.to);

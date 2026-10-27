@@ -32,7 +32,8 @@ import { useRoster, type RosterUser } from '../issues/shared';
 import { canNow, useCan } from '@/hooks/useCan';
 
 import { useT } from '@/store/useLangStore';
-const ROLE_SHORT: Record<string, string> = { gm: 'GM', rm: 'RM', bm: 'BM', sales: 'Sales' };
+import { isGmLevel } from '@/lib/roles';
+const ROLE_SHORT: Record<string, string> = { vp: 'VP', gm: 'GM', rm: 'RM', bm: 'BM', sales: 'Sales' };
 const blankVisit = (): TripVisit => ({ id: '', customer: '', pic: '', tanggal: '', tujuan: '', realisasi: '', uraian: '', hasil: '', tambahan: false });
 let tmpSeq = 0;
 const tmpId = () => `new-${++tmpSeq}`;
@@ -514,7 +515,7 @@ export function VisitTripModal() {
         <IconPlus /> {tr("Tambah kunjungan")}
       </button>
       <div className="field-note" style={{ marginTop: 8 }}>
-        {currentUser?.role === 'gm' ? tr("Sebagai GM, rencana langsung berstatus Disetujui saat ditetapkan.") : `Setelah diajukan, rencana ini disetujui oleh ${approverLabel(currentUser?.role || '')}.`}
+        {isGmLevel(currentUser?.role) ? tr("Sebagai GM, rencana langsung berstatus Disetujui saat ditetapkan.") : `Setelah diajukan, rencana ini disetujui oleh ${approverLabel(currentUser?.role || '')}.`}
       </div>
     </>
   );
@@ -770,7 +771,7 @@ export function VisitTripModal() {
           {tr("Simpan Draft")}
         </button>
         <button type="button" className="btn btn-primary" disabled={busy} onClick={() => savePlan(true)}>
-          {currentUser?.role === 'gm' ? tr("Simpan & Tetapkan") : tr("Simpan & Ajukan")}
+          {isGmLevel(currentUser?.role) ? tr("Simpan & Tetapkan") : tr("Simpan & Ajukan")}
         </button>
       </>
     );
@@ -802,7 +803,7 @@ export function VisitTripModal() {
               {tr("Ubah Rencana")}
             </button>
             <button type="button" className="btn btn-primary" disabled={busy} onClick={() => doAction('submit')}>
-              {current.ownerRole === 'gm' ? tr("Tetapkan") : tr("Ajukan")}
+              {isGmLevel(current.ownerRole) ? tr("Tetapkan") : tr("Ajukan")}
             </button>
           </>
         )}

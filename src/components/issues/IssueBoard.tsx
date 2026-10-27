@@ -16,7 +16,10 @@ import {
   urgensiLabel,
   type IssueSuggestion,
   type PipelineIssue,
+  eskalasiLabel,
+  issueLeadLabel,
 } from '@/lib/issues';
+import { canManagePurchIssue } from '@/lib/roles';
 import { localToday } from '@/lib/sales-activity';
 import { canNow, useCan } from '@/hooks/useCan';
 import { useDataStore } from '@/store/useDataStore';
@@ -65,7 +68,8 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
   const [st, setSt] = useState<StFilter>('aktif');
   const [mine, setMine] = useState(purch);
   // Halaman Purchasing: ditugaskan ke saya (PJ) / dilaporkan oleh saya / semua.
-  const [pview, setPview] = useState<'pj' | 'lapor' | 'semua'>('pj');
+  // GM Operation / VP memproses laporan Purchasing → mulai dari Semua.
+  const [pview, setPview] = useState<'pj' | 'lapor' | 'semua'>(canManagePurchIssue(me?.role) && me?.role !== 'admin' ? 'semua' : 'pj');
   const [purchCat, setPurchCat] = useState(false);
   const [cat, setCat] = useState('');
   const [cabang, setCabang] = useState('');
@@ -161,7 +165,7 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
       'Tgl lapor': (i.dilaporAt || i.createdAt).slice(0, 10),
       'Umur (hari)': daysSince(i.dilaporAt || i.createdAt, i.selesaiAt ? i.selesaiAt.slice(0, 10) : today),
       'Target selesai': i.targetDate || '',
-      Eskalasi: i.eskalasi >= 2 ? 'RM & GM' : i.eskalasi === 1 ? 'BM' : '',
+      Eskalasi: eskalasiLabel(i),
       Solusi: i.solusi || i.alasanTolak || '',
       Hasil: i.hasil ? HASIL_META[i.hasil] : '',
     }));
@@ -172,7 +176,7 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
 
   const chips: [StFilter, string, number][] = [
     ['aktif', 'Aktif', open.length],
-    ['usulan', purch ? 'Menunggu BM' : 'Usulan ke BM', usulan.length],
+    ['usulan', purch ? 'Menunggu GM Operation' : 'Usulan ke BM', usulan.length],
     ['selesai', 'Selesai / ditolak', scoped.filter((i) => i.status === 'selesai' || i.status === 'ditolak').length],
     ['semua', 'Semua', scoped.length],
   ];
@@ -271,8 +275,8 @@ export function IssueBoard({ variant }: { variant: 'board' | 'purchasing' }) {
                 <div className="r1"><b>{i.customer}</b><span className={`badge ${meta.badge}`}>{meta.label}</span></div>
                 <div className="r2">{issueCatLabel(i.kategori)}{i.noDoc ? ` · ${i.noDoc}` : ''} · {i.se || '-'} · {i.cabang || '-'}{!purch && <> · <span className="mono">{formatRupiah(valueOf(i))}</span></>}</div>
                 <div className="r3">
-                  <span>{tr("PJ:")} {i.pjIds.length ? i.pjIds.map((id, k) => `${nameOf(roster, id)}${k === 0 && i.pjIds.length > 1 ? '*' : ''}`).join(', ') : i.status === 'usulan' ? `menunggu BM (dari ${i.diajukanNama || 'Sales'})` : '-'}</span>
-                  <span className={late ? 'late' : ''}>{issueAgeText(i, today)}{i.eskalasi ? ` · ↑ ${i.eskalasi >= 2 ? 'RM & GM' : 'BM'}` : ''}</span>
+                  <span>{tr("PJ:")} {i.pjIds.length ? i.pjIds.map((id, k) => `${nameOf(roster, id)}${k === 0 && i.pjIds.length > 1 ? '*' : ''}`).join(', ') : i.status === 'usulan' ? `menunggu ${issueLeadLabel(i)} (dari ${i.diajukanNama || 'Sales'})` : '-'}</span>
+                  <span className={late ? 'late' : ''}>{issueAgeText(i, today)}{i.eskalasi ? ` · ↑ ${eskalasiLabel(i)}` : ''}</span>
                 </div>
                 {i.status === 'selesai' && <div className="r2 ok">✓ {i.solusi} · {i.hasil ? HASIL_META[i.hasil] : ''}</div>}
               </button>

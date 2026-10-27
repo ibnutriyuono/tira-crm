@@ -45,6 +45,8 @@ export type ModalKey =
   | 'account'
   | 'mailCompose'
   | 'visitTasks'
+  | 'leadDesk'
+  | 'opsRules'
   | null;
 
 export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq' | 'vendor' | 'fupa';

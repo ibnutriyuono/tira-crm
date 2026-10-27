@@ -2,7 +2,7 @@ import { notify, tripApproverIds, tripHostIds } from './notify';
 
 export type TripRow = { id: string; ownerId: string; ownerName: string; ownerRole: string; ownerReg: number | null; ownerCabang?: string | null; cabang: string; reg: number | null; tglBerangkat: string; tglPulang: string; visits: unknown; status: string; pesertaIds?: unknown };
 
-const ROLE_SHORT: Record<string, string> = { gm: 'GM', rm: 'RM', bm: 'BM', sales: 'Sales' };
+const ROLE_SHORT: Record<string, string> = { vp: 'VP', gm: 'GM', rm: 'RM', bm: 'BM', sales: 'Sales' };
 
 function fmt(d: string): string {
   const t = new Date(`${d}T00:00:00`);

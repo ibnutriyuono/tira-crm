@@ -27,6 +27,7 @@ import { FollowUpMoveModal } from './FollowUpMoveModal';
 import { followUpRequiredOnMove } from '@/lib/followup-rule';
 
 import { useT } from '@/store/useLangStore';
+import { isGmLevel } from '@/lib/roles';
 const CAP = 40;
 
 function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: number; starCount?: number }) {
@@ -40,7 +41,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
   // Ikon Surat Penawaran (Admin Sales: hak Tambah/Ubah, lainnya: Download).
   const canX = useCan('prospek', quotePermAct(currentUser?.role));
   const canRfq = useCan('rfq', 'e');
-  const canDelete = useCan('prospek', 'd') && (currentUser?.role === 'gm' || currentUser?.role === 'admin');
+  const canDelete = useCan('prospek', 'd') && (isGmLevel(currentUser?.role) || currentUser?.role === 'admin');
   const [dragging, setDragging] = useState(false);
 
   return (

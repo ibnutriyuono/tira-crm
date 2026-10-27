@@ -9,6 +9,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { IconEdit } from './icons';
 
 import { useT } from '@/store/useLangStore';
+import { isGmLevel } from '@/lib/roles';
 const GROUPS = Array.from(new Set(TICKER_ITEMS.map((i) => i.group)));
 const dots = (n: number | null | undefined) => (n ? Math.round(n).toLocaleString('id-ID') : '');
 const undot = (s: string) => Number(s.replace(/\D/g, '')) || null;
@@ -26,7 +27,7 @@ export function RunningText() {
   const prospects = useDataStore((s) => s.prospects);
   const salesPlans = useDataStore((s) => s.salesPlans);
   const toast = useDataStore((s) => s.toast);
-  const canEdit = currentUser?.role === 'gm' || currentUser?.role === 'admin';
+  const canEdit = isGmLevel(currentUser?.role) || currentUser?.role === 'admin';
 
   const [data, setData] = useState<TickerData | null>(null);
   const [editing, setEditing] = useState(false);

@@ -14,6 +14,7 @@ import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
 
 import { useT } from '@/store/useLangStore';
+import { isGmLevel } from '@/lib/roles';
 export function CustomersModal() {
   const tr = useT();
   const modal = useUiStore((s) => s.modal);
@@ -99,7 +100,7 @@ export function CustomersModal() {
             {tr("Import Excel")}
           </button>
         )}
-        {(currentUser?.role === 'gm' || currentUser?.role === 'admin') && canNow('customer', 'e') && (
+        {(isGmLevel(currentUser?.role) || currentUser?.role === 'admin') && canNow('customer', 'e') && (
           <button className="btn btn-outline btn-sm" onClick={() => openModal('customerUnify')}>
             {tr("Satukan Nama Customer")}
           </button>

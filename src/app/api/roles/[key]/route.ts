@@ -6,7 +6,7 @@ import { invalidateRoleCache } from '@/lib/permissions-server';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 
-const BUILTIN_BASE: Record<string, string> = { gm: 'gm', rm: 'rm', bm: 'bm', salesadmin: 'salesadmin', sales: 'sales', purchasing: 'purchasing', purchasing05: 'purchasing' };
+const BUILTIN_BASE: Record<string, string> = { vp: 'vp', gm: 'gm', gmops: 'gmops', rm: 'rm', bm: 'bm', salesadmin: 'salesadmin', sales: 'sales', purchasing: 'purchasing', purchasing05: 'purchasing' };
 
 /** Ringkasan perubahan hak untuk Log Aktivitas, mis. "Key Account: Hapus ✗, Download ✗". */
 function describe(before: Perms, after: Perms): string {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { runDailyDigest } from '@/lib/email-notify';
 import { sweepFollowUpNotifications } from '@/lib/followup-notify';
 import { sweepIssueEscalation } from '@/lib/issues-server';
+import { sweepOpsEscalation } from '@/lib/ops-escalation';
 
 /**
  * Dipanggil penjadwal di server.js tiap 5 menit (header x-cron-key =
@@ -14,6 +15,7 @@ export async function POST(req: Request) {
   if (!key || req.headers.get('x-cron-key') !== key) return NextResponse.json({ error: 'Tidak diizinkan' }, { status: 401 });
   await sweepFollowUpNotifications();
   await sweepIssueEscalation();
+  await sweepOpsEscalation();
   const result = await runDailyDigest();
   return NextResponse.json(result);
 }

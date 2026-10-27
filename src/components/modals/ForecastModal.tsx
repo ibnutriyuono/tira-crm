@@ -17,6 +17,7 @@ import { yearMonthTarget } from '@/lib/kpi';
 import { useCan } from '@/hooks/useCan';
 
 import { useT } from '@/store/useLangStore';
+import { isGmLevel } from '@/lib/roles';
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const labelPeriode = (p: string) => `${BULAN[Number(p.slice(5, 7)) - 1] || ''} ${p.slice(0, 4)}`;
 /** 1165999999 -> "1.165.999.999" */
@@ -114,7 +115,7 @@ export function ForecastModal() {
   const permRencanaD = useCan('rencana', 'd');
   const canEdit = (cabang: string) => {
     if (!currentUser || !permE) return false;
-    if (currentUser.role === 'admin' || currentUser.role === 'gm') return true;
+    if (currentUser.role === 'admin' || isGmLevel(currentUser.role)) return true;
     if (currentUser.role === 'rm') return cabangReg[cabang.toUpperCase()] === currentUser.reg;
     if (currentUser.role === 'bm') return (currentUser.cabang || '').toUpperCase() === cabang.toUpperCase();
     return false;

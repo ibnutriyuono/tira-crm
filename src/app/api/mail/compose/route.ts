@@ -28,7 +28,7 @@ import { emitCrmEvent } from '@/lib/socket';
  *     → satu email per customer ke PIC yang dipilih; balasan ke pengirim.
  */
 
-const JABATAN: Record<string, string> = { gm: 'General Manager', admin: 'Administrator CRM' };
+const JABATAN: Record<string, string> = { vp: 'Vice President', gm: 'General Manager', admin: 'Administrator CRM' };
 const str = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max);
 const list = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean) : []);
 

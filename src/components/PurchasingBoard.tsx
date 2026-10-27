@@ -1,7 +1,8 @@
 'use client';
 import { PoIndentTab } from './purchasing/PoIndentTab';
 import { isPurchasingRoleClient } from '@/lib/doc-lines';
-import { canEditPoIndent, canSeeHpp, canSeePoIndent, canSeeVendors } from '@/lib/roles';
+import { canEditPoIndent, canSeeHpp, canSeePoIndent, canSeeVendors, isOpsLead } from '@/lib/roles';
+import { LeadDesk } from './leaddesk/LeadDesk';
 import { actualMargin, hasHpp, hppIdr, sellPrice, type RfqHppFields } from '@/lib/rfq-price';
 import { avlOf, suggestVendors } from '@/lib/vendor-profile';
 import { VendorRequestPanel } from './purchasing/VendorRequestPanel';
@@ -27,7 +28,7 @@ import type { Fupa, PurchDocType, Rfq, RfqItem } from '@/lib/types';
 import { canNow, useCan } from '@/hooks/useCan';
 
 import { useT } from '@/store/useLangStore';
-type Tab = 'dashboard' | 'masuk' | 'vendor' | 'masalah' | 'indent' | 'qcd';
+type Tab = 'beranda' | 'dashboard' | 'masuk' | 'vendor' | 'masalah' | 'indent' | 'qcd';
 
 /** One row in the combined RFQ + FUP A worklist. */
 interface PurchDoc {
@@ -254,7 +255,9 @@ export function PurchasingBoard({
 
   const openModal = useUiStore((s) => s.openModal);
   const isPic05 = useDataStore((s) => s.currentUser?.role === 'purchasing05');
-  const [tab, setTab] = useState<Tab>('dashboard');
+  // GM Operation / VP: ruang kerja dibuka di Beranda pimpinan.
+  const opsLead = standalone && isOpsLead(useDataStore.getState().currentUser?.role);
+  const [tab, setTab] = useState<Tab>(opsLead ? 'beranda' : 'dashboard');
   // Tab ⚑ Masalah (halaman Purchasing): masalah pipeline yang menjadikan user ini PJ.
   const issues = useDataStore((s) => s.issues);
   const myId = useDataStore((s) => s.currentUser?.id || '');
@@ -315,7 +318,7 @@ export function PurchasingBoard({
   const currentUser = useDataStore((s) => s.currentUser);
   // Membatalkan menghentikan dokumen untuk semua orang, jadi dibatasi ke
   // peran yang juga berhak mengisi jawabannya.
-  const canCancel = canNow('rfq', 'e') && !!currentUser && ['purchasing', 'purchasing05', 'admin', 'gm'].includes(currentUser.role);
+  const canCancel = canNow('rfq', 'e') && !!currentUser && ['purchasing', 'purchasing05', 'admin', 'gm', 'gmops', 'vp'].includes(currentUser.role);
   const askCancel = useCallback((d: PurchDoc) => {
     useUiStore.setState({ cancelDocCtx: { jenis: d.jenis, id: d.id, noDoc: d.noDoc, customer: d.customer, cancelled: !!d.cancelledAt } });
     useUiStore.getState().openModal('cancelDoc');
@@ -439,6 +442,7 @@ export function PurchasingBoard({
   return (
     <div>
       <div className={`purch-tabs${standalone ? ' pagebar' : ''}`}>
+        {opsLead && <button type="button" className={tab === 'beranda' ? 'active' : ''} onClick={() => setTab('beranda')}>{tr("Beranda")}</button>}
         <button type="button" className={tab === 'dashboard' ? 'active' : ''} onClick={() => setTab('dashboard')}>{tr("Dashboard")}</button>
         <button type="button" className={tab === 'masuk' ? 'active' : ''} onClick={() => setTab('masuk')}>{tr("Permintaan Masuk")}</button>
         {standalone && seePoIndent && (
@@ -698,6 +702,15 @@ export function PurchasingBoard({
         </>
       )}
 
+      {tab === 'beranda' && opsLead && (
+        <LeadDesk
+          onOpenRfq={(id) => {
+            const d = docs.find((x) => x.jenis === 'RFQ' && x.id === id);
+            if (d) openDetail(d);
+          }}
+          onGoTab={(t) => setTab(t)}
+        />
+      )}
       {tab === 'masalah' && standalone && <IssueBoard variant="purchasing" />}
       {tab === 'qcd' && standalone && seePoIndent && <RfqQcdTab />}
       {tab === 'indent' && standalone && seePoIndent && <PoIndentTab readOnly={readOnly || !canEditPoIndent(useDataStore.getState().currentUser?.role)} />}
@@ -915,7 +928,7 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
   // Mirrors auth.ts#canEditRfqAnswer, which the PATCH route enforces. Deliberately
   // NOT gated on `readOnly`: gm reaches this panel through the monitor modal, which
   // is read-only for vendors/quotations/status, yet gm may still fill in the answer.
-  const canAnswer = canNow('rfq', 'e') && !!currentUser && ['purchasing', 'purchasing05', 'admin', 'gm'].includes(currentUser.role);
+  const canAnswer = canNow('rfq', 'e') && !!currentUser && ['purchasing', 'purchasing05', 'admin', 'gm', 'gmops', 'vp'].includes(currentUser.role);
   void readOnly;
 
   const defKurs = (cur: string) => (cur === 'USD' ? kurs?.usd || undefined : cur === 'EUR' ? kurs?.eur || undefined : undefined);

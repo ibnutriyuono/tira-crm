@@ -33,7 +33,7 @@ export const KAM_ACTION_STATUS: Record<KamAction['status'], { label: string; bad
 };
 
 /** Who may change groups, tiers and teams. */
-export const canManageKam = (role: string | null | undefined) => role === 'gm' || role === 'rm' || role === 'admin';
+export const canManageKam = (role: string | null | undefined) => role === 'gm' || role === 'vp' || role === 'rm' || role === 'admin';
 
 /** "PT. Indah Kiat Pulp & Paper Tbk" -> "INDAH KIAT PULP PAPER" */
 export function normalizeCustomerName(name: string | null | undefined): string {

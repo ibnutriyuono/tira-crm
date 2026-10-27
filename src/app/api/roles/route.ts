@@ -6,7 +6,7 @@ import { effectivePerms, invalidateRoleCache } from '@/lib/permissions-server';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 
-const BUILTIN_BASE: Record<string, string> = { gm: 'gm', rm: 'rm', bm: 'bm', salesadmin: 'salesadmin', sales: 'sales', purchasing: 'purchasing', purchasing05: 'purchasing' };
+const BUILTIN_BASE: Record<string, string> = { vp: 'vp', gm: 'gm', gmops: 'gmops', rm: 'rm', bm: 'bm', salesadmin: 'salesadmin', sales: 'sales', purchasing: 'purchasing', purchasing05: 'purchasing' };
 
 type Row = { key: string; label: string; base: string; perms: unknown; builtin: boolean; updatedBy: string | null; updatedAt: Date };
 

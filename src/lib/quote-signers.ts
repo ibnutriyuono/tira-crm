@@ -16,6 +16,7 @@ export const QUOTE_JABATAN: Record<string, string> = {
   bm: 'Branch Manager',
   rm: 'Regional Manager',
   gm: 'General Manager',
+  vp: 'Vice President',
   salesadmin: 'Admin Sales',
 };
 

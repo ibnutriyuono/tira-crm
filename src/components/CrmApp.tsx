@@ -34,6 +34,10 @@ import { CustomerProfileModal } from './modals/CustomerProfileModal';
 import { KeyAccountModal } from './modals/KeyAccountModal';
 import { PipelineIssuesModal } from './modals/PipelineIssuesModal';
 import { AdminQueueModal } from './modals/AdminQueueModal';
+import { OpsRulesModal } from './modals/OpsRulesModal';
+import { MobileShell } from './mobile/MobileShell';
+import { isSmallScreen, setPhonePref, usePhoneMode } from '@/hooks/usePhoneMode';
+import { LeadDeskModal } from './leaddesk/LeadDeskModal';
 import { RolesModal } from './modals/RolesModal';
 import { MarketingModal } from './modals/MarketingModal';
 import { CancelDocModal } from './modals/CancelDocModal';
@@ -90,6 +94,23 @@ export function CrmApp() {
     if (loaded && isPurchasingRoleClient(currentUser?.role)) router.replace('/purchasing' + window.location.search);
   }, [loaded, currentUser?.role, router]);
 
+  // VP: Beranda Pimpinan terbuka sekali per sesi browser saat CRM pertama dibuka.
+  useEffect(() => {
+    if (!loaded || currentUser?.role !== 'vp' || window.location.search.includes('n=')) return;
+    try {
+      if (sessionStorage.getItem('tira.leadDesk.shown')) return;
+      sessionStorage.setItem('tira.leadDesk.shown', '1');
+    } catch {
+      /* tanpa sessionStorage: tetap buka */
+    }
+    useUiStore.getState().openModal('leadDesk');
+  }, [loaded, currentUser?.role]);
+
+  // Mode HP (web responsif): layar kecil → MobileShell; Purchasing punya halaman sendiri.
+  const phoneView = usePhoneMode();
+  const phone = phoneView && !isPurchasingRoleClient(currentUser?.role);
+  const smallScreen = !phoneView && isSmallScreen();
+
   // Deliberately depends on the individual filter/sort fields rather than `ui`
   // as a whole — `ui` also carries page/viewMode/modal state that shouldn't
   // invalidate this list.
@@ -106,6 +127,15 @@ export function CrmApp() {
 
   return (
     <>
+      {phone ? (
+        <MobileShell />
+      ) : (
+      <>
+      {smallScreen && (
+        <button type="button" className="mb-back-hp" onClick={() => setPhonePref('auto')}>
+          📱 {tr("Tampilan HP")}
+        </button>
+      )}
       <TopBar />
       <RunningText />
       <div className="wrap">
@@ -132,6 +162,8 @@ export function CrmApp() {
           {ui.viewMode === 'card' ? <KanbanBoard filtered={filtered} /> : <ProspectTable filtered={filtered} total={records.length} />}
         </div>
       </div>
+      </>
+      )}
 
       <ProspectFormModal />
       <ImportModal />
@@ -153,6 +185,8 @@ export function CrmApp() {
       <PipelineIssuesModal />
       <AdminQueueModal />
       <RolesModal />
+      <OpsRulesModal />
+      <LeadDeskModal />
       <MarketingModal />
       <CancelDocModal />
       <SalesPlanModal />

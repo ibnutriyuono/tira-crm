@@ -14,6 +14,7 @@ import { ImportModal } from './modals/ImportModal';
 import { DeleteConfirmModal } from './modals/DeleteConfirmModal';
 import { NotificationsModal } from './modals/NotificationsModal';
 import { AccountModal } from './modals/AccountModal';
+import { LeadDeskModal } from './leaddesk/LeadDeskModal';
 import { SalesActivityModal } from './modals/SalesActivityModal';
 import { useCan } from '@/hooks/useCan';
 import { TeamChatWidget } from './TeamChatWidget';
@@ -114,6 +115,7 @@ export function PurchasingPageClient() {
       <ImportModal />
       <DeleteConfirmModal />
       <NotificationsModal />
+      <LeadDeskModal />
       <AccountModal />
       <SalesActivityModal />
       <ToastHost />

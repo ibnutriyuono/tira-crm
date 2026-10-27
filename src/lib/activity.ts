@@ -3,6 +3,7 @@ import { prisma } from './prisma';
 import { emitCrmEvent } from './socket';
 import type { ActivityChanges, ActivityAction, ActivityEntity, SafeUser } from './types';
 import { isBranchRole } from './roles';
+import { isGmLevel } from './roles';
 
 interface LogInput {
   /** Null only for a failed login, where no session exists yet. */
@@ -189,7 +190,7 @@ export const USER_FIELD_LABELS: Record<string, string> = {
  * each scoped branch ORs in `userId`.
  */
 export function activityScopeWhere(user: SafeUser) {
-  if (user.role === 'admin' || user.role === 'gm') return {};
+  if (user.role === 'admin' || isGmLevel(user.role)) return {};
   if (user.role === 'rm') return { OR: [{ actorReg: user.reg ?? -1 }, { userId: user.id }] };
   if (isBranchRole(user.role)) {
     return { OR: [{ actorCabang: { equals: user.cabang || '', mode: 'insensitive' as const } }, { userId: user.id }] };

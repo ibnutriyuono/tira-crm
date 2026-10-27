@@ -187,3 +187,15 @@ export function issueInputError(b: { kategori?: unknown; keterangan?: unknown; u
   if (needPj && pjIds.length === 0) return 'Pilih minimal satu penanggung jawab.';
   return null;
 }
+
+/** Atasan yang memproses usulan: GM Operation untuk laporan Purchasing, selain itu BM. */
+export function issueLeadLabel(i: { sumber?: string | null }): string {
+  return i.sumber === 'purchasing' ? 'GM Operation' : 'BM';
+}
+
+/** Ke mana masalah sudah dieskalasi (tingkat 1 / 2), atau ''. */
+export function eskalasiLabel(i: { sumber?: string | null; eskalasi: number }): string {
+  if (!i.eskalasi) return '';
+  if (i.sumber === 'purchasing') return i.eskalasi >= 2 ? 'GM Operation & VP' : 'GM Operation';
+  return i.eskalasi >= 2 ? 'RM & GM' : 'BM';
+}

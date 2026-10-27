@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   if (isResponse(user)) return user;
   const denied = await guard(user, 'trip', 'e');
   if (denied) return denied;
-  if (!TRIP_ROLES.includes(user.role)) return NextResponse.json({ error: 'Hanya Sales, BM, RM, dan GM yang membuat rencana perjalanan.' }, { status: 403 });
+  if (!TRIP_ROLES.includes(user.role)) return NextResponse.json({ error: 'Hanya Sales, BM, RM, GM dan VP yang membuat rencana perjalanan.' }, { status: 403 });
   if (tripCabangLocked(user.role) && !user.cabang) return NextResponse.json({ error: 'Akun Anda belum memiliki cabang. Minta Admin mengisi cabang di Kelola User.' }, { status: 400 });
 
   const body = await req.json().catch(() => null);

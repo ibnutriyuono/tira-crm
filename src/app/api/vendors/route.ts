@@ -5,9 +5,9 @@ import { canEditPurchasing } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { guard } from '@/lib/permissions-server';
-import { canSeeVendors } from '@/lib/roles';
+import { canApproveVendor, canSeeVendors } from '@/lib/roles';
 import { cleanVendorProfile } from '@/lib/vendor-profile';
-import { notify } from '@/lib/notify';
+import { notify, opsLeadIds } from '@/lib/notify';
 
 export async function GET() {
   const user = await requireUser();
@@ -43,16 +43,15 @@ export async function POST(req: Request) {
       alamat: String(body?.alamat || '').trim(),
       catatan: String(body?.catatan || '').trim(),
       ...cleanVendorProfile(body || {}),
-      // Vendor baru dari Purchasing menunggu persetujuan GM (Approved Vendor List).
-      statusAvl: user.role === 'gm' || user.role === 'admin' ? 'aktif' : 'evaluasi',
-      statusAlasan: user.role === 'gm' || user.role === 'admin' ? null : 'Vendor baru — menunggu persetujuan GM',
+      // Vendor baru dari Purchasing menunggu persetujuan GM Operation (Approved Vendor List).
+      statusAvl: canApproveVendor(user.role) ? 'aktif' : 'evaluasi',
+      statusAlasan: canApproveVendor(user.role) ? null : 'Vendor baru — menunggu persetujuan GM Operation',
       statusOleh: user.name,
       statusAt: new Date(),
     },
   });
   if (vendor.statusAvl === 'evaluasi') {
-    const gms = await prisma.user.findMany({ where: { role: 'gm' }, select: { id: true } });
-    await notify({ userIds: gms.map((g) => g.id), type: 'announcement', entity: 'announcement', entityId: vendor.id, title: `Vendor baru menunggu persetujuan: ${vendor.nama}`, message: `${user.name} menambahkan vendor ${vendor.nama}. Setujui (Aktif) atau blokir di Database Vendor.` });
+    await notify({ userIds: await opsLeadIds(), type: 'announcement', entity: 'announcement', entityId: vendor.id, title: `Vendor baru menunggu persetujuan: ${vendor.nama}`, message: `${user.name} menambahkan vendor ${vendor.nama}. Setujui (Aktif) atau blokir di Database Vendor.` });
   }
 
   emitCrmEvent('vendor:created', vendor);

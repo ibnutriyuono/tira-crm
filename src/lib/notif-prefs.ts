@@ -24,6 +24,7 @@ export const NOTIF_CATEGORIES: NotifCategory[] = [
   { key: 'trip', label: 'Perjalanan dinas', hint: 'perlu persetujuan, disetujui/ditolak, ikut sebagai peserta', def: 'langsung', types: ['trip_submitted', 'trip_approved', 'trip_rejected', 'trip_scheduled', 'trip_cancelled'] },
   { key: 'target', label: 'Target', hint: 'target cabang perlu dibagi, target Sales ditetapkan', def: 'ringkasan', types: ['target_allocate', 'target_assigned'] },
   { key: 'admin', label: 'Antrian Admin', hint: 'tugas faktur & dokumen PO/DO', def: 'ringkasan', types: ['admin_task'] },
+  { key: 'ops', label: 'Eskalasi Operation & persetujuan margin', hint: 'RFQ belum dijawab, persetujuan margin VP diajukan / diputuskan', def: 'langsung', types: ['ops_escalated', 'margin_request', 'margin_decided'] },
   { key: 'kam', label: 'Key Account lintas cabang', hint: 'prospek/RFQ grup di cabang lain', def: 'mati', types: ['kam_cross_branch'] },
 ];
 

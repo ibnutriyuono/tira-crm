@@ -21,8 +21,8 @@ export interface PurchIssueTarget {
 }
 
 /**
- * ⚑ Laporkan masalah dari Purchasing — masuk sebagai usulan ke BM cabang
- * dokumen (BM menunjuk PJ atau menolak), Sales pemilik prospek diberi tahu.
+ * ⚑ Laporkan masalah dari Purchasing — masuk sebagai usulan ke GM Operation
+ * (menunjuk PJ atau menolak), Sales pemilik prospek diberi tahu.
  */
 export function PurchIssueModal({ target, onClose }: { target: PurchIssueTarget; onClose: () => void }) {
   const tr = useT();
@@ -53,7 +53,7 @@ export function PurchIssueModal({ target, onClose }: { target: PurchIssueTarget;
         items: picked,
       });
       useDataStore.getState().upsertIssue(r.issue);
-      toast(`Laporan masalah ${target.noDoc} dikirim ke BM ${target.cabang}`, 'success');
+      toast(`Laporan masalah ${target.noDoc} dikirim ke GM Operation`, 'success');
       onClose();
     } catch (e) {
       setErr((e as Error).message);
@@ -100,14 +100,14 @@ export function PurchIssueModal({ target, onClose }: { target: PurchIssueTarget;
           ))}
         </div>
         <div className="pm-route">
-          <div>{tr("Dikirim ke:")} <b>{tr("BM cabang")} {target.cabang || '-'}</b> {target.hasProspect ? <>{tr("sebagai usulan masalah di prospek")} <b>{target.customer}</b></> : tr("(dokumen tanpa prospek — diskusi di thread dokumen)")}</div>
+          <div>{tr("Dikirim ke:")} <b>{tr("GM Operation")}</b> {target.hasProspect ? <>{tr("sebagai usulan masalah di prospek")} <b>{target.customer}</b></> : tr("(dokumen tanpa prospek — diskusi di thread dokumen)")}</div>
           {target.sales && <div>{tr("Diberi tahu:")} {target.sales} {tr("(Sales pemilik)")}</div>}
-          <div>{tr("BM memutuskan: buka masalah & tunjuk PJ, atau tolak dengan alasan. Pantau di tab ⚑ Masalah → Dilaporkan oleh saya.")}</div>
+          <div>{tr("GM Operation memutuskan: buka masalah & tunjuk PJ, atau tolak dengan alasan. Pantau di tab ⚑ Masalah → Dilaporkan oleh saya.")}</div>
         </div>
         {err && <div className="form-error">{err}</div>}
         <div className="toolbar-row" style={{ marginTop: 10, marginBottom: 0, justifyContent: 'flex-end' }}>
           <button type="button" className="btn btn-outline btn-sm" onClick={onClose}>{tr("Batal")}</button>
-          <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={send}>{tr("Kirim ke BM")}</button>
+          <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={send}>{tr("Kirim ke GM Operation")}</button>
         </div>
       </div>
     </div>

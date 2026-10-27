@@ -19,7 +19,10 @@ import {
   urgensiLabel,
   type IssueHasil,
   type PipelineIssue,
+  eskalasiLabel,
+  issueLeadLabel,
 } from '@/lib/issues';
+import { canManagePurchIssue } from '@/lib/roles';
 import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { ItemChat } from '../ItemChat';
@@ -89,7 +92,7 @@ export function IssueBadge({ prospectId, compact }: { prospectId: string; compac
   const issue = useDataStore((s) => s.issues.find((i) => i.prospectId === prospectId && isActiveIssue(i)));
   if (!issue) return null;
   const usulan = issue.status === 'usulan';
-  const text = usulan ? 'Diajukan ke BM' : `${compact ? '' : `${issueCatLabel(issue.kategori)} · `}${issueAgeText(issue)}`;
+  const text = usulan ? `Diajukan ke ${issueLeadLabel(issue)}` : `${compact ? '' : `${issueCatLabel(issue.kategori)} · `}${issueAgeText(issue)}`;
   return (
     <span className={`badge ${usulan ? 'violet' : 'rust'} issue-badge`} title={`Masalah: ${issueCatLabel(issue.kategori)} — ${ISSUE_STATUS_META[issue.status].label}. ${issue.keterangan}`}>
       ⚑ {text}
@@ -308,7 +311,7 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
     ];
     return list.filter((d, i) => list.findIndex((x) => x.id === d.id) === i);
   }, [rfqs, fupas, issue.prospectId, issue.docJenis, issue.docId]);
-  const isBm = !!me && (me.role === 'admin' || (me.role === 'bm' && up(me.cabang) === up(issue.cabang)));
+  const isBm = !!me && (me.role === 'admin' || (issue.sumber === 'purchasing' ? canManagePurchIssue(me.role) : me.role === 'bm' && up(me.cabang) === up(issue.cabang)));
   const isPj = !!me && issue.pjIds.includes(me.id);
   const canHandle = canE && (isPj || isBm);
   const st = ISSUE_STATUS_META[issue.status];
@@ -365,7 +368,7 @@ export function IssueDetail({ issue }: { issue: PipelineIssue }) {
             <b>⚑ {issueCatLabel(issue.kategori)}</b> <span className={`badge ${URGENSI.find((u) => u.key === issue.urgensi)?.badge || 'slate'}`}>{urgensiLabel(issue.urgensi)}</span>{' '}
             <span className="field-note" style={{ margin: 0, display: 'inline' }}>
               {issue.status === 'usulan' ? `diajukan ${issue.diajukanNama || '-'}` : `dilaporkan ${issue.dilaporNama || '-'}${issue.diajukanNama ? ` (usulan ${issue.diajukanNama})` : ''}`} · {issueAgeText(issue)}
-              {issue.eskalasi ? ` · ↑ dieskalasi ${issue.eskalasi >= 2 ? 'RM & GM' : 'BM'}` : ''}
+              {issue.eskalasi ? ` · ↑ dieskalasi ${eskalasiLabel(issue)}` : ''}
             </span>
           </div>
           <div style={{ marginTop: 3 }}>{issue.keterangan}</div>

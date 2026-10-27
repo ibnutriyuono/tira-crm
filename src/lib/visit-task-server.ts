@@ -3,7 +3,7 @@ import { prisma } from './prisma';
 import { emitCrmEvent } from './socket';
 import { notify } from './notify';
 import { customerKey } from './reports';
-import { isBranchRole } from './roles';
+import { isBranchRole, isGmLevel } from './roles';
 import { jakartaToday } from './followup-notify';
 import { addDays } from './visit-task';
 import type { SafeUser } from './types';
@@ -12,7 +12,7 @@ const up = (s: string | null | undefined) => (s || '').trim().toUpperCase();
 
 /** Tugas / rencana yang boleh dilihat: Sales miliknya, BM & Admin Sales cabangnya, RM regionalnya, GM & Admin semua. */
 export function visitScopeWhere(user: SafeUser): Record<string, unknown> {
-  if (user.role === 'gm' || user.role === 'admin') return {};
+  if (isGmLevel(user.role) || user.role === 'admin') return {};
   if (isBranchRole(user.role)) return { cabang: { equals: user.cabang || '__none__', mode: 'insensitive' } };
   if (user.role === 'rm') return { reg: user.reg ?? -1 };
   return { id: '__none__' };
@@ -25,13 +25,13 @@ export const planScopeWhere = (user: SafeUser): Prisma.VisitPlanWhereInput =>
 /** BM hanya menugaskan Sales di cabangnya; GM (dan Admin) semua Sales. */
 export function canAssignTo(user: SafeUser, assignee: { role: string; cabang: string | null; se: string | null }): boolean {
   if (!assignee.se && assignee.role !== 'sales') return false;
-  if (user.role === 'gm' || user.role === 'admin') return true;
+  if (isGmLevel(user.role) || user.role === 'admin') return true;
   return user.role === 'bm' && !!user.cabang && up(user.cabang) === up(assignee.cabang);
 }
 
 /** BM cabang menyetujui rencana; GM / Admin juga boleh. */
 export function canReviewPlan(user: SafeUser, plan: { cabang: string | null }): boolean {
-  if (user.role === 'gm' || user.role === 'admin') return true;
+  if (isGmLevel(user.role) || user.role === 'admin') return true;
   return user.role === 'bm' && !!user.cabang && up(user.cabang) === up(plan.cabang);
 }
 

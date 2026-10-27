@@ -41,7 +41,10 @@ export type NotifType =
   | 'po_arrived'
   | 'visit_assigned'
   | 'visit_update'
-  | 'visit_plan';
+  | 'visit_plan'
+  | 'ops_escalated'
+  | 'margin_request'
+  | 'margin_decided';
 
 interface NotifyInput {
   userIds: string[];
@@ -157,5 +160,24 @@ export async function bmUserIds(cabang: string | null | undefined): Promise<stri
   const c = (cabang || '').trim();
   if (!c) return [];
   const rows = await prisma.user.findMany({ where: { role: 'bm', cabang: { equals: c, mode: 'insensitive' } }, select: { id: true } });
+  return rows.map((r) => r.id);
+}
+
+/**
+ * Pimpinan operasional yang menerima urusan Purchasing (AVL vendor, masalah
+ * dari Purchasing): GM Operation; bila belum ada akun GM Operation → VP;
+ * bila belum ada juga → Admin, supaya persetujuan tidak hilang.
+ */
+export async function opsLeadIds(): Promise<string[]> {
+  for (const role of ['gmops', 'vp', 'admin'] as const) {
+    const rows = await prisma.user.findMany({ where: { role }, select: { id: true } });
+    if (rows.length) return rows.map((r) => r.id);
+  }
+  return [];
+}
+
+/** VP — tingkat eskalasi tertinggi. */
+export async function vpIds(): Promise<string[]> {
+  const rows = await prisma.user.findMany({ where: { role: 'vp' }, select: { id: true } });
   return rows.map((r) => r.id);
 }

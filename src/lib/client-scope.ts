@@ -111,6 +111,7 @@ export function matchesDocScope(user: SafeUser, doc: Rfq | Fupa, regionCabangs?:
 export function matchesSalesPlanScope(user: SafeUser, plan: SalesPlan, regionCabangs?: Set<string>): boolean {
   switch (user.role) {
     case 'admin':
+    case 'vp':
     case 'gm':
       return true;
     case 'sales':

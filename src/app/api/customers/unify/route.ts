@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { CustomerPic, TripVisit } from '@/lib/types';
 import { guard } from '@/lib/permissions-server';
+import { isGmLevel } from '@/lib/roles';
 
 /**
  * Satukan Nama Customer: every record written with one of the `from`
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
   if (isResponse(user)) return user;
   const denied = await guard(user, 'customer', 'e');
   if (denied) return denied;
-  if (user.role !== 'gm' && user.role !== 'admin') {
+  if (!isGmLevel(user.role) && user.role !== 'admin') {
     return NextResponse.json({ error: 'Hanya GM / Admin yang dapat menyatukan nama customer.' }, { status: 403 });
   }
 

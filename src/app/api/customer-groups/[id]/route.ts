@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { CustomerGroup, KamTierChange } from '@/lib/types';
 import { guard } from '@/lib/permissions-server';
+import { isGmLevel } from '@/lib/roles';
 
 /** Fields the team lead (ketua grup) may change on their own: perusahaan, sekretaris, PIC, rencana aksi. */
 const KETUA_FIELDS = ['actions', 'notes', 'reviewNext', 'sekretarisId', 'anggotaIds', 'entities'];
@@ -64,7 +65,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (isResponse(user)) return user;
   const denied = await guard(user, 'kam', 'd');
   if (denied) return denied;
-  if (user.role !== 'gm' && user.role !== 'admin') return NextResponse.json({ error: 'Hanya GM dan Admin yang dapat menghapus grup.' }, { status: 403 });
+  if (!isGmLevel(user.role) && user.role !== 'admin') return NextResponse.json({ error: 'Hanya GM dan Admin yang dapat menghapus grup.' }, { status: 403 });
   const { id } = await params;
   const existing = await prisma.customerGroup.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: 'Grup tidak ditemukan' }, { status: 404 });

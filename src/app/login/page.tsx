@@ -31,7 +31,8 @@ export default function LoginPage() {
       }
       // Dari link email "Buka di CRM" (/login?n=<id>): lanjut ke notifikasinya.
       const n = new URLSearchParams(window.location.search).get('n');
-      router.replace(n ? `/?n=${encodeURIComponent(n)}` : '/');
+      // GM Operation bekerja di ruang Purchasing; tetap bisa kembali ke CRM (hanya baca).
+      router.replace(n ? `/?n=${encodeURIComponent(n)}` : data.user?.role === 'gmops' ? '/purchasing' : '/');
       router.refresh();
     } catch {
       setError(tr('Gagal terhubung ke server. Coba lagi.'));

@@ -8,6 +8,7 @@ import { canAssignVisits } from '@/lib/roles';
 import { emitCrmEvent } from '@/lib/socket';
 import { addDays } from '@/lib/visit-task';
 import { bmIdsOf, canAssignTo, planScopeWhere, taskScopeWhere } from '@/lib/visit-task-server';
+import { isGmLevel } from '@/lib/roles';
 
 /**
  * Tugas Kunjungan.
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
     message: `${names.slice(0, 5).join(', ')}${names.length > 5 ? ` +${names.length - 5}` : ''} · tenggat ${dueDate} · ${tujuan}${catatan ? ` — ${catatan}` : ''}`,
   });
   // GM menugaskan langsung: BM cabang ikut diberi tahu.
-  if (user.role === 'gm') {
+  if (isGmLevel(user.role)) {
     await notify({
       userIds: await bmIdsOf(assignee.cabang),
       type: 'visit_assigned',

@@ -16,6 +16,7 @@ import { IssueBadge } from './issues/shared';
 import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './ProspectPurchasingBubble';
 
 import { useT } from '@/store/useLangStore';
+import { isGmLevel } from '@/lib/roles';
 const COLS: { key: string; label: string; sortable?: boolean }[] = [
   { key: 'no', label: 'No' },
   { key: 'reg', label: 'Reg', sortable: true },
@@ -39,7 +40,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
   // Kelola Role: tombol hanya tampil bila aksinya diizinkan (server tetap menjaga).
   const role = useDataStore((s) => s.currentUser?.role);
   const canE = useCan('prospek', 'e');
-  const canD = useCan('prospek', 'd') && (role === 'gm' || role === 'admin');
+  const canD = useCan('prospek', 'd') && (isGmLevel(role) || role === 'admin');
   // Ikon Surat Penawaran (Admin Sales: hak Tambah/Ubah, lainnya: Download).
   const canX = useCan('prospek', quotePermAct(role));
   const canRfq = useCan('rfq', 'e');

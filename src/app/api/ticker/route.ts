@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { applyManualKurs, getKurs } from '@/lib/kurs';
 import { TICKER_SETTING_KEY, buildTickerExtras, buildTickerHighlights, jakartaPeriode, jakartaToday, normalizeTickerCustom, type TickerData } from '@/lib/ticker';
+import { isGmLevel } from '@/lib/roles';
 
 /**
  * Running text. Highlights are computed company-wide on the server (not from
@@ -53,7 +54,7 @@ export async function GET() {
 export async function PUT(req: Request) {
   const user = await requireUser();
   if (isResponse(user)) return user;
-  if (user.role !== 'gm' && user.role !== 'admin') return NextResponse.json({ error: 'Hanya GM/admin yang dapat mengubah running text.' }, { status: 403 });
+  if (!isGmLevel(user.role) && user.role !== 'admin') return NextResponse.json({ error: 'Hanya GM/admin yang dapat mengubah running text.' }, { status: 403 });
   const custom = normalizeTickerCustom(await req.json().catch(() => null));
   const value = custom as unknown as Prisma.InputJsonValue;
   await prisma.setting.upsert({ where: { key: TICKER_SETTING_KEY }, update: { value }, create: { key: TICKER_SETTING_KEY, value } });

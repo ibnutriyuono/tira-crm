@@ -13,6 +13,7 @@ import type { ActivityLog } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
 
 import { useT } from '@/store/useLangStore';
+import { isGmLevel } from '@/lib/roles';
 interface Actor {
   userId: string;
   username: string;
@@ -138,7 +139,7 @@ export function ActivityLogModal() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const scopeHint =
-    currentUser?.role === 'admin' || currentUser?.role === 'gm'
+    currentUser?.role === 'admin' || isGmLevel(currentUser?.role)
       ? 'seluruh perusahaan'
       : currentUser?.role === 'rm'
         ? `Regional ${currentUser.reg ?? '-'}`

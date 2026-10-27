@@ -49,7 +49,7 @@ export async function POST(req: Request) {
   if (!se) return NextResponse.json({ error: 'Akun ini belum memiliki identitas aktivitas.' }, { status: 403 });
   // Tanggal surat; bila di masa depan, aktivitasnya hari ini.
   const tanggal = validTanggal(body?.tanggal) || new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
-  const kanal = body?.kanal === 'email' ? 'email' : null;
+  const kanal = body?.kanal === 'email' || body?.kanal === 'wa' ? String(body.kanal) : null;
   const ringkas = String(body?.ringkas || '').trim().slice(0, 400);
   const total = String(body?.total || '').trim().slice(0, 40);
   const keterangan = [`Surat penawaran No. ${nomor}`, ringkas, total && `total ${total}`, onBehalf && `dibuat oleh ${user.name}`].filter(Boolean).join(' · ').slice(0, 2000);

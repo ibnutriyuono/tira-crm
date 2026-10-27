@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { isNonBranchRole } from '@/lib/roles';
 import { api } from '@/lib/api-client';
 import { IconTrash } from '../icons';
 import { formatRupiah } from '@/lib/format';
@@ -116,10 +117,10 @@ export function SeTargetSection({
   const draftStatus = cur ? allocStatus(cur.target, total, ses.filter((se) => cur.missing.includes(se) && !val(se)).length) : 'noTarget';
   const editable = !!cur && canEdit(cur.cabang);
   // Semua user bisa ditambahkan (Sales, Marketing, BM, dll.); user tanpa Kode SE memakai username.
-  const addable = roster.filter((u) => u.role !== 'purchasing05' && !ses.includes(userTargetKey(u))).sort((a, b) => Number(b.role === 'sales') - Number(a.role === 'sales') || a.name.localeCompare(b.name));
+  const addable = roster.filter((u) => !isNonBranchRole(u.role) && !ses.includes(userTargetKey(u))).sort((a, b) => Number(b.role === 'sales') - Number(a.role === 'sales') || a.name.localeCompare(b.name));
   const userOf = (se: string) => roster.find((u) => userTargetKey(u) === se);
   const nameOf = (se: string) => userOf(se)?.name || '';
-  const ROLE_SHORT: Record<string, string> = { sales: 'Sales', salesadmin: 'Admin Sales', bm: 'BM', rm: 'RM', gm: 'GM', admin: 'Admin', purchasing: 'Purchasing' };
+  const ROLE_SHORT: Record<string, string> = { sales: 'Sales', salesadmin: 'Admin Sales', bm: 'BM', rm: 'RM', gm: 'GM', vp: 'VP', gmops: 'GM Operation', admin: 'Admin', purchasing: 'Purchasing' };
   const removeRow = (se: string) => {
     if (extra.includes(se) && !cur?.ses.includes(se)) setExtra(extra.filter((x) => x !== se));
     else setRemovedSe([...removedSe, se]);

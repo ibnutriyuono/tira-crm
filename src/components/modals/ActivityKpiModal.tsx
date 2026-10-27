@@ -6,6 +6,8 @@ import { ACTIVITY_TYPES, type ActivityTipe } from '@/lib/constants';
 import { buildActivityKpi, paceFor, prevPeriode, type ActivityKpiRow, type PaceSignal } from '@/lib/activity-kpi';
 import { formatDateID, formatRupiah } from '@/lib/format';
 import { isStaffActivityKey, localToday } from '@/lib/sales-activity';
+import { isNonBranchRole } from '@/lib/roles';
+import type { RosterUser } from '@/lib/types';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -47,7 +49,7 @@ export function ActivityKpiModal() {
   const toast = useDataStore((s) => s.toast);
 
   const permKpiE = useCan('kpi', 'e');
-  const canSetTarget = permKpiE && ['admin', 'gm', 'rm', 'bm'].includes(currentUser?.role || '');
+  const canSetTarget = permKpiE && ['admin', 'vp', 'gm', 'rm', 'bm'].includes(currentUser?.role || '');
   const today = localToday();
 
   const [periode, setPeriode] = useState(today.slice(0, 7));
@@ -63,16 +65,20 @@ export function ActivityKpiModal() {
   const [cabang, setCabang] = useState('');
   const [only, setOnly] = useState<'' | 'stale' | 'default'>('');
   const [sel, setSel] = useState<string | null>(null);
+  const [staffSe, setStaffSe] = useState<Set<string>>(() => new Set());
 
   const load = useCallback(async () => {
     if (!/^\d{4}-\d{2}$/.test(periode)) return;
     setLoading(true);
     try {
-      const [a, p, t] = await Promise.all([
+      const [a, p, t, ro] = await Promise.all([
         api.get<{ activities: SalesActivity[] }>(`/api/sales-activities?periode=${periode}`),
         api.get<{ activities: SalesActivity[] }>(`/api/sales-activities?periode=${prevPeriode(periode)}`).catch(() => ({ activities: [] as SalesActivity[] })),
         api.get<{ targets: ActivityTarget[] }>(`/api/activity-targets?periode=${periode}`),
+        api.get<{ roster: RosterUser[] }>('/api/users/roster').catch(() => ({ roster: [] as RosterUser[] })),
       ]);
+      // Kode SE milik Purchasing / GM / VP / GM Operation / Admin: bukan Sales cabang.
+      setStaffSe(new Set(ro.roster.filter((u) => isNonBranchRole(u.role) && u.se).map((u) => String(u.se).trim().toLowerCase())));
       setActivities(a.activities);
       setPrevActivities(p.activities);
       setTargets(t.targets);
@@ -101,16 +107,17 @@ export function ActivityKpiModal() {
     if (canSetTarget) {
       prospects.forEach((p) => {
         const se = (p.se || '').trim();
-        if (se && !known.has(se.toLowerCase())) {
+        if (se && !known.has(se.toLowerCase()) && !staffSe.has(se.toLowerCase())) {
           known.set(se.toLowerCase(), { id: '', se, periode, cabang: p.cabang, reg: p.reg, targets: {}, updatedBy: null });
         }
       });
     }
     // Aktivitas GM / RM / Admin / Admin Sales / Purchasing tampil di Aktivitas
     // Harian masing-masing, tetapi tidak dihitung sebagai baris KPI Sales.
-    const field = (list: typeof activities) => list.filter((a) => !isStaffActivityKey(a.se));
-    return buildActivityKpi(field(activities), Array.from(known.values()).filter((t) => !isStaffActivityKey(t.se)), prospects, { periode, today, prevActivities: field(prevActivities) });
-  }, [activities, prevActivities, targets, prospects, periode, today, canSetTarget]);
+    const staff = (se: string) => isStaffActivityKey(se) || staffSe.has(se.trim().toLowerCase());
+    const field = (list: typeof activities) => list.filter((a) => !staff(a.se));
+    return buildActivityKpi(field(activities), Array.from(known.values()).filter((t) => !staff(t.se)), prospects, { periode, today, prevActivities: field(prevActivities) });
+  }, [activities, prevActivities, targets, prospects, periode, today, canSetTarget, staffSe]);
 
   const isDefault = (r: ActivityKpiRow) => r.types.every((t) => !t.targetSet);
   const isStale = (r: ActivityKpiRow) => pi.elapsed > 0 && (r.idleWorkdays == null || r.idleWorkdays >= STALE);

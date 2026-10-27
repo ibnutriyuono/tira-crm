@@ -1511,3 +1511,137 @@ body:has(.chat-fab) .modal-foot{padding-right:88px}
 
 /* Purchasing RFQ: the main action, sends the price answer plus both notes. */
 .btn.purch-send-btn{padding:11px 22px;font-size:14.5px;font-weight:700;min-width:240px}
+
+/* Batas Waktu & Margin (Admin) */
+.or-grid{display:flex;flex-direction:column;gap:2px}
+.or-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:9px 0;border-bottom:1px solid var(--border)}
+.or-row>span:first-child{display:flex;flex-direction:column;gap:2px;font-size:13px}
+.or-in{display:flex;align-items:center;gap:6px}
+.or-in input{width:84px;text-align:right}
+.or-flow{display:flex;flex-direction:column;gap:4px;margin-top:12px;background:#F4F7FA;border-radius:8px;padding:10px 12px;font-size:12.5px}
+
+/* Surat Penawaran: margin vs HPP (persetujuan VP) */
+.qm-margin{display:flex;flex-direction:column;gap:5px;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:13px;border:1px solid}
+.qm-margin.bad{background:#FDF0EE;border-color:#E9BEB7;color:#7A2E24}
+.qm-margin.wait{background:#FDF5E8;border-color:#EBCF9F;color:#6E4A12}
+.qm-margin.ok{background:#EAF5EF;border-color:#B9DCC8;color:#1F5F3C}
+.qm-margin-act{display:flex;gap:6px;flex-wrap:wrap}
+.qm-margin-act input{flex:1;min-width:240px}
+.qitem-row.qm-low input[aria-label]{border-color:#D98C80}
+.qitem-row.qm-low{box-shadow:inset 3px 0 0 #B94A3D}
+
+.vd-score{margin-bottom:8px}
+.vd-score small{display:block;font-size:11px;color:var(--text-soft);font-weight:400}
+.vd-score b.up{color:var(--rust-600)}
+
+/* Beranda Pimpinan (GM Operation / VP) */
+.ld{display:flex;flex-direction:column;gap:12px}
+.ld-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.ld-title{margin:2px 0 0;font-size:24px}
+.ld-scope{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px}
+.ld-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+@media (max-width:1100px){.ld-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.ld-kpi{display:flex;flex-direction:column;gap:2px;text-align:left;background:#fff;border:1px solid var(--border);border-left:4px solid var(--steel-500);border-radius:10px;padding:10px 12px;font:inherit;cursor:pointer;color:inherit}
+.ld-kpi:disabled{cursor:default}
+.ld-kpi .lb{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text-soft)}
+.ld-kpi .n{font-family:var(--font-ibm-plex-mono),monospace;font-size:20px;font-weight:700}
+.ld-kpi .sub{font-size:11.5px;color:var(--text-soft)}
+.ld-kpi.grn{border-left-color:#2F8F5B}.ld-kpi.org{border-left-color:#C47F2C}.ld-kpi.red{border-left-color:#B94A3D}.ld-kpi.red .n{color:#B94A3D}.ld-kpi.vio{border-left-color:#6B4FA0}.ld-kpi.gry{border-left-color:#8A96A3}.ld-kpi.blu{border-left-color:#2F5576}
+.ld-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px}
+@media (max-width:1000px){.ld-grid{grid-template-columns:1fr}}
+.ld-card{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;min-width:0}
+.ld-card-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border);font-size:14px}
+.ld-empty{padding:18px 14px;color:var(--text-soft);font-size:13px}
+.ld-dec{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 14px;border-top:1px solid #EEF1F4}
+.ld-dec-t{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:13px}
+.ld-dec-t .muted{font-size:12px}
+.ld-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.ld-tag{align-self:flex-start;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;letter-spacing:.3px}
+.ld-tag.vio{background:#EFE9F7;color:#6B4FA0}.ld-tag.org{background:#FDF1E2;color:#A9661C}.ld-tag.red{background:#FBE9E6;color:#B94A3D}.ld-tag.blu{background:#E8EEF4;color:#2F5576}
+.ld-note{display:flex;gap:6px;margin-top:4px}
+.ld-note input{flex:1;min-width:180px}
+.ld-tbl{min-width:0 !important}
+.ld-tbl td.r,.ld-tbl th.r{text-align:right}
+.ld-tbl td.bad{color:#B94A3D;font-weight:700}.ld-tbl td.warn{color:#A9661C;font-weight:700}.ld-tbl td.ok{color:#2F8F5B;font-weight:700}
+.ld-foot{padding:9px 14px;font-size:11.5px;border-top:1px solid #EEF1F4}
+.ld-low{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:900px){.ld-low{grid-template-columns:1fr}}
+.ld-low-col{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-right:1px solid #EEF1F4;font-size:13px}
+.ld-low-row{display:flex;justify-content:space-between;gap:8px;font-size:12.5px}
+
+/* ===== Mode HP Sales (web responsif) ===== */
+.mb{min-height:100vh;background:#EEF1F4;padding-bottom:84px;color:var(--graphite-900)}
+.mb-top{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;background:var(--graphite-900,#1B2430);color:#fff}
+.mb-brand{display:flex;flex-direction:column;min-width:0}
+.mb-brand b{font-size:18px;letter-spacing:.3px}.mb-brand b span{color:#E8B472}
+.mb-brand small{font-size:11.5px;color:#C9D4DF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mb-bell{position:relative;border:0;background:rgba(255,255,255,.08);color:#fff;border-radius:10px;width:42px;height:42px;font-size:18px}
+.mb-bell span{position:absolute;top:-4px;right:-4px;background:#B94A3D;color:#fff;border-radius:9px;font-size:10.5px;min-width:18px;height:18px;line-height:18px;padding:0 4px}
+.mb-main{padding:12px}
+.mb-page{display:flex;flex-direction:column;gap:10px}
+.mb-hello{display:flex;flex-direction:column}.mb-hello small{color:var(--text-soft);font-size:12px}.mb-hello b{font-size:20px}
+.mb-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.mb-card-h{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
+.mb-link{border:0;background:none;color:var(--steel-600,#2F5576);font-weight:700;font-size:13px;padding:4px}
+.mb-row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.mb-big{font-size:22px;font-family:var(--font-ibm-plex-mono),monospace}.mb-big small{font-size:13px;color:var(--text-soft);font-family:inherit}
+.mb-bar{position:relative;height:8px;background:#E3E8EE;border-radius:4px;overflow:visible}
+.mb-bar span{display:block;height:100%;background:#2F8F5B;border-radius:4px}.mb-target.warn .mb-bar span{background:#C47F2C}
+.mb-bar i{position:absolute;top:-3px;width:2px;height:14px;background:#1B2430}
+.mb-empty{color:var(--text-soft);font-size:13px;padding:4px 0}
+.mb-item{display:flex;flex-direction:column;gap:8px;border-top:1px solid #EEF1F4;padding-top:8px}
+.mb-item-t{display:flex;flex-direction:column;gap:2px;font-size:14px}.mb-item-t small{font-size:12px;color:var(--text-soft)}
+.mb-item-t small.bad,.mb-row small.bad{color:#B94A3D;font-weight:600}
+.mb-item-a{display:flex;gap:8px;flex-wrap:wrap}
+.mb-item-a select{flex:1;min-width:130px;height:40px}
+.mb-btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 14px;border-radius:10px;border:1px solid #C9D3DD;background:#fff;font:inherit;font-size:13.5px;font-weight:700;color:#1B2430;text-decoration:none;flex:1}
+.mb-btn.pri{background:#C47F2C;border-color:#C47F2C;color:#fff}
+.mb-btn:disabled{opacity:.6}
+.mb-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mb-stats>*{display:flex;flex-direction:column;gap:1px;background:#F4F7FA;border:0;border-radius:10px;padding:10px;font:inherit;text-align:left;color:inherit}
+.mb-stats b{font-size:20px}.mb-stats small{font-size:11.5px}
+.mb-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.mb-chips button{flex-shrink:0;height:36px;padding:0 12px;border-radius:18px;border:1px solid #C9D3DD;background:#fff;font:inherit;font-size:13px;font-weight:600;white-space:nowrap}
+.mb-chips button span{margin-left:4px;color:var(--text-soft)}
+.mb-chips button.on{background:#2F5576;border-color:#2F5576;color:#fff}.mb-chips button.on span{color:#DCE6EF}
+.mb-search{width:100%;height:42px;border-radius:10px;font-size:15px}
+.mb-sum{font-size:12.5px}
+.mb-deal-t{display:flex;flex-direction:column;gap:3px;text-align:left;border:0;background:none;padding:0;font:inherit;color:inherit;width:100%}
+.mb-deal-t b{font-size:15px}
+.mb-wrap{flex-wrap:wrap}.mb-wrap .mb-btn{flex:1 1 40%}
+.mb-menu{display:flex;flex-direction:column;gap:8px}
+.mb-menu-i{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:13px 14px;font:inherit;text-align:left;color:inherit}
+.mb-menu-i small{color:var(--text-soft);font-size:12px}
+.mb-menu-lang{flex-direction:row;justify-content:space-between;align-items:center}
+.mb-out b{color:#B94A3D}
+.mb-fab{position:fixed;right:14px;bottom:78px;z-index:30;display:flex;align-items:center;gap:6px;height:52px;padding:0 18px;border:0;border-radius:26px;background:#C47F2C;color:#fff;font:inherit;font-size:15px;font-weight:700;box-shadow:0 8px 20px rgba(0,0,0,.25)}
+.mb-nav{position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(4,1fr);background:#fff;border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom)}
+.mb-nav button{display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;padding:8px 0 10px;font:inherit;font-size:11.5px;font-weight:600;color:#6B7684}
+.mb-nav button span{font-size:18px;line-height:1}
+.mb-nav button.on{color:#2F5576}
+.mb-sheet-bg{position:fixed;inset:0;z-index:1200;background:rgba(15,20,26,.45);display:flex;align-items:flex-end}
+.mb-sheet{width:100%;max-height:92vh;overflow-y:auto;background:#fff;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px}
+.mb-sheet label{font-size:12px;font-weight:700;color:var(--text-soft);margin-top:6px}
+.mb-sheet input,.mb-sheet select,.mb-sheet textarea{width:100%;font-size:15px;min-height:42px}
+.mb-sheet-t{font-size:17px}
+.mb-sheet-a{display:flex;gap:8px;margin-top:10px}
+.mb-sheet .ok{color:#2F8F5B;font-weight:600}
+.mb-pills{display:flex;flex-wrap:wrap;gap:6px}
+.mb-pills button{min-height:36px;padding:0 12px;border-radius:18px;border:1px solid #C9D3DD;background:#fff;font:inherit;font-size:13px}
+.mb-pills button.on{background:#E3F2EA;border-color:#2F8F5B;color:#1F5F3C;font-weight:700}
+.mb-two{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.mb-back-hp{position:fixed;left:12px;bottom:12px;z-index:900;border:0;border-radius:20px;background:#1B2430;color:#fff;padding:10px 14px;font:inherit;font-weight:700;box-shadow:0 6px 16px rgba(0,0,0,.3)}
+/* Modal CRM di HP: layar penuh */
+@media (max-width:760px){
+  .overlay{padding:0 !important}
+  .modal,.modal.wide,.modal.wide2,.modal.xwide{max-width:none !important;width:100% !important;height:100% !important;max-height:none !important;border-radius:0 !important}
+  .modal-body{padding:12px !important}
+  .modal-foot{padding:10px 12px !important}
+  .modal-foot .btn{flex:1 1 auto}
+  .form-grid{grid-template-columns:1fr !important}
+  .qitem-row{grid-template-columns:1fr 1fr !important}
+}
+/* Chat mengambang di mode HP: di atas tombol Catat kunjungan & menu bawah. */
+body:has(.mb) .chat-fab{bottom:140px !important;right:14px !important}
+body:has(.mb) .tc-panel{bottom:0 !important;right:0 !important;left:0 !important;width:auto !important;max-height:85vh}
+body:has(.mb):has(.overlay.show) .chat-fab{display:none}

@@ -25,7 +25,7 @@ interface Preview {
   names: string[];
 }
 
-const JABATAN: Record<string, string> = { gm: 'General Manager', admin: 'Administrator CRM' };
+const JABATAN: Record<string, string> = { vp: 'Vice President', gm: 'General Manager', admin: 'Administrator CRM' };
 
 const toBase64 = (f: File) =>
   new Promise<string>((resolve, reject) => {

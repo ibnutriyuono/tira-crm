@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'gm' | 'rm' | 'bm' | 'sales' | 'purchasing' | 'purchasing05' | 'salesadmin';
+export type Role = 'admin' | 'vp' | 'gm' | 'gmops' | 'rm' | 'bm' | 'sales' | 'purchasing' | 'purchasing05' | 'salesadmin';
 
 export interface SafeUser {
   id: string;
@@ -370,7 +370,10 @@ export type NotificationType =
   | 'po_arrived'
   | 'visit_assigned'
   | 'visit_update'
-  | 'visit_plan';
+  | 'visit_plan'
+  | 'ops_escalated'
+  | 'margin_request'
+  | 'margin_decided';
 
 export interface AppNotification {
   id: string;

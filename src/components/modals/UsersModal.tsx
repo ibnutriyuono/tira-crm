@@ -10,7 +10,9 @@ import { useUiStore } from '@/store/useUiStore';
 import { useT } from '@/store/useLangStore';
 const ROLE_META: Record<string, (u: { reg: number | null; cabang: string | null; se: string | null }) => { label: string; color: string }> = {
   admin: () => ({ label: 'Admin', color: 'amber' }),
+  vp: () => ({ label: 'VP', color: 'rust' }),
   gm: () => ({ label: 'GM', color: 'rust' }),
+  gmops: () => ({ label: 'GM Operation', color: 'rust' }),
   rm: (u) => ({ label: `RM · Regional ${u.reg ?? '-'}`, color: 'steel' }),
   bm: (u) => ({ label: `BM · ${u.cabang || '-'}`, color: 'green' }),
   salesadmin: (u) => ({ label: `Admin Sales · ${u.cabang || '-'}`, color: 'violet' }),

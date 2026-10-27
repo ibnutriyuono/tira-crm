@@ -18,6 +18,7 @@ import { canNow, useCan } from '@/hooks/useCan';
 import { HASIL_KEYS, HASIL_LABEL, KANAL_BY_TIPE, KANAL_LABEL, contactErrors, emailError, kanalNeeds, needsHasil, normalizePhone, phoneError, waLink, type Hasil, type Kanal } from '@/lib/activity-contact';
 
 import { useT } from '@/store/useLangStore';
+import { isGmLevel } from '@/lib/roles';
 const plusDays = (ymd: string, n: number) => {
   const d = new Date(`${ymd}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
@@ -181,7 +182,7 @@ export function SalesActivityModal() {
   const multi = !!owner && currentUser?.role !== 'sales';
   // Label "semua" sesuai cakupan role (API sudah membatasi datanya).
   const semuaLabel =
-    currentUser?.role === 'gm' || currentUser?.role === 'admin' ? 'Semua aktivitas' : currentUser?.role === 'rm' ? 'Semua di regional' : currentUser?.role === 'bm' || currentUser?.role === 'salesadmin' ? 'Semua Sales cabang' : 'Semua yang terlihat';
+    isGmLevel(currentUser?.role) || currentUser?.role === 'admin' ? 'Semua aktivitas' : currentUser?.role === 'rm' ? 'Semua di regional' : currentUser?.role === 'bm' || currentUser?.role === 'salesadmin' ? 'Semua Sales cabang' : 'Semua yang terlihat';
   const [lihat, setLihat] = useState<string>('semua');
   const seOptions = useMemo(() => {
     const set = new Set(activities.map((a) => a.se.toUpperCase()));

@@ -7,6 +7,7 @@ import { isOpenIssue } from '@/lib/issues';
 import { can, type PermAct } from '@/lib/permissions';
 import { adminTaskCount } from './modals/AdminQueueModal';
 import { useRouter } from 'next/navigation';
+import { isOpsLead } from '@/lib/roles';
 import { useEffect, useMemo, useState } from 'react';
 import { getSocket } from '@/lib/socket-client';
 import { useDataStore } from '@/store/useDataStore';
@@ -24,7 +25,9 @@ import { useT } from '@/store/useLangStore';
 import { LangSwitch } from './LangSwitch';
 const ROLE_LABEL: Record<string, { label: string; color: string }> = {
   admin: { label: 'Admin', color: 'amber' },
+  vp: { label: 'VP', color: 'rust' },
   gm: { label: 'GM', color: 'rust' },
+  gmops: { label: 'GM Operation', color: 'rust' },
   rm: { label: 'RM', color: 'steel' },
   bm: { label: 'BM', color: 'green' },
   sales: { label: 'Sales', color: 'slate' },
@@ -62,7 +65,7 @@ export function TopBar() {
   const [visitBadge, setVisitBadge] = useState(0);
   const myRole = currentUser?.role;
   useEffect(() => {
-    if (!myRole || !['sales', 'bm', 'rm', 'gm', 'admin', 'salesadmin'].includes(myRole)) return;
+    if (!myRole || !['sales', 'bm', 'rm', 'gm', 'vp', 'admin', 'salesadmin'].includes(myRole)) return;
     let alive = true;
     const load = () =>
       api
@@ -216,6 +219,12 @@ export function TopBar() {
               {tr("Kelola Role")}
             </button>
           )}
+          {currentUser.role === 'admin' && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('opsRules')} title={tr("Pengingat & eskalasi Operation, margin minimum Surat Penawaran")}>
+              <IconCheckSquare />
+              {tr("Batas Waktu & Margin")}
+            </button>
+          )}
           {c('faktur') && (
             <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('adminQueue')}>
               <IconCheckSquare />
@@ -342,7 +351,7 @@ export function TopBar() {
               )}
             </button>
           )}
-          {['sales', 'bm', 'rm', 'gm', 'admin', 'salesadmin'].includes(currentUser.role) && (
+          {['sales', 'bm', 'rm', 'gm', 'vp', 'admin', 'salesadmin'].includes(currentUser.role) && (
             <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('visitTasks')} title={tr("Tugas kunjungan dari BM / GM dan rencana kunjungan mingguan")}>
               <IconFlag />
               {tr("Tugas Kunjungan")}
@@ -351,6 +360,12 @@ export function TopBar() {
                   {visitBadge > 9 ? '9+' : visitBadge}
                 </span>
               )}
+            </button>
+          )}
+          {(isOpsLead(currentUser.role) || currentUser.role === 'admin') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('leadDesk')} title={tr("Beranda VP / GM Operation: keputusan yang menunggu, kinerja divisi")}>
+              <IconPresentation />
+              {tr("Beranda Pimpinan")}
             </button>
           )}
           <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('notifications')}>
@@ -363,7 +378,7 @@ export function TopBar() {
             )}
           </button>
           {c(isPurchasingRoleClient(currentUser.role) ? 'purch' : 'rfq') && (
-            <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => openModal('purchasing')}>
+            <button className="btn btn-ghost-dark" style={{ position: 'relative' }} onClick={() => (isOpsLead(currentUser.role) ? router.push('/purchasing') : openModal('purchasing'))} title={isOpsLead(currentUser.role) ? tr('Buka ruang kerja Purchasing') : undefined}>
               <IconBag />
               {tr("Purchasing")}
               {newPurchasingCount > 0 && (

@@ -35,6 +35,7 @@ import { useUiStore } from '@/store/useUiStore';
 import { canNow, useCan } from '@/hooks/useCan';
 
 import { useT } from '@/store/useLangStore';
+import { isGmLevel } from '@/lib/roles';
 type Tab = 'ringkasan' | 'daftar' | 'profil' | 'struktur';
 interface RosterUser {
   id: string;
@@ -43,7 +44,7 @@ interface RosterUser {
   cabang: string | null;
 }
 
-const ROLE_LABEL: Record<string, string> = { gm: 'GM', rm: 'RM', bm: 'BM', sales: 'Sales', admin: 'Admin', purchasing: 'Purchasing', purchasing05: 'PIC Line 05' };
+const ROLE_LABEL: Record<string, string> = { vp: 'VP', gm: 'GM', gmops: 'GM Operation', rm: 'RM', bm: 'BM', sales: 'Sales', admin: 'Admin', purchasing: 'Purchasing', purchasing05: 'PIC Line 05' };
 const rpJt = (n: number | null) => (n == null ? '-' : `Rp ${Math.round(n).toLocaleString('id-ID')} jt`);
 const pctTxt = (n: number | null, sign = false) => (n == null ? '-' : `${sign && n > 0 ? '+' : ''}${Math.round(n)}%`);
 const FLAG_BADGE: Record<KamFlag['level'], string> = { high: 'rust', mid: 'amber', low: 'violet' };
@@ -233,7 +234,7 @@ export function KeyAccountModal() {
             setSelId={setSelId}
             manager={manager}
             isKetua={kamE && !!currentUser && sel.ketuaId === currentUser.id}
-            canDelete={kamD && (currentUser?.role === 'gm' || currentUser?.role === 'admin')}
+            canDelete={kamD && (isGmLevel(currentUser?.role) || currentUser?.role === 'admin')}
             stat={stats.m.get(sel.id)}
             flags={flagsOf(sel)}
             daysSince={daysSince(sel)}
@@ -263,7 +264,7 @@ export function KeyAccountModal() {
           }}
           teamDirty={teamDirty}
           manager={manager}
-          canDelete={kamD && (currentUser?.role === 'gm' || currentUser?.role === 'admin')}
+          canDelete={kamD && (isGmLevel(currentUser?.role) || currentUser?.role === 'admin')}
           currentUserId={kamE ? currentUser?.id || '' : ''}
           busy={busy}
           prospects={prospects}
