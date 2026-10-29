@@ -113,6 +113,12 @@ const VIEW_STATE_KEY = 'crm_view_state_v1';
 interface UiState {
   // filters / sort / pagination / view mode — persisted to localStorage
   viewMode: 'table' | 'card';
+  /** Tampilan desktop baru aktif (DeskShell terpasang) — klik baris prospek membuka panel kanan. */
+  deskActive: boolean;
+  /** Prospek yang sedang terbuka di panel kanan tampilan baru. */
+  deskPanelId: string | null;
+  /** Buka palet perintah (Ctrl+K). */
+  paletteOpen: boolean;
   search: string;
   fReg: string;
   fCabang: string;
@@ -186,6 +192,9 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useUiStore = create<UiState>((set, get) => ({
   viewMode: 'table',
+  deskActive: false,
+  deskPanelId: null,
+  paletteOpen: false,
   search: '',
   fReg: '',
   fCabang: '',

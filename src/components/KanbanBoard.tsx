@@ -43,16 +43,19 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
   const canRfq = useCan('rfq', 'e');
   const canDelete = useCan('prospek', 'd') && (isGmLevel(currentUser?.role) || currentUser?.role === 'admin');
   const [dragging, setDragging] = useState(false);
+  const deskActive = useUiStore((s) => s.deskActive);
+  const deskPanelId = useUiStore((s) => s.deskPanelId);
 
   return (
     <div
-      className={`kanban-card${dragging ? ' dragging' : ''}${valueHighlightClass(r.value) ? ' ' + valueHighlightClass(r.value) : ''}`}
+      className={`kanban-card${dragging ? ' dragging' : ''}${deskActive ? ' dk-row' : ''}${deskActive && deskPanelId === r.id ? ' dk-card-on' : ''}${valueHighlightClass(r.value) ? ' ' + valueHighlightClass(r.value) : ''}`}
       draggable={canE}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', r.id);
         setDragging(true);
       }}
       onDragEnd={() => setDragging(false)}
+      onClick={deskActive ? (e) => { if (!(e.target as HTMLElement).closest('button,a,input,select')) useUiStore.setState({ deskPanelId: r.id }); } : undefined}
     >
       <div className="kc-top">
         <span className="kc-customer">

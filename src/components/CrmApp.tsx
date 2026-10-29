@@ -36,6 +36,8 @@ import { PipelineIssuesModal } from './modals/PipelineIssuesModal';
 import { AdminQueueModal } from './modals/AdminQueueModal';
 import { OpsRulesModal } from './modals/OpsRulesModal';
 import { MobileShell } from './mobile/MobileShell';
+import { DeskShell } from './desk/DeskShell';
+import { useDeskMode } from '@/hooks/useDeskMode';
 import { isSmallScreen, setPhonePref, usePhoneMode } from '@/hooks/usePhoneMode';
 import { LeadDeskModal } from './leaddesk/LeadDeskModal';
 import { RolesModal } from './modals/RolesModal';
@@ -110,6 +112,7 @@ export function CrmApp() {
   const phoneView = usePhoneMode();
   const phone = phoneView && !isPurchasingRoleClient(currentUser?.role);
   const smallScreen = !phoneView && isSmallScreen();
+  const deskNew = useDeskMode();
 
   // Deliberately depends on the individual filter/sort fields rather than `ui`
   // as a whole — `ui` also carries page/viewMode/modal state that shouldn't
@@ -129,6 +132,8 @@ export function CrmApp() {
     <>
       {phone ? (
         <MobileShell />
+      ) : deskNew ? (
+        <DeskShell filtered={filtered} />
       ) : (
       <>
       {smallScreen && (

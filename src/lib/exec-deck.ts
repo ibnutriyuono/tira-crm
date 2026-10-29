@@ -17,6 +17,7 @@ import { ISSUE_CATS, isOpenIssue, type PipelineIssue } from './issues';
 import { QCD_DIMS, QCD_FAKTOR_LABEL } from './qcd';
 import { fupaAsWorkflowDoc, rfqAsWorkflowDoc, workflowStage, WORKFLOW_META } from './purchasing-workflow';
 import { isStaffActivityKey } from './sales-activity';
+import { buildActivityAnalysis, buildBranchScorecard } from './exec-more';
 import type { ActivityTarget, BudgetTarget, CustomerGroup, Fupa, Prospect, Rfq, SalesActivity, SalesPlan, SeTarget, VisitTrip } from './types';
 
 // ---------------------------------------------------------------- model
@@ -97,6 +98,8 @@ export interface DeckInput {
   activities: SalesActivity[] | null;
   activityTargets: ActivityTarget[] | null;
   trips: VisitTrip[] | null;
+  /** Kode SE milik staf (GM, VP, Purchasing, …) — bukan Sales cabang. */
+  staffSe?: string[];
   /** Hak lihat modul (Kelola Role). */
   can: (mod: string) => boolean;
   user: { name: string; role: string; se: string | null };
@@ -243,6 +246,42 @@ export function buildDeck(inp: DeckInput): DeckModel {
           rows: rows.slice(0, 13).map((r) => [r.cabang, rp(r.target), rp(r.won), `${r.achievement}%`, rp(r.weighted), String(r.agingCount)]),
           widths: [14, 18, 18, 10, 18, 12],
           right: [1, 2, 3, 4, 5],
+        },
+        temuan,
+        aksi,
+      });
+    }
+  }
+
+  // ============================================================ 2b. Scorecard cabang (semua aspek)
+  if (!isSe && scope.kind !== 'cabang' && a.rows.length > 1) {
+    const staff = new Set((inp.staffSe || []).map(up));
+    const isStaff = (se: string) => isStaffActivityKey(se) || staff.has(up(se));
+    const sc = buildBranchScorecard({
+      prospects,
+      forecast: a.rows.map((r) => ({ cabang: r.cabang, reg: r.reg, target: r.target, won: r.won })),
+      activities: inp.can('aktivitas') ? inp.activities : null,
+      issues: inp.issues,
+      rfqs: inp.rfqs,
+      range: { months, today: today.toISOString().slice(0, 10) },
+      isStaff,
+      cabangs: scope.cabangs,
+    });
+    if (sc.length > 1) {
+      const low = sc.filter((r) => r.score < 60);
+      const temuan = [`Skor tertinggi ${sc.slice(0, 3).map((r) => `${r.cabang} ${r.score}`).join(', ')}; terendah ${sc.slice(-3).reverse().map((r) => `${r.cabang} ${r.score}`).join(', ')}.`];
+      sc.filter((r) => r.flags.length).slice(-3).reverse().forEach((r) => temuan.push(`${r.cabang}: ${r.flags.slice(0, 3).join(', ')}.`));
+      const aksi = low.slice(-3).reverse().map((r) => `${r.cabang} (skor ${r.score}): ${r.parts.slice().sort((x, y) => x.value - y.value)[0]?.label.toLowerCase() || 'tinjau kinerja'} paling lemah — jadikan agenda review cabang.`);
+      slides.push({
+        section: 'Kinerja Penjualan',
+        title: low.length ? `${low.length} dari ${sc.length} cabang perlu perhatian menyeluruh (skor < 60)` : `Semua cabang skor ≥ 60 pada ${a.periodLabel}`,
+        kicker: 'Skor indikatif 0–100: target 30, win rate 15, aktivitas/SE 20, disiplin follow-up 15, pipeline bergerak 10, cakupan pipeline 10',
+        charts: [{ kind: 'barH', title: 'Skor cabang', labels: sc.slice(0, 13).map((r) => r.cabang).reverse(), series: [{ name: 'Skor', values: sc.slice(0, 13).map((r) => r.score).reverse() }], unit: 'count', colors: ['2E5C7E'] }],
+        table: {
+          head: ['Cabang', 'Skor', 'Ach.', 'Win', 'FU tertib', 'Akt./SE', 'Masalah', 'DO>30h'],
+          rows: sc.slice(0, 13).map((r) => [r.cabang, String(r.score), r.ach == null ? '-' : `${r.ach}%`, r.winRate == null ? '-' : `${r.winRate}%`, r.openCount ? `${100 - Math.round(((r.noFu + r.fuLate) / r.openCount) * 100)}%` : '-', String(r.aktPerSe), String(r.issuesOpen), String(r.gitOld)]),
+          widths: [14, 10, 11, 10, 13, 12, 12, 12],
+          right: [1, 2, 3, 4, 5, 6, 7],
         },
         temuan,
         aksi,
@@ -572,7 +611,24 @@ export function buildDeck(inp: DeckInput): DeckModel {
     if (inPer.length && pct(converted, inPer.length) < 10) aksi.push('Konversi aktivitas ke pipeline rendah — dorong tombol "→ Permintaan/Penawaran" saat kunjungan menghasilkan peluang.');
     if (low.length) aksi.push(`Review disiplin input aktivitas bersama ${low.slice(0, 3).map((r) => r.se).join(', ')}.`);
     if (visits < inPer.length * 0.2 && inPer.length > 10) aksi.push('Proporsi kunjungan tatap muka rendah — jadwalkan kunjungan ke customer prioritas.');
+    const staffA = new Set((inp.staffSe || []).map(up));
+    const actA = !isSe ? buildActivityAnalysis({ activities: inp.activities, prospects, range: { months, today: today.toISOString().slice(0, 10) }, isStaff: (se) => isStaffActivityKey(se) || staffA.has(up(se)) }) : null;
+    if (actA && actA.cabangRows.length > 1) {
+      const weakCov = [...actA.cabangRows].filter((c) => c.coveragePct != null).sort((x, y) => (x.coveragePct ?? 0) - (y.coveragePct ?? 0))[0];
+      if (weakCov) temuan.push(`Cakupan customer aktif terendah: ${weakCov.cabang} ${weakCov.coveragePct}%; aktivitas per SE tertinggi ${actA.cabangRows[0].cabang} (${actA.cabangRows[0].perSe}).`);
+      if (actA.verifPct != null && actA.verifPct < 50) aksi.push(`Hanya ${actA.verifPct}% kunjungan tercatat dengan lokasi — biasakan mencatat kunjungan dari HP di lokasi customer.`);
+    }
     slides.push({
+      ...(actA && actA.cabangRows.length > 1
+        ? {
+            table: {
+              head: ['Cabang', 'SE', 'Akt./SE', 'Kunj./SE', 'Berlokasi', 'Cakupan cust.', 'Ke pipeline'],
+              rows: actA.cabangRows.slice(0, 13).map((c) => [c.cabang, String(c.seCount), String(c.perSe), c.kunjPerSe.toLocaleString('id-ID'), c.verifPct == null ? '-' : `${c.verifPct}%`, c.coveragePct == null ? '-' : `${c.coveragePct}%`, `${c.converted}`]),
+              widths: [14, 8, 13, 13, 14, 18, 14],
+              right: [1, 2, 3, 4, 5, 6],
+            },
+          }
+        : {}),
       section: 'Aktivitas & Operasional',
       title: inPer.length ? `${inPer.length} aktivitas menyentuh ${custTouched} customer; ${pct(converted, inPer.length)}% menjadi pipeline` : 'Belum ada aktivitas tercatat pada periode ini',
       kicker: `Aktivitas customer per jenis, 6 bulan terakhir${isSe ? ' (aktivitas Anda)' : ' (Sales & BM)'}`,

@@ -37,6 +37,8 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
   const tr = useT();
   const ui = useUiStore();
   const openModal = useUiStore((s) => s.openModal);
+  const deskActive = useUiStore((s) => s.deskActive);
+  const deskPanelId = useUiStore((s) => s.deskPanelId);
   // Kelola Role: tombol hanya tampil bila aksinya diizinkan (server tetap menjaga).
   const role = useDataStore((s) => s.currentUser?.role);
   const canE = useCan('prospek', 'e');
@@ -104,7 +106,11 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
               const klas = classify(r);
               const stMeta = STATUS_META[num(r.status)] || STATUS_META[0];
               return (
-                <tr key={r.id} className={valueHighlightClass(r.value)}>
+                <tr
+                  key={r.id}
+                  className={`${valueHighlightClass(r.value)}${deskActive ? ' dk-row' : ''}${deskActive && deskPanelId === r.id ? ' dk-row-on' : ''}`}
+                  onClick={deskActive ? (e) => { if (!(e.target as HTMLElement).closest('button,a,input,select')) useUiStore.setState({ deskPanelId: r.id }); } : undefined}
+                >
                   <td className="num">{startIdx + idx + 1}</td>
                   <td className="center">{r.reg || '-'}</td>
                   <td>{r.cabang || '-'}</td>

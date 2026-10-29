@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type PptxGenJS from 'pptxgenjs';
 import { Modal } from '../Modal';
 import { IconDownload } from '../icons';
@@ -15,6 +15,13 @@ import { buildExecAnalysis, execScopeFor, inScope, localPeriode, type ExecAnalys
 import { PipelineTab } from '../analisa/PipelineTab';
 import { ProductTab } from '../analisa/ProductTab';
 import { TargetTab } from '../analisa/TargetTab';
+import { ActivityTab } from '../analisa/ActivityTab';
+import { BranchTab } from '../analisa/BranchTab';
+import { CustomerTab } from '../analisa/CustomerTab';
+import { OpsTab } from '../analisa/OpsTab';
+import { isNonBranchRole } from '@/lib/roles';
+import { isStaffActivityKey } from '@/lib/sales-activity';
+import type { RosterUser } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
@@ -67,7 +74,27 @@ export function GmAnalysisModal() {
     { label: 'Tahun lalu', from: `${Number(thisMonth.slice(0, 4)) - 1}-01`, to: `${Number(thisMonth.slice(0, 4)) - 1}-12` },
   ];
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<'sales' | 'target' | 'product' | 'pipeline'>('sales');
+  const [tab, setTab] = useState<'sales' | 'target' | 'product' | 'pipeline' | 'aktivitas' | 'cabang' | 'customer' | 'operasional'>('sales');
+  // Aktivitas (semua bulan, sesuai cakupan server) + Kode SE staf — dimuat saat tab Aktivitas / Cabang dibuka.
+  const [acts, setActs] = useState<SalesActivity[] | null>(null);
+  const [staffSe, setStaffSe] = useState<Set<string>>(() => new Set());
+  const needActs = show && (tab === 'aktivitas' || tab === 'cabang') && canNow('aktivitas', 'v');
+  useEffect(() => {
+    if (!needActs || acts) return;
+    let alive = true;
+    Promise.all([
+      api.get<{ activities: SalesActivity[] }>('/api/sales-activities?all=1').catch(() => ({ activities: [] as SalesActivity[] })),
+      api.get<{ roster: RosterUser[] }>('/api/users/roster').catch(() => ({ roster: [] as RosterUser[] })),
+    ]).then(([a, r]) => {
+      if (!alive) return;
+      setStaffSe(new Set(r.roster.filter((u) => isNonBranchRole(u.role) && u.se).map((u) => String(u.se).trim().toUpperCase())));
+      setActs(a.activities);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [needActs, acts]);
+  const isStaff = useCallback((se: string) => isStaffActivityKey(se) || staffSe.has((se || '').trim().toUpperCase()), [staffSe]);
 
   // The modal key is only client state; the scope check here is what keeps a
   // role with no sales data (purchasing) from rendering anything.
@@ -88,12 +115,14 @@ export function GmAnalysisModal() {
         return null;
       }
     };
-    const [activities, activityTargets, trips] = await Promise.all([
+    const [activities, activityTargets, trips, roster] = await Promise.all([
       canNow('aktivitas', 'v') ? get<SalesActivity[]>('/api/sales-activities?all=1', 'activities') : Promise.resolve(null),
       canNow('kpi', 'v') && scope?.kind !== 'se' ? get<ActivityTarget[]>(`/api/activity-targets?periode=${periodeTo}`, 'targets') : Promise.resolve(null),
       canNow('trip', 'v') ? get<VisitTrip[]>('/api/visit-trips', 'trips') : Promise.resolve(null),
+      get<RosterUser[]>('/api/users/roster', 'roster'),
     ]);
-    return { activities, activityTargets, trips };
+    const staffSe = (roster || []).filter((u) => isNonBranchRole(u.role) && u.se).map((u) => String(u.se).trim().toUpperCase());
+    return { activities, activityTargets, trips, staffSe };
   }
 
   async function loadLogoImage(): Promise<PptImage | null> {
@@ -180,6 +209,10 @@ export function GmAnalysisModal() {
             ['target', tr("Target")],
             ['product', tr("Product")],
             ['pipeline', tr("Pipeline")],
+            ...(canNow('aktivitas', 'v') ? [['aktivitas', tr("Aktivitas")] as const] : []),
+            ...(scope.kind === 'nasional' || scope.kind === 'regional' ? [['cabang', tr("Cabang")] as const] : []),
+            ['customer', tr("Customer")],
+            ['operasional', tr("Operasional")],
           ] as const
         ).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
@@ -190,6 +223,10 @@ export function GmAnalysisModal() {
       {show && tab === 'target' && <TargetTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={scope.cabangs} isSe={scope.kind === 'se'} />}
       {show && tab === 'product' && <ProductTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={tabCabangs} thisMonth={thisMonth} />}
       {show && tab === 'pipeline' && <PipelineTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={tabCabangs} thisMonth={thisMonth} />}
+      {show && tab === 'aktivitas' && <ActivityTab activities={acts} prospects={scopedProspects} cabangs={tabCabangs} thisMonth={thisMonth} isStaff={isStaff} isSe={scope.kind === 'se'} />}
+      {show && tab === 'cabang' && <BranchTab scope={scope} prospects={scopedProspects} activities={canNow('aktivitas', 'v') ? acts : null} thisMonth={thisMonth} isStaff={isStaff} />}
+      {show && tab === 'customer' && <CustomerTab prospects={scopedProspects} cabangs={tabCabangs} thisMonth={thisMonth} />}
+      {show && tab === 'operasional' && <OpsTab prospects={scopedProspects} cabangs={tabCabangs} thisMonth={thisMonth} />}
       {a && tab === 'sales' && (
         <>
           <div className="toolbar-row" style={{ alignItems: 'center', marginBottom: 12 }}>
