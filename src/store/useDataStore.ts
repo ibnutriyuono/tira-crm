@@ -130,6 +130,12 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   bootstrap: async () => {
     const res = await fetch('/api/bootstrap');
+    if (res.status === 401) {
+      // Sesi habis / akun dijeda Admin: kembali ke login (cookie sudah dihapus server).
+      const body = await res.json().catch(() => ({}));
+      window.location.replace(body?.paused ? '/login?paused=1' : '/login');
+      return;
+    }
     if (!res.ok) return;
     const data = await res.json();
     set({

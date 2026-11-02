@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { useT } from '@/store/useLangStore';
@@ -12,6 +12,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // Dikeluarkan karena akun dijeda Admin (/login?paused=1).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('paused')) setError(tr('Akun Anda sedang dijeda oleh Admin. Hubungi Admin untuk mengaktifkannya kembali.'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

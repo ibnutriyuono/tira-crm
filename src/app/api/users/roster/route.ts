@@ -12,8 +12,10 @@ export async function GET() {
   if (isResponse(user)) return user;
 
   const roster = await prisma.user.findMany({
-    select: { id: true, username: true, name: true, role: true, cabang: true, se: true },
+    select: { id: true, username: true, name: true, role: true, cabang: true, se: true, pausedAt: true },
     orderBy: { name: 'asc' },
   });
-  return NextResponse.json({ roster });
+  // Akun dijeda tetap ada di daftar (nama di riwayat tetap terbaca) dan
+  // ditandai `paused` supaya tidak dipilih untuk tugas / chat baru.
+  return NextResponse.json({ roster: roster.map(({ pausedAt, ...u }) => ({ ...u, paused: !!pausedAt })) });
 }

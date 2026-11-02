@@ -19,6 +19,7 @@ import { ActivityTab } from '../analisa/ActivityTab';
 import { BranchTab } from '../analisa/BranchTab';
 import { CustomerTab } from '../analisa/CustomerTab';
 import { OpsTab } from '../analisa/OpsTab';
+import { SegmentTab } from '../analisa/SegmentTab';
 import { isNonBranchRole } from '@/lib/roles';
 import { isStaffActivityKey } from '@/lib/sales-activity';
 import type { RosterUser } from '@/lib/types';
@@ -74,7 +75,23 @@ export function GmAnalysisModal() {
     { label: 'Tahun lalu', from: `${Number(thisMonth.slice(0, 4)) - 1}-01`, to: `${Number(thisMonth.slice(0, 4)) - 1}-12` },
   ];
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<'sales' | 'target' | 'product' | 'pipeline' | 'aktivitas' | 'cabang' | 'customer' | 'operasional'>('sales');
+  const [tab, setTab] = useState<'sales' | 'target' | 'product' | 'pipeline' | 'aktivitas' | 'cabang' | 'customer' | 'segmen' | 'operasional'>('sales');
+  // Dibuka dari pintasan "Peta kunjungan" (KPI Aktivitas / Beranda): langsung ke tab Aktivitas › peta.
+  const focus = useUiStore((s) => s.analysisFocus);
+  useEffect(() => {
+    if (!show || focus !== 'peta') return;
+    useUiStore.setState({ analysisFocus: null });
+    setTab('aktivitas');
+    let n = 0;
+    const t = window.setInterval(() => {
+      const el = document.getElementById('peta-kunjungan');
+      if (el || ++n > 40) {
+        window.clearInterval(t);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 150);
+    return () => window.clearInterval(t);
+  }, [show, focus]);
   // Aktivitas (semua bulan, sesuai cakupan server) + Kode SE staf — dimuat saat tab Aktivitas / Cabang dibuka.
   const [acts, setActs] = useState<SalesActivity[] | null>(null);
   const [staffSe, setStaffSe] = useState<Set<string>>(() => new Set());
@@ -212,6 +229,7 @@ export function GmAnalysisModal() {
             ...(canNow('aktivitas', 'v') ? [['aktivitas', tr("Aktivitas")] as const] : []),
             ...(scope.kind === 'nasional' || scope.kind === 'regional' ? [['cabang', tr("Cabang")] as const] : []),
             ['customer', tr("Customer")],
+            ['segmen', tr("Segmen")],
             ['operasional', tr("Operasional")],
           ] as const
         ).map(([k, l]) => (
@@ -226,6 +244,7 @@ export function GmAnalysisModal() {
       {show && tab === 'aktivitas' && <ActivityTab activities={acts} prospects={scopedProspects} cabangs={tabCabangs} thisMonth={thisMonth} isStaff={isStaff} isSe={scope.kind === 'se'} />}
       {show && tab === 'cabang' && <BranchTab scope={scope} prospects={scopedProspects} activities={canNow('aktivitas', 'v') ? acts : null} thisMonth={thisMonth} isStaff={isStaff} />}
       {show && tab === 'customer' && <CustomerTab prospects={scopedProspects} cabangs={tabCabangs} thisMonth={thisMonth} />}
+      {show && tab === 'segmen' && <SegmentTab prospects={scopedProspects} cabangs={tabCabangs} thisMonth={thisMonth} />}
       {show && tab === 'operasional' && <OpsTab prospects={scopedProspects} cabangs={tabCabangs} thisMonth={thisMonth} />}
       {a && tab === 'sales' && (
         <>

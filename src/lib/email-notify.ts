@@ -147,7 +147,7 @@ async function deliver(userId: string | null, kind: string, to: string, msg: { s
 export async function emailNewNotifications(rows: NotifRow[]): Promise<void> {
   if (!mailConfigured() || rows.length === 0) return;
   const users = (await prisma.user.findMany({
-    where: { id: { in: Array.from(new Set(rows.map((r) => r.userId))) } },
+    where: { id: { in: Array.from(new Set(rows.map((r) => r.userId))) }, pausedAt: null },
     select: { id: true, name: true, email: true, notifPrefs: true },
   })) as { id: string; name: string; email: string | null; notifPrefs: unknown }[];
   const byId = new Map(users.map((u) => [u.id, u]));
@@ -176,7 +176,7 @@ export async function runDailyDigest(now = new Date()): Promise<{ sent: number; 
   const { dow, hhmm } = localParts(now);
   const since = startOfLocalDay(now);
   const users = (await prisma.user.findMany({
-    where: { email: { not: null } },
+    where: { email: { not: null }, pausedAt: null },
     select: { id: true, name: true, email: true, notifPrefs: true },
   })) as { id: string; name: string; email: string | null; notifPrefs: unknown }[];
   let sent = 0;

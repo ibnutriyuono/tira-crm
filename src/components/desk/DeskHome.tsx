@@ -10,10 +10,14 @@ import { rfqAsWorkflowDoc, workflowStage } from '@/lib/purchasing-workflow';
 import { buildAgingList } from '@/lib/reports';
 import { bookingPeriode, buildTargetAchievement } from '@/lib/target-achievement';
 import type { SalesActivity } from '@/lib/types';
+import { canNow } from '@/hooks/useCan';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { useT } from '@/store/useLangStore';
 import { rpShort } from '../analisa/ui';
+import { customerKey } from '@/lib/reports';
+import { SEG_OTHERS, needsSegment } from '@/lib/customer-segments';
+import { useSegments } from '@/hooks/useSegments';
 
 interface TaskLite {
   id: string;
@@ -28,7 +32,7 @@ interface TaskLite {
 
 interface Todo {
   key: string;
-  kind: 'fu' | 'tugas' | 'masalah' | 'rfq' | 'mangkrak' | 'kirim';
+  kind: 'fu' | 'tugas' | 'masalah' | 'rfq' | 'mangkrak' | 'kirim' | 'segmen';
   late: boolean;
   sort: number;
   title: string;
@@ -44,8 +48,11 @@ const KIND: Record<Todo['kind'], { label: string; cls: string }> = {
   rfq: { label: 'Jawaban RFQ', cls: 'amber' },
   mangkrak: { label: 'Tidak bergerak', cls: 'slate' },
   kirim: { label: 'Penawaran belum dikirim', cls: 'amber' },
+  segmen: { label: 'Segmen customer', cls: 'slate' },
 };
 
+let segFocusSeq = 0;
+const nextSegFocus = () => `f${++segFocusSeq}`;
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 const dayDiff = (a: string, b: string) => Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a.slice(0, 10)}T00:00:00`).getTime()) / 86400000);
 
@@ -71,6 +78,8 @@ export function DeskHome({ onPage }: { onPage: (p: 'pipeline') => void }) {
   const issues = useDataStore((s) => s.issues);
   const rfqs = useDataStore((s) => s.rfqs);
   const groups = useDataStore((s) => s.customerGroups);
+  const customers = useDataStore((s) => s.customers);
+  const { canEdit: canSeg } = useSegments();
   const [today] = useState(() => ymd(new Date()));
   const [tasks, setTasks] = useState<TaskLite[]>([]);
   const [acts, setActs] = useState<SalesActivity[]>([]);
@@ -222,9 +231,27 @@ export function DeskHome({ onPage }: { onPage: (p: 'pipeline') => void }) {
           ],
         }),
       );
+    // Customer yang segmennya kosong / Others, di wilayah user (customer yang punya prospek di daftar user).
+    if (canSeg) {
+      const mine = new Set(prospects.map((p) => customerKey(p.customer)));
+      const need = customers.filter((c) => mine.has(customerKey(c.name)) && needsSegment(c));
+      if (need.length) {
+        const others = need.filter((c) => c.segmen === SEG_OTHERS).length;
+        out.push({
+          key: 'segmen',
+          kind: 'segmen',
+          late: false,
+          sort: 4,
+          title: `${need.length} ${tr('customer belum jelas segmennya')}`,
+          sub: [others ? `${others} Others` : '', need.length - others ? `${need.length - others} ${tr('belum diisi')}` : '', need.slice(0, 3).map((c) => c.name).join(', ')].filter(Boolean).join(' · '),
+          when: '',
+          actions: [{ label: tr('Lengkapi'), run: () => { useUiStore.setState({ customersSegFocus: nextSegFocus() }); open('customers'); }, pri: true }],
+        });
+      }
+    }
     return out.sort((a, b) => a.sort - b.sort || Number(b.late) - Number(a.late));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prospects, tasks, issues, rfqs, today, me, role, sales, tr]);
+  }, [prospects, tasks, issues, rfqs, today, me, role, sales, tr, canSeg, customers]);
 
   // ---- deal yang bisa didorong
   const hot = [...active].filter((p) => num(p.status) >= 2).sort((a, b) => num(b.status) - num(a.status) || num(b.value) - num(a.value)).slice(0, 6);
@@ -372,7 +399,17 @@ export function DeskHome({ onPage }: { onPage: (p: 'pipeline') => void }) {
 
       {team.length > 0 && (
         <section className="dk-card">
-          <div className="dk-card-h"><b>{tr('Tim saya bulan ini')}</b><small className="muted">{tr('aktivitas = pekan ini')}</small></div>
+          <div className="dk-card-h">
+            <b>{tr('Tim saya bulan ini')}</b>
+            <span>
+              <small className="muted">{tr('aktivitas = pekan ini')}</small>
+              {canNow('analisa') && (
+                <button type="button" className="dk-link" style={{ marginLeft: 10 }} onClick={() => { useUiStore.setState({ analysisFocus: 'peta' }); open('gmAnalysis'); }}>
+                  {tr('Peta kunjungan')} →
+                </button>
+              )}
+            </span>
+          </div>
           <div className="table-wrap" style={{ borderTop: 'none' }}>
             <table className="simple-table ea-tbl">
               <thead>

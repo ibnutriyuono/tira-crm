@@ -13,6 +13,7 @@ import { Pagination } from './Pagination';
 import { useCan } from '@/hooks/useCan';
 import { NewBadge } from './NewBadge';
 import { IssueBadge } from './issues/shared';
+import { LeadBadge } from './LeadBadge';
 import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './ProspectPurchasingBubble';
 
 import { useT } from '@/store/useLangStore';
@@ -119,6 +120,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                     {r.customer || '-'}
                     <NewBadge createdAt={r.createdAt} />
                     <IssueBadge prospectId={r.id} compact />
+                    <LeadBadge p={r} compact />
                     <ProspectPurchasingBubble count={purchCounts[r.id]} />
                     {!!starCounts.get(r.id) && (
                       <span

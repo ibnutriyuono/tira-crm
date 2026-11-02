@@ -120,7 +120,7 @@ export function SeTargetSection({
   const addable = roster.filter((u) => !isNonBranchRole(u.role) && !ses.includes(userTargetKey(u))).sort((a, b) => Number(b.role === 'sales') - Number(a.role === 'sales') || a.name.localeCompare(b.name));
   const userOf = (se: string) => roster.find((u) => userTargetKey(u) === se);
   const nameOf = (se: string) => userOf(se)?.name || '';
-  const ROLE_SHORT: Record<string, string> = { sales: 'Sales', salesadmin: 'Admin Sales', bm: 'BM', rm: 'RM', gm: 'GM', vp: 'VP', gmops: 'GM Operation', admin: 'Admin', purchasing: 'Purchasing' };
+  const ROLE_SHORT: Record<string, string> = { sales: 'Sales', salesadmin: 'Admin Sales', bm: 'BM', rm: 'RM', gm: 'GM', vp: 'VP', gmops: 'GM Operation', marketing: 'Marketing', admin: 'Admin', purchasing: 'Purchasing' };
   const removeRow = (se: string) => {
     if (extra.includes(se) && !cur?.ses.includes(se)) setExtra(extra.filter((x) => x !== se));
     else setRemovedSe([...removedSe, se]);

@@ -42,9 +42,10 @@ interface RosterUser {
   name: string;
   role: string;
   cabang: string | null;
+  paused?: boolean;
 }
 
-const ROLE_LABEL: Record<string, string> = { vp: 'VP', gm: 'GM', gmops: 'GM Operation', rm: 'RM', bm: 'BM', sales: 'Sales', admin: 'Admin', purchasing: 'Purchasing', purchasing05: 'PIC Line 05' };
+const ROLE_LABEL: Record<string, string> = { vp: 'VP', gm: 'GM', gmops: 'GM Operation', marketing: 'Marketing', rm: 'RM', bm: 'BM', sales: 'Sales', admin: 'Admin', purchasing: 'Purchasing', purchasing05: 'PIC Line 05' };
 const rpJt = (n: number | null) => (n == null ? '-' : `Rp ${Math.round(n).toLocaleString('id-ID')} jt`);
 const pctTxt = (n: number | null, sign = false) => (n == null ? '-' : `${sign && n > 0 ? '+' : ''}${Math.round(n)}%`);
 const FLAG_BADGE: Record<KamFlag['level'], string> = { high: 'rust', mid: 'amber', low: 'violet' };
@@ -119,7 +120,7 @@ export function KeyAccountModal() {
     const u = roster.find((x) => x.id === id);
     return u ? `${u.name}` : '(user dihapus)';
   }, [roster]);
-  const userLabel = (u: RosterUser) => `${u.name} · ${ROLE_LABEL[u.role] || u.role}${u.cabang ? ` ${u.cabang}` : ''}`;
+  const userLabel = (u: RosterUser) => `${u.name} · ${ROLE_LABEL[u.role] || u.role}${u.cabang ? ` ${u.cabang}` : ''}${u.paused ? ' · dijeda' : ''}`;
 
   // Per group: last contact (Aktivitas Harian), CRM pipeline and won value.
   const stats = useMemo(() => {

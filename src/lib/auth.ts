@@ -34,20 +34,46 @@ async function verifySessionToken(token: string): Promise<string | null> {
   }
 }
 
-export function toSafeUser(u: { id: string; username: string; name: string; role: string; customRole?: string | null; se: string | null; cabang: string | null; reg: number | null; email?: string | null; mustChangePassword?: boolean; signatureAt?: Date | null }): SafeUser {
-  return { id: u.id, username: u.username, name: u.name, role: u.role as SafeUser['role'], customRole: u.customRole ?? null, se: u.se, cabang: u.cabang, reg: u.reg, email: u.email ?? null, mustChangePassword: !!u.mustChangePassword, signatureAt: u.signatureAt ? u.signatureAt.toISOString() : null };
+export function toSafeUser(u: { id: string; username: string; name: string; role: string; customRole?: string | null; se: string | null; cabang: string | null; reg: number | null; email?: string | null; mustChangePassword?: boolean; signatureAt?: Date | null; pausedAt?: Date | null; pausedReason?: string | null; pausedBy?: string | null }): SafeUser {
+  return {
+    id: u.id,
+    username: u.username,
+    name: u.name,
+    role: u.role as SafeUser['role'],
+    customRole: u.customRole ?? null,
+    se: u.se,
+    cabang: u.cabang,
+    reg: u.reg,
+    email: u.email ?? null,
+    mustChangePassword: !!u.mustChangePassword,
+    signatureAt: u.signatureAt ? u.signatureAt.toISOString() : null,
+    pausedAt: u.pausedAt ? u.pausedAt.toISOString() : null,
+    pausedReason: u.pausedReason ?? null,
+    pausedBy: u.pausedBy ?? null,
+  };
+}
+
+export const PAUSED_MESSAGE = 'Akun Anda sedang dijeda oleh Admin. Hubungi Admin untuk mengaktifkannya kembali.';
+
+/**
+ * Sesi dari cookie: `paused` = token sah tetapi akunnya dijeda Admin —
+ * diperlakukan seperti tidak login (requireUser menolak & menghapus cookie).
+ */
+export async function getSession(): Promise<{ user: SafeUser | null; paused: boolean }> {
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (!token) return { user: null, paused: false };
+  const userId = await verifySessionToken(token);
+  if (!userId) return { user: null, paused: false };
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return { user: null, paused: false };
+  if (user.pausedAt) return { user: null, paused: true };
+  return { user: toSafeUser(user), paused: false };
 }
 
 /** Server Component / Route Handler helper: reads the session cookie via next/headers. */
 export async function getCurrentUser(): Promise<SafeUser | null> {
-  const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  const userId = await verifySessionToken(token);
-  if (!userId) return null;
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) return null;
-  return toSafeUser(user);
+  return (await getSession()).user;
 }
 
 /** Middleware helper: reads the session cookie straight off the NextRequest. */
@@ -90,6 +116,8 @@ export function prospectScopeWhere(user: SafeUser) {
   if (user.role === 'purchasing') return {};
   // PIC Line 05 works only RFQ / FUP A that contain a Line 05 item, nothing else.
   if (user.role === 'purchasing05') return NONE;
+  // Product & Marketing: nasional, hanya baca (lead dibuat lewat /api/leads).
+  if (user.role === 'marketing') return {};
   return {}; // gm, vp, gmops (hanya baca) & admin see everything
 }
 
@@ -354,6 +382,8 @@ export async function canEditBudgetTarget(user: SafeUser, cabang: string): Promi
  * every other role (purchasing) only its own rows (activityOwner).
  */
 export async function salesActivityScopeWhere(user: SafeUser) {
+  // Product & Marketing membaca aktivitas nasional (riwayat kontak customer, reaktivasi).
+  if (user.role === 'marketing') return {};
   const base = await salesPlanScopeWhere(user);
   const own = activityOwner(user);
   // Admin / GM melihat semua; role lain: cakupannya + aktivitasnya sendiri.

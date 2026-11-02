@@ -1,5 +1,6 @@
 'use client';
 
+import { SEG_OTHERS, needsSegment, segmentLabel } from '@/lib/customer-segments';
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { CUSTOMER_APLIKASI_LABEL, PIC_PERAN, PIC_PERAN_LABEL, STATUS_META } from '@/lib/constants';
@@ -142,11 +143,17 @@ export function CustomerProfileModal() {
     >
       <div className="cp-head">
         <span className={`badge ${st.color}`} title={st.hint}>{st.label}</span>
-        <span>{f.segmen || <i className="cp-muted">{tr("segmen belum diisi")}</i>}</span>
+        <span>{f.segmen ? segmentLabel(f.segmen, f.customer?.segmen === f.segmen ? f.customer?.subSegmen : null) : <i className="cp-muted">{tr("segmen belum diisi")}</i>}</span>
         {apl.length > 0 && <span>· {apl.join(', ')}</span>}
         {f.cabang && <span>{tr("· Cabang")} {f.cabang}</span>}
         {f.se && <span>{tr("· SE")} {f.se}</span>}
         {kam && f.group && <span className="badge steel" title={`Key Account · ${f.group.name}`}>{kam.label} · {f.group.name}</span>}
+        {f.customer && needsSegment({ segmen: f.segmen }) && (
+          <span className="seg-need">
+            ⚠ {f.segmen === SEG_OTHERS ? tr("Segmen masih Others — lengkapi segmen aslinya") : tr("Segmen belum diisi")}
+            {canEdit && <button type="button" className="link-btn" style={{ marginLeft: 6 }} onClick={editProfile}>{tr("Lengkapi")}</button>}
+          </span>
+        )}
         {!f.customer && <span className="field-note" style={{ margin: 0 }}>{tr("Belum ada di Kelola Customer — segmen, potensi & peran PIC bisa diisi setelah customer ditambahkan.")}</span>}
       </div>
 

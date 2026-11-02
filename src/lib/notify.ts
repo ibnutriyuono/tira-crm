@@ -44,7 +44,10 @@ export type NotifType =
   | 'visit_plan'
   | 'ops_escalated'
   | 'margin_request'
-  | 'margin_decided';
+  | 'margin_decided'
+  | 'prospect_duplicate'
+  | 'lead_new'
+  | 'lead_update';
 
 interface NotifyInput {
   userIds: string[];
@@ -62,7 +65,13 @@ interface NotifyInput {
  * to notify" is an expected outcome, not an error.
  */
 export async function notify({ userIds, type, entity, entityId, title, message }: NotifyInput): Promise<void> {
-  const uniq = Array.from(new Set(userIds.filter(Boolean)));
+  const wanted = Array.from(new Set(userIds.filter(Boolean)));
+  if (wanted.length === 0) return;
+  // Akun yang dijeda Admin tidak menerima notifikasi (tidak bisa login juga).
+  const paused = new Set(
+    (await prisma.user.findMany({ where: { id: { in: wanted }, pausedAt: { not: null } }, select: { id: true } })).map((u) => u.id),
+  );
+  const uniq = wanted.filter((id) => !paused.has(id));
   if (uniq.length === 0) return;
   const rows = await Promise.all(
     uniq.map((userId) => prisma.notification.create({ data: { userId, type, entity, entityId, title, message } })),
@@ -82,7 +91,7 @@ export async function notify({ userIds, type, entity, entityId, title, message }
 export async function purchasingUserIds(items?: unknown): Promise<string[]> {
   // PIC Line 05 only hears about documents that contain a Line 05 item.
   const roles: Role[] = itemsHaveLine(items) ? ['purchasing', 'purchasing05'] : ['purchasing'];
-  const rows = await prisma.user.findMany({ where: { role: { in: roles } }, select: { id: true } });
+  const rows = await prisma.user.findMany({ where: { pausedAt: null, role: { in: roles } }, select: { id: true } });
   return rows.map((r) => r.id);
 }
 
@@ -99,7 +108,7 @@ export async function requesterUserIds(requestedBy: string | null): Promise<stri
   const name = (requestedBy || '').trim();
   if (!name) return [];
   const rows = await prisma.user.findMany({
-    where: { OR: [{ name: { equals: name, mode: 'insensitive' } }, { username: { equals: name, mode: 'insensitive' } }] },
+    where: { pausedAt: null, OR: [{ name: { equals: name, mode: 'insensitive' } }, { username: { equals: name, mode: 'insensitive' } }] },
     select: { id: true },
   });
   return rows.map((r) => r.id);
@@ -116,10 +125,10 @@ export async function tripApproverIds(ownerRole: string, ownerReg: number | null
     // BM cabang Sales yang menyetujui; RM regional & GM boleh juga, tapi
     // yang diberi tahu cukup BM-nya (bila cabang tanpa BM: RM, lalu GM).
     const c = (ownerCabang || '').trim();
-    const bm = c ? await prisma.user.findMany({ where: { role: 'bm', cabang: { equals: c, mode: 'insensitive' } }, select: { id: true } }) : [];
+    const bm = c ? await prisma.user.findMany({ where: { pausedAt: null, role: 'bm', cabang: { equals: c, mode: 'insensitive' } }, select: { id: true } }) : [];
     if (bm.length) return bm.map((r) => r.id);
     if (ownerReg != null) {
-      const rm = await prisma.user.findMany({ where: { role: 'rm', reg: ownerReg }, select: { id: true } });
+      const rm = await prisma.user.findMany({ where: { pausedAt: null, role: 'rm', reg: ownerReg }, select: { id: true } });
       if (rm.length) return rm.map((r) => r.id);
     }
     or.push({ role: 'gm' });
@@ -131,7 +140,7 @@ export async function tripApproverIds(ownerRole: string, ownerReg: number | null
   } else {
     return [];
   }
-  const rows = await prisma.user.findMany({ where: { OR: or }, select: { id: true } });
+  const rows = await prisma.user.findMany({ where: { pausedAt: null, OR: or }, select: { id: true } });
   return rows.map((r) => r.id);
 }
 
@@ -143,7 +152,7 @@ export async function tripApproverIds(ownerRole: string, ownerReg: number | null
 export async function tripHostIds(cabang: string, reg: number | null): Promise<string[]> {
   const or: Record<string, unknown>[] = [{ role: 'bm', cabang: { equals: cabang, mode: 'insensitive' } }];
   if (reg != null) or.push({ role: 'rm', reg });
-  const rows = await prisma.user.findMany({ where: { OR: or }, select: { id: true } });
+  const rows = await prisma.user.findMany({ where: { pausedAt: null, OR: or }, select: { id: true } });
   return rows.map((r) => r.id);
 }
 
@@ -151,7 +160,7 @@ export async function tripHostIds(cabang: string, reg: number | null): Promise<s
 export async function seUserIds(se: string | null | undefined): Promise<string[]> {
   const code = (se || '').trim();
   if (!code) return [];
-  const rows = await prisma.user.findMany({ where: { se: { equals: code, mode: 'insensitive' } }, select: { id: true } });
+  const rows = await prisma.user.findMany({ where: { pausedAt: null, se: { equals: code, mode: 'insensitive' } }, select: { id: true } });
   return rows.map((r) => r.id);
 }
 
@@ -159,7 +168,7 @@ export async function seUserIds(se: string | null | undefined): Promise<string[]
 export async function bmUserIds(cabang: string | null | undefined): Promise<string[]> {
   const c = (cabang || '').trim();
   if (!c) return [];
-  const rows = await prisma.user.findMany({ where: { role: 'bm', cabang: { equals: c, mode: 'insensitive' } }, select: { id: true } });
+  const rows = await prisma.user.findMany({ where: { pausedAt: null, role: 'bm', cabang: { equals: c, mode: 'insensitive' } }, select: { id: true } });
   return rows.map((r) => r.id);
 }
 
@@ -170,7 +179,7 @@ export async function bmUserIds(cabang: string | null | undefined): Promise<stri
  */
 export async function opsLeadIds(): Promise<string[]> {
   for (const role of ['gmops', 'vp', 'admin'] as const) {
-    const rows = await prisma.user.findMany({ where: { role }, select: { id: true } });
+    const rows = await prisma.user.findMany({ where: { pausedAt: null, role }, select: { id: true } });
     if (rows.length) return rows.map((r) => r.id);
   }
   return [];
@@ -178,6 +187,6 @@ export async function opsLeadIds(): Promise<string[]> {
 
 /** VP — tingkat eskalasi tertinggi. */
 export async function vpIds(): Promise<string[]> {
-  const rows = await prisma.user.findMany({ where: { role: 'vp' }, select: { id: true } });
+  const rows = await prisma.user.findMany({ where: { pausedAt: null, role: 'vp' }, select: { id: true } });
   return rows.map((r) => r.id);
 }

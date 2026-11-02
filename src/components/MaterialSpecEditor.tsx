@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { IconPlus, IconTrash } from './icons';
 import { RFQ_LOKAL_OPTIONS } from '@/lib/constants';
 import { formatRupiah, normalizeLine, num } from '@/lib/format';
 import {
-  GRADE_SUGGESTIONS,
   SATUAN_FAB,
   SHAPES,
   SHAPE_NAMES,
@@ -22,6 +21,8 @@ import {
 } from '@/lib/material-spec';
 
 import { useT } from '@/store/useLangStore';
+import { useMaterialLexicon } from '@/hooks/useMaterialLexicon';
+import { findGrade, gradeOptions, parseWithLexicon } from '@/lib/material-learn';
 import { STOK_KEYS, STOK_META, needsArrival, type StokKond } from '@/lib/item-stock';
 interface Props {
   /** 'prospek' shows Harga/kg + Total; 'doc' (RFQ / FUP A) shows Lokal/Import + tanggal butuh. */
@@ -46,6 +47,56 @@ export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hi
   const [paste, setPaste] = useState('');
   const [showPaste, setShowPaste] = useState(false);
   const prospek = variant === 'prospek';
+  // Kamus material hasil belajar dari isian sebelumnya (lib/material-learn.ts).
+  const lex = useMaterialLexicon();
+  const gradeOpts = useMemo(() => gradeOptions(lex), [lex]);
+  const nameOpts = useMemo(() => lex.names.slice(0, 400), [lex]);
+  const hasDims = (r: SpecRow) => Object.values(r.dim).some((v) => String(v || '').trim());
+
+  /** Grade selesai diketik: rapikan ejaannya, dan isi Line / bentuk dari kebiasaan grade itu bila masih kosong. */
+  function onGradeDone(idx: number) {
+    const r = rows[idx];
+    const g = findGrade(lex, r.grade);
+    if (!g) return;
+    const patch: Partial<SpecRow> = {};
+    if (g.g !== r.grade) patch.grade = g.g;
+    if (!r.line.trim() && g.line) patch.line = g.line;
+    if (g.bentuk && g.bentuk !== r.bentuk && !hasDims(r)) patch.bentuk = g.bentuk;
+    if (Object.keys(patch).length) update(idx, patch);
+  }
+
+  /**
+   * Uraian selesai diketik: bila sama dengan nama material yang pernah dipakai,
+   * bentuk / grade / Line diisi dari situ dan uraian kembali otomatis (tinggal
+   * isi ukuran). Bila berupa teks lengkap dengan ukuran ("creusabro 4800
+   * 20x2000x6000"), bentuk, grade, ukuran dan Line dibaca dari teksnya.
+   */
+  function onUraianDone(idx: number) {
+    const r = rows[idx];
+    const text = r.uraianManual.trim();
+    if (!text) return;
+    const name = lex.names.find((x) => x.t.toLowerCase() === text.toLowerCase());
+    if (name && !/\d{2,}\s*[x×*]/i.test(text)) {
+      update(idx, {
+        bentuk: name.bentuk || r.bentuk,
+        grade: r.grade || name.grade,
+        line: r.line.trim() ? r.line : name.line,
+        uraianManual: name.bentuk ? '' : text,
+      });
+      return;
+    }
+    if (r.bentuk !== 'Lainnya' && hasDims(r)) return;
+    const p = parseWithLexicon(text, lex, parseMaterialText);
+    if (p.bentuk === 'Lainnya' || !Object.values(p.dim).some(Boolean)) return;
+    update(idx, {
+      bentuk: p.bentuk,
+      grade: r.grade || p.grade,
+      dim: p.dim,
+      line: r.line.trim() ? r.line : p.line,
+      pcs: p.pcs && (r.pcs === '1' || !r.pcs) ? p.pcs : r.pcs,
+      uraianManual: '',
+    });
+  }
 
   const update = (idx: number, patch: Partial<SpecRow>) => onChange(rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   const setDim = (idx: number, k: DimKey, v: string) => update(idx, { dim: { ...rows[idx].dim, [k]: v } });
@@ -55,8 +106,8 @@ export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hi
     const lines = paste.split(/\n+/).map((s) => s.trim()).filter(Boolean);
     if (!lines.length) return;
     const added = lines.map((s) => {
-      const p = parseMaterialText(s);
-      return emptyRow({ bentuk: p.bentuk, grade: p.grade, dim: p.dim, pcs: p.pcs || '1', uraianManual: p.bentuk === 'Lainnya' && !p.grade ? s : '' });
+      const p = parseWithLexicon(s, lex, parseMaterialText);
+      return emptyRow({ line: p.line, bentuk: p.bentuk, grade: p.grade, dim: p.dim, pcs: p.pcs || '1', uraianManual: p.bentuk === 'Lainnya' ? s : '' });
     });
     // Replace the single blank starter row instead of leaving it on top.
     const keep = rows.filter((r) => r.line || r.grade || r.uraianManual || r.fabNama || Object.values(r.dim).some(Boolean));
@@ -76,7 +127,7 @@ export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hi
           {showPaste ? tr("Tutup") : tr("Tempel dari teks")}
         </button>
         <span className="field-note" style={{ margin: 0 }}>
-          {tr("Ketik / tempel uraian lama, cth.")} <i>{tr("AS HQ 705 Dia 75 x 6 M")}</i> {tr("— bentuk, grade, ukuran dan pcs terisi otomatis.")}
+          {tr("Ketik / tempel uraian lama, cth.")} <i>{tr("AS HQ 705 Dia 75 x 6 M")}</i> {tr("— bentuk, grade, ukuran, pcs dan Line terisi otomatis. Grade & nama material yang pernah diinput ikut disarankan.")}
         </span>
       </div>
       {showPaste && (
@@ -94,8 +145,13 @@ export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hi
       )}
 
       <datalist id="msr-grades">
-        {GRADE_SUGGESTIONS.map((g) => (
+        {gradeOpts.map((g) => (
           <option key={g} value={g} />
+        ))}
+      </datalist>
+      <datalist id="msr-names">
+        {nameOpts.map((x) => (
+          <option key={x.t} value={x.t}>{[x.bentuk, x.line ? `Line ${x.line}` : '', x.n > 1 ? `${x.n}×` : ''].filter(Boolean).join(' · ')}</option>
         ))}
       </datalist>
 
@@ -141,7 +197,7 @@ export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hi
                   </div>
                   <div className="msr-f" style={{ width: 118 }}>
                     <label>{tr("Grade")}</label>
-                    <input type="text" list="msr-grades" value={r.grade} placeholder={tr("HQ 705")} onChange={(e) => update(idx, { grade: e.target.value })} />
+                    <input type="text" list="msr-grades" value={r.grade} placeholder={tr("HQ 705")} onChange={(e) => update(idx, { grade: e.target.value })} onBlur={() => onGradeDone(idx)} />
                   </div>
                   <div className="msr-f msr-grow">
                     <label>{tr("Ukuran (mm)")}</label>
@@ -180,7 +236,9 @@ export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hi
                     type="text"
                     value={manualText ? r.uraianManual : autoText}
                     onChange={(e) => update(idx, { uraianManual: e.target.value === autoText ? '' : e.target.value })}
-                    placeholder={tr("Uraian material")}
+                    onBlur={() => onUraianDone(idx)}
+                    list="msr-names"
+                    placeholder={tr("Ketik nama material — saran dari isian sebelumnya")}
                   />
                 </div>
               )}

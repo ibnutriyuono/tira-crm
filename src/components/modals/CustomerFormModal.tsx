@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { CustomerNameInput } from '../CustomerNameInput';
 import { IconPlus, IconTrash } from '../icons';
-import { CABANG_LIST, CUSTOMER_APLIKASI, CUSTOMER_SEGMENTS, PIC_PERAN } from '@/lib/constants';
+import { CABANG_LIST, CUSTOMER_APLIKASI, PIC_PERAN } from '@/lib/constants';
+import { SEG_OTHERS, SEG_SUPPLIER, segmentChoices, subOptions } from '@/lib/customer-segments';
+import { useSegments } from '@/hooks/useSegments';
 import { uid } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
@@ -53,6 +55,8 @@ export function CustomerFormModal() {
   const [address, setAddress] = useState('');
   const [catatan, setCatatan] = useState('');
   const [segmen, setSegmen] = useState('');
+  const [subSegmen, setSubSegmen] = useState('');
+  const { segments: taxonomy, canEdit: canSeg } = useSegments();
   const [aplikasi, setAplikasi] = useState<string[]>([]);
   const [potensi, setPotensi] = useState('');
   const [kompetitor, setKompetitor] = useState('');
@@ -67,6 +71,7 @@ export function CustomerFormModal() {
       setAddress(editing.address || '');
       setCatatan(editing.catatan || '');
       setSegmen(editing.segmen || '');
+      setSubSegmen(editing.subSegmen || '');
       setAplikasi(Array.isArray(editing.aplikasi) ? editing.aplikasi : []);
       setPotensi(fmtPotensi(editing.potensi));
       setKompetitor(editing.kompetitor || '');
@@ -76,6 +81,7 @@ export function CustomerFormModal() {
       setAddress('');
       setCatatan('');
       setSegmen('');
+      setSubSegmen('');
       setAplikasi([]);
       setPotensi('');
       setKompetitor('');
@@ -103,15 +109,19 @@ export function CustomerFormModal() {
     setPics((list) => list.map((p) => ({ ...p, isPrimary: p.id === id })));
   }
 
+  const segChoices = segmentChoices(taxonomy, editing?.segmen);
+  const subChoices = subOptions(taxonomy, segmen, editing?.segmen === segmen ? editing?.subSegmen : null);
   const cabangOptions = useMemo(() => Array.from(new Set([...CABANG_LIST, ...records.map((r) => r.cabang).filter(Boolean)])) as string[], [records]);
 
   async function onSubmit() {
     const trimmed = name.trim();
     if (!trimmed) return toast('Nama customer wajib diisi', 'error');
+    if (canSeg && !segmen) return toast('Pilih segmen customer — pilih Others bila belum diketahui', 'error');
+    if (canSeg && subChoices.length && !subSegmen) return toast(segmen === SEG_SUPPLIER ? 'Pilih segmen yang dipasok Supplier ini' : 'Pilih sub-segmen', 'error');
     setBusy(true);
     // Blank rows (no nama typed) are dropped server-side by
     // normalizeCustomerPics, so an untouched "+ Tambah PIC" row is harmless.
-    const payload = { name: trimmed, cabang, pics, address, catatan, segmen, aplikasi, potensi: potensi.replace(/\D/g, ''), kompetitor };
+    const payload = { name: trimmed, cabang, pics, address, catatan, ...(canSeg ? { segmen, subSegmen: segmen === SEG_OTHERS ? '' : subSegmen } : {}), aplikasi, potensi: potensi.replace(/\D/g, ''), kompetitor };
     try {
       const { customer } = customerEditId ? await api.put<{ customer: Customer }>(`/api/customers/${customerEditId}`, payload) : await api.post<{ customer: Customer }>('/api/customers', payload);
       upsertCustomer(customer);
@@ -173,14 +183,29 @@ export function CustomerFormModal() {
           <div className="cf-profile-head">{tr("Profil customer")} <span>{tr("dipakai untuk status, skor & pembanding customer sejenis")}</span></div>
           <div className="form-grid">
             <div>
-              <label>{tr("Industri / segmen")}</label>
-              <select value={segmen} onChange={(e) => setSegmen(e.target.value)}>
-                <option value="">{tr("— belum diisi —")}</option>
-                {[...CUSTOMER_SEGMENTS, ...(segmen && !CUSTOMER_SEGMENTS.includes(segmen) ? [segmen] : [])].map((x) => (
+              <label>{tr("Segmen")}{canSeg && <span style={{ color: 'var(--rust-500)' }}> *</span>}</label>
+              <select value={segmen} disabled={!canSeg} onChange={(e) => { setSegmen(e.target.value); setSubSegmen(''); }}>
+                <option value="">{tr("— pilih segmen —")}</option>
+                {segChoices.map((x) => (
+                  <option key={x} value={x}>{x === SEG_SUPPLIER ? tr('Supplier (memasok ke industri lain)') : x === SEG_OTHERS ? tr('Others (belum diketahui)') : x}</option>
+                ))}
+              </select>
+              {!canSeg && <div className="field-note">{tr("Segmen diisi oleh Sales, Admin Sales, BM, Marketing atau Admin.")}</div>}
+            </div>
+            <div>
+              <label>{segmen === SEG_SUPPLIER ? tr("Memasok ke segmen") : tr("Sub-segmen")}{canSeg && subChoices.length > 0 && <span style={{ color: 'var(--rust-500)' }}> *</span>}</label>
+              <select value={subSegmen} disabled={!canSeg || subChoices.length === 0} onChange={(e) => setSubSegmen(e.target.value)}>
+                <option value="">{segmen === SEG_OTHERS ? tr("— tidak ada —") : !segmen ? tr("— pilih segmen dulu —") : tr("— pilih —")}</option>
+                {subChoices.map((x) => (
                   <option key={x} value={x}>{x}</option>
                 ))}
               </select>
             </div>
+            {segmen === SEG_OTHERS && (
+              <div className="full seg-warn">
+                ⚠ {tr("Segmen asli customer ini belum diketahui. Customer akan terus diingatkan di Kelola Customer, Profil Customer dan Beranda sampai segmennya dilengkapi.")}
+              </div>
+            )}
             <div>
               <label>{tr("Estimasi potensi pembelian / tahun (Rp)")}</label>
               <input type="text" inputMode="numeric" value={potensi} onChange={(e) => setPotensi(fmtPotensi(Number(e.target.value.replace(/\D/g, ''))))} placeholder={tr("cth. 5.000.000.000")} />

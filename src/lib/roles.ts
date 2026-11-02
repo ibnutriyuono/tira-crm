@@ -14,6 +14,16 @@
  * Purchasing (isOpsLead). VP juga boleh semua yang boleh GM Operation.
  */
 
+/**
+ * Product & Marketing: membaca data nasional (pipeline hanya baca), tanpa HPP,
+ * margin & vendor (seperti Sales), mengelola profil & segmen customer, dan
+ * memasukkan lead ke cabang tujuan (lib/leads.ts). Tidak ikut alur
+ * persetujuan maupun notifikasi operasional.
+ */
+export function isMarketing(role: string | null | undefined): boolean {
+  return role === 'marketing';
+}
+
 /** GM atau VP — VP mewarisi semua hak GM. */
 export function isGmLevel(role: string | null | undefined): boolean {
   return role === 'gm' || role === 'vp';
@@ -102,5 +112,5 @@ export function canAssignVisits(role: string | null | undefined): boolean {
  * target per Sales, dan pengelompokan per cabang — walau akunnya punya Kode SE.
  */
 export function isNonBranchRole(role: string | null | undefined): boolean {
-  return role === 'purchasing' || role === 'purchasing05' || role === 'gm' || role === 'vp' || role === 'gmops' || role === 'admin';
+  return role === 'purchasing' || role === 'purchasing05' || role === 'gm' || role === 'vp' || role === 'gmops' || role === 'admin' || role === 'marketing';
 }

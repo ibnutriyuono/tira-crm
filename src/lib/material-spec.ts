@@ -146,7 +146,7 @@ export function parseMaterialText(text: string): { bentuk: string; grade: string
   }
   t = t.replace(/(\d+(?:[.,]\d+)?)\s*m(?![a-z])/g, (_m, n: string) => ` ${Math.round(dimNum(n) * 1000)} `);
   let dia = '';
-  t = t.replace(/(?:dia(?:meter)?\.?|ø)\s*(\d+(?:[.,]\d+)?)/, (_m, n: string) => {
+  t = t.replace(/(?:dia(?:meter)?\.?|ø|\bod\.?)\s*(\d+(?:[.,]\d+)?)/, (_m, n: string) => {
     dia = n;
     return ' ';
   });

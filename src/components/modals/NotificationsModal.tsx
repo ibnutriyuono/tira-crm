@@ -47,6 +47,9 @@ const NOTIF_META: Record<NotificationType, { icon: () => React.JSX.Element; colo
   ops_escalated: { icon: IconFlag, color: 'rust' },
   margin_request: { icon: IconFlag, color: 'violet' },
   margin_decided: { icon: IconFlag, color: 'green' },
+  prospect_duplicate: { icon: IconFlag, color: 'amber' },
+  lead_new: { icon: IconFlag, color: 'violet' },
+  lead_update: { icon: IconFlag, color: 'steel' },
 };
 
 function timeAgo(iso: string): string {

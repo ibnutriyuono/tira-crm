@@ -47,7 +47,7 @@ export function scopeGroups(user: Pick<SafeUser, 'role'> | null, rows: ScopeRow[
     if (se && !ses.has(se)) ses.set(se, cb);
   });
   const groups: ScopeGroup[] = [];
-  if (isGmLevel(user.role) || user.role === 'gmops' || user.role === 'admin' || user.role === 'purchasing') {
+  if (isGmLevel(user.role) || user.role === 'gmops' || user.role === 'marketing' || user.role === 'admin' || user.role === 'purchasing') {
     if (regs.size > 1) groups.push({ label: 'Regional', options: [...regs].sort((a, b) => a - b).map((r) => ({ value: `reg:${r}`, label: `Regional ${r}` })) });
   }
   if (user.role !== 'bm' && user.role !== 'salesadmin' && cabs.size > 1) groups.push({ label: 'Cabang', options: [...cabs].sort().map((c) => ({ value: `cab:${c}`, label: c })) });

@@ -50,10 +50,11 @@ export const BASE_ROLES: { key: string; label: string; scope: string; note: stri
   { key: 'vp', label: 'VP (Vice President)', scope: 'Nasional — seluruh divisi', note: 'Semua hak GM dan GM Operation; tingkat eskalasi tertinggi.' },
   { key: 'gm', label: 'GM (General Manager)', scope: 'Nasional', note: 'Seluruh data perusahaan; menetapkan target cabang.' },
   { key: 'gmops', label: 'GM Operation', scope: 'Nasional — operasional', note: 'Membawahi Purchasing, IPC, gudang: menyetujui status vendor (AVL), memproses masalah dari Purchasing, melihat HPP; pipeline Sales hanya baca.' },
+  { key: 'marketing', label: 'Product & Marketing', scope: 'Nasional — hanya baca', note: 'Membaca pipeline, customer, RFQ, aktivitas & analisa nasional tanpa HPP/margin/vendor; mengelola profil & segmen customer; memasukkan lead ke cabang (BM cabang diberi tahu).' },
   { key: 'purchasing', label: 'Purchasing', scope: 'Nasional — dokumen RFQ/FUP A', note: 'UI Purchasing; melihat semua RFQ/FUP A dan prospek.' },
 ];
 export const BUILTIN_ROLE_LABEL: Record<string, string> = {
-  admin: 'Admin', vp: 'VP', gm: 'GM', gmops: 'GM Operation', rm: 'RM', bm: 'BM', salesadmin: 'Admin Sales', sales: 'Sales', purchasing: 'Purchasing', purchasing05: 'PIC Line 05',
+  admin: 'Admin', vp: 'VP', gm: 'GM', gmops: 'GM Operation', rm: 'RM', bm: 'BM', salesadmin: 'Admin Sales', sales: 'Sales', purchasing: 'Purchasing', purchasing05: 'PIC Line 05', marketing: 'Product & Marketing',
 };
 
 /**
@@ -95,6 +96,19 @@ export const ROLE_LIMITS: Record<string, Partial<Record<string, Limit>>> = {
     faktur: L(ALL, 'Antrian Admin untuk Admin Sales, BM, RM, GM'),
     trip: L(ALL, 'Perjalanan dinas untuk Sales, BM, RM, GM, VP'),
     purch: PURCH_ED,
+  },
+  marketing: {
+    prospek: L(['e', 'd'], 'Pipeline hanya baca untuk Marketing — lead dimasukkan lewat Tambah Lead'),
+    rfq: L(['e', 'd'], 'RFQ / FUP A dibuat & dikerjakan Sales / Purchasing'),
+    masalah: L(['e'], 'Masalah pipeline ditangani BM / PJ'),
+    rencana: L(ALL, 'Rencana penjualan dikelola Sales / BM / GM'),
+    forecast: TARGET_E,
+    kpi: TARGET_E,
+    kam: KAM_ED,
+    faktur: L(ALL, 'Antrian Admin untuk Admin Sales, BM, RM, GM'),
+    trip: L(ALL, 'Perjalanan dinas untuk Sales, BM, RM, GM, VP'),
+    purch: L(ALL, 'Data Purchasing & vendor tidak untuk Marketing'),
+    log: L(ALL, 'Log Aktivitas untuk pimpinan & Admin'),
   },
   purchasing: {
     rfq: L(ALL, 'Untuk Purchasing diatur lewat modul Purchasing'),
@@ -157,6 +171,13 @@ export function normalizePerms(raw: unknown): Perms {
     out[m.key] = { v, e: v && pick('e'), d: v && pick('d'), x: v && pick('x') };
   });
   return out;
+}
+
+/** Modul yang ikut Export Semua (lib/app-actions.ts#exportAllExcel). */
+export const EXPORT_ALL_MODULES = ['prospek', 'rfq', 'customer', 'kam', 'masalah', 'rencana', 'forecast', 'aktivitas', 'trip', 'purch'];
+/** Tombol Export Semua tampil bila minimal satu modulnya boleh di-Download. */
+export function canExportAny(perms: Perms | null | undefined): boolean {
+  return EXPORT_ALL_MODULES.some((m) => can(perms, m, 'x'));
 }
 
 export function can(perms: Perms | null | undefined, mod: string, act: PermAct): boolean {

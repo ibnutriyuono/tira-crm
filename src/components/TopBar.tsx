@@ -4,7 +4,7 @@ import { canComposeMail } from '@/lib/compose-email';
 import { quotePermAct } from '@/lib/roles';
 import { isPurchasingRoleClient } from '@/lib/doc-lines';
 import { isOpenIssue } from '@/lib/issues';
-import { can, type PermAct } from '@/lib/permissions';
+import { can, canExportAny, type PermAct } from '@/lib/permissions';
 import { adminTaskCount } from './modals/AdminQueueModal';
 import { useRouter } from 'next/navigation';
 import { isOpsLead } from '@/lib/roles';
@@ -26,6 +26,7 @@ const ROLE_LABEL: Record<string, { label: string; color: string }> = {
   vp: { label: 'VP', color: 'rust' },
   gm: { label: 'GM', color: 'rust' },
   gmops: { label: 'GM Operation', color: 'rust' },
+  marketing: { label: 'Product & Marketing', color: 'violet' },
   rm: { label: 'RM', color: 'steel' },
   bm: { label: 'BM', color: 'green' },
   sales: { label: 'Sales', color: 'slate' },
@@ -341,8 +342,8 @@ export function TopBar() {
               {tr("Export Excel")}
             </button>
           )}
-          {c('prospek', 'x') && (
-            <button className="btn btn-ghost-dark" onClick={exportAllExcel} title={tr("Satu file Excel berisi semua data (Prospek, RFQ, FUP A, Customer, Rencana Penjualan, Target, Aktivitas Harian), tiap jenis di sheet terpisah")}>
+          {canExportAny(perms) && (
+            <button className="btn btn-ghost-dark" onClick={exportAllExcel} title={tr("Satu file Excel berisi semua data yang boleh Anda unduh (Prospek, RFQ/FUP A, Customer, Key Account, Masalah Pipeline, Rencana, Target, Aktivitas Harian, Perjalanan Dinas, Vendor), tiap jenis di sheet terpisah")}>
               <IconDownload />
               {tr("Export Semua")}
             </button>
@@ -394,6 +395,12 @@ export function TopBar() {
             >
               <IconPlus />
               {tr("Tambah Prospek")}
+            </button>
+          )}
+          {currentUser?.role === 'marketing' && c('marketing', 'e') && (
+            <button className="btn btn-primary" onClick={() => openModal('leadForm')}>
+              <IconPlus />
+              {tr("Tambah Lead")}
             </button>
           )}
         </div>

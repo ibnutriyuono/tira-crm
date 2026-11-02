@@ -9,6 +9,7 @@ import { flowItems, flowTotals } from '@/lib/item-flow';
 import { FlowBar } from './modals/ItemFlowModal';
 import { KamBadge } from './KamBadge';
 import { IssueBadge } from './issues/shared';
+import { LeadBadge } from './LeadBadge';
 import { useMemo, useState } from 'react';
 import { KANBAN_STATUSES, STATUS_META } from '@/lib/constants';
 import { classify, formatDateID, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
@@ -81,6 +82,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
       <div className="kc-meta-row">
         <span className={`badge ${r.penawaranTerkirim ? 'green' : 'rust pending-dot'}`}>{r.penawaranTerkirim ? tr("Penawaran Terkirim") : tr("Penawaran Pending")}</span>
         <IssueBadge prospectId={r.id} />
+        <LeadBadge p={r} compact />
       </div>
       {num(r.status) === 6 && (
         <div className="kc-meta-row">

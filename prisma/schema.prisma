@@ -22,6 +22,9 @@ enum Role {
   purchasing05
   /// Admin Sales: back-office satu cabang — data & dokumen PO/DO, pemilik status terfaktur.
   salesadmin
+  /// Product & Marketing: baca nasional (pipeline hanya baca, tanpa HPP/margin/vendor),
+  /// mengelola profil & segmen customer, memasukkan lead ke cabang (BM diberi tahu).
+  marketing
 }
 
 /// Notifikasi persisten per-user — riwayat semua kejadian penting pada RFQ/FUP A
@@ -82,6 +85,12 @@ model User {
   mustChangePassword Boolean @default(false)
   /// Waktu tanda tangan terakhir disimpan (null = belum punya). Gambarnya di UserSignature.
   signatureAt  DateTime?
+  /// Akun dijeda Admin (null = aktif): tidak bisa login, sesi yang terbuka
+  /// ditolak, data & riwayat tetap. Diaktifkan lagi dengan mengosongkan ini.
+  pausedAt     DateTime?
+  /// Alasan jeda (opsional) dan nama Admin yang menjeda — tampil di Kelola User.
+  pausedReason String?
+  pausedBy     String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -116,6 +125,8 @@ model Customer {
   /// material (JSON array kunci CUSTOMER_APLIKASI), estimasi potensi
   /// pembelian per tahun (Rupiah), dan kompetitor yang memasok saat ini.
   segmen     String?
+  /// Sub-segmen (lib/customer-segments.ts). Untuk segmen Supplier: segmen yang dipasok.
+  subSegmen  String?
   aplikasi   Json     @default("[]")
   potensi    Float?
   kompetitor String?
@@ -319,6 +330,12 @@ model Prospect {
   /// (pipeline mangkrak, customer dingin) dalam satu tampilan.
   followUpAt        String?
   followUpNote      String?
+  /// Lead dari Product & Marketing (Indotrading, pameran, website, dst.): sumber,
+  /// pembuat (nama & id) dan waktu. Kosong = prospek biasa dari Sales.
+  leadSource   String?
+  leadBy       String?
+  leadById     String?
+  leadAt       DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

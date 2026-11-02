@@ -97,6 +97,7 @@ export const ROLE_LABELS: Record<string, string> = {
   bm: 'BM',
   sales: 'Sales',
   salesadmin: 'Admin Sales',
+  marketing: 'Product & Marketing',
 };
 
 export const BROADCAST_ROLE_OPTIONS = [
@@ -107,6 +108,7 @@ export const BROADCAST_ROLE_OPTIONS = [
   { v: 'gm', l: 'GM (General Manager)' },
   { v: 'gmops', l: 'GM Operation' },
   { v: 'vp', l: 'VP (Vice President)' },
+  { v: 'marketing', l: 'Product & Marketing' },
   { v: 'purchasing', l: 'Purchasing' },
   { v: 'purchasing05', l: 'PIC Line 05 (Purchasing fabrikasi)' },
   { v: 'admin', l: 'Admin' },
@@ -168,20 +170,7 @@ export const DEFAULT_ACTIVITY_TARGETS: Record<ActivityTipe, number> = {
 /** Status pipeline yang bisa dituju tombol "Masukkan ke Pipeline". */
 export const ACTIVITY_CONVERT_STATUSES = [1, 2, 4] as const;
 
-/** Industri / segmen customer (profil customer). */
-export const CUSTOMER_SEGMENTS: string[] = [
-  'Tambang',
-  'Semen',
-  'Sawit & agro',
-  'Pulp & kertas',
-  'Energi & pembangkit',
-  'Migas & petrokimia',
-  'Fabrikator / bengkel',
-  'Konstruksi',
-  'Manufaktur',
-  'Distributor / trader',
-  'Lainnya',
-];
+/** Segmen & sub-segmen customer: lib/customer-segments.ts (daftar bisa diubah Admin). */
 
 /** Aplikasi pemakaian material di customer (boleh lebih dari satu). */
 export const CUSTOMER_APLIKASI: { key: string; label: string }[] = [

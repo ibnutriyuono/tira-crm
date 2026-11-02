@@ -131,6 +131,7 @@ export const CUSTOMER_FIELD_LABELS: Record<string, string> = {
   catatan: 'Catatan',
   pics: 'Daftar PIC',
   segmen: 'Segmen',
+  subSegmen: 'Sub-segmen',
   aplikasi: 'Aplikasi pemakaian',
   potensi: 'Potensi / tahun',
   kompetitor: 'Kompetitor',

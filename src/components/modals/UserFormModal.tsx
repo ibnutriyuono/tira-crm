@@ -144,6 +144,7 @@ export function UserFormModal() {
             <option value="gm">{tr("GM (General Manager)")}</option>
             <option value="gmops">{tr("GM Operation (Purchasing, IPC, gudang)")}</option>
             <option value="vp">{tr("VP (seluruh divisi)")}</option>
+            <option value="marketing">{tr("Product & Marketing (nasional, hanya baca + lead)")}</option>
             <option value="purchasing">{tr("Purchasing")}</option>
             <option value="purchasing05">{tr("PIC Line 05 (Purchasing fabrikasi)")}</option>
             <option value="admin">{tr("Admin")}</option>

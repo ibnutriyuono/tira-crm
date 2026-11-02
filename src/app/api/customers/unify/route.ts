@@ -105,6 +105,7 @@ export async function POST(req: Request) {
           pics: pics as unknown as Prisma.InputJsonValue,
           // Profil: pakai milik entri yang dipertahankan, isi yang kosong dari duplikat.
           segmen: keep.segmen || others.map((o) => o.segmen).find((v) => v) || null,
+          subSegmen: keep.segmen ? keep.subSegmen : others.find((o) => o.segmen)?.subSegmen ?? null,
           potensi: keep.potensi ?? others.map((o) => o.potensi).find((v) => v != null) ?? null,
           kompetitor: keep.kompetitor || others.map((o) => o.kompetitor).find((v) => v) || null,
           aplikasi: Array.from(new Set([keep, ...others].flatMap((o) => (Array.isArray(o.aplikasi) ? (o.aplikasi as string[]) : [])))) as unknown as Prisma.InputJsonValue,

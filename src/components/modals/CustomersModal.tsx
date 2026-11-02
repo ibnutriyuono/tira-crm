@@ -4,7 +4,9 @@ import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { IconEdit, IconTrash, IconWa } from '../icons';
 import { formatDateID, getPrimaryPic, todayStr } from '@/lib/format';
-import { CUSTOMER_SEGMENTS } from '@/lib/constants';
+import { SEG_OTHERS, needsSegment, segmentLabel, subOptions } from '@/lib/customer-segments';
+import { useSegments } from '@/hooks/useSegments';
+import { SegmentsEditor } from '../SegmentsEditor';
 import { CUST_STATUS_META, CUST_STATUS_ORDER, scoreColor, type CustStatus } from '@/lib/customer-profile';
 import { customerKey } from '@/lib/reports';
 import { useCustomerProfiles } from '@/hooks/useCustomerProfiles';
@@ -30,9 +32,28 @@ export function CustomersModal() {
   const [search, setSearch] = useState('');
   const [fStatus, setFStatus] = useState<'' | CustStatus>('');
   const [fSegmen, setFSegmen] = useState('');
+  const [fSub, setFSub] = useState('');
+  const [segEdit, setSegEdit] = useState(false);
+  const { segments: taxonomy } = useSegments();
+  // Dibuka dari pengingat (Beranda / Profil): langsung saring "perlu dilengkapi".
+  const segFocus = useUiStore((s) => s.customersSegFocus);
+  const [lastFocus, setLastFocus] = useState<string | null>(null);
+  if (show && segFocus && segFocus !== lastFocus) {
+    setLastFocus(segFocus);
+    setFSegmen('?');
+    setFSub('');
+    useUiStore.setState({ customersSegFocus: null });
+  }
   const { index, loaded } = useCustomerProfiles(show);
   const factsOf = (name: string) => index.get(customerKey(name));
-  const segOptions = useMemo(() => Array.from(new Set([...CUSTOMER_SEGMENTS, ...customers.map((c) => c.segmen || '').filter(Boolean)])), [customers]);
+  const segOptions = useMemo(() => Array.from(new Set([...taxonomy.map((s) => s.name), ...customers.map((c) => c.segmen || '').filter(Boolean)])), [taxonomy, customers]);
+  const subOpts = fSegmen && fSegmen !== '-' && fSegmen !== '?' ? subOptions(taxonomy, fSegmen) : [];
+  const usage = useMemo(() => {
+    const m = new Map<string, number>();
+    customers.forEach((c) => c.segmen && m.set(c.segmen, (m.get(c.segmen) || 0) + 1));
+    return m;
+  }, [customers]);
+  const needCount = useMemo(() => customers.filter((c) => needsSegment(c)).length, [customers]);
 
   function openProfile(name: string) {
     useUiStore.setState({ profileCustomer: name, profileReturnTo: 'customers' });
@@ -41,7 +62,9 @@ export function CustomersModal() {
 
   const list = useMemo(() => {
     let base = customers;
-    if (fSegmen) base = base.filter((c) => (fSegmen === '-' ? !c.segmen : (c.segmen || index.get(customerKey(c.name))?.segmen) === fSegmen));
+    if (fSegmen === '?') base = base.filter((c) => needsSegment(c));
+    else if (fSegmen) base = base.filter((c) => (fSegmen === '-' ? !c.segmen : (c.segmen || index.get(customerKey(c.name))?.segmen) === fSegmen));
+    if (fSub) base = base.filter((c) => c.subSegmen === fSub);
     if (fStatus) base = base.filter((c) => index.get(customerKey(c.name))?.status === fStatus);
     if (!search) return base;
     const q = search.toLowerCase();
@@ -52,7 +75,7 @@ export function CustomersModal() {
         (c.pics || []).some((p) => (p.nama || '').toLowerCase().includes(q) || (p.jabatan || '').toLowerCase().includes(q)) ||
         (getPrimaryPic(c)?.nama || '').toLowerCase().includes(q),
     );
-  }, [customers, search, fSegmen, fStatus, index]);
+  }, [customers, search, fSegmen, fSub, fStatus, index]);
 
   async function exportExcel() {
     if (customers.length === 0) return toast('Tidak ada data customer untuk diexport', 'error');
@@ -126,15 +149,28 @@ export function CustomersModal() {
           </button>
         ))}
         <span className="cp-filter-label" style={{ marginLeft: 10 }}>{tr("Segmen")}</span>
-        <select className="btn-sm" value={fSegmen} onChange={(e) => setFSegmen(e.target.value)}>
+        <select className="btn-sm" value={fSegmen} onChange={(e) => { setFSegmen(e.target.value); setFSub(''); }}>
           <option value="">{tr("Semua segmen")}</option>
+          <option value="?">⚠ {tr("Perlu dilengkapi (kosong / Others)")} · {needCount}</option>
           {segOptions.map((x) => (
             <option key={x} value={x}>{x}</option>
           ))}
           <option value="-">{tr("Belum diisi")}</option>
         </select>
+        {subOpts.length > 0 && (
+          <select className="btn-sm" value={fSub} onChange={(e) => setFSub(e.target.value)} aria-label={tr("Sub-segmen")}>
+            <option value="">{tr("Semua sub-segmen")}</option>
+            {subOpts.map((x) => (
+              <option key={x} value={x}>{x}</option>
+            ))}
+          </select>
+        )}
+        {currentUser?.role === 'admin' && (
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => setSegEdit((v) => !v)}>{tr("Kelola Segmen")}</button>
+        )}
         <span className="field-note" style={{ margin: 0 }}>{list.length} {tr("dari")} {customers.length} {tr("customer")}{loaded ? '' : tr(" · memuat aktivitas…")}</span>
       </div>
+      {segEdit && <SegmentsEditor usage={usage} onClose={() => setSegEdit(false)} />}
       {list.length === 0 ? (
         <div className="empty-state" style={{ padding: '34px 10px' }}>
           <h3>{customers.length === 0 ? tr("Belum ada data customer") : tr("Tidak ditemukan")}</h3>
@@ -176,7 +212,17 @@ export function CustomersModal() {
                       {extra > 0 && <span className="badge steel" style={{ marginLeft: 6 }}>+{extra}</span>}
                     </td>
                     <td className="mono">{primary?.phone || '-'}</td>
-                    <td>{c.segmen || f?.segmen || <span className="field-note" style={{ margin: 0 }}>{tr("belum diisi")}</span>}</td>
+                    <td>
+                      {c.segmen ? (
+                        <span className={c.segmen === SEG_OTHERS ? 'seg-need' : ''} title={c.segmen === SEG_OTHERS ? tr('Segmen asli belum diketahui — lengkapi') : undefined}>
+                          {c.segmen === SEG_OTHERS ? '⚠ ' : ''}{segmentLabel(c.segmen, c.subSegmen)}
+                        </span>
+                      ) : f?.segmen ? (
+                        <span title={tr('Dari grup Key Account')}>{f.segmen}</span>
+                      ) : (
+                        <span className="seg-need">⚠ {tr("belum diisi")}</span>
+                      )}
+                    </td>
                     <td>{st ? <span className={`badge ${st.color}`} title={st.hint}>{st.label}</span> : '-'}</td>
                     <td>{f && loaded ? <span className={`cp-score ${scoreColor(f.score)}`}>{f.score}</span> : '…'}</td>
                     <td style={{ whiteSpace: 'nowrap', fontSize: 12.5 }}>{f?.lastOrder ? <>{formatDateID(f.lastOrder)}<div className="field-note" style={{ margin: 0 }}>{f.daysSinceOrder} {tr("hari lalu")}</div></> : '-'}</td>

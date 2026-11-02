@@ -2,7 +2,11 @@ import { lostDateOf } from './lose-date';
 import { classify, formatDateID, formatRupiah, materialUnitPrice, num } from './format';
 import { WORKFLOW_META, fupaAsWorkflowDoc, rfqAsWorkflowDoc, workflowStage } from './purchasing-workflow';
 import { ACTIVITY_LABEL, CUSTOMER_APLIKASI_LABEL, PIC_PERAN_LABEL, STATUS_META } from './constants';
-import type { BudgetTarget, Customer, Fupa, Prospect, Rfq, RfqItem, SalesActivity, SalesPlan, Vendor } from './types';
+import { QCD_FAKTOR_LABEL } from './qcd';
+import { ISSUE_STATUS_META, HASIL_META, eskalasiLabel, issueCatLabel, urgensiLabel, type PipelineIssue } from './issues';
+import { KAM_TIER_META } from './kam';
+import { TRIP_HASIL_LABEL, TRIP_STATUS_META } from './visit-trip';
+import type { AnnualTarget, BudgetTarget, Customer, CustomerGroup, Fupa, Prospect, Rfq, RfqItem, SalesActivity, SalesPlan, SeTarget, Vendor, VisitTrip } from './types';
 
 /** What every builder below returns — enough for xlsx.utils.aoa_to_sheet plus column widths, and a sheet name that stays under Excel's 31-char sheet-name limit. */
 export interface SheetSpec {
@@ -31,11 +35,21 @@ export interface SheetSpec {
 /** Strips float noise (19.6 x 95000 = 1862000.0000000002). */
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export function buildProspectSheet(list: Prospect[]): SheetSpec {
+/** Segmen customer per nama (Kelola Customer) untuk kolom SEGMEN di sheet Prospek. */
+export function customerSegmentLookup(customers: Pick<Customer, 'name' | 'segmen' | 'subSegmen'>[]): (name: string) => string {
+  const key = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
+  const m = new Map(customers.map((c) => [key(c.name || ''), [c.segmen, c.subSegmen].filter(Boolean).join(' › ')]));
+  return (name) => m.get(key(name || '')) || '';
+}
+
+export function buildProspectSheet(list: Prospect[], segOf?: (customer: string) => string): SheetSpec {
   const header = [
     'REG', 'CABANG', 'SE', 'CUSTOMER', 'NO. WHATSAPP', 'TGL. PENAWARAN', 'NO. PO', 'TGL. PO', 'TGL. DELIVERY', 'LINE', 'URAIAN PRODUCT', 'QTY (Pcs)', 'VALUE (Rp)',
     'NO. MATERIAL', 'LINE MATERIAL', 'URAIAN MATERIAL', 'QTY MATERIAL (Pcs)', 'BERAT/PC (Kg)', 'HARGA/KG (Rp)', 'HARGA SATUAN (Rp)', 'SUBTOTAL MATERIAL (Rp)',
     'KONDISI STOCK', 'KETERANGAN', 'STATUS', 'KLASIFIKASI', 'STATUS PENAWARAN', 'STATUS FAKTUR', 'TGL. LOSE ORDER',
+    // Kolom tambahan di ujung kanan supaya file tetap bisa diimpor ulang (Import Excel membaca per nama kolom).
+    'NO. FAKTUR', 'TGL. FAKTUR', 'FOLLOW-UP', 'CATATAN FOLLOW-UP', 'KOMPETITOR (QCD)', 'FAKTOR MENANG/KALAH', 'CATATAN QCD', 'STATUS BERUBAH', 'DIBUAT',
+    ...(segOf ? ['SEGMEN CUSTOMER'] : []),
   ];
   const rows: unknown[][] = [];
   list.forEach((r) => {
@@ -53,6 +67,16 @@ export function buildProspectSheet(list: Prospect[]): SheetSpec {
       // "GIT" for a deal that was never billed because it isn't Won yet.
       klas === 'Won' ? (r.terfaktur ? 'Omzet (Terfaktur)' : 'GIT (Belum Terfaktur)') : '',
       klas === 'Lost' ? lostDateOf(r) : '',
+      klas === 'Won' ? r.noFaktur || '' : '',
+      klas === 'Won' ? r.tglFaktur || '' : '',
+      r.followUpAt ? String(r.followUpAt).slice(0, 10) : '',
+      r.followUpNote || '',
+      r.qcdKompetitor || '',
+      r.qcdFaktor ? QCD_FAKTOR_LABEL[r.qcdFaktor] || r.qcdFaktor : '',
+      r.qcdCatatan || '',
+      r.statusChangedAt ? String(r.statusChangedAt).slice(0, 10) : '',
+      r.createdAt ? String(r.createdAt).slice(0, 10) : '',
+      ...(segOf ? [segOf(r.customer || '') || '(belum diisi)'] : []),
     ];
     const mats = (Array.isArray(r.materials) ? r.materials : []).filter((m) => (m.uraian || '').trim() || num(m.qty) || materialUnitPrice(m));
     const lines = mats.length
@@ -70,6 +94,8 @@ export function buildProspectSheet(list: Prospect[]): SheetSpec {
     { wch: 5 }, { wch: 8 }, { wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 13 }, { wch: 16 }, { wch: 12 }, { wch: 13 }, { wch: 6 }, { wch: 32 }, { wch: 8 }, { wch: 16 },
     { wch: 6 }, { wch: 8 }, { wch: 34 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 17 },
     { wch: 14 }, { wch: 24 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 20 }, { wch: 14 },
+    { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 28 }, { wch: 20 }, { wch: 20 }, { wch: 28 }, { wch: 12 }, { wch: 12 },
+    ...(segOf ? [{ wch: 26 }] : []),
   ];
   const rp = '#,##0';
   const numFormats: Record<number, string> = { 11: rp, 12: rp, 16: '#,##0.##', 17: '#,##0.###', 18: rp, 19: rp, 20: rp };
@@ -135,17 +161,17 @@ export function buildCustomerSheet(list: Customer[]): SheetSpec {
   // One row per PIC (a customer with three PICs becomes three rows, the
   // company columns repeated) so every contact survives the export; a
   // customer with no PIC at all still gets a single row.
-  const header = ['NAMA CUSTOMER', 'CABANG', 'PIC', 'JABATAN', 'PERAN PIC', 'NO TELP', 'EMAIL', 'ALAMAT', 'CATATAN', 'SEGMEN', 'APLIKASI', 'POTENSI / TAHUN', 'KOMPETITOR'];
+  const header = ['NAMA CUSTOMER', 'CABANG', 'PIC', 'JABATAN', 'PERAN PIC', 'NO TELP', 'EMAIL', 'ALAMAT', 'CATATAN', 'SEGMEN', 'SUB-SEGMEN', 'APLIKASI', 'POTENSI / TAHUN', 'KOMPETITOR'];
   const rows: unknown[][] = [];
   list.forEach((c) => {
     const pics: { nama: string; jabatan: string | null; phone: string | null; email: string | null; peran?: string | null }[] =
       Array.isArray(c.pics) && c.pics.length > 0 ? c.pics : [{ nama: c.pic || '', jabatan: null, phone: c.phone, email: c.email }];
     const apl = (Array.isArray(c.aplikasi) ? c.aplikasi : []).map((k) => CUSTOMER_APLIKASI_LABEL[k] || k).join(', ');
     pics.forEach((p) =>
-      rows.push([c.name || '', c.cabang || '', p.nama || '', p.jabatan || '', PIC_PERAN_LABEL[p.peran || ''] || '', p.phone || '', p.email || '', c.address || '', c.catatan || '', c.segmen || '', apl, c.potensi || '', c.kompetitor || '']),
+      rows.push([c.name || '', c.cabang || '', p.nama || '', p.jabatan || '', PIC_PERAN_LABEL[p.peran || ''] || '', p.phone || '', p.email || '', c.address || '', c.catatan || '', c.segmen || '', c.subSegmen || '', apl, c.potensi || '', c.kompetitor || '']),
     );
   });
-  const colWidths = [{ wch: 28 }, { wch: 8 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 16 }, { wch: 24 }, { wch: 36 }, { wch: 26 }, { wch: 18 }, { wch: 28 }, { wch: 16 }, { wch: 24 }];
+  const colWidths = [{ wch: 28 }, { wch: 8 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 16 }, { wch: 24 }, { wch: 36 }, { wch: 26 }, { wch: 18 }, { wch: 20 }, { wch: 28 }, { wch: 16 }, { wch: 24 }];
   return { sheetName: 'Customer', header, rows, colWidths };
 }
 
@@ -178,6 +204,73 @@ export function buildBudgetTargetSheet(list: BudgetTarget[]): SheetSpec {
   const rows = list.map((t) => [t.periode, t.cabang, num(t.amount)]);
   const colWidths = [{ wch: 9 }, { wch: 8 }, { wch: 18 }];
   return { sheetName: 'Target Bulanan', header, rows, colWidths };
+}
+
+export function buildAnnualTargetSheet(list: AnnualTarget[]): SheetSpec {
+  const header = ['TAHUN', 'CABANG', 'TARGET TAHUNAN (Rp)'];
+  const rows = list.slice().sort((a, b) => b.year.localeCompare(a.year) || a.cabang.localeCompare(b.cabang)).map((t) => [t.year, t.cabang, num(t.amount)]);
+  return { sheetName: 'Target Tahunan', header, rows, colWidths: [{ wch: 8 }, { wch: 8 }, { wch: 20 }], numFormats: { 2: '#,##0' } };
+}
+
+export function buildSeTargetSheet(list: SeTarget[]): SheetSpec {
+  const header = ['PERIODE', 'CABANG', 'SE', 'TARGET (Rp)', 'DIATUR OLEH'];
+  const rows = list.slice().sort((a, b) => b.periode.localeCompare(a.periode) || a.cabang.localeCompare(b.cabang) || a.se.localeCompare(b.se)).map((t) => [t.periode, t.cabang, t.se, num(t.amount), t.updatedBy || '']);
+  return { sheetName: 'Target per Sales', header, rows, colWidths: [{ wch: 9 }, { wch: 8 }, { wch: 8 }, { wch: 18 }, { wch: 18 }], numFormats: { 3: '#,##0' } };
+}
+
+/**
+ * Key Account, satu baris per grup. Kolom MARGIN hanya untuk role yang boleh
+ * melihat HPP/margin (lib/roles.ts#canSeeHpp) — Sales-side tidak pernah.
+ */
+export function buildKamSheet(list: CustomerGroup[], userName: (id: string | null) => string, showMargin: boolean): SheetSpec {
+  const header = ['GRUP', 'TIER', 'SKOR', 'POLA', 'SEGMEN', 'CABANG UTAMA', 'CABANG PENDUKUNG', 'ENTITAS / CUSTOMER', 'SPONSOR', 'KETUA', 'SEKRETARIS', 'ANGGOTA', 'OMZET 12 BLN (Rp)', 'GROWTH YTD %', ...(showMargin ? ['MARGIN %'] : []), 'RATA-RATA 3 TH (Rp)', 'TARGET (Rp)', 'TRANSAKSI TERAKHIR', 'REVIEW BERIKUTNYA', 'RENCANA AKSI TERBUKA', 'CATATAN'];
+  const rows = list.map((g) => [
+    g.name, KAM_TIER_META[g.tier]?.label || g.tier, g.skor ?? '', g.pola || '', g.segmen || '', g.homeCabang || '', (g.supportCabang || []).join(', '),
+    (g.entities || []).join('; '), g.sponsor || '', userName(g.ketuaId), userName(g.sekretarisId), (g.anggotaIds || []).map((id) => userName(id)).filter(Boolean).join(', '),
+    g.l12m ?? '', g.growthYtd ?? '', ...(showMargin ? [g.margin ?? ''] : []), g.avg3y ?? '', g.target ?? '', g.lastTrx || '', g.reviewNext || '',
+    (g.actions || []).filter((a) => a.status === 'belum' || a.status === 'berjalan').length, g.notes || '',
+  ]);
+  const colWidths = [30, 12, 6, 6, 18, 10, 16, 40, 18, 18, 18, 28, 16, 10, ...(showMargin ? [9] : []), 16, 16, 12, 12, 10, 30].map((wch) => ({ wch }));
+  const rp = '#,##0';
+  const o = showMargin ? 1 : 0;
+  return { sheetName: 'Key Account', header, rows, colWidths, numFormats: { 12: rp, [14 + o]: rp, [15 + o]: rp } };
+}
+
+/** Masalah Pipeline (sama dengan export di papan Masalah). */
+export function buildIssueSheet(list: PipelineIssue[], valueOf: (i: PipelineIssue) => number, userName: (id: string | null) => string, today: string): SheetSpec {
+  const days = (from: string, to: string) => Math.max(0, Math.round((Date.parse(to.slice(0, 10)) - Date.parse(from.slice(0, 10))) / 86400000));
+  const header = ['CUSTOMER', 'SE', 'CABANG', 'NILAI PROSPEK (Rp)', 'KATEGORI', 'URGENSI', 'STATUS', 'PENANGGUNG JAWAB', 'KETERANGAN', 'DIAJUKAN OLEH', 'DILAPORKAN OLEH', 'TGL LAPOR', 'UMUR (HARI)', 'TARGET SELESAI', 'ESKALASI', 'SOLUSI', 'HASIL'];
+  const rows = list
+    .filter((i) => i.status !== 'diabaikan')
+    .map((i) => {
+      const lapor = i.dilaporAt || i.createdAt;
+      return [
+        i.customer, i.se || '', i.cabang || '', valueOf(i), issueCatLabel(i.kategori), urgensiLabel(i.urgensi), ISSUE_STATUS_META[i.status]?.label || i.status,
+        i.pjIds.map((id) => userName(id)).filter(Boolean).join(', '), i.keterangan, i.diajukanNama || '', i.dilaporNama || '', lapor.slice(0, 10),
+        days(lapor, i.selesaiAt || today), i.targetDate || '', eskalasiLabel(i), i.solusi || i.alasanTolak || '', i.hasil ? HASIL_META[i.hasil] : '',
+      ];
+    });
+  const colWidths = [28, 8, 8, 16, 18, 9, 18, 26, 40, 18, 18, 11, 8, 12, 16, 34, 14].map((wch) => ({ wch }));
+  return { sheetName: 'Masalah Pipeline', header, rows, colWidths, numFormats: { 3: '#,##0' } };
+}
+
+/** Perjalanan Dinas, satu baris per kunjungan customer (perjalanan tanpa kunjungan tetap satu baris). */
+export function buildTripSheet(list: VisitTrip[], userName: (id: string | null) => string): SheetSpec {
+  const header = ['BERANGKAT', 'PULANG', 'PEMILIK', 'CABANG TUJUAN', 'KEPERLUAN', 'PESERTA', 'STATUS', 'DISETUJUI OLEH', 'TGL KUNJUNGAN', 'CUSTOMER', 'PIC', 'TUJUAN', 'REALISASI', 'HASIL', 'DI LUAR RENCANA', 'CATATAN REALISASI'];
+  const rows: unknown[][] = [];
+  list.forEach((t) => {
+    const head = [t.tglBerangkat, t.tglPulang, t.ownerName, t.cabang, t.keperluan || '', (t.pesertaIds || []).map((id) => userName(id)).filter(Boolean).join(', '), TRIP_STATUS_META[t.status]?.label || t.status, t.approverName || ''];
+    const visits = t.visits?.length ? t.visits : [null];
+    visits.forEach((v, idx) => {
+      rows.push([
+        ...(idx === 0 ? head : head.map(() => '')),
+        v?.tanggal || '', v?.customer || '', v?.pic || '', v?.tujuan || '', v?.realisasi || '', v?.hasil ? TRIP_HASIL_LABEL[v.hasil] || v.hasil : '', v?.tambahan ? 'Ya' : '',
+        idx === 0 ? t.catatanRealisasi || '' : '',
+      ]);
+    });
+  });
+  const colWidths = [11, 11, 20, 10, 26, 26, 18, 18, 11, 28, 18, 28, 32, 16, 9, 30].map((wch) => ({ wch }));
+  return { sheetName: 'Perjalanan Dinas', header, rows, colWidths };
 }
 
 const ACT_LABEL: Record<string, string> = ACTIVITY_LABEL;

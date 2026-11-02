@@ -19,6 +19,7 @@ import { IconBell, IconCalendar, IconChartLine, IconDoc, IconPlus, IconSearch } 
 import { useNavItems, type NavGroup } from './useNavItems';
 import { CommandPalette } from './CommandPalette';
 import { DeskHome } from './DeskHome';
+import { MarketingHome } from './MarketingHome';
 import { ProspectPanel } from './ProspectPanel';
 
 type Page = 'beranda' | 'pipeline';
@@ -162,13 +163,14 @@ export function DeskShell({ filtered }: { filtered: Prospect[] }) {
             {canAkt && <button type="button" className="btn btn-activity" onClick={() => run('aktivitas')}><IconCalendar />{tr('Aktivitas Harian')}</button>}
             {canE && canQuote && <button type="button" className="btn btn-quote" onClick={() => run('penawaran')}><IconDoc />{tr('Buat Penawaran')}</button>}
             {canE && <button type="button" className="btn btn-primary" onClick={() => run('tambah')}><IconPlus />{tr('Tambah Prospek')}</button>}
+            {byId('lead') && <button type="button" className="btn btn-primary" onClick={() => run('lead')}><IconPlus />{tr('Tambah Lead')}</button>}
           </div>
         </header>
         <RunningText />
 
         {page === 'beranda' ? (
           <div className="dk-body">
-            <DeskHome onPage={setPage} />
+            {me?.role === 'marketing' ? <MarketingHome onPage={setPage} /> : <DeskHome onPage={setPage} />}
           </div>
         ) : (
           <div className={`dk-pipe${panelId ? ' with-panel' : ''}`}>

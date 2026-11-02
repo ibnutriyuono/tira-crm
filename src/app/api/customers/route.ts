@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import type { Prisma } from '@prisma/client';
 import { guard } from '@/lib/permissions-server';
+import { segmentFieldsFor } from '@/lib/customer-segments-server';
 
 export async function GET() {
   const user = await requireUser();
@@ -34,6 +35,8 @@ export async function POST(req: Request) {
   const pics = normalizeCustomerPics(body?.pics);
   const primary = pics.find((p) => p.isPrimary);
   const profile = customerProfileFields(body);
+  const seg = await segmentFieldsFor(user, body, null);
+  if ('error' in seg) return NextResponse.json({ error: seg.error }, { status: 400 });
 
   const customer = await prisma.customer.create({
     data: {
@@ -46,6 +49,7 @@ export async function POST(req: Request) {
       catatan: String(body?.catatan || '').trim(),
       pics: pics as unknown as Prisma.InputJsonValue,
       ...profile,
+      ...seg,
     },
   });
 

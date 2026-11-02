@@ -49,6 +49,7 @@ export function ActivityKpiModal() {
   const toast = useDataStore((s) => s.toast);
 
   const permKpiE = useCan('kpi', 'e');
+  const canMap = useCan('analisa');
   const canSetTarget = permKpiE && ['admin', 'vp', 'gm', 'rm', 'bm'].includes(currentUser?.role || '');
   const today = localToday();
 
@@ -203,9 +204,16 @@ export function ActivityKpiModal() {
       title={tr("KPI Aktivitas Sales")}
       xwide
       footer={
-        <button type="button" className="btn btn-outline" onClick={closeModal}>
-          {tr("Tutup")}
-        </button>
+        <>
+          {canMap && (
+            <button type="button" className="btn btn-outline" style={{ marginRight: 'auto' }} onClick={() => { useUiStore.setState({ analysisFocus: 'peta' }); useUiStore.getState().openModal('gmAnalysis'); }}>
+              {tr("Peta kunjungan")}
+            </button>
+          )}
+          <button type="button" className="btn btn-outline" onClick={closeModal}>
+            {tr("Tutup")}
+          </button>
+        </>
       }
     >
       <div className="toolbar-row" style={{ marginBottom: 12, alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>

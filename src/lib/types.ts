@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'vp' | 'gm' | 'gmops' | 'rm' | 'bm' | 'sales' | 'purchasing' | 'purchasing05' | 'salesadmin';
+export type Role = 'admin' | 'vp' | 'gm' | 'gmops' | 'rm' | 'bm' | 'sales' | 'purchasing' | 'purchasing05' | 'salesadmin' | 'marketing';
 
 export interface SafeUser {
   id: string;
@@ -18,6 +18,10 @@ export interface SafeUser {
   mustChangePassword?: boolean;
   /** Waktu tanda tangan disimpan (ISO) — null = belum punya tanda tangan. */
   signatureAt?: string | null;
+  /** Akun dijeda Admin (ISO) — null = aktif. Hanya terisi di daftar Kelola User. */
+  pausedAt?: string | null;
+  pausedReason?: string | null;
+  pausedBy?: string | null;
 }
 
 export interface Material {
@@ -72,6 +76,11 @@ export interface Prospect {
   qcdFaktor?: string | null;
   followUpAt: string | null;
   followUpNote: string | null;
+  /** Lead dari Product & Marketing — sumber (lib/leads.ts), pembuat & waktu. */
+  leadSource?: string | null;
+  leadBy?: string | null;
+  leadById?: string | null;
+  leadAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -106,8 +115,9 @@ export interface Customer {
   address: string | null;
   catatan: string | null;
   pics: CustomerPic[] | null;
-  /** Profil (diisi Sales) — lihat CUSTOMER_SEGMENTS / CUSTOMER_APLIKASI. */
+  /** Profil (diisi Sales) — segmen & sub-segmen: lib/customer-segments.ts; aplikasi: CUSTOMER_APLIKASI. */
   segmen?: string | null;
+  subSegmen?: string | null;
   aplikasi?: string[];
   /** Estimasi potensi pembelian per tahun (Rupiah). */
   potensi?: number | null;
@@ -274,6 +284,8 @@ export interface RosterUser {
   role: Role;
   cabang: string | null;
   se?: string | null;
+  /** Akun dijeda Admin — jangan ditawarkan untuk chat / tugas baru. */
+  paused?: boolean;
 }
 
 export type ItemEntity = 'prospect' | 'rfq' | 'fupa';
@@ -373,7 +385,10 @@ export type NotificationType =
   | 'visit_plan'
   | 'ops_escalated'
   | 'margin_request'
-  | 'margin_decided';
+  | 'margin_decided'
+  | 'prospect_duplicate'
+  | 'lead_new'
+  | 'lead_update';
 
 export interface AppNotification {
   id: string;

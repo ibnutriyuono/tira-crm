@@ -10,6 +10,10 @@ import { useDataStore } from '@/store/useDataStore';
 import { useT } from '@/store/useLangStore';
 import { PeriodRange, normRange, rangeMonths, type PeriodRangeValue } from './PeriodRange';
 import { Bars, Columns, Heat, Insights, Kpi, Section, Table, rpShort } from './ui';
+import dynamic from 'next/dynamic';
+
+// Leaflet hanya di browser.
+const VisitMap = dynamic(() => import('./VisitMap').then((m) => m.VisitMap), { ssr: false, loading: () => <div className="vm-map vm-loading" style={{ height: 460 }} /> });
 
 const COLORS: Record<string, string> = { kunjungan: '#2F8F5B', telepon: '#2F5576', meeting: '#C47F2C', dokumen: '#6B7684' };
 
@@ -24,6 +28,36 @@ export function ActivityTab({ activities, prospects, cabangs, thisMonth, isStaff
   const [cabang, setCabang] = useState('');
   const [sort, setSort] = useState<'total' | 'won' | 'idle' | 'achieve'>('total');
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
+  // Peta Kunjungan: filter sendiri (SE & jenis), periode & cabang mengikuti tab.
+  const [mapSe, setMapSe] = useState('');
+  const [mapTipe, setMapTipe] = useState<'semua' | 'kunjungan' | 'meeting'>('semua');
+  const geo = useMemo(() => {
+    if (!activities) return null;
+    const months = new Set(rangeMonths(range));
+    const up = (s: string | null | undefined) => (s || '').trim().toUpperCase();
+    const base = activities.filter(
+      (x) =>
+        (x.tipe === 'kunjungan' || x.tipe === 'meeting') &&
+        x.status !== 'rencana' &&
+        months.has(String(x.tanggal).slice(0, 7)) &&
+        (!cabang || up(x.cabang) === up(cabang)) &&
+        (mapTipe === 'semua' || x.tipe === mapTipe),
+    );
+    const ses = Array.from(new Set(base.map((x) => up(x.se)).filter(Boolean))).sort();
+    const rows = base.filter((x) => !mapSe || up(x.se) === mapSe);
+    const located = rows.filter((x) => x.lat != null && x.lng != null);
+    // SE dengan kunjungan tanpa lokasi terbanyak (dicatat dari kantor / izin lokasi ditolak).
+    const miss = new Map<string, { n: number; total: number }>();
+    rows.forEach((x) => {
+      const k = up(x.se);
+      const m = miss.get(k) || { n: 0, total: 0 };
+      m.total++;
+      if (x.lat == null) m.n++;
+      miss.set(k, m);
+    });
+    const worst = [...miss.entries()].filter(([, m]) => m.n > 0).sort((p, q) => q[1].n - p[1].n).slice(0, 5);
+    return { ses, rows, located, worst };
+  }, [activities, range, cabang, mapSe, mapTipe]);
   const a = useMemo(
     () => (activities ? buildActivityAnalysis({ activities, prospects, range: { months: rangeMonths(range), today }, isStaff, cabangFilter: cabang }) : null),
     [activities, prospects, range, today, isStaff, cabang],
@@ -85,6 +119,45 @@ export function ActivityTab({ activities, prospects, cabangs, thisMonth, isStaff
       </div>
 
       <Insights list={a.insights} />
+
+      {geo && (
+        <div id="peta-kunjungan">
+          <Section
+            title={tr('Peta Kunjungan')}
+            note={tr('Kunjungan & meeting yang lokasinya tercatat saat disimpan (Tandai kunjungan di HP / laporan Tugas Kunjungan). Lokasi GPS dari browser HP hanya berjalan lewat HTTPS.')}
+            right={
+              <span className="vm-filters">
+                {!isSe && geo.ses.length > 1 && (
+                  <select value={mapSe} onChange={(e) => setMapSe(e.target.value)} aria-label="SE">
+                    <option value="">{tr('Semua SE')}</option>
+                    {geo.ses.map((s) => <option key={s} value={s}>SE {s}</option>)}
+                  </select>
+                )}
+                <select value={mapTipe} onChange={(e) => setMapTipe(e.target.value as typeof mapTipe)} aria-label={tr('Jenis')}>
+                  <option value="semua">{tr('Kunjungan & meeting')}</option>
+                  <option value="kunjungan">{tr('Kunjungan')}</option>
+                  <option value="meeting">{tr('Meeting')}</option>
+                </select>
+              </span>
+            }
+          >
+            <div className="vm-stats">
+              <span><b className="mono">{geo.located.length}</b> {tr('titik berlokasi')}</span>
+              <span>
+                <b className="mono">{geo.rows.length - geo.located.length}</b> {tr('tanpa lokasi')}
+                {geo.rows.length > 0 && ` (${Math.round(((geo.rows.length - geo.located.length) / geo.rows.length) * 100)}%)`}
+              </span>
+              <span><b className="mono">{new Set(geo.located.map((x) => x.customer.trim().toUpperCase())).size}</b> {tr('customer')}</span>
+              {!isSe && geo.worst.length > 0 && (
+                <span className="muted">
+                  {tr('Paling banyak tanpa lokasi')}: {geo.worst.map(([se, m]) => `${se} ${m.n}/${m.total}`).join(' · ')}
+                </span>
+              )}
+            </div>
+            <VisitMap points={geo.located} />
+          </Section>
+        </div>
+      )}
 
       <div className="ea-grid2">
         <Section title={tr('Bauran aktivitas vs target')} note={tr('Target = acuan default per SE per bulan × jumlah SE × bulan.')}>

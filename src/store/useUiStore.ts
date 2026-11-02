@@ -47,6 +47,7 @@ export type ModalKey =
   | 'visitTasks'
   | 'leadDesk'
   | 'opsRules'
+  | 'leadForm'
   | null;
 
 export type DeleteMode = 'prospect' | 'user' | 'customer' | 'rfq' | 'vendor' | 'fupa';
@@ -119,6 +120,12 @@ interface UiState {
   deskPanelId: string | null;
   /** Buka palet perintah (Ctrl+K). */
   paletteOpen: boolean;
+  /** Kelola Customer dibuka dari pengingat segmen: saring "perlu dilengkapi" (nilai = penanda unik). */
+  customersSegFocus: string | null;
+  /** Isian awal Tambah Lead (mis. dari "Customer mulai hilang" di Beranda Marketing). */
+  leadPrefill: { customer: string; cabang: string; source: string } | null;
+  /** Buka Analisa Eksekutif langsung di bagian tertentu (mis. 'peta' = tab Aktivitas › Peta Kunjungan). */
+  analysisFocus: 'peta' | null;
   search: string;
   fReg: string;
   fCabang: string;
@@ -195,6 +202,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   deskActive: false,
   deskPanelId: null,
   paletteOpen: false,
+  customersSegFocus: null,
+  leadPrefill: null,
+  analysisFocus: null,
   search: '',
   fReg: '',
   fCabang: '',

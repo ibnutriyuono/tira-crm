@@ -9,7 +9,9 @@ import { cleanFaktor, cleanLevel } from '@/lib/qcd';
 import { deriveFromMaterials, requireQcdOnClose, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
-import type { Material } from '@/lib/types';
+import type { Material, Prospect } from '@/lib/types';
+import { recordDuplicateAck } from '@/lib/prospect-duplicates-server';
+import { invalidateMaterialLexicon } from '@/lib/material-lexicon-server';
 import { resolveFaktur } from '@/lib/faktur';
 import { notifyAdminTask } from '@/lib/admin-sales-server';
 import { guard } from '@/lib/permissions-server';
@@ -102,5 +104,7 @@ export async function POST(req: Request) {
   });
   // Customer typed here -> Kelola Customer (created / phone filled).
   await ensureCustomerFromProspect(user, prospect);
+  await recordDuplicateAck(user, body, prospect as unknown as Prospect);
+  invalidateMaterialLexicon();
   return NextResponse.json({ prospect }, { status: 201 });
 }

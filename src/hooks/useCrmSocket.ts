@@ -246,7 +246,7 @@ export function useCrmSocket() {
       const me = st.currentUser;
       if (!me) return;
       const known = st.issues.some((x) => x.id === i.id);
-      const wide = me.role === 'gm' || me.role === 'vp' || me.role === 'gmops' || me.role === 'admin' || me.role === 'purchasing';
+      const wide = me.role === 'gm' || me.role === 'vp' || me.role === 'gmops' || me.role === 'marketing' || me.role === 'admin' || me.role === 'purchasing';
       const visible = wide || (Array.isArray(i.pjIds) && i.pjIds.includes(me.id)) || st.prospects.some((p) => p.id === i.prospectId);
       if (known || visible) st.upsertIssue(i);
     };
@@ -262,6 +262,13 @@ export function useCrmSocket() {
 
     const onUserUpsert = (u: SafeUser) => useDataStore.getState().upsertUser(u);
     const onUserDelete = ({ id }: { id: string }) => useDataStore.getState().removeUser(id);
+    // Akun ini dijeda Admin: keluar sekarang juga (cookie dihapus lewat logout).
+    const onUserPaused = ({ id }: { id: string }) => {
+      if (useDataStore.getState().currentUser?.id !== id) return;
+      fetch('/api/auth/logout', { method: 'POST' })
+        .catch(() => {})
+        .finally(() => window.location.replace('/login?paused=1'));
+    };
 
     const onPurchasingContact = (c: PurchasingContact) => useDataStore.getState().setPurchasingContact(c);
     const onOpsRules = (r: OpsRules) => useDataStore.getState().setOpsRules(r);
@@ -312,6 +319,7 @@ export function useCrmSocket() {
     s.on('user:created', onUserUpsert);
     s.on('user:updated', onUserUpsert);
     s.on('user:deleted', onUserDelete);
+    s.on('user:paused', onUserPaused);
 
     s.on('purchasingContact:updated', onPurchasingContact);
     s.on('opsRules:updated', onOpsRules);
@@ -352,6 +360,7 @@ export function useCrmSocket() {
       s.off('user:created', onUserUpsert);
       s.off('user:updated', onUserUpsert);
       s.off('user:deleted', onUserDelete);
+      s.off('user:paused', onUserPaused);
       s.off('itemchat:message', onItemChatMessage);
       s.off('purchasingContact:updated', onPurchasingContact);
       s.off('opsRules:updated', onOpsRules);

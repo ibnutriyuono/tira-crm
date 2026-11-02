@@ -2,14 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { STATUS_META } from '@/lib/constants';
-import { classify, formatDateID, formatRupiah, klasBadgeColor, materialsWithValue, num } from '@/lib/format';
+import { classify, formatDateID, formatRupiah, getProspectMaterials, klasBadgeColor, materialsWithValue, num } from '@/lib/format';
 import { isOpenIssue } from '@/lib/issues';
 import { fupaAsWorkflowDoc, rfqAsWorkflowDoc, WORKFLOW_META, workflowStage } from '@/lib/purchasing-workflow';
 import { quotePermAct } from '@/lib/roles';
+import { findDuplicates } from '@/lib/prospect-duplicates';
 import { useCan } from '@/hooks/useCan';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import { useT } from '@/store/useLangStore';
+import { LeadBadge } from '../LeadBadge';
 import { KamBadge } from '../KamBadge';
 import { IconDoc, IconEdit, IconRfq, IconWa } from '../icons';
 
@@ -26,6 +28,7 @@ export function ProspectPanel({ id }: { id: string }) {
   const rfqs = useDataStore((s) => s.rfqs);
   const fupas = useDataStore((s) => s.fupas);
   const issues = useDataStore((s) => s.issues);
+  const allProspects = useDataStore((s) => s.prospects);
   const me = useDataStore((s) => s.currentUser);
   const canE = useCan('prospek', 'e');
   const canX = useCan('prospek', quotePermAct(me?.role));
@@ -48,6 +51,8 @@ export function ProspectPanel({ id }: { id: string }) {
       ...fupas.filter((f) => f.prospectId === p.id).map((f) => ({ id: f.id, jenis: 'FUP A' as const, no: f.noFupa || tr('(draft)'), tgl: f.tglFupa, stage: workflowStage(fupaAsWorkflowDoc(f)), draft: f.status === 'Draft' })),
     ];
   }, [p, rfqs, fupas, tr]);
+
+  const dupes = useMemo(() => (p && classify(p) !== 'Lost' ? findDuplicates({ id: p.id, customer: p.customer, materials: getProspectMaterials(p) }, allProspects) : []), [p, allProspects]);
 
   if (!p) {
     return (
@@ -72,7 +77,7 @@ export function ProspectPanel({ id }: { id: string }) {
       <div className="dk-panel-h">
         <div style={{ minWidth: 0 }}>
           <button type="button" className="dk-cust" title={tr('Buka Profil Customer')} onClick={() => { set({ profileCustomer: p.customer, profileReturnTo: null }); open('customerProfile'); }}>
-            {p.customer} <KamBadge customer={p.customer} />
+            {p.customer} <KamBadge customer={p.customer} /> <LeadBadge p={p} />
           </button>
           <div className="dk-sub">{[p.cabang, p.se, p.reg ? `Reg ${p.reg}` : null].filter(Boolean).join(' · ')}</div>
         </div>
@@ -156,6 +161,23 @@ export function ProspectPanel({ id }: { id: string }) {
               >
                 <span>{d.jenis} {d.no}</span>
                 <span className={`badge ${d.draft ? 'slate' : WORKFLOW_META[d.stage].color}`}>{d.draft ? 'Draft' : tr(WORKFLOW_META[d.stage].label)}</span>
+              </button>
+            ))}
+          </section>
+        )}
+
+        {dupes.length > 0 && (
+          <section className="dk-sec">
+            <h4 className="dk-warn">⚠ {tr('Mirip prospek lain')} · {dupes.length}</h4>
+            {dupes.map((d) => (
+              <button key={d.prospect.id} type="button" className="dk-doc" onClick={() => useUiStore.setState({ deskPanelId: d.prospect.id })}>
+                <span>
+                  <b>{d.sameCustomer ? d.prospect.customer : `${tr('Customer lain')}: ${d.prospect.customer}`}</b>
+                  <small className="muted" style={{ display: 'block' }}>
+                    {[d.prospect.cabang, d.prospect.se, tr(STATUS_META[num(d.prospect.status)]?.label || ''), `${d.matched}/${d.total} ${tr('item sama')}`].filter(Boolean).join(' · ')}
+                  </small>
+                </span>
+                <span className="mono">{formatRupiah(num(d.prospect.value))}</span>
               </button>
             ))}
           </section>

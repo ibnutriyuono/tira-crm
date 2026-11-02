@@ -21,6 +21,7 @@ import { VisitTasksModal } from './modals/VisitTasksModal';
 import { RfqModal } from './modals/RfqModal';
 import { RfqManageModal } from './modals/RfqManageModal';
 import { UsersModal } from './modals/UsersModal';
+import { LeadFormModal } from './modals/LeadFormModal';
 import { UserFormModal } from './modals/UserFormModal';
 import { CustomersModal } from './modals/CustomersModal';
 import { CustomerUnifyModal } from './modals/CustomerUnifyModal';
@@ -175,6 +176,7 @@ export function CrmApp() {
       <DeleteConfirmModal />
       <FollowUpModal />
       <UsersModal />
+      <LeadFormModal />
       <UserFormModal />
       <CustomersModal />
       <CustomerUnifyModal />

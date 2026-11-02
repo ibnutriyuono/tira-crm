@@ -1,10 +1,12 @@
 'use client';
 
 import { api } from '@/lib/api-client';
-import { appendSheet, buildBudgetTargetSheet, buildCustomerSheet, buildFupaSheet, buildProspectSheet, buildRfqSheet, buildSalesActivitySheet, buildSalesPlanSheet, STATUS_LEGEND } from '@/lib/exports';
+import { appendSheet, buildAnnualTargetSheet, buildBudgetTargetSheet, buildCustomerSheet, buildFupaSheet, buildIssueSheet, buildKamSheet, buildProspectSheet, buildRfqSheet, buildSalesActivitySheet, buildSalesPlanSheet, buildSeTargetSheet, buildTripSheet, buildVendorSheet, customerSegmentLookup, STATUS_LEGEND, type SheetSpec } from '@/lib/exports';
+import { can } from '@/lib/permissions';
+import { canSeeHpp, canSeeVendors } from '@/lib/roles';
 import { getFilteredProspects, sortProspects } from '@/lib/filter';
 import { todayStr } from '@/lib/format';
-import type { SalesActivity } from '@/lib/types';
+import type { RosterUser, SalesActivity, VisitTrip } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 
@@ -42,32 +44,60 @@ export async function exportProspectsExcel() {
 // One workbook, one sheet per entity — everything the CURRENT user's store
 // already holds, which is exactly what they're each individually scoped to see.
 // The vendor list is Purchasing data and is never part of this export.
+/**
+ * Export Semua: satu file, satu sheet per modul — hanya modul yang boleh
+ * di-Download role ini (Kelola Role, hak "x"), dan isinya sudah tercakup
+ * sesuai role dari server (cabang / regional / Kode SE; HPP, margin & vendor
+ * tidak pernah dikirim ke Sales-side). Modul yang tidak dimuat di awal
+ * (Aktivitas Harian, Perjalanan Dinas, daftar nama user) diambil di sini;
+ * bila gagal, sheet-nya dilewati dan disebut di pesan.
+ */
 export async function exportAllExcel() {
   const s = useDataStore.getState();
-  // Aktivitas Harian isn't kept in the store (loaded per month), so it's
-  // fetched here -- all months this role can see. A failure skips the sheet.
-  let activities: SalesActivity[] = [];
-  try {
-    activities = (await api.get<{ activities: SalesActivity[] }>('/api/sales-activities?all=1')).activities;
-  } catch {
-    activities = [];
-  }
+  const role = s.currentUser?.role;
+  const x = (mod: string) => can(s.perms, mod, 'x');
+  const skipped: string[] = [];
+  const fetchOr = async <T,>(url: string, pick: (r: never) => T, label: string, fallback: T): Promise<T> => {
+    try {
+      return pick((await api.get(url)) as never);
+    } catch {
+      skipped.push(label);
+      return fallback;
+    }
+  };
+  const [activities, trips, roster] = await Promise.all([
+    x('aktivitas') ? fetchOr<SalesActivity[]>('/api/sales-activities?all=1', (r: { activities: SalesActivity[] }) => r.activities, 'Aktivitas Harian', []) : Promise.resolve([] as SalesActivity[]),
+    x('trip') ? fetchOr<VisitTrip[]>('/api/visit-trips', (r: { trips: VisitTrip[] }) => r.trips, 'Perjalanan Dinas', []) : Promise.resolve([] as VisitTrip[]),
+    (x('kam') && s.customerGroups.length) || (x('masalah') && s.issues.length) || x('trip')
+      ? fetchOr<RosterUser[]>('/api/users/roster', (r: { roster: RosterUser[] }) => r.roster, 'nama user', [])
+      : Promise.resolve([] as RosterUser[]),
+  ]);
+  const names = new Map(roster.map((u) => [u.id, u.name]));
+  const userName = (id: string | null) => (id ? names.get(id) || '' : '');
+  const valueById = new Map(s.prospects.map((p) => [p.id, Number(p.value) || 0]));
+
   const specs = [
-    s.prospects.length && buildProspectSheet(s.prospects),
-    s.rfqs.length && buildRfqSheet(s.rfqs),
-    s.fupas.length && buildFupaSheet(s.fupas),
-    s.customers.length && buildCustomerSheet(s.customers),
-    s.salesPlans.length && buildSalesPlanSheet(s.salesPlans),
-    s.budgetTargets.length && buildBudgetTargetSheet(s.budgetTargets),
-    activities.length && buildSalesActivitySheet(activities, s.prospects),
-  ].filter(Boolean) as ReturnType<typeof buildProspectSheet>[];
-  if (specs.length === 0) return s.toast('Tidak ada data untuk diexport', 'error');
+    x('prospek') && s.prospects.length && buildProspectSheet(s.prospects, x('customer') ? customerSegmentLookup(s.customers) : undefined),
+    x('rfq') && s.rfqs.length && buildRfqSheet(s.rfqs),
+    x('rfq') && s.fupas.length && buildFupaSheet(s.fupas),
+    x('customer') && s.customers.length && buildCustomerSheet(s.customers),
+    x('kam') && s.customerGroups.length && buildKamSheet(s.customerGroups, userName, canSeeHpp(role)),
+    x('masalah') && s.issues.length && buildIssueSheet(s.issues, (i) => valueById.get(i.prospectId) || 0, userName, todayStr()),
+    x('rencana') && s.salesPlans.length && buildSalesPlanSheet(s.salesPlans),
+    x('forecast') && s.budgetTargets.length && buildBudgetTargetSheet(s.budgetTargets),
+    x('forecast') && s.annualTargets.length && buildAnnualTargetSheet(s.annualTargets),
+    x('forecast') && s.seTargets.length && buildSeTargetSheet(s.seTargets),
+    x('aktivitas') && activities.length && buildSalesActivitySheet(activities, s.prospects),
+    x('trip') && trips.length && buildTripSheet(trips, userName),
+    x('purch') && canSeeVendors(role) && s.vendors.length && buildVendorSheet(s.vendors),
+  ].filter(Boolean) as SheetSpec[];
+  if (specs.length === 0) return s.toast('Tidak ada data yang boleh diexport untuk role ini', 'error');
   const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
   specs.forEach((spec) => appendSheet(XLSX, wb, spec));
-  appendSheet(XLSX, wb, STATUS_LEGEND);
+  if (specs.some((sp) => sp.sheetName === 'Prospek')) appendSheet(XLSX, wb, STATUS_LEGEND);
   XLSX.writeFile(wb, `CRM_Export_Semua_${todayStr()}.xlsx`);
-  s.toast(`Export semua data berhasil (${specs.length} sheet)`, 'success');
+  s.toast(`Export semua data berhasil (${specs.length} sheet)${skipped.length ? ` · gagal memuat: ${skipped.join(', ')}` : ''}`, skipped.length ? 'info' : 'success');
 }
 
 export async function downloadProspectTemplate() {

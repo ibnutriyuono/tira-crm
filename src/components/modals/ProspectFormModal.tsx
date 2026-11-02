@@ -27,6 +27,8 @@ import { canSetFaktur } from '@/lib/roles';
 import { FollowUpFields } from '../FollowUpMoveModal';
 import { followUpDateProblem, followUpRequiredOnMove, jakartaDate } from '@/lib/followup-rule';
 import { useT } from '@/store/useLangStore';
+import { dupInputsChanged, type DupView } from '@/lib/prospect-duplicates';
+import { DuplicateWarning } from '../DuplicateWarning';
 export function ProspectFormModal() {
   const tr = useT();
   const modal = useUiStore((s) => s.modal);
@@ -103,6 +105,39 @@ export function ProspectFormModal() {
   const [fuDate, setFuDate] = useState('');
   const [fuNote, setFuNote] = useState('');
   const [fuErr, setFuErr] = useState(false);
+  // Peringatan prospek ganda / mirip: dicek otomatis saat customer & material
+  // terisi; bila ada, simpan pertama hanya menampilkan peringatan — simpan
+  // kedua ("Tetap simpan") baru menyimpan dan dicatat.
+  const [dupes, setDupes] = useState<DupView[] | null>(null);
+  const [dupWarned, setDupWarned] = useState(false);
+  const dupDraft = useMemo(
+    () => ({ id: editId, customer: customer.trim(), materials: materials.map((m) => ({ uraian: m.uraian, qty: m.qty })) }),
+    [editId, customer, materials],
+  );
+  const dupKey = JSON.stringify(dupDraft);
+  const dupNeeded = !readOnly && !!dupDraft.customer && dupDraft.materials.some((m) => (m.uraian || '').trim()) && dupInputsChanged(editing, dupDraft);
+  async function checkDupes(): Promise<DupView[]> {
+    try {
+      const r = await api.post<{ matches: DupView[] }>('/api/prospects/duplicates', dupDraft);
+      return r.matches || [];
+    } catch {
+      return []; // cek gagal tidak boleh menghalangi simpan
+    }
+  }
+  useEffect(() => {
+    setDupes(null);
+    setDupWarned(false);
+    if (!show || !dupNeeded) return;
+    let alive = true;
+    const t = setTimeout(() => {
+      void checkDupes().then((m) => alive && setDupes(m));
+    }, 900);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show, dupKey, dupNeeded]);
 
   useEffect(() => {
     if (!show) return;
@@ -271,8 +306,22 @@ export function ProspectFormModal() {
       toast('Pilih Sales yang menangani penawaran ini', 'error');
       return;
     }
+    let dup = dupNeeded ? dupes : [];
+    if (dup == null) {
+      setBusy(true);
+      dup = await checkDupes();
+      setBusy(false);
+      setDupes(dup);
+    }
+    if (dup.length && !dupWarned) {
+      setDupWarned(true);
+      document.querySelector('.dup-warn')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      toast('Ada prospek yang mirip — periksa dulu, lalu tekan "Tetap simpan" bila memang berbeda', 'error');
+      return;
+    }
     setBusy(true);
     const payload = {
+      ...(dup.length ? { dupAck: true } : {}),
       ...(fuNeeded ? { followUpAt: fuDate, followUpNote: fuNote.trim() } : {}),
       reg: Number(reg),
       cabang,
@@ -338,7 +387,7 @@ export function ProspectFormModal() {
           </button>
           {!readOnly && (
             <button type="submit" className="btn btn-primary" disabled={busy}>
-              {quoteMode ? tr("Simpan & Buat Surat Penawaran") : tr("Simpan Prospek")}
+              {dupWarned && dupes?.length ? tr("Tetap simpan") : quoteMode ? tr("Simpan & Buat Surat Penawaran") : tr("Simpan Prospek")}
             </button>
           )}
         </>
@@ -348,6 +397,15 @@ export function ProspectFormModal() {
         <div className="import-summary" style={{ marginTop: 0, marginBottom: 12 }}>
           {tr("Isi customer, Sales yang menangani, dan material. Setelah disimpan, prospek masuk tahap")} <b>{tr("Penawaran Harga")}</b> {tr("dan Surat Penawaran langsung terbuka (atas nama Sales tersebut).")}
         </div>
+      )}
+      {!!dupes?.length && (
+        <DuplicateWarning
+          matches={dupes}
+          emphasize={dupWarned}
+          onOpen={(id) => {
+            useUiStore.setState({ editProspectId: id, prospectFormQuote: false });
+          }}
+        />
       )}
       <fieldset disabled={readOnly} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="form-grid">

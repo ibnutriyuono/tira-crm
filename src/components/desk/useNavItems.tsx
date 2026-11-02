@@ -7,7 +7,7 @@ import { downloadProspectTemplate, exportAllExcel, exportProspectsExcel, logoutN
 import { canComposeMail } from '@/lib/compose-email';
 import { isPurchasingRoleClient } from '@/lib/doc-lines';
 import { isOpenIssue } from '@/lib/issues';
-import { can, type PermAct } from '@/lib/permissions';
+import { can, canExportAny, type PermAct } from '@/lib/permissions';
 import { countNewPurchasingItems } from '@/lib/purchasing-workflow';
 import { countUrgentFollowUps } from '@/lib/reports';
 import { isOpsLead, quotePermAct } from '@/lib/roles';
@@ -85,7 +85,8 @@ export function useNavItems(tr: (s: string) => string): { items: NavItem[]; unre
     const out: (NavItem | false)[] = [
       // Kerja harian
       c('aktivitas') && { id: 'aktivitas', label: tr('Aktivitas Harian'), group: 'Kerja', icon: <IconCalendar />, run: open('salesActivity'), keys: 'kunjungan telepon meeting catat' },
-      c('prospek') && { id: 'followup', label: tr('Follow-up'), group: 'Kerja', icon: <IconCalendar />, run: open('followUpBoard'), badge: countUrgentFollowUps(prospects), keys: 'papan jatuh tempo terlambat' },
+      role === 'marketing' && c('marketing', 'e') && { id: 'lead', label: tr('Tambah Lead'), group: 'Kerja', icon: <IconPlus />, run: open('leadForm'), keys: 'indotrading pameran inquiry permintaan baru' },
+      c('prospek') && role !== 'marketing' && { id: 'followup', label: tr('Follow-up'), group: 'Kerja', icon: <IconCalendar />, run: open('followUpBoard'), badge: countUrgentFollowUps(prospects), keys: 'papan jatuh tempo terlambat' },
       ['sales', 'bm', 'rm', 'gm', 'vp', 'admin', 'salesadmin'].includes(role) && { id: 'tugas', label: tr('Tugas Kunjungan'), group: 'Kerja', icon: <IconFlag />, run: open('visitTasks'), badge: visitBadge, keys: 'rencana mingguan' },
       !purch && c('masalah') && { id: 'masalah', label: tr('Masalah'), group: 'Kerja', icon: <span aria-hidden="true">⚑</span>, run: open('pipelineIssues'), badge: issueCount, keys: 'issue kendala pipeline' },
       c('faktur') && { id: 'antrian', label: tr('Antrian Admin'), group: 'Kerja', icon: <IconCheckSquare />, run: open('adminQueue'), badge: role === 'salesadmin' ? adminTaskCount(prospects) : 0, keys: 'faktur do pengiriman' },
@@ -120,9 +121,9 @@ export function useNavItems(tr: (s: string) => string): { items: NavItem[]; unre
       c('log') && { id: 'log', label: tr('Log Aktivitas'), group: 'Admin', icon: <IconActivity />, run: open('activity'), keys: 'audit riwayat' },
       // Data
       role === 'admin' && { id: 'import', label: tr('Import Excel'), group: 'Data', icon: <IconImport />, run: () => { useUiStore.setState({ importTarget: 'prospect' }); useUiStore.getState().openModal('import'); } },
-      c('prospek', 'x') && { id: 'template', label: tr('Template'), group: 'Data', icon: <IconTemplate />, run: () => void downloadProspectTemplate(), keys: 'excel' },
+      c('prospek', 'x') && role !== 'marketing' && { id: 'template', label: tr('Template'), group: 'Data', icon: <IconTemplate />, run: () => void downloadProspectTemplate(), keys: 'excel' },
       c('prospek', 'x') && { id: 'export', label: tr('Export Excel'), group: 'Data', icon: <IconExport />, run: () => void exportProspectsExcel(), keys: 'unduh download' },
-      c('prospek', 'x') && { id: 'exportall', label: tr('Export Semua'), group: 'Data', icon: <IconDownload />, run: () => void exportAllExcel(), keys: 'unduh download' },
+      canExportAny(perms) && { id: 'exportall', label: tr('Export Semua'), group: 'Data', icon: <IconDownload />, run: () => void exportAllExcel(), keys: 'unduh download' },
       { id: 'save', label: tr('Simpan Perubahan'), group: 'Data', icon: <IconSave />, run: () => void saveAllNow(), keys: 'sinkron refresh' },
       // Lainnya (tidak tampil di navigasi, hanya Ctrl+K)
       { id: 'notif', label: tr('Notifikasi'), group: 'Data', icon: <IconBell />, run: open('notifications') },

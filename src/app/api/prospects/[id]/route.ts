@@ -4,6 +4,8 @@ import { closeIssuesOnLose } from '@/lib/issues-server';
 import { ensureCustomerFromProspect } from '@/lib/customer-sync';
 import { syncFollowUpPlan } from '@/lib/followup-activity';
 import { diffFields, logActivity, PROSPECT_FIELD_LABELS } from '@/lib/activity';
+import { recordDuplicateAck } from '@/lib/prospect-duplicates-server';
+import { invalidateMaterialLexicon } from '@/lib/material-lexicon-server';
 import { cleanFaktor, cleanLevel, type QcdInput } from '@/lib/qcd';
 import { carryItemTracking, deriveFromMaterials, ensureItemIds, requireQcdOnClose, isResponse, requireNoPoOnMoveToPo, requireUser, resolveProspectScope } from '@/lib/api-helpers';
 import { STATUS_META } from '@/lib/constants';
@@ -12,11 +14,12 @@ import { prisma } from '@/lib/prisma';
 import { logMaterialRevision, logPenawaranSent } from '@/lib/item-events';
 import { assertProspectInScope as assertInScope } from '@/lib/prospect-access';
 import { emitCrmEvent } from '@/lib/socket';
-import type { Material } from '@/lib/types';
+import type { Material, Prospect } from '@/lib/types';
 import { resolveFaktur } from '@/lib/faktur';
 import { canSetFaktur } from '@/lib/roles';
 import { notifyAdminTask } from '@/lib/admin-sales-server';
 import { guard } from '@/lib/permissions-server';
+import { notifyLeadProgress } from '@/lib/leads-server';
 import { followUpDateProblem, followUpRequiredOnMove } from '@/lib/followup-rule';
 
 /** The record's QCD as it will be after this request: request values win, existing ones fill the gaps. */
@@ -106,6 +109,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   emitCrmEvent('prospect:updated', prospect);
   if (Number(prospect.status) === 6 && Number(scoped.existing.status) !== 6) await closeIssuesOnLose(prospect as never, user);
+  // Lead dari Marketing: Sales ditunjuk / status berubah -> beri tahu pembuatnya.
+  await notifyLeadProgress(user, scoped.existing, prospect);
   if (fuGiven) {
     try {
       await syncFollowUpPlan(user, prospect);
@@ -130,6 +135,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     changes: diffFields(scoped.existing, prospect, PROSPECT_FIELD_LABELS),
   });
   await notifyAdminTask(user, scoped.existing, prospect);
+  await recordDuplicateAck(user, body, prospect as unknown as Prospect);
+  invalidateMaterialLexicon();
   return NextResponse.json({ prospect });
 }
 
@@ -211,6 +218,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const prospect = await prisma.prospect.update({ where: { id }, data });
   emitCrmEvent('prospect:updated', prospect);
   if (Number(prospect.status) === 6 && Number(scoped.existing.status) !== 6) await closeIssuesOnLose(prospect as never, user);
+  // Lead dari Marketing: Sales ditunjuk / status berubah -> beri tahu pembuatnya.
+  await notifyLeadProgress(user, scoped.existing, prospect);
   await notifyAdminTask(user, scoped.existing, prospect);
   if (sentNow) await logPenawaranSent(user, prospect.id, prospect.materials, prospect.tglPenawaran);
 

@@ -132,7 +132,7 @@ export function TeamChatWidget() {
     // Kelola User stays invisible in the pickers — and unresolved in DM
     // titles — for every session that was already open.
     const onUserUpsert = (u: SafeUser) => {
-      const row: RosterUser = { id: u.id, username: u.username, name: u.name, role: u.role, cabang: u.cabang };
+      const row: RosterUser = { id: u.id, username: u.username, name: u.name, role: u.role, cabang: u.cabang, paused: !!u.pausedAt };
       setRoster((prev) => {
         const next = prev.some((x) => x.id === row.id) ? prev.map((x) => (x.id === row.id ? row : x)) : [...prev, row];
         return next.sort((a, b) => a.name.localeCompare(b.name));
@@ -163,6 +163,7 @@ export function TeamChatWidget() {
     return roster.filter(
       (u) =>
         u.username !== currentUser?.username &&
+        !u.paused &&
         (!q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q)),
     );
   }, [roster, userSearch, currentUser?.username]);

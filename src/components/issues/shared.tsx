@@ -36,6 +36,7 @@ export interface RosterUser {
   role: string;
   cabang: string | null;
   se: string | null;
+  paused?: boolean;
 }
 
 let rosterCache: RosterUser[] | null = null;
@@ -55,7 +56,7 @@ export function useRoster(): RosterUser[] {
   return list;
 }
 
-export const userLabel = (u: RosterUser) => `${u.name} · ${ROLE_LABELS[u.role] || u.role}${u.cabang ? ` ${u.cabang}` : ''}`;
+export const userLabel = (u: RosterUser) => `${u.name} · ${ROLE_LABELS[u.role] || u.role}${u.cabang ? ` ${u.cabang}` : ''}${u.paused ? ' · dijeda' : ''}`;
 export const nameOf = (roster: RosterUser[], id: string) => roster.find((u) => u.id === id)?.name || '(user)';
 
 const up = (s: string | null | undefined) => (s || '').trim().toUpperCase();
@@ -72,6 +73,7 @@ export function suggestPjIds(kategori: string, p: Pick<Prospect, 'cabang' | 'se'
     }
     roster
       .filter((u) => {
+        if (u.paused) return false;
         if (r === 'purchasing') return u.role === 'purchasing';
         if (r === 'sales') return u.role === 'sales' && up(u.se) === up(p.se);
         return u.role === r && up(u.cabang) === up(p.cabang);
