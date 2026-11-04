@@ -1,4 +1,5 @@
 import { docForRole } from '@/lib/rfq-price';
+import { nextFupaNo } from '@/lib/fupa-number';
 import { normalizeItemLines } from '@/lib/format';
 import type { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
@@ -42,7 +43,8 @@ export async function POST(req: Request) {
 
   const fupa = await prisma.fupa.create({
     data: {
-      noFupa: String(body?.noFupa || ''),
+      // Nomor kosong -> otomatis FUPA/<CABANG>/<TAHUN>/<urut>.
+      noFupa: String(body?.noFupa || '').trim() || (await nextFupaNo(String(body?.cabang || sourceRfq?.cabang || ''), String(body?.tglFupa || ''))),
       tglFupa: String(body?.tglFupa || ''),
       sourceRfqId,
       sourceNoRfq: String(body?.sourceNoRfq || sourceRfq?.noRfq || ''),

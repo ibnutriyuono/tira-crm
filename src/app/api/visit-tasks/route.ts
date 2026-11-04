@@ -24,12 +24,14 @@ export async function GET(req: Request) {
   if (sp.get('count')) {
     const today = jakartaToday();
     const where = taskScopeWhere(user);
-    const [open, late, plans] = await Promise.all([
+    const [open, late, plans, mine] = await Promise.all([
       prisma.visitTask.count({ where: { AND: [where, { status: 'ditugaskan' }] } }),
       prisma.visitTask.count({ where: { AND: [where, { status: 'ditugaskan', dueDate: { lt: today } }] } }),
       user.role === 'sales' ? Promise.resolve(0) : prisma.visitPlan.count({ where: { AND: [planScopeWhere(user), { status: 'diajukan' }] } }),
+      // BM / RM yang ditugaskan GM: tugas sendiri yang belum lewat tenggat (yang lewat sudah masuk `late`).
+      user.role === 'sales' ? Promise.resolve(0) : prisma.visitTask.count({ where: { assigneeId: user.id, status: 'ditugaskan', dueDate: { gte: today } } }),
     ]);
-    return NextResponse.json({ open, late, plans });
+    return NextResponse.json({ open, late, plans, mine });
   }
   const from = sp.get('from') || addDays(jakartaToday(), -90);
   const tasks = await prisma.visitTask.findMany({
@@ -45,8 +47,9 @@ export async function POST(req: Request) {
   if (!canAssignVisits(user.role) && user.role !== 'admin') return NextResponse.json({ error: 'Tugas kunjungan diberikan oleh BM atau GM.' }, { status: 403 });
   const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const assignee = await prisma.user.findUnique({ where: { id: String(b.assigneeId || '') } });
-  if (!assignee) return NextResponse.json({ error: 'Pilih Sales yang ditugaskan.' }, { status: 400 });
-  if (!canAssignTo(user, assignee)) return NextResponse.json({ error: 'BM hanya dapat menugaskan Sales di cabangnya.' }, { status: 403 });
+  if (!assignee) return NextResponse.json({ error: 'Pilih yang ditugaskan.' }, { status: 400 });
+  if (assignee.pausedAt) return NextResponse.json({ error: `Akun ${assignee.name} sedang dijeda.` }, { status: 400 });
+  if (!canAssignTo(user, assignee)) return NextResponse.json({ error: user.role === 'bm' ? 'BM hanya dapat menugaskan Sales di cabangnya.' : 'Tugas kunjungan hanya untuk Sales, BM atau RM.' }, { status: 403 });
   const dueDate = String(b.dueDate || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || dueDate < jakartaToday()) return NextResponse.json({ error: 'Tenggat tidak valid (tidak boleh sebelum hari ini).' }, { status: 400 });
   const tujuan = String(b.tujuan || '').trim().slice(0, 200);
@@ -87,10 +90,10 @@ export async function POST(req: Request) {
     title: `Tugas kunjungan dari ${user.name}: ${names.length > 1 ? `${names.length} customer` : names[0]}`,
     message: `${names.slice(0, 5).join(', ')}${names.length > 5 ? ` +${names.length - 5}` : ''} · tenggat ${dueDate} · ${tujuan}${catatan ? ` — ${catatan}` : ''}`,
   });
-  // GM menugaskan langsung: BM cabang ikut diberi tahu.
-  if (isGmLevel(user.role)) {
+  // GM menugaskan Sales langsung: BM cabang ikut diberi tahu (bukan saat yang ditugaskan BM / RM sendiri).
+  if (isGmLevel(user.role) && assignee.role !== 'bm' && assignee.role !== 'rm') {
     await notify({
-      userIds: await bmIdsOf(assignee.cabang),
+      userIds: (await bmIdsOf(assignee.cabang)).filter((id) => id !== assignee.id),
       type: 'visit_assigned',
       entity: 'visitTask',
       entityId: created[0].id,

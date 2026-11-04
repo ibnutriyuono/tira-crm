@@ -35,7 +35,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (t.status !== 'ditugaskan') return NextResponse.json({ error: 'Tugas ini sudah ditutup.' }, { status: 409 });
 
   if (action === 'lapor') {
-    if (!mine) return NextResponse.json({ error: 'Laporan diisi oleh Sales yang ditugaskan.' }, { status: 403 });
+    if (!mine) return NextResponse.json({ error: 'Laporan diisi oleh yang ditugaskan.' }, { status: 403 });
     const tanggal = validTanggal(b.tanggal);
     if (!tanggal) return NextResponse.json({ error: 'Tanggal kunjungan tidak valid (tidak boleh lebih dari hari ini).' }, { status: 400 });
     const keterangan = String(b.keterangan || '').trim();

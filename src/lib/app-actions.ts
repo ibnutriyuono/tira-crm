@@ -1,6 +1,7 @@
 'use client';
 
 import { api } from '@/lib/api-client';
+import { buildDeliverySheet, deliveryRows, type DeliveryEvent } from '@/lib/deliveries';
 import { appendSheet, buildAnnualTargetSheet, buildBudgetTargetSheet, buildCustomerSheet, buildFupaSheet, buildIssueSheet, buildKamSheet, buildProspectSheet, buildRfqSheet, buildSalesActivitySheet, buildSalesPlanSheet, buildSeTargetSheet, buildTripSheet, buildVendorSheet, customerSegmentLookup, STATUS_LEGEND, type SheetSpec } from '@/lib/exports';
 import { can } from '@/lib/permissions';
 import { canSeeHpp, canSeeVendors } from '@/lib/roles';
@@ -65,12 +66,15 @@ export async function exportAllExcel() {
       return fallback;
     }
   };
-  const [activities, trips, roster] = await Promise.all([
+  const [activities, trips, roster, deliveries] = await Promise.all([
     x('aktivitas') ? fetchOr<SalesActivity[]>('/api/sales-activities?all=1', (r: { activities: SalesActivity[] }) => r.activities, 'Aktivitas Harian', []) : Promise.resolve([] as SalesActivity[]),
     x('trip') ? fetchOr<VisitTrip[]>('/api/visit-trips', (r: { trips: VisitTrip[] }) => r.trips, 'Perjalanan Dinas', []) : Promise.resolve([] as VisitTrip[]),
     (x('kam') && s.customerGroups.length) || (x('masalah') && s.issues.length) || x('trip')
       ? fetchOr<RosterUser[]>('/api/users/roster', (r: { roster: RosterUser[] }) => r.roster, 'nama user', [])
       : Promise.resolve([] as RosterUser[]),
+    x('prospek') && s.prospects.length
+      ? fetchOr<DeliveryEvent[]>('/api/prospect-item-events?type=kirim&from=2000-01-01', (r: { events: DeliveryEvent[] }) => r.events, 'Pengiriman (DO)', [])
+      : Promise.resolve([] as DeliveryEvent[]),
   ]);
   const names = new Map(roster.map((u) => [u.id, u.name]));
   const userName = (id: string | null) => (id ? names.get(id) || '' : '');
@@ -78,6 +82,7 @@ export async function exportAllExcel() {
 
   const specs = [
     x('prospek') && s.prospects.length && buildProspectSheet(s.prospects, x('customer') ? customerSegmentLookup(s.customers) : undefined),
+    x('prospek') && deliveries.length && buildDeliverySheet(deliveryRows(deliveries, s.prospects)),
     x('rfq') && s.rfqs.length && buildRfqSheet(s.rfqs),
     x('rfq') && s.fupas.length && buildFupaSheet(s.fupas),
     x('customer') && s.customers.length && buildCustomerSheet(s.customers),

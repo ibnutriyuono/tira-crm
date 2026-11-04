@@ -241,11 +241,11 @@ export function LeadDesk({ onOpenRfq, onGoTab }: LeadDeskProps) {
       const low = (a.lines || []).filter((l) => l.below);
       decisions.push({
         id: `m:${a.id}`,
-        kind: tr('MARGIN DI BAWAH BATAS'),
+        kind: `${tr('MARGIN DI BAWAH BATAS')} · ${(a.level || 'vp').toUpperCase()}`,
         tone: 'vio',
         name: `${a.customer}${a.nomor ? ` · ${a.nomor}` : ''}`,
         sub: `${a.requestedByName} · ${a.cabang || '-'} · ${low.length} ${tr('item di bawah')} ${a.minMargin}%${low.length ? ` (${low.map((l) => `${l.uraian.slice(0, 28)}: ${l.margin == null ? '-' : `${fmt1(l.margin)}%`}`).join('; ')})` : ''} · ${tr('Alasan')}: ${a.alasan || '-'}`,
-        acts: canApprove
+        acts: (a.canDecide ?? canApprove)
           ? [
               { label: tr('Setujui'), run: () => decideMargin(a, 'setuju'), cls: 'btn-primary' },
               { label: tr('Tolak'), run: () => setNote({ id: `m:${a.id}`, kind: 'tolak', text: '' }), needNote: 'tolak' },

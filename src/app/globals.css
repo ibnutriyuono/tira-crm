@@ -1934,3 +1934,111 @@ button.dk-tile:hover{border-color:var(--steel-500); box-shadow:var(--shadow-1);}
 .seg-tbl tr.seg-sub td{background:var(--bg); font-size:12.5px;}
 .seg-tbl tr.seg-sub td:first-child{padding-left:26px; color:var(--text-soft);}
 .seg-heat{transition:background .2s;}
+
+/* Rekap Pengiriman (DO) */
+.dr-filters{align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;}
+.dr-filters select,.dr-filters input[type=date]{max-width:180px;}
+.dr-filters .dr-search{flex:1 1 220px; min-width:180px;}
+.dr-by{font-size:11px; color:var(--text-soft); margin-top:2px;}
+.dr-sd{font-size:12px; color:var(--text-soft);}
+.dr-table{table-layout:fixed; min-width:980px;}
+.dr-table td{vertical-align:top; overflow-wrap:anywhere;}
+.modal.sticky-head .table-wrap:has(.dr-table){overflow-x:auto;}
+.dr-row{cursor:pointer;}
+.dr-row.picked td{background:#fff8ec;}
+.dr-fbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;}
+.dr-fix-row td{background:#f7f9fb;}
+.dr-fix{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:4px;}
+.dr-fix label{display:flex; align-items:center; gap:6px; font-size:12.5px;}
+.dr-fix-why{flex:1 1 260px;}
+.dr-fix-why input{flex:1; min-width:180px;}
+.dr-fix-act{display:flex; gap:6px; margin-left:auto;}
+.dr-row:hover td{background:var(--hover, rgba(0,0,0,.03));}
+.dr-lines{list-style:none; margin:0; padding:0; display:grid; gap:3px; font-size:12.5px;}
+.dr-lines b{white-space:nowrap;}
+.dr-sisa{margin-left:6px; font-size:11px; padding:1px 6px; border-radius:8px; background:#e7f4ec; color:#2f8f5b; white-space:nowrap;}
+.dr-sisa.open{background:#fdf1e2; color:#b0701c;}
+@media (max-width:700px){ .dr-filters select,.dr-filters input[type=date]{max-width:none; flex:1 1 140px;} }
+
+/* Tambah Lead: penanda isian otomatis & prospek aktif */
+.lead-auto{display:inline-block; margin-left:6px; padding:0 6px; border-radius:8px; background:#e8f1fb; color:#2563a8; font-size:10.5px; font-weight:600; text-transform:none; letter-spacing:0; vertical-align:1px;}
+.lead-open ul{margin:4px 0 0; padding-left:18px;}
+.lead-open{margin-top:6px; padding:7px 10px; border-radius:6px; background:#fdf1e2; color:#8a5a14; font-size:12.5px; line-height:1.45;}
+
+/* Form SPP FUP A */
+.spp-h{display:flex; align-items:center; gap:10px; margin:16px 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-soft);}
+.spp-h .dk-link{margin-left:auto; text-transform:none; letter-spacing:0;}
+.spp-pages{padding:1px 8px; border-radius:8px; background:#fdf1e2; color:#8a5a14; font-size:11px; letter-spacing:0; text-transform:none;}
+.spp-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 12px;}
+.spp-grid .full{grid-column:1/-1;}
+.spp-grid label,.spp-sign label{display:block;}
+.spp-grid input,.spp-grid select,.spp-grid textarea{width:100%;}
+.spp-items{table-layout:fixed; min-width:760px;}
+.spp-items td{padding:4px 6px; vertical-align:middle;}
+.spp-items input{width:100%; padding:5px 7px;}
+.spp-items tr.spp-pagebreak td{border-top:2px dashed #c47f2c;}
+.spp-items tfoot td{border-bottom:none; padding:6px;}
+.spp-tl{text-align:right; font-weight:600; color:var(--text-soft);}
+.spp-tv{text-align:right; font-weight:600;}
+.spp-grand td{font-size:14px; color:var(--text);}
+.spp-ppn{width:64px !important; display:inline-block; padding:3px 6px; margin:0 4px;}
+.spp-sign{display:grid; grid-template-columns:repeat(3,1fr); gap:12px;}
+.spp-sign-col{display:flex; flex-direction:column; gap:6px; padding:10px; border:1px solid var(--border); border-radius:8px;}
+.spp-mail{margin:10px 0 4px; padding:12px; border:1px solid var(--border); border-radius:8px; background:var(--steel-100, #f3f5f8);}
+.spp-mail textarea{width:100%;}
+.spp-mail-foot{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:13px;}
+.spp-mail-foot label{display:inline-flex; align-items:center; gap:6px; margin:0; text-transform:none; font-weight:500;}
+.spp-mail-foot .btn{margin-left:auto;}
+@media (max-width:700px){ .spp-sign{grid-template-columns:1fr;} }
+
+/* Tambah Lead: tempel inquiry */
+.lead-inq{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:0 0 12px;}
+.lead-inq-box{flex:1 1 100%; display:flex; flex-direction:column; gap:8px; padding:10px; border:1px dashed var(--border); border-radius:8px; background:#f7f9fb;}
+.lead-inq-box textarea{width:100%; font-size:12.5px;}
+.lead-inq-box .btn{align-self:flex-end;}
+
+/* Hasil Lead / Insight Produk / Kampanye */
+.lr-filters{align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;}
+.lr-funnel{display:grid; gap:6px; margin:4px 0 16px;}
+.lr-step{position:relative; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 12px; border-radius:6px; background:#f3f5f8; overflow:hidden; font-size:13px;}
+.lr-step i{position:absolute; left:0; top:0; bottom:0; background:linear-gradient(90deg,#c9dbe9,#e3ecf3); z-index:0;}
+.lr-step span,.lr-step b{position:relative; z-index:1;}
+.lr-cols{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+@media (max-width:1100px){ .lr-cols{grid-template-columns:1fr;} }
+.pi-sel{color:#c47f2c;}
+.cp-filters{display:flex; flex-wrap:wrap; gap:10px 12px; align-items:flex-end; margin-bottom:10px;}
+.cp-filters label{display:flex; flex-direction:column; gap:4px; margin:0; font-size:11px;}
+.cp-filters select,.cp-filters input[type=text]{min-width:150px;}
+.cp-filters .cp-check{flex-direction:row; align-items:center; gap:6px; font-size:13px; text-transform:none; letter-spacing:0;}
+.cp-filters .cp-search{flex:1 1 200px;}
+.cp-bar{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; font-size:13px;}
+.cp-bar .btn{margin-left:auto;}
+.cp-table td{vertical-align:middle;}
+.cp-mail{font-size:12px; color:var(--text-soft); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.cp-compose{margin-top:14px; padding:12px; border:1px solid var(--border); border-radius:8px; background:#f7f9fb;}
+.cp-compose textarea,.cp-compose input[type=text]{width:100%;}
+.cp-actions{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px;}
+.cp-actions .field-note{flex:1 1 300px;}
+.cp-detail{margin-top:14px; padding:12px; border:1px solid var(--border); border-radius:8px;}
+
+/* Batas Waktu & Margin: kelompok */
+.or-group{margin:14px 0 2px; padding-top:10px; border-top:1px solid var(--border); font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-soft);}
+.or-group.first{margin-top:0; padding-top:0; border-top:none;}
+
+/* Persetujuan Margin */
+.ma-tiers{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; font-size:13px;}
+.ma-list{display:grid; grid-template-columns:minmax(0,1fr); gap:10px;}
+.ma-card{border:1px solid var(--border); border-radius:8px; padding:12px 14px; min-width:0; overflow-x:auto;}
+.ma-card.mine{border-color:#c47f2c; box-shadow:0 0 0 1px #c47f2c33;}
+.ma-head{display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+.ma-tags{display:flex; gap:6px; flex-wrap:wrap; align-items:flex-start;}
+.ma-lines{margin:8px 0 4px; font-size:12.5px;}
+.ma-why{font-size:13px; margin-top:4px;}
+.ma-act{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px;}
+.ma-act input{flex:1 1 240px;}
+
+/* RFQ: koneksi ke pipeline */
+.rfq-link{margin-top:12px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#f7f9fb;}
+.rfq-link.need{border-color:#c47f2c; background:#fdf6ec;}
+.rfq-link.warn{border-style:dashed;}
+.rfq-link select{width:100%;}

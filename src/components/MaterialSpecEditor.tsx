@@ -25,8 +25,8 @@ import { useMaterialLexicon } from '@/hooks/useMaterialLexicon';
 import { findGrade, gradeOptions, parseWithLexicon } from '@/lib/material-learn';
 import { STOK_KEYS, STOK_META, needsArrival, type StokKond } from '@/lib/item-stock';
 interface Props {
-  /** 'prospek' shows Harga/kg + Total; 'doc' (RFQ / FUP A) shows Lokal/Import + tanggal butuh. */
-  variant: 'prospek' | 'doc';
+  /** 'prospek' shows Harga/kg + Total; 'doc' (RFQ / FUP A) shows Lokal/Import + tanggal butuh; 'lead' (Marketing) only spec, qty & berat. */
+  variant: 'prospek' | 'doc' | 'lead';
   rows: SpecRow[];
   onChange: (rows: SpecRow[]) => void;
   /** Rendered under a row (e.g. Purchasing's answer on an RFQ item). */
@@ -288,7 +288,7 @@ export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hi
                     <div className="mono">{formatRupiah(rowTotal(r))}</div>
                   </div>
                 </>
-              ) : (
+              ) : variant === 'doc' ? (
                 <>
                   <div className="msr-f" style={{ width: 128 }}>
                     <label>{tr("Lokal/Import")}</label>
@@ -305,7 +305,7 @@ export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hi
                     <input type="date" value={r.estimasi} onChange={(e) => update(idx, { estimasi: e.target.value })} />
                   </div>
                 </>
-              )}
+              ) : null}
             </div>
             {prospek && (
               <div className="msr-stock">

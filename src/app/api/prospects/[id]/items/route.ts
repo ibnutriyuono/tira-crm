@@ -1,3 +1,4 @@
+import { stampLeadMilestones } from '@/lib/leads-server';
 import { NextResponse } from 'next/server';
 import { logActivity } from '@/lib/activity';
 import { ensureItemIds, isResponse, requireUser } from '@/lib/api-helpers';
@@ -156,6 +157,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     data.noPo = noPo;
     data.tglPO = tglPO;
     const prospect = await prisma.prospect.update({ where: { id }, data });
+    await stampLeadMilestones(prospect);
     emitCrmEvent('prospect:updated', prospect);
     await logItemEvent({ prospectId: id, type: 'po', title: `${correction ? 'Koreksi qty PO' : 'PO dikonfirmasi'} — ${noPo}`, items: poLines, user, tgl: tglPO, docNo: noPo });
     await logItemEvent({ prospectId: id, type: 'nopo', title: 'Tidak di-PO', items: noLines, user, tgl: tglPO, docNo: noPo });
@@ -188,6 +190,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       data.statusChangedAt = new Date();
     }
     const prospect = await prisma.prospect.update({ where: { id }, data });
+    await stampLeadMilestones(prospect);
     emitCrmEvent('prospect:updated', prospect);
     await logItemEvent({ prospectId: id, type: 'kirim', title: `Dikirim — ${noDo}`, items: lines, user, tgl, docNo: noDo });
     await logActivity({
@@ -254,6 +257,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const prospect = await prisma.prospect.update({ where: { id }, data });
+    await stampLeadMilestones(prospect);
     if (batal) {
       await prisma.prospectItemEvent.update({ where: { id: ev.id }, data: { type: 'kirim-batal', title: `Dikirim — ${ev.docNo || '-'} (dibatalkan)` } });
     } else {

@@ -38,6 +38,7 @@ export function MarketingHome({ onPage }: { onPage: (p: 'pipeline') => void }) {
   const tr = useT();
   const me = useDataStore((s) => s.currentUser);
   const prospects = useDataStore((s) => s.prospects);
+  const staleDays = useDataStore((s) => s.opsRules.leadTugasHari) || LEAD_STALE_DAYS;
   const customers = useDataStore((s) => s.customers);
   const groups = useDataStore((s) => s.customerGroups);
   const [today] = useState(() => ymd(new Date()));
@@ -55,7 +56,7 @@ export function MarketingHome({ onPage }: { onPage: (p: 'pipeline') => void }) {
 
   const leads = useMemo(() => prospects.filter((p) => isLead(p)).sort((a, b) => String(b.leadAt || b.createdAt).localeCompare(String(a.leadAt || a.createdAt))), [prospects]);
   const shown = mine ? leads.filter((p) => p.leadById === me?.id) : leads;
-  const staleOf = (p: Prospect) => leadStage(p) === 'baru' && daysBetween(String(p.leadAt || p.createdAt), today) >= LEAD_STALE_DAYS;
+  const staleOf = (p: Prospect) => leadStage(p) === 'baru' && daysBetween(String(p.leadAt || p.createdAt), today) > staleDays;
   const thisMonth = leads.filter((p) => String(p.leadAt || p.createdAt).slice(0, 7) === ym);
   const recent = leads.filter((p) => daysBetween(String(p.leadAt || p.createdAt), today) <= 90);
   const reached = recent.filter((p) => (num(p.status) >= 2 && num(p.status) <= 5) || (num(p.status) === 6 && p.penawaranTerkirim));
@@ -102,7 +103,7 @@ export function MarketingHome({ onPage }: { onPage: (p: 'pipeline') => void }) {
           <p>
             {stale.length > 0 ? (
               <>
-                <b className="dk-bad">{stale.length} {tr('lead')}</b> {tr('belum ditunjuk Sales lebih dari')} {LEAD_STALE_DAYS} {tr('hari')}.{' '}
+                <b className="dk-bad">{stale.length} {tr('lead')}</b> {tr('belum ditunjuk Sales lebih dari')} {staleDays} {tr('hari')}.{' '}
               </>
             ) : null}
             {segTodo.length > 0 && (
@@ -120,11 +121,12 @@ export function MarketingHome({ onPage }: { onPage: (p: 'pipeline') => void }) {
       <div className="dk-tiles">
         <Tile label={tr('Lead bulan ini')} value={thisMonth.length} foot={`${thisMonth.filter((p) => p.leadById === me?.id).length} ${tr('dari Anda')} · ${leads.length} ${tr('total')}`} />
         <Tile
+          onClick={() => open('leadResults')}
           label={tr('Konversi lead (90 hari)')}
           value={recent.length ? `${Math.round((reached.length / recent.length) * 100)}%` : '–'}
           foot={`${reached.length}/${recent.length} ${tr('sampai penawaran')} · ${won.length} PO/DO ${rpShort(wonValue)}`}
         />
-        <Tile label={tr('Menunggu BM')} value={stale.length} tone={stale.length ? 'bad' : ''} foot={`${tr('belum ada Sales')} > ${LEAD_STALE_DAYS} ${tr('hari')}`} onClick={() => setMine(false)} />
+        <Tile label={tr('Menunggu BM')} value={stale.length} tone={stale.length ? 'bad' : ''} foot={`${tr('belum ada Sales')} > ${staleDays} ${tr('hari')}`} onClick={() => setMine(false)} />
         <Tile
           label={tr('Segmen perlu dilengkapi')}
           value={segTodo.length}
@@ -176,7 +178,7 @@ export function MarketingHome({ onPage }: { onPage: (p: 'pipeline') => void }) {
         <div className="dk-side">
           {lapsed.length > 0 && (
             <section className="dk-card">
-              <div className="dk-card-h"><b>{tr('Customer mulai hilang')}</b><button type="button" className="dk-link" onClick={() => open('marketing')}>{tr('Kampanye')} →</button></div>
+              <div className="dk-card-h"><b>{tr('Customer mulai hilang')}</b><button type="button" className="dk-link" onClick={() => open('campaign')}>{tr('Kampanye')} →</button></div>
               {lapsed.map((c) => (
                 <div key={c.name} className="dk-deal mk-lapsed">
                   <button type="button" className="mk-lapsed-n" onClick={() => { useUiStore.setState({ profileCustomer: c.name, profileReturnTo: null }); open('customerProfile'); }}>
@@ -219,6 +221,9 @@ export function MarketingHome({ onPage }: { onPage: (p: 'pipeline') => void }) {
           <section className="dk-card">
             <div className="dk-card-h"><b>{tr('Analisa')}</b></div>
             <div className="mk-links">
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => open('leadResults')}>{tr('Hasil Lead')} — {tr('sumber & respons cabang')}</button>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => open('campaign')}>{tr('Kampanye')} — {tr('email & hasilnya')}</button>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => open('productInsight')}>{tr('Insight Produk')} — {tr('grade, kalah & stok')}</button>
               <button type="button" className="btn btn-outline btn-sm" onClick={() => open('gmAnalysis')}>{tr('Analisa Eksekutif')} — {tr('Segmen & harga per grade')}</button>
               <button type="button" className="btn btn-outline btn-sm" onClick={() => open('customerIntel')}>{tr('Customer Intelligence')}</button>
               <button type="button" className="btn btn-outline btn-sm" onClick={() => open('marketing')}>{tr('Marketing')}</button>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Modal } from '../Modal';
 import { api } from '@/lib/api-client';
 import { OPS_RULE_FIELDS, normalizeOpsRules, type OpsRules } from '@/lib/ops-rules';
@@ -56,9 +56,11 @@ export function OpsRulesModal() {
         </>
       }
     >
-      <p className="field-note" style={{ marginTop: 0 }}>{tr('Dipakai pengingat & eskalasi otomatis Operation (RFQ belum dijawab, barang telat) dan persetujuan margin oleh VP di Surat Penawaran.')}</p>
+      <p className="field-note" style={{ marginTop: 0 }}>{tr('Dipakai pengingat & eskalasi otomatis (RFQ belum dijawab, barang telat, lead Marketing) dan persetujuan margin bertingkat BM → RM → GM → VP di Surat Penawaran.')}</p>
       <div className="or-grid">
-        {OPS_RULE_FIELDS.map((f) => (
+        {OPS_RULE_FIELDS.map((f, i) => (
+          <Fragment key={f.key}>
+          {OR_GROUP_AT[f.key] && <div className={`or-group${i ? '' : ' first'}`}>{tr(OR_GROUP_AT[f.key] as string)}</div>}
           <label key={f.key} className="or-row">
             <span>
               <b>{tr(f.label)}</b>
@@ -69,6 +71,7 @@ export function OpsRulesModal() {
               <span className="muted">{tr(f.unit)}</span>
             </span>
           </label>
+          </Fragment>
         ))}
       </div>
       <div className="or-flow">
@@ -80,12 +83,22 @@ export function OpsRulesModal() {
           {tr('Barang lewat target kedatangan')}: &gt; {preview.telatOpsHari} {tr('hari')} → GM Operation · &gt; {preview.telatVpHari} {tr('hari')} → VP
         </span>
         <span>
-          {tr('Surat Penawaran dengan margin di bawah')} {preview.marginMin}% {tr('dari HPP → perlu persetujuan VP')}
+          {tr('Lead Marketing')}: {tr('tanpa Sales')} &gt; {preview.leadTugasHari} {tr('hari')} → BM · {tr('tanpa penawaran')} &gt; {preview.leadPenawaranHari} {tr('hari')} → Sales + BM · &gt; {preview.leadEskalasiHari} {tr('hari')} → RM + Marketing
         </span>
+        <span>
+          {tr('Margin Surat Penawaran')}: ≥ {preview.marginMin}% {tr('langsung')} · ≥ {preview.marginBm}% → BM · ≥ {preview.marginRm}% → RM · ≥ {preview.marginGm}% → GM · &lt; {preview.marginGm}% → VP
+        </span>
+        <span className="muted">{tr('Penyetuju tingkat lebih tinggi boleh menyetujui tingkat di bawahnya; pembuat surat yang wewenangnya sudah cukup tidak perlu mengajukan.')}</span>
       </div>
     </Modal>
   );
 }
+
+const OR_GROUP_AT: Partial<Record<keyof OpsRules, string>> = {
+  rfqTargetHari: 'Operation (RFQ & barang)',
+  leadTugasHari: 'Lead Marketing',
+  marginMin: 'Persetujuan margin bertingkat',
+};
 
 function toDraft(r: OpsRules): Record<keyof OpsRules, string> {
   return Object.fromEntries(Object.entries(r).map(([k, v]) => [k, String(v)])) as Record<keyof OpsRules, string>;

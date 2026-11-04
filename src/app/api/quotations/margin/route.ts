@@ -3,8 +3,9 @@ import { isResponse, requireUser } from '@/lib/api-helpers';
 import { guard } from '@/lib/permissions-server';
 import { quotePermAct } from '@/lib/roles';
 import { assertProspectInScope } from '@/lib/prospect-access';
-import { checkQuoteMargins, marginApproverIds } from '@/lib/margin-check';
-import { cleanQuoteItems, marginStatus } from '@/lib/margin-server';
+import { checkQuoteMargins } from '@/lib/margin-check';
+import { cleanQuoteItems, marginApproverIdsFor, marginStatus } from '@/lib/margin-server';
+import { MARGIN_LEVEL_LABEL } from '@/lib/margin-tier';
 import { getOpsRules } from '@/lib/ops-escalation';
 import { notify } from '@/lib/notify';
 import { prisma } from '@/lib/prisma';
@@ -14,8 +15,8 @@ import type { Prisma } from '@prisma/client';
 
 /**
  * Cek margin Surat Penawaran: { prospectId, items } → item di bawah batas &
- * status persetujuan VP. { ..., ajukan: true, alasan, nomor } mengajukan
- * persetujuan ke VP.
+ * tingkat & status persetujuan (BM / RM / GM / VP). { ..., ajukan: true,
+ * alasan, nomor } mengajukan persetujuan ke penyetuju tingkat tsb.
  */
 export async function POST(req: Request) {
   const user = await requireUser();
@@ -32,13 +33,16 @@ export async function POST(req: Request) {
   if (!body.ajukan) return NextResponse.json(status);
 
   if (!status.needs) return NextResponse.json(status);
-  if (status.approval?.status === 'menunggu') return NextResponse.json({ error: 'Persetujuan untuk harga ini sudah diajukan dan menunggu VP.' }, { status: 409 });
+  const level = status.level || 'vp';
+  const who = MARGIN_LEVEL_LABEL[level];
+  if (status.approval?.status === 'menunggu') return NextResponse.json({ error: `Persetujuan untuk harga ini sudah diajukan dan menunggu ${who}.` }, { status: 409 });
   const alasan = String(body.alasan || '').trim().slice(0, 500);
   if (alasan.length < 5) return NextResponse.json({ error: 'Tulis alasan harga di bawah margin (min. 5 karakter).' }, { status: 400 });
   const p = scoped.existing!;
   const rules = await getOpsRules();
   const lines = await checkQuoteMargins(prospectId, items, rules.marginMin);
   const snap = lines.map((l) => ({ ...l, uraian: items[l.idx]?.uraian || '' }));
+  const lowest = Math.min(...snap.filter((l) => l.below && l.margin != null).map((l) => l.margin as number));
   const a = await prisma.marginApproval.create({
     data: {
       prospectId,
@@ -49,21 +53,23 @@ export async function POST(req: Request) {
       items: snap as unknown as Prisma.InputJsonValue,
       priceKey: status.key,
       minMargin: rules.marginMin,
+      level,
+      lowestMargin: Number.isFinite(lowest) ? lowest : null,
+      reg: p.reg ?? null,
       alasan,
       requestedById: user.id,
       requestedByName: user.name,
     },
   });
   emitCrmEvent('marginApproval:updated', { id: a.id });
-  const lowest = Math.min(...snap.filter((l) => l.below && l.margin != null).map((l) => l.margin as number));
   await notify({
-    userIds: await marginApproverIds(),
+    userIds: (await marginApproverIdsFor(level, { cabang: p.cabang, reg: p.reg ?? null })).filter((id) => id !== user.id),
     type: 'margin_request',
     entity: 'prospect',
     entityId: prospectId,
-    title: `Persetujuan margin: ${p.customer}`,
+    title: `Persetujuan margin (${who}): ${p.customer}`,
     message: `${user.name} · ${status.below} item di bawah ${rules.marginMin}% (terendah ${Number.isFinite(lowest) ? lowest.toLocaleString('id-ID') : '-'}%). Alasan: ${alasan}`.slice(0, 300),
   });
-  await logActivity({ user, action: 'create', entity: 'quotation', entityId: prospectId, summary: `Mengajukan persetujuan margin Surat Penawaran ${p.customer} (${status.below} item di bawah ${rules.marginMin}%)` });
+  await logActivity({ user, action: 'create', entity: 'quotation', entityId: prospectId, summary: `Mengajukan persetujuan margin ${who} untuk Surat Penawaran ${p.customer} (${status.below} item di bawah ${rules.marginMin}%)` });
   return NextResponse.json(await marginStatus(user, prospectId, items));
 }

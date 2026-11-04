@@ -1,3 +1,4 @@
+import { resolveRfqProspect } from '@/lib/rfq-prospect';
 import { docForRole } from '@/lib/rfq-price';
 import { normalizeItemLines } from '@/lib/format';
 import type { Prisma } from '@prisma/client';
@@ -71,7 +72,10 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   // Nomor boleh dikosongkan — kalau kosong, dibuatkan otomatis saat create.
   const nomorManual = String(body?.noRfq || '').trim();
-  const prospectId = body?.prospectId || null;
+  // Terhubung ke pipeline: prospek dipilih / dibuat dari isi RFQ (lib/rfq-prospect.ts).
+  const linked = await resolveRfqProspect(user, body || {});
+  if ('error' in linked) return linked.error;
+  const prospectId = linked.prospectId;
   // Denormalize the region from the source prospect so rm-scoped queries can
   // filter on the RFQ alone; fall back to the acting user's own region.
   const sourceProspect = prospectId ? await prisma.prospect.findUnique({ where: { id: prospectId }, select: { reg: true } }) : null;

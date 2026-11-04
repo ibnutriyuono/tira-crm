@@ -96,18 +96,3 @@ export async function checkQuoteMargins(prospectId: string, items: QuoteLineIn[]
     return { idx, checked: true, below: margin < minMargin - 1e-9, margin: Math.round(margin * 10) / 10, hpp, price, uom, rfqNo: m.rfqNo };
   });
 }
-
-/** Penyetuju margin: VP & Admin; bila belum ada akun VP, GM. */
-export async function marginApproverIds(): Promise<string[]> {
-  for (const role of ['vp', 'gm', 'admin'] as const) {
-    const rows = await prisma.user.findMany({ where: { role }, select: { id: true } });
-    if (rows.length) return rows.map((r) => r.id);
-  }
-  return [];
-}
-
-export async function canApproveMargin(role: string): Promise<boolean> {
-  if (role === 'vp' || role === 'admin') return true;
-  if (role !== 'gm') return false;
-  return (await prisma.user.count({ where: { role: 'vp' } })) === 0;
-}

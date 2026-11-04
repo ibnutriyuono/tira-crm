@@ -22,11 +22,14 @@ export const taskScopeWhere = (user: SafeUser): Prisma.VisitTaskWhereInput =>
 export const planScopeWhere = (user: SafeUser): Prisma.VisitPlanWhereInput =>
   (user.role === 'sales' ? { userId: user.id } : user.role === 'purchasing' || user.role === 'purchasing05' ? { userId: '__none__' } : visitScopeWhere(user)) as Prisma.VisitPlanWhereInput;
 
-/** BM hanya menugaskan Sales di cabangnya; GM (dan Admin) semua Sales. */
+/** Penerima tugas kunjungan dari GM / Admin: Sales, BM dan RM. */
+export const VISIT_LEADER_ROLES = ['bm', 'rm'];
+
+/** BM hanya menugaskan Sales di cabangnya; GM (dan Admin) semua Sales, BM dan RM. */
 export function canAssignTo(user: SafeUser, assignee: { role: string; cabang: string | null; se: string | null }): boolean {
-  if (!assignee.se && assignee.role !== 'sales') return false;
-  if (isGmLevel(user.role) || user.role === 'admin') return true;
-  return user.role === 'bm' && !!user.cabang && up(user.cabang) === up(assignee.cabang);
+  const salesLike = assignee.role === 'sales' || !!assignee.se;
+  if (isGmLevel(user.role) || user.role === 'admin') return salesLike || VISIT_LEADER_ROLES.includes(assignee.role);
+  return salesLike && user.role === 'bm' && !!user.cabang && up(user.cabang) === up(assignee.cabang);
 }
 
 /** BM cabang menyetujui rencana; GM / Admin juga boleh. */

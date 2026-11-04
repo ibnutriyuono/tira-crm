@@ -162,7 +162,8 @@ export function AdminQueueModal() {
             </button>
           ))}
         </div>
-        <select value={se} onChange={(e) => { setSe(e.target.value); setPicked([]); }} style={{ maxWidth: 170, marginLeft: 'auto' }} aria-label={tr("Filter SE")}>
+        <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: 'auto' }} onClick={() => openModal('deliveryRecap')}>{tr("Rekap Pengiriman (DO)")}</button>
+        <select value={se} onChange={(e) => { setSe(e.target.value); setPicked([]); }} style={{ maxWidth: 170 }} aria-label={tr("Filter SE")}>
           <option value="">{tr("Semua Sales")}</option>
           {seOptions.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>

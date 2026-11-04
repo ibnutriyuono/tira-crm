@@ -196,6 +196,10 @@ export function ItemFlowModal() {
         if (ctx.mode === 'po') startPo(list, prospect);
         if (ctx.mode === 'kirim') startKirim(list);
         if (ctx.mode === 'qcd') startQcd(list, prospect);
+        if (ctx.mode === 'koreksi' && !prospect.terfaktur && currentUser && canSetFaktur(currentUser.role)) {
+          const target = ev.find((x) => x.id === ctx.eventId && x.type === 'kirim');
+          if (target) startKoreksi(target);
+        }
       })
       .catch((err) => alive && toast(err instanceof Error ? err.message : 'Gagal memuat status item', 'error'))
       .finally(() => alive && setLoading(false));
@@ -203,7 +207,7 @@ export function ItemFlowModal() {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [show, ctx?.prospectId, ctx?.mode]);
+  }, [show, ctx?.prospectId, ctx?.mode, ctx?.eventId]);
 
   if (!ctx) return null;
 

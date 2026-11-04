@@ -5,7 +5,8 @@ import { Modal } from '../Modal';
 import { AttachNoteBadges } from '../AttachNoteBadges';
 import { ItemChatBadge, useItemChatCounts } from '../ItemChatBadge';
 import { IconCheck, IconEdit, IconTrash } from '../icons';
-import { formatDateID, formatDateTimeID, formatRupiah, todayStr } from '@/lib/format';
+import { formatDateID, formatDateTimeID, formatRupiah, num, todayStr } from '@/lib/format';
+import { STATUS_META } from '@/lib/constants';
 import { WORKFLOW_META, rfqAsWorkflowDoc, workflowStage } from '@/lib/purchasing-workflow';
 import { appendSheet, buildRfqSheet } from '@/lib/exports';
 import { api } from '@/lib/api-client';
@@ -36,6 +37,7 @@ export function RfqManageModal() {
   const openModal = useUiStore((s) => s.openModal);
 
   const rfqs = useDataStore((s) => s.rfqs);
+  const prospects = useDataStore((s) => s.prospects);
   const upsertRfq = useDataStore((s) => s.upsertRfq);
   const toast = useDataStore((s) => s.toast);
 
@@ -114,6 +116,7 @@ export function RfqManageModal() {
                 <th>{tr("Tanggal")}</th>
                 <th>{tr("Cabang")}</th>
                 <th>{tr("Customer")}</th>
+                <th>{tr("Prospek")}</th>
                 <th>{tr("Material")}</th>
                 <th>{tr("Status")}</th>
                 <th>{tr("FUP A")}</th>
@@ -131,6 +134,31 @@ export function RfqManageModal() {
                   <td className="mono">{formatDateID(r.tglRfq)}</td>
                   <td>{r.cabang || '-'}</td>
                   <td>{r.customer || '-'}</td>
+                  <td>
+                    {r.prospectId ? (
+                      (() => {
+                        const p = prospects.find((x) => x.id === r.prospectId);
+                        return <span className="badge green" title={p ? `${p.customer} · SE ${p.se || '-'}` : ''}>{p ? STATUS_META[num(p.status)]?.label || tr('Terhubung') : tr('Terhubung')}</span>;
+                      })()
+                    ) : (
+                      <>
+                        <span className="badge amber">{tr('Belum terhubung')}</span>
+                        {canNow('rfq', 'e') && canNow('prospek', 'v') && (
+                          <button
+                            type="button"
+                            className="link-btn"
+                            style={{ display: 'block', marginTop: 3, fontSize: 11.5 }}
+                            onClick={() => {
+                              useUiStore.setState({ rfqCtx: { prospectId: null, rfqId: r.id } });
+                              openModal('rfq');
+                            }}
+                          >
+                            {tr('Hubungkan')} →
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </td>
                   <td className="center">{(r.items || []).length}</td>
                   <td>
                     <span className={`badge ${statusColor(r.status)}`}>{r.status || tr("Draft")}</span>

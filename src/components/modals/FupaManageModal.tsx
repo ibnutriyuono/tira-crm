@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { AttachNoteBadges } from '../AttachNoteBadges';
 import { ItemChatBadge, useItemChatCounts } from '../ItemChatBadge';
-import { IconCheck, IconEdit, IconTrash } from '../icons';
+import { IconCheck, IconDownload, IconEdit, IconTrash } from '../icons';
 import { formatDateID, formatDateTimeID, todayStr } from '@/lib/format';
 import { WORKFLOW_META, fupaAsWorkflowDoc, workflowStage } from '@/lib/purchasing-workflow';
 import { appendSheet, buildFupaSheet } from '@/lib/exports';
@@ -153,6 +153,18 @@ export function FupaManageModal() {
                         >
                           <IconEdit />
                         </button>
+                        {canNow('rfq', 'x') && (
+                          <button
+                            className="icon-btn"
+                            title={tr("Form SPP (edit, unduh Excel / Word, kirim email)")}
+                            onClick={() => {
+                              useUiStore.setState({ sppCtx: { fupaId: f.id, returnTo: 'fupaManage' } });
+                              openModal('sppForm');
+                            }}
+                          >
+                            <IconDownload />
+                          </button>
+                        )}
                         {f.status !== 'Selesai' && canNow('rfq', 'e') && (
                           <button className="icon-btn" title={tr("Tandai selesai")} onClick={() => markDone(f.id)}>
                             <IconCheck />

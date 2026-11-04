@@ -9,7 +9,9 @@ import { MaterialSpecEditor } from '../MaterialSpecEditor';
 import { emptyRow, itemToRow, materialRowsToItemRows, materialToRow, rowToItem, type SpecRow } from '@/lib/material-spec';
 import { IconDownload, IconMail, IconSave, IconWa } from '../icons';
 import { ATTACHMENT_MAX_BYTES } from '@/lib/constants';
-import { formatDateID, formatFileSize, getProspectMaterials, normalizePhone, todayStr } from '@/lib/format';
+import { formatDateID, formatFileSize, getProspectMaterials, normalizePhone, num, todayStr } from '@/lib/format';
+import { STATUS_META } from '@/lib/constants';
+import { customerKey } from '@/lib/reports';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -77,6 +79,9 @@ export function RfqModal() {
   const [purchWa, setPurchWa] = useState('');
   const [purchEmail, setPurchEmail] = useState('');
   const [busy, setBusy] = useState(false);
+  // Koneksi ke pipeline: prospek yang sudah terhubung, atau pilihan (id prospek / '__new' = buat prospek Permintaan baru).
+  const [linkedId, setLinkedId] = useState<string | null>(null);
+  const [linkPick, setLinkPick] = useState('');
   /** Unread discussion at the moment the thread was opened, for the heading bubble. */
   const [chatUnread, setChatUnread] = useState(0);
 
@@ -87,9 +92,12 @@ export function RfqModal() {
     setPurchWa(purchasingContact.wa || '');
     setPurchEmail(purchasingContact.email || '');
 
+    setLinkedId(ctx.prospectId || null);
+    setLinkPick('');
     if (ctx.rfqId) {
       const r = rfqs.find((x) => x.id === ctx.rfqId);
       if (r) {
+        setLinkedId(r.prospectId || ctx.prospectId || null);
         setNoRfq(r.noRfq || '');
         setTglRfq(r.tglRfq || todayStr());
         setCabang(r.cabang || '');
@@ -146,6 +154,27 @@ export function RfqModal() {
     return lines.join('\n');
   }, [noRfq, tglRfq, cabang, cust, requestedBy, items]);
 
+  // Prospek aktif (Permintaan s.d. Negosiasi) untuk dihubungkan: customer yang sama dulu, lalu prospek lain di cabang ini.
+  const linkCands = (() => {
+    if (linkedId) return { same: [], other: [] };
+    const key = customerKey(cust);
+    const cab = cabang.trim().toUpperCase();
+    const active = records.filter((p) => num(p.status) >= 1 && num(p.status) <= 3);
+    const same = key ? active.filter((p) => customerKey(p.customer) === key) : [];
+    const other = active.filter((p) => !same.includes(p) && (!cab || (p.cabang || '').toUpperCase() === cab)).slice(0, 150);
+    return { same, other };
+  })();
+  const linkedProspect = linkedId ? records.find((p) => p.id === linkedId) || null : null;
+  const canLinkView = canNow('prospek', 'v');
+  const canNewProspect = canNow('prospek', 'e');
+  const isNewRfq = !rfqId && !ctx?.prospectId;
+  // Satu-satunya prospek aktif customer ini: langsung dipilihkan.
+  const onlySame = linkCands.same.length === 1 ? linkCands.same[0].id : '';
+  useEffect(() => {
+    if (onlySame && !linkPick) setLinkPick(onlySame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlySame]);
+
   if (!ctx) return null;
 
 
@@ -157,10 +186,21 @@ export function RfqModal() {
   }
 
   async function saveOrUpdateRecord(markSent: boolean): Promise<Rfq> {
-    const body = { noRfq, tglRfq, cabang, customer: cust, requestedBy, prospectId: ctx!.prospectId, items, catatan, markSent };
+    const pick = !linkedId && linkPick ? linkPick : '';
+    const body = {
+      noRfq, tglRfq, cabang, customer: cust, requestedBy,
+      prospectId: linkedId || (pick && pick !== '__new' ? pick : null),
+      createProspect: pick === '__new',
+      items, catatan, markSent,
+    };
     const { rfq } = rfqId ? await api.put<{ rfq: Rfq }>(`/api/rfqs/${rfqId}`, body) : await api.post<{ rfq: Rfq }>('/api/rfqs', body);
     upsertRfq(rfq);
     if (!rfqId) setRfqId(rfq.id);
+    if (rfq.prospectId) {
+      if (!linkedId && pick) toast(pick === '__new' ? 'Prospek baru (Permintaan) dibuat dan terhubung ke RFQ ini' : 'RFQ terhubung ke prospek di pipeline', 'success');
+      setLinkedId(rfq.prospectId);
+      setLinkPick('');
+    }
     // Nomor dibuat server saat kosong — tarik balik ke form, kalau tidak
     // simpan berikutnya (PUT) mengirim string kosong dan ditolak server.
     if (rfq.noRfq && rfq.noRfq !== noRfq) setNoRfq(rfq.noRfq);
@@ -178,6 +218,11 @@ export function RfqModal() {
     // otomatis (RFQ-YYYY-NNNN) kalau dikosongkan.
     if (!hasMaterial()) {
       toast('Isi minimal satu material yang diminta', 'error');
+      return false;
+    }
+    // RFQ baru dari Kelola RFQ wajib terhubung ke pipeline.
+    if (isNewRfq && canLinkView && !linkedId && !linkPick) {
+      toast('Pilih prospek di pipeline untuk RFQ ini, atau buat prospek baru', 'error');
       return false;
     }
     return true;
@@ -332,6 +377,52 @@ export function RfqModal() {
           <CustomerNameInput value={cust} onChange={setCust} />
         </div>
       </div>
+      {canLinkView && (
+        <div className={`rfq-link${linkedId ? ' ok' : isNewRfq ? ' need' : ' warn'}`}>
+          <label>{tr('Prospek di pipeline')}{isNewRfq ? ' *' : ''}</label>
+          {linkedId ? (
+            <div>
+              <span className="badge green">{tr('Terhubung')}</span>{' '}
+              <b>{linkedProspect?.customer || cust || '-'}</b>
+              {linkedProspect && (
+                <span className="muted">
+                  {' '}· {linkedProspect.cabang || '-'} · SE {linkedProspect.se || '-'} · {STATUS_META[num(linkedProspect.status)]?.label || linkedProspect.status}
+                  {linkedProspect.uraian ? ` · ${linkedProspect.uraian.slice(0, 60)}` : ''}
+                </span>
+              )}
+            </div>
+          ) : (
+            <>
+              <select value={linkPick} onChange={(e) => setLinkPick(e.target.value)}>
+                <option value="">{isNewRfq ? tr('— pilih prospek —') : tr('— belum terhubung, pilih prospek —')}</option>
+                {linkCands.same.length > 0 && (
+                  <optgroup label={tr('Prospek aktif customer ini')}>
+                    {linkCands.same.map((p) => (
+                      <option key={p.id} value={p.id}>{p.customer} · {p.cabang || '-'} · SE {p.se || '-'} · {STATUS_META[num(p.status)]?.label || p.status}{p.uraian ? ` · ${p.uraian.slice(0, 50)}` : ''}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {canNewProspect && <option value="__new">{tr('+ Buat prospek baru (Permintaan) dari RFQ ini')}</option>}
+                {linkCands.other.length > 0 && (
+                  <optgroup label={tr('Prospek aktif lain')}>
+                    {linkCands.other.map((p) => (
+                      <option key={p.id} value={p.id}>{p.customer} · {p.cabang || '-'} · SE {p.se || '-'} · {STATUS_META[num(p.status)]?.label || p.status}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              <div className="field-note" style={{ margin: '4px 0 0' }}>
+                {linkCands.same.length
+                  ? `${linkCands.same.length} ${tr('prospek aktif untuk customer ini — pilih yang sesuai.')}`
+                  : cust.trim()
+                    ? tr('Belum ada prospek aktif untuk customer ini — pilih "Buat prospek baru" supaya RFQ masuk pipeline.')
+                    : tr('Isi customer dulu; prospek aktif customer itu akan muncul di sini.')}{' '}
+                {tr('RFQ yang terhubung: jawaban Purchasing tampil di kartu prospek dan HPP dipakai untuk cek margin Surat Penawaran.')}
+              </div>
+            </>
+          )}
+        </div>
+      )}
       <div className="full" style={{ marginTop: 14 }}>
         <label>{tr("Daftar Material yang Diminta")}</label>
         <MaterialSpecEditor variant="doc" rows={rows} onChange={setRows} renderRowExtra={(row) => <PurchasingAnswer it={row.src as RfqItem | undefined} />} />

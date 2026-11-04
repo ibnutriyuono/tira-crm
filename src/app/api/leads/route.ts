@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ensureCustomerFromProspect } from '@/lib/customer-sync';
+import { syncCustomerFromLead } from '@/lib/customer-sync';
 import { cabangRegMap } from '@/lib/auth';
 import { logActivity } from '@/lib/activity';
 import { deriveFromMaterials, isResponse, requireUser } from '@/lib/api-helpers';
@@ -36,18 +36,37 @@ export async function POST(req: Request) {
   const se = String(body?.se || '').trim().toUpperCase();
   const source = String(body?.source || '').trim();
   const phone = String(body?.phone || '').trim();
-  const kontak = String(body?.kontak || '').trim().slice(0, 120);
+  // Kontak: nama + jabatan terpisah; `kontak` (teks bebas) dari versi lama tetap diterima.
+  const kontakNama = String(body?.kontakNama ?? body?.kontak ?? '').trim().slice(0, 120);
+  const kontakJabatan = String(body?.kontakJabatan || '').trim().slice(0, 80);
+  const kontak = [kontakNama, kontakJabatan].filter(Boolean).join(' — ');
+  const email = String(body?.email || '').trim().slice(0, 120);
+  const address = String(body?.address || '').trim().slice(0, 500);
   const catatan = String(body?.catatan || '').trim().slice(0, 1000);
 
   if (!customer) return NextResponse.json({ error: 'Nama customer wajib diisi' }, { status: 400 });
   if (customer.length > 150) return NextResponse.json({ error: 'Nama customer terlalu panjang' }, { status: 400 });
   if (!CABANG_LIST.includes(cabang)) return NextResponse.json({ error: 'Pilih cabang tujuan' }, { status: 400 });
   if (!LEAD_SOURCE_LABEL[source]) return NextResponse.json({ error: 'Pilih sumber lead' }, { status: 400 });
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: 'Format email tidak valid' }, { status: 400 });
 
-  const rawItems: unknown[] = Array.isArray(body?.items) ? body.items : [];
-  const materials: Material[] = rawItems
-    .map((x) => x as { uraian?: unknown; qty?: unknown; line?: unknown })
-    .map((x) => ({ line: String(x.line || '').trim(), uraian: String(x.uraian || '').trim().slice(0, 300), qty: Math.max(0, Number(x.qty) || 0), beratPc: 0, hargaKg: 0, harga: 0 }))
+  // `materials`: baris lengkap dari editor material (bentuk, grade, ukuran, berat/pc).
+  // `items`: format lama { uraian, qty }. Harga & kondisi stok tidak diisi Marketing.
+  const rawMats: unknown[] = Array.isArray(body?.materials) ? body.materials.slice(0, 100) : Array.isArray(body?.items) ? body.items.slice(0, 100) : [];
+  const materials: Material[] = rawMats
+    .map((x) => (x && typeof x === 'object' ? (x as Record<string, unknown>) : {}))
+    .map((x) => {
+      const { hargaKg: _hk, harga: _h, hargaUnit: _hu, stok: _s, stokLama: _sl, ...rest } = x;
+      return {
+        ...rest,
+        line: String(x.line || '').trim().slice(0, 40),
+        uraian: String(x.uraian || '').trim().slice(0, 300),
+        qty: Math.max(0, Number(x.qty) || 0),
+        beratPc: Math.max(0, Number(x.beratPc) || 0),
+        hargaKg: 0,
+        harga: 0,
+      } as Material;
+    })
     .filter((m) => m.uraian);
   if (!materials.length) return NextResponse.json({ error: 'Isi minimal satu kebutuhan material' }, { status: 400 });
 
@@ -57,7 +76,7 @@ export async function POST(req: Request) {
   }
 
   const reg = (await cabangRegMap())[cabang] ?? null;
-  const keterangan = [`Lead Marketing (${leadSourceLabel(source)})`, kontak ? `Kontak: ${kontak}` : '', catatan].filter(Boolean).join(' — ');
+  const keterangan = [`Lead Marketing (${leadSourceLabel(source)})`, kontak ? `Kontak: ${kontak}` : '', email ? `Email: ${email}` : '', catatan].filter(Boolean).join(' — ');
 
   const prospect = await prisma.prospect.create({
     data: {
@@ -80,6 +99,7 @@ export async function POST(req: Request) {
       leadBy: user.name,
       leadById: user.id,
       leadAt: new Date(),
+      ...(se ? { leadAssignedAt: new Date() } : {}),
     },
   });
 
@@ -92,7 +112,7 @@ export async function POST(req: Request) {
     summary: `Memasukkan lead "${customer}" (${leadSourceLabel(source)}) untuk cabang ${cabang}${se ? ` · SE ${se}` : ''}`,
   });
   await notifyLeadCreated(user, prospect);
-  await ensureCustomerFromProspect(user, prospect);
+  await syncCustomerFromLead(user, { customer, cabang, address, kontakNama, kontakJabatan, phone, email, source: leadSourceLabel(source) });
   invalidateMaterialLexicon();
   return NextResponse.json({ prospect }, { status: 201 });
 }

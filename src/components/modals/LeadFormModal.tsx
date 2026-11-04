@@ -3,21 +3,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api-client';
 import { CABANG_LIST } from '@/lib/constants';
+import { num } from '@/lib/format';
 import { LEAD_SOURCES } from '@/lib/leads';
-import type { Prospect, RosterUser } from '@/lib/types';
+import { emptyRow, parseMaterialText, rowToMaterial, rowUraian, type SpecRow } from '@/lib/material-spec';
+import { parseWithLexicon } from '@/lib/material-learn';
+import { parseInquiry } from '@/lib/inquiry-parse';
+import { useMaterialLexicon } from '@/hooks/useMaterialLexicon';
+import type { Customer, Prospect, RosterUser } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
 import { useT } from '@/store/useLangStore';
 import { useUiStore } from '@/store/useUiStore';
+import { MaterialSpecEditor } from '../MaterialSpecEditor';
 import { Modal } from '../Modal';
-import { IconPlus, IconTrash } from '../icons';
 
-interface Item {
-  key: number;
-  uraian: string;
-  qty: string;
+/** Kontak utama customer + alamat dari Kelola Customer. */
+function primaryPic(c: Customer): { nama: string; jabatan: string; phone: string; email: string; address: string } {
+  const p = (c.pics || []).find((x) => x.isPrimary) || (c.pics || [])[0];
+  const address = c.address || '';
+  if (p) return { nama: p.nama || '', jabatan: p.jabatan || '', phone: p.phone || c.phone || '', email: p.email || c.email || '', address };
+  return { nama: c.pic || '', jabatan: '', phone: c.phone || '', email: c.email || '', address };
 }
-let seq = 0;
-const blankItem = (): Item => ({ key: seq++, uraian: '', qty: '' });
+const EMPTY_PIC = { nama: '', jabatan: '', phone: '', email: '', address: '' };
 
 /**
  * Tambah Lead (Product & Marketing): permintaan dari Indotrading, website,
@@ -35,11 +41,21 @@ export function LeadFormModal() {
   const [customer, setCustomer] = useState('');
   const [phone, setPhone] = useState('');
   const [kontak, setKontak] = useState('');
+  const [jabatan, setJabatan] = useState('');
+  const [email, setEmail] = useState('');
+  const [alamat, setAlamat] = useState('');
   const [cabang, setCabang] = useState('');
   const [se, setSe] = useState('');
   const [source, setSource] = useState('');
-  const [items, setItems] = useState<Item[]>([blankItem()]);
+  const [rows, setRows] = useState<SpecRow[]>([emptyRow()]);
+  // Kolom yang diisi otomatis dari data customer (ditandai, dan boleh diubah).
+  const [auto, setAuto] = useState<Record<string, boolean>>({});
   const [catatan, setCatatan] = useState('');
+  // Tempel inquiry (Indotrading / email / WA) -> isi form otomatis.
+  const [inqOpen, setInqOpen] = useState(false);
+  const [inqText, setInqText] = useState('');
+  const [inqNote, setInqNote] = useState('');
+  const lex = useMaterialLexicon();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [roster, setRoster] = useState<RosterUser[]>([]);
@@ -49,14 +65,23 @@ export function LeadFormModal() {
     const pre = useUiStore.getState().leadPrefill;
     useUiStore.setState({ leadPrefill: null });
     const preCust = pre ? useDataStore.getState().customers.find((c) => c.name.trim().toUpperCase() === pre.customer.trim().toUpperCase()) : undefined;
+    const prePic = preCust ? primaryPic(preCust) : EMPTY_PIC;
+    const preCab = (pre?.cabang || preCust?.cabang || '').toUpperCase();
     setCustomer(pre?.customer || '');
-    setPhone(preCust?.phone || '');
-    setKontak('');
-    setCabang((pre?.cabang || '').toUpperCase());
+    setPhone(prePic.phone);
+    setKontak(prePic.nama);
+    setJabatan(prePic.jabatan);
+    setEmail(prePic.email);
+    setAlamat(prePic.address);
+    setCabang(preCab);
     setSe('');
     setSource(pre?.source || '');
-    setItems([blankItem()]);
+    setRows([emptyRow()]);
+    setAuto({ phone: !!prePic.phone, kontak: !!prePic.nama, jabatan: !!prePic.jabatan, email: !!prePic.email, alamat: !!prePic.address, cabang: !!preCab && !pre?.cabang });
     setCatatan('');
+    setInqOpen(false);
+    setInqText('');
+    setInqNote('');
     setError('');
     let alive = true;
     api
@@ -75,28 +100,138 @@ export function LeadFormModal() {
     () => roster.filter((u) => u.role === 'sales' && !u.paused && (u.se || '').trim() && (u.cabang || '').toUpperCase() === cabang).sort((a, b) => (a.se || '').localeCompare(b.se || '')),
     [roster, cabang],
   );
+  const prospects = useDataStore((s) => s.prospects);
+  /** Prospek customer ini: SE yang terakhir menangani per cabang + yang masih aktif (status 1–3). */
+  const history = useMemo(() => {
+    const key = customer.trim().toUpperCase();
+    if (!key) return { lastSe: {} as Record<string, string>, open: [] as Prospect[] };
+    const mine = prospects.filter((p) => p.customer.trim().toUpperCase() === key).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+    const lastSe: Record<string, string> = {};
+    mine.forEach((p) => {
+      const c = (p.cabang || '').toUpperCase();
+      if (c && p.se && !lastSe[c]) lastSe[c] = p.se.toUpperCase();
+    });
+    return { lastSe, open: mine.filter((p) => num(p.status) >= 1 && num(p.status) <= 3) };
+  }, [prospects, customer]);
+
+  /** Customer dipilih dari daftar: isi cabang, kontak, telepon dan Sales yang biasa menangani. */
+  function fillFromCustomer(name: string) {
+    const c = known.get(name.trim().toUpperCase());
+    if (!c) return;
+    const pic = primaryPic(c);
+    const next: Record<string, boolean> = {};
+    const cab = (c.cabang || '').toUpperCase();
+    if (cab && !cabang) {
+      setCabang(cab);
+      next.cabang = true;
+    }
+    // Kontak diisi sebagai satu paket (nama, jabatan, telp, email) bila nama kontak masih kosong.
+    if (pic.nama && !kontak) {
+      setKontak(pic.nama);
+      next.kontak = true;
+      if (pic.jabatan && !jabatan) (setJabatan(pic.jabatan), (next.jabatan = true));
+      if (pic.email && !email) (setEmail(pic.email), (next.email = true));
+    }
+    if (pic.phone && !phone) {
+      setPhone(pic.phone);
+      next.phone = true;
+    }
+    if (pic.address && !alamat) {
+      setAlamat(pic.address);
+      next.alamat = true;
+    }
+    setAuto((a) => ({ ...a, ...next }));
+  }
+  // Sales yang terakhir menangani customer ini di cabang tujuan — diusulkan bila SE masih kosong.
+  const suggestSe = cabang ? history.lastSe[cabang] || '' : '';
+  const suggestOk = !!suggestSe && salesOfCabang.some((u) => (u.se || '').toUpperCase() === suggestSe);
+  useEffect(() => {
+    if (suggestOk && !se) {
+      setSe(suggestSe);
+      setAuto((a) => ({ ...a, se: true }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestOk, suggestSe]);
+
   const bmName = roster.find((u) => u.role === 'bm' && !u.paused && (u.cabang || '').toUpperCase() === cabang)?.name;
 
-  const upd = (key: number, patch: Partial<Item>) => setItems((l) => l.map((x) => (x.key === key ? { ...x, ...patch } : x)));
+  const autoMark = (k: string) => (auto[k] ? <span className="lead-auto" title={tr('Diisi otomatis dari data customer — boleh diubah')}>{tr('otomatis')}</span> : null);
+  const unAuto = (k: string) => auto[k] && setAuto((a) => ({ ...a, [k]: false }));
+  /** Nama kontak otomatis diganti orang lain: jabatan / telp / email milik kontak lama ikut dikosongkan. */
+  function changeKontak(v: string) {
+    if (auto.kontak) {
+      if (auto.jabatan) setJabatan('');
+      if (auto.phone) setPhone('');
+      if (auto.email) setEmail('');
+      setAuto((a) => ({ ...a, kontak: false, jabatan: false, phone: false, email: false }));
+    }
+    setKontak(v);
+  }
+
+  /** Isi kolom yang masih kosong dari teks inquiry; kebutuhan material ditambahkan. */
+  function applyInquiry() {
+    const x = parseInquiry(inqText);
+    const filled: string[] = [];
+    const next: Record<string, boolean> = {};
+    const fill = (cur: string, val: string, setter: (v: string) => void, label: string) => {
+      if (!cur.trim() && val) {
+        setter(val);
+        filled.push(label);
+        return true;
+      }
+      return false;
+    };
+    if (fill(customer, x.customer, setCustomer, tr('customer'))) {
+      // Kontak dari inquiry lebih baru — dari data customer cukup cabang (& alamat bila inquiry tanpa alamat).
+      const c = known.get(x.customer.trim().toUpperCase());
+      if (!x.kontakNama) fillFromCustomer(x.customer);
+      else if (c?.cabang && !cabang) {
+        setCabang(c.cabang.toUpperCase());
+        next.cabang = true;
+      }
+    }
+    if (fill(kontak, x.kontakNama, setKontak, tr('kontak'))) next.kontak = false;
+    fill(jabatan, x.kontakJabatan, setJabatan, tr('jabatan'));
+    fill(phone, x.phone, setPhone, tr('telepon'));
+    fill(email, x.email, setEmail, 'email');
+    fill(alamat, x.alamat, setAlamat, tr('alamat'));
+    fill(source, x.source, setSource, tr('sumber'));
+    if (x.catatan) setCatatan((c) => (c.trim() ? `${c.trim()}\n${x.catatan}` : x.catatan));
+    if (x.items.length) {
+      const added = x.items.map((s) => {
+        const p = parseWithLexicon(s, lex, parseMaterialText);
+        return emptyRow({ line: p.line, bentuk: p.bentuk, grade: p.grade, dim: p.dim, pcs: p.pcs || '1', uraianManual: p.bentuk === 'Lainnya' ? s : '' });
+      });
+      setRows((r) => [...r.filter((row) => rowUraian(row).trim()), ...added]);
+      filled.push(`${x.items.length} ${tr('kebutuhan')}`);
+    }
+    setAuto((a) => ({ ...a, ...next }));
+    setInqNote(filled.length ? `${tr('Terisi')}: ${filled.join(', ')}. ${tr('Periksa lagi sebelum dikirim.')}` : tr('Tidak ada data yang terbaca — isi manual.'));
+    if (filled.length) setInqOpen(false);
+  }
 
   async function submit() {
     setError('');
     if (!customer.trim()) return setError(tr('Nama customer wajib diisi'));
     if (!cabang) return setError(tr('Pilih cabang tujuan'));
     if (!source) return setError(tr('Pilih sumber lead'));
-    const list = items.filter((x) => x.uraian.trim());
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError(tr('Format email tidak valid'));
+    const list = rows.filter((r) => rowUraian(r).trim());
     if (!list.length) return setError(tr('Isi minimal satu kebutuhan material'));
     setBusy(true);
     try {
       const r = await api.post<{ prospect: Prospect }>('/api/leads', {
         customer,
         phone,
-        kontak,
+        kontakNama: kontak,
+        kontakJabatan: jabatan,
+        email,
+        address: alamat,
         cabang,
         se,
         source,
         catatan,
-        items: list.map((x) => ({ uraian: x.uraian, qty: Number(x.qty) || 0 })),
+        materials: list.map(rowToMaterial),
       });
       upsertProspect(r.prospect);
       toast(`Lead ${r.prospect.customer} dikirim ke cabang ${cabang}${se ? ` · SE ${se}` : ''} — BM diberi tahu`, 'success');
@@ -126,24 +261,69 @@ export function LeadFormModal() {
       }
     >
       <div className="field-note" style={{ marginTop: 0 }}>
-        {tr('Lead masuk ke pipeline cabang tujuan sebagai "Permintaan". BM cabang diberi tahu dan menunjuk Sales bila SE dikosongkan. Anda menerima notifikasi setiap perkembangannya; isi prospek selanjutnya dikelola cabang.')}
+        {tr('Lead masuk ke pipeline cabang tujuan sebagai "Permintaan". BM cabang diberi tahu dan menunjuk Sales bila SE dikosongkan. Anda menerima notifikasi setiap perkembangannya; isi prospek selanjutnya dikelola cabang.')}{' '}
+        {tr('Data kontak & alamat juga dicatat ke Kelola Customer: customer baru dibuat lengkap; customer lama hanya dilengkapi kolom yang masih kosong dan kontak baru ditambahkan — data yang sudah ada tidak ditimpa.')}
       </div>
       {error && <div className="auth-error show" style={{ marginBottom: 10 }}>{error}</div>}
+      <div className="lead-inq">
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => setInqOpen((v) => !v)}>
+          {inqOpen ? tr('Tutup') : tr('Tempel inquiry (Indotrading / email / WA)')}
+        </button>
+        {inqNote && <span className="field-note" style={{ margin: 0 }}>{inqNote}</span>}
+        {inqOpen && (
+          <div className="lead-inq-box">
+            <textarea rows={7} value={inqText} onChange={(e) => setInqText(e.target.value)} placeholder={tr('Tempel seluruh isi email / notifikasi inquiry di sini — nama perusahaan, kontak, telepon, email, alamat dan kebutuhan material dibaca otomatis.')} />
+            <button type="button" className="btn btn-primary btn-sm" disabled={!inqText.trim()} onClick={applyInquiry}>{tr('Isi otomatis')}</button>
+          </div>
+        )}
+      </div>
       <div className="form-grid lead-grid">
         <div className="full">
           <label>{tr('Customer')} *</label>
           <input type="text" list="leadCustomers" value={customer} onChange={(e) => {
             setCustomer(e.target.value);
-            const c = known.get(e.target.value.trim().toUpperCase());
-            if (c?.cabang && !cabang) setCabang(c.cabang.toUpperCase());
-            if (c?.phone && !phone) setPhone(c.phone);
-          }} placeholder={tr('Nama perusahaan')} />
+            fillFromCustomer(e.target.value);
+          }} onBlur={() => fillFromCustomer(customer)} placeholder={tr('Nama perusahaan — pilih dari daftar untuk isi otomatis')} />
           <datalist id="leadCustomers">
             {customers.slice(0, 2000).map((c) => (
               <option key={c.id} value={c.name} />
             ))}
           </datalist>
           {match && <small className="field-note" style={{ margin: 0 }}>{tr('Customer terdaftar')} · {match.cabang || '-'}{match.segmen ? ` · ${match.segmen}` : ''}</small>}
+          {history.open.length > 0 && (
+            <div className="lead-open">
+              <b>{tr('Sudah ada prospek aktif untuk customer ini')}</b> — {tr('pastikan ini permintaan baru, bukan permintaan yang sama.')}
+              <ul>
+                {history.open.slice(0, 3).map((p) => (
+                  <li key={p.id}>
+                    <b>{p.cabang || '-'}</b> · {p.se ? `SE ${p.se}` : tr('SE belum ditunjuk')} · {(p.uraian || '').split(' + ')[0].slice(0, 60)}
+                    {(p.uraian || '').includes(' + ') ? ` ${tr('dan item lain')}` : ''}
+                  </li>
+                ))}
+                {history.open.length > 3 && <li>+{history.open.length - 3} {tr('prospek lain')}</li>}
+              </ul>
+            </div>
+          )}
+        </div>
+        <div>
+          <label>{tr('Nama kontak')} {autoMark('kontak')}</label>
+          <input type="text" value={kontak} onChange={(e) => changeKontak(e.target.value)} placeholder={tr('cth. Budi Santoso')} />
+        </div>
+        <div>
+          <label>{tr('Jabatan')} {autoMark('jabatan')}</label>
+          <input type="text" value={jabatan} onChange={(e) => { setJabatan(e.target.value); unAuto('jabatan'); }} placeholder={tr('cth. Purchasing')} />
+        </div>
+        <div>
+          <label>{tr('No. telp / WhatsApp')} {autoMark('phone')}</label>
+          <input type="text" value={phone} onChange={(e) => { setPhone(e.target.value); unAuto('phone'); }} />
+        </div>
+        <div>
+          <label>{tr('Email')} {autoMark('email')}</label>
+          <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); unAuto('email'); }} placeholder={tr('cth. purchasing@perusahaan.co.id')} />
+        </div>
+        <div className="full">
+          <label>{tr('Alamat')} {autoMark('alamat')}</label>
+          <textarea rows={2} style={{ width: '100%' }} value={alamat} onChange={(e) => { setAlamat(e.target.value); unAuto('alamat'); }} placeholder={tr('Alamat perusahaan / lokasi proyek')} />
         </div>
         <div>
           <label>{tr('Sumber lead')} *</label>
@@ -155,16 +335,8 @@ export function LeadFormModal() {
           </select>
         </div>
         <div>
-          <label>{tr('Kontak (nama / jabatan)')}</label>
-          <input type="text" value={kontak} onChange={(e) => setKontak(e.target.value)} placeholder={tr('cth. Budi — Purchasing')} />
-        </div>
-        <div>
-          <label>{tr('No. telp / WhatsApp')}</label>
-          <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        </div>
-        <div>
-          <label>{tr('Cabang tujuan')} *</label>
-          <select value={cabang} onChange={(e) => { setCabang(e.target.value); setSe(''); }}>
+          <label>{tr('Cabang tujuan')} * {autoMark('cabang')}</label>
+          <select value={cabang} onChange={(e) => { setCabang(e.target.value); setSe(''); setAuto((a) => ({ ...a, cabang: false, se: false })); }}>
             <option value="">{tr('— pilih —')}</option>
             {CABANG_LIST.map((c) => (
               <option key={c} value={c}>{c}</option>
@@ -173,8 +345,8 @@ export function LeadFormModal() {
           {cabang && <small className="field-note" style={{ margin: 0 }}>{bmName ? `${tr('BM')}: ${bmName}` : tr('Cabang tanpa BM aktif — RM regional diberi tahu')}</small>}
         </div>
         <div>
-          <label>{tr('Sales (opsional)')}</label>
-          <select value={se} onChange={(e) => setSe(e.target.value)} disabled={!cabang}>
+          <label>{tr('Sales (opsional)')} {auto.se && se === suggestSe ? <span className="lead-auto" title={tr('Sales yang terakhir menangani customer ini di cabang tujuan')}>{tr('terakhir menangani')}</span> : null}</label>
+          <select value={se} onChange={(e) => { setSe(e.target.value); unAuto('se'); }} disabled={!cabang}>
             <option value="">{tr('— biar BM yang menunjuk —')}</option>
             {salesOfCabang.map((u) => (
               <option key={u.id} value={(u.se || '').toUpperCase()}>{(u.se || '').toUpperCase()} · {u.name}</option>
@@ -184,35 +356,7 @@ export function LeadFormModal() {
       </div>
 
       <div className="form-grid" style={{ marginTop: 12 }}><div className="full"><label>{tr('Kebutuhan')} *</label></div></div>
-      <table className="simple-table lead-items">
-        <thead>
-          <tr>
-            <th>{tr('Material / spesifikasi')}</th>
-            <th style={{ width: 110 }}>{tr('Qty (pcs)')}</th>
-            <th style={{ width: 44 }} />
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((x) => (
-            <tr key={x.key}>
-              <td>
-                <input type="text" value={x.uraian} onChange={(e) => upd(x.key, { uraian: e.target.value })} placeholder={tr('cth. Pelat Creusabro 8000 t20 x 2000 x 6000')} />
-              </td>
-              <td>
-                <input type="number" min={0} value={x.qty} onChange={(e) => upd(x.key, { qty: e.target.value })} />
-              </td>
-              <td>
-                <button type="button" className="icon-btn danger" disabled={items.length === 1} onClick={() => setItems((l) => l.filter((y) => y.key !== x.key))} aria-label={tr('Hapus baris')}>
-                  <IconTrash />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 6 }} onClick={() => setItems((l) => [...l, blankItem()])}>
-        <IconPlus /> {tr('Tambah baris')}
-      </button>
+      <MaterialSpecEditor variant="lead" rows={rows} onChange={setRows} />
 
       <div className="form-grid" style={{ marginTop: 12 }}><div className="full"><label>{tr('Catatan untuk cabang')}</label>
       <textarea rows={3} style={{ width: '100%' }} value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder={tr('cth. butuh penawaran minggu ini, aplikasi liner hopper, link inquiry Indotrading')} />

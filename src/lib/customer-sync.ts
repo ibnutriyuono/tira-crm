@@ -209,3 +209,96 @@ export async function ensureCustomerFromProspect(user: SafeUser, p: { customer: 
     console.error('[customer-sync] gagal mencatat customer dari prospek', name, err);
   }
 }
+
+export interface LeadCustomerInput {
+  customer: string;
+  cabang: string | null;
+  address?: string | null;
+  kontakNama?: string | null;
+  kontakJabatan?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  source: string;
+}
+
+/**
+ * Lead dari Marketing -> Kelola Customer.
+ * - Customer belum ada: dibuat lengkap (cabang, alamat, kontak utama berisi
+ *   nama, jabatan, telepon, email).
+ * - Customer sudah ada: data lama tidak pernah ditimpa. Cabang / alamat /
+ *   telepon / email hanya diisi bila kosong; kontak yang namanya belum ada
+ *   ditambahkan sebagai kontak baru (bukan kontak utama), kontak yang sudah
+ *   ada hanya dilengkapi kolom yang masih kosong.
+ * Best-effort: kegagalan dicatat di log dan tidak menggagalkan lead.
+ */
+export async function syncCustomerFromLead(user: SafeUser, x: LeadCustomerInput): Promise<void> {
+  const name = (x.customer || '').trim().replace(/\s+/g, ' ');
+  if (!name || name.length > 150) return;
+  const clean = (s: string | null | undefined, max: number) => (s || '').trim().replace(/\s+/g, ' ').slice(0, max);
+  const cabang = clean(x.cabang, 20).toUpperCase();
+  const address = (x.address || '').trim().slice(0, 500);
+  const nama = clean(x.kontakNama, 120);
+  const jabatan = clean(x.kontakJabatan, 80) || null;
+  const phone = clean(x.phone, 40);
+  const email = clean(x.email, 120);
+  const sumber = `Lead Marketing (${x.source})`;
+  try {
+    const existing = await prisma.customer.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+    if (!existing) {
+      const pics: CustomerPic[] = nama ? [{ id: randomUUID(), nama, jabatan, phone: phone || null, email: email || null, isPrimary: true }] : [];
+      const customer = await prisma.customer.create({
+        data: { name, cabang, pic: nama, phone, email, address, catatan: `Ditambahkan otomatis dari ${sumber}`, pics: pics as unknown as Prisma.InputJsonValue },
+      });
+      emitCrmEvent('customer:created', customer);
+      await logActivity({ user, action: 'create', entity: 'customer', entityId: customer.id, summary: `Customer "${name}" ditambahkan otomatis dari ${sumber}${nama ? ` — kontak ${nama}` : ''}` });
+      return;
+    }
+
+    const filled: string[] = [];
+    const data: Record<string, unknown> = {};
+    if (cabang && !(existing.cabang || '').trim()) (data.cabang = cabang), filled.push('cabang');
+    if (address && !(existing.address || '').trim()) (data.address = address), filled.push('alamat');
+
+    const current = Array.isArray(existing.pics) ? (existing.pics as unknown as CustomerPic[]).map((p) => ({ ...p })) : [];
+    const pics: CustomerPic[] =
+      current.length === 0 && existing.pic
+        ? [{ id: randomUUID(), nama: existing.pic, jabatan: null, phone: existing.phone || null, email: existing.email || null, isPrimary: true }]
+        : current;
+    let picsChanged = pics !== current;
+    if (nama) {
+      const hit = pics.find((p) => norm(p.nama) === norm(nama));
+      if (!hit) {
+        pics.push({ id: randomUUID(), nama, jabatan, phone: phone || null, email: email || null, isPrimary: pics.length === 0 });
+        picsChanged = true;
+        filled.push(`kontak baru ${nama}`);
+      } else {
+        const before = JSON.stringify(hit);
+        if (!hit.jabatan && jabatan) hit.jabatan = jabatan;
+        if (!hit.phone && phone) hit.phone = phone;
+        if (!hit.email && email) hit.email = email;
+        if (JSON.stringify(hit) !== before) {
+          picsChanged = true;
+          filled.push(`kontak ${hit.nama} dilengkapi`);
+        }
+      }
+    }
+    if (picsChanged) {
+      const primary = pics.find((p) => p.isPrimary) || pics[0];
+      data.pics = pics as unknown as Prisma.InputJsonValue;
+      if (primary && !(existing.pic || '').trim()) data.pic = primary.nama;
+    }
+    // Kolom telepon / email lama (kontak utama) hanya diisi bila kosong.
+    // Kolom lama mencerminkan kontak utama; tanpa kontak bernama, telp/email lead dipakai sebagai kontak perusahaan.
+    const prim = pics.find((p) => p.isPrimary);
+    const newPhone = prim ? prim.phone || '' : phone;
+    const newEmail = prim ? prim.email || '' : email;
+    if (!(existing.phone || '').trim() && newPhone) (data.phone = newPhone), filled.push('telepon');
+    if (!(existing.email || '').trim() && newEmail) (data.email = newEmail), filled.push('email');
+    if (!Object.keys(data).length) return;
+    const customer = await prisma.customer.update({ where: { id: existing.id }, data });
+    emitCrmEvent('customer:updated', customer);
+    await logActivity({ user, action: 'update', entity: 'customer', entityId: customer.id, summary: `Data customer "${customer.name}" dilengkapi otomatis dari ${sumber} (${Array.from(new Set(filled)).join(', ')})` });
+  } catch (err) {
+    console.error('[customer-sync] gagal mencatat customer dari lead', name, err);
+  }
+}

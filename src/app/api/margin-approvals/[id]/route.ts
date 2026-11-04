@@ -1,20 +1,21 @@
 import { NextResponse } from 'next/server';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { prisma } from '@/lib/prisma';
-import { canApproveMargin } from '@/lib/margin-check';
-import { approvalView } from '@/lib/margin-server';
+import { approvalView, canDecideMargin } from '@/lib/margin-server';
+import { MARGIN_LEVEL_LABEL, asLevel } from '@/lib/margin-tier';
+import { canSeeHpp } from '@/lib/roles';
 import { notify } from '@/lib/notify';
 import { emitCrmEvent } from '@/lib/socket';
 import { logActivity } from '@/lib/activity';
 
-/** VP memutuskan: { action: 'setuju' | 'tolak', catatan }. Tolak wajib catatan. */
+/** Penyetuju (BM / RM / GM / VP sesuai tingkat) memutuskan: { action: 'setuju' | 'tolak', catatan }. Tolak wajib catatan. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
-  if (!(await canApproveMargin(user.role))) return NextResponse.json({ error: 'Hanya VP yang menyetujui margin di bawah batas.' }, { status: 403 });
   const { id } = await params;
   const a = await prisma.marginApproval.findUnique({ where: { id } });
   if (!a) return NextResponse.json({ error: 'Pengajuan tidak ditemukan' }, { status: 404 });
+  if (!(await canDecideMargin(user, a))) return NextResponse.json({ error: `Margin ini perlu persetujuan ${MARGIN_LEVEL_LABEL[asLevel(a.level)]} atau di atasnya${a.level === 'bm' ? ' (BM cabangnya)' : a.level === 'rm' ? ' (RM regionalnya)' : ''}.` }, { status: 403 });
   if (a.status !== 'menunggu') return NextResponse.json({ error: 'Pengajuan ini sudah diputuskan.' }, { status: 409 });
   const b = ((await req.json().catch(() => null)) || {}) as Record<string, unknown>;
   const action = String(b.action || '');
@@ -35,5 +36,5 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     message: `${user.name}${catatan ? ` — ${catatan}` : ''}. ${action === 'setuju' ? 'Surat Penawaran dengan harga tersebut sudah bisa diunduh / dikirim.' : 'Revisi harga lalu ajukan lagi bila perlu.'}`.slice(0, 300),
   });
   await logActivity({ user, action: 'status_change', entity: 'quotation', entityId: a.prospectId, summary: `${action === 'setuju' ? 'Menyetujui' : 'Menolak'} margin Surat Penawaran ${a.customer}${catatan ? ` — ${catatan}` : ''}` });
-  return NextResponse.json({ approval: approvalView(fresh, true) });
+  return NextResponse.json({ approval: approvalView(fresh, canSeeHpp(user.role) ? true : user.role === 'bm' ? 'margin' : false) });
 }

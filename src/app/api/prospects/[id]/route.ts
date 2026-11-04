@@ -19,7 +19,7 @@ import { resolveFaktur } from '@/lib/faktur';
 import { canSetFaktur } from '@/lib/roles';
 import { notifyAdminTask } from '@/lib/admin-sales-server';
 import { guard } from '@/lib/permissions-server';
-import { notifyLeadProgress } from '@/lib/leads-server';
+import { notifyLeadProgress, stampLeadMilestones } from '@/lib/leads-server';
 import { followUpDateProblem, followUpRequiredOnMove } from '@/lib/followup-rule';
 
 /** The record's QCD as it will be after this request: request values win, existing ones fill the gaps. */
@@ -111,6 +111,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (Number(prospect.status) === 6 && Number(scoped.existing.status) !== 6) await closeIssuesOnLose(prospect as never, user);
   // Lead dari Marketing: Sales ditunjuk / status berubah -> beri tahu pembuatnya.
   await notifyLeadProgress(user, scoped.existing, prospect);
+  await stampLeadMilestones(prospect);
   if (fuGiven) {
     try {
       await syncFollowUpPlan(user, prospect);
@@ -220,6 +221,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (Number(prospect.status) === 6 && Number(scoped.existing.status) !== 6) await closeIssuesOnLose(prospect as never, user);
   // Lead dari Marketing: Sales ditunjuk / status berubah -> beri tahu pembuatnya.
   await notifyLeadProgress(user, scoped.existing, prospect);
+  await stampLeadMilestones(prospect);
   await notifyAdminTask(user, scoped.existing, prospect);
   if (sentNow) await logPenawaranSent(user, prospect.id, prospect.materials, prospect.tglPenawaran);
 

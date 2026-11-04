@@ -336,6 +336,10 @@ model Prospect {
   leadBy       String?
   leadById     String?
   leadAt       DateTime?
+  /// Tonggak respons cabang atas lead (dicap sekali): Sales pertama kali
+  /// ditunjuk, dan penawaran pertama (status >= 2 / penawaran terkirim).
+  leadAssignedAt DateTime?
+  leadQuotedAt   DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -479,6 +483,9 @@ model Fupa {
   jawabanFupaDikirim Boolean  @default(false)
   jawabanFupaAt      DateTime?
   quotations   Quotation[]
+  /// Isi Form SPP (Surat Penerimaan Pesanan) yang sudah diedit / dilengkapi
+  /// manual — lihat src/lib/spp-doc.ts. Kosong = diisi otomatis dari CRM.
+  spp          Json?
   /// Pembatalan. Dokumen tetap tampil di daftar dengan status "Dibatalkan"
   /// beserta alasannya — bukan dihapus, supaya riwayatnya tetap terbaca.
   cancelledAt   DateTime?
@@ -995,6 +1002,11 @@ model MarginApproval {
   items           Json
   priceKey        String
   minMargin       Float
+  /// Tingkat penyetuju yang dibutuhkan (lib/margin-tier.ts): bm | rm | gm | vp.
+  level           String    @default("vp")
+  /// Margin item terendah (%) saat diajukan — dasar tingkat persetujuan.
+  lowestMargin    Float?
+  reg             Int?
   alasan          String?
   /// menunggu | disetujui | ditolak
   status          String    @default("menunggu")
@@ -1009,4 +1021,26 @@ model MarginApproval {
 
   @@index([prospectId])
   @@index([status])
+}
+
+/// Kampanye email Marketing ke daftar customer (reaktivasi, produk baru, dst.).
+/// Hasil dihitung dari prospek customer tsb. yang dibuat setelah `sentAt`.
+model Campaign {
+  id          String   @id @default(cuid())
+  nama        String
+  /// Kriteria daftar sasaran saat dibuat (untuk dibaca ulang).
+  filter      Json     @default("{}")
+  /// [{ customerId, name, cabang, emails[] }]
+  targets     Json     @default("[]")
+  subject     String
+  message     String
+  attachments Json     @default("[]")
+  sentCount   Int      @default(0)
+  failed      Json     @default("[]")
+  sentAt      DateTime?
+  createdById String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  @@index([sentAt])
 }

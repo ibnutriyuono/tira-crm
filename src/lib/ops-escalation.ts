@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
-import { notify, opsLeadIds, purchasingUserIds, vpIds } from './notify';
+import { bmUserIds, notify, opsLeadIds, purchasingUserIds, seUserIds, vpIds } from './notify';
 import { normalizeOpsRules, type OpsRules } from './ops-rules';
 import { buildPoIndent } from './po-indent';
 import { rfqAsWorkflowDoc, workflowStage } from './purchasing-workflow';
@@ -24,6 +24,9 @@ let lastSweep = 0;
  *  - RFQ belum dijawab > rfqIngatHari → Purchasing; > rfqEskalasiHari → GM Operation.
  *  - Barang (PO Indent) lewat target kedatangan > telatOpsHari → GM Operation;
  *    > telatVpHari → VP. Target dimundurkan = dihitung ulang dari target baru.
+ *  - Lead Marketing: belum ada Sales > leadTugasHari → BM; Sales belum
+ *    menawarkan > leadPenawaranHari → Sales + BM; lead belum sampai
+ *    penawaran > leadEskalasiHari → RM + Marketing pembuatnya.
  * Tingkat yang sudah dikirim disimpan di Setting "opsEscalationSent".
  */
 export async function sweepOpsEscalation(opts: { force?: boolean; today?: string } = {}): Promise<void> {
@@ -33,8 +36,8 @@ export async function sweepOpsEscalation(opts: { force?: boolean; today?: string
     const rules = await getOpsRules();
     const today = opts.today || jakartaToday();
     const row = await prisma.setting.findUnique({ where: { key: SENT_KEY } });
-    const sent = { rfq: {}, eta: {}, ...((row?.value as Record<string, Record<string, number>>) || {}) } as { rfq: Record<string, number>; eta: Record<string, number> };
-    const next: typeof sent = { rfq: {}, eta: {} };
+    const sent = { rfq: {}, eta: {}, lead: {}, ...((row?.value as Record<string, Record<string, number>>) || {}) } as { rfq: Record<string, number>; eta: Record<string, number>; lead: Record<string, number> };
+    const next: typeof sent = { rfq: {}, eta: {}, lead: {} };
     let changed = false;
 
     // ── RFQ belum dijawab ────────────────────────────────────────────────
@@ -82,8 +85,42 @@ export async function sweepOpsEscalation(opts: { force?: boolean; today?: string
         if (lvl !== was) changed = true;
       }
     }
+    // ── Lead Marketing belum ditindaklanjuti ────────────────────────────
+    // Tingkat (bit): 1 = BM diingatkan (belum ada Sales), 2 = Sales diingatkan
+    // (belum ada penawaran), 4 = eskalasi RM + Marketing pembuatnya.
+    const leads = await prisma.prospect.findMany({
+      where: { leadAt: { not: null }, status: { lte: 1 }, penawaranTerkirim: false },
+      select: { id: true, customer: true, cabang: true, reg: true, se: true, leadAt: true, leadAssignedAt: true, leadById: true, leadBy: true },
+    });
+    for (const p of leads) {
+      const age = dayDiff(p.leadAt!.toISOString().slice(0, 10), today);
+      const was = sent.lead[p.id] || 0;
+      let lvl = was;
+      const se = (p.se || '').trim();
+      const where = `${p.cabang || '-'} · ${p.customer}`;
+      if (!se && age > rules.leadTugasHari && !(was & 1)) {
+        await notify({ userIds: await bmUserIds(p.cabang), type: 'lead_overdue', entity: 'prospect', entityId: p.id, title: `Lead belum ditunjuk Sales ${age} hari: ${p.customer}`, message: `${where} — lead dari Marketing${p.leadBy ? ` (${p.leadBy})` : ''}. Mohon tunjuk Sales yang menangani.` });
+        lvl |= 1;
+      }
+      if (se) {
+        const since = dayDiff((p.leadAssignedAt || p.leadAt!).toISOString().slice(0, 10), today);
+        if (since > rules.leadPenawaranHari && !(was & 2)) {
+          await notify({ userIds: [...(await seUserIds(se)), ...(await bmUserIds(p.cabang))], type: 'lead_overdue', entity: 'prospect', entityId: p.id, title: `Lead belum ada penawaran ${since} hari: ${p.customer}`, message: `${where} · SE ${se} — mohon segera hubungi customer & kirim penawaran.` });
+          lvl |= 2;
+        }
+      }
+      if (age > rules.leadEskalasiHari && !(was & 4)) {
+        const rms = p.reg != null ? (await prisma.user.findMany({ where: { pausedAt: null, role: 'rm', reg: p.reg }, select: { id: true } })).map((u) => u.id) : [];
+        const to = Array.from(new Set([...rms, ...(p.leadById ? [p.leadById] : [])]));
+        await notify({ userIds: to, type: 'lead_overdue', entity: 'prospect', entityId: p.id, title: `Eskalasi lead: ${age} hari belum ada penawaran`, message: `${where} · ${se ? `SE ${se}` : 'belum ada Sales'} — batas ${rules.leadEskalasiHari} hari.` });
+        lvl |= 4;
+      }
+      if (lvl) next.lead[p.id] = lvl;
+      if (lvl !== was) changed = true;
+    }
+
     // Simpan hanya yang masih aktif (RFQ terjawab / barang tiba otomatis terhapus).
-    if (changed || Object.keys(sent.rfq).length !== Object.keys(next.rfq).length || Object.keys(sent.eta).length !== Object.keys(next.eta).length) {
+    if (changed || Object.keys(sent.rfq).length !== Object.keys(next.rfq).length || Object.keys(sent.eta).length !== Object.keys(next.eta).length || Object.keys(sent.lead).length !== Object.keys(next.lead).length) {
       const value = next as unknown as Prisma.InputJsonValue;
       await prisma.setting.upsert({ where: { key: SENT_KEY }, update: { value }, create: { key: SENT_KEY, value } });
     }

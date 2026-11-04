@@ -51,10 +51,12 @@ export function VisitTasksModal() {
   const toast = useDataStore((s) => s.toast);
   const today = localToday();
   const isSales = me?.role === 'sales';
+  // BM / RM bisa ditugaskan GM: punya tab "Tugas saya" sendiri.
+  const isLeader = me?.role === 'bm' || me?.role === 'rm';
   const boss = canAssignVisits(me?.role) || me?.role === 'admin';
   const tabs: [Tab, string][] = isSales
     ? [['tugas', 'Tugas saya'], ['rencana', 'Rencana mingguan']]
-    : [['papan', 'Papan tugas'], ...(boss ? ([['tugaskan', 'Tugaskan & saran']] as [Tab, string][]) : []), ['persetujuan', 'Rencana mingguan Sales']];
+    : [['papan', 'Papan tugas'], ...(isLeader ? ([['tugas', 'Tugas saya']] as [Tab, string][]) : []), ...(boss ? ([['tugaskan', 'Tugaskan & saran']] as [Tab, string][]) : []), ['persetujuan', 'Rencana mingguan Sales']];
   const [tab, setTab] = useState<Tab>(tabs[0][0]);
   const [tasks, setTasks] = useState<VisitTask[] | null>(null);
   const [plans, setPlans] = useState<VisitPlan[] | null>(null);
@@ -79,12 +81,12 @@ export function VisitTasksModal() {
 
   useEffect(() => {
     if (!show || !focus) return;
-    setTab(focus.kind === 'plan' ? (isSales ? 'rencana' : 'persetujuan') : isSales ? 'tugas' : 'papan');
+    setTab(focus.kind === 'plan' ? (isSales ? 'rencana' : 'persetujuan') : isSales ? 'tugas' : isLeader && focus.kind === 'task' && (tasks || []).some((t) => t.id === focus.id && t.assigneeId === me?.id) ? 'tugas' : 'papan');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, focus]);
 
   if (!show || !me) return null;
-  const openCount = (tasks || []).filter((t) => isOpenTask(t) && (isSales ? t.assigneeId === me.id : true)).length;
+  const openCount = (tasks || []).filter((t) => isOpenTask(t) && t.assigneeId === me.id).length;
   const pendingPlans = (plans || []).filter((p) => p.status === 'diajukan').length;
 
   return (
@@ -437,7 +439,14 @@ function Assign({ tasks, today, onDone }: { tasks: VisitTask[]; today: string; o
   const customers = useDataStore((s) => s.customers);
   const prospects = useDataStore((s) => s.prospects);
   const roster = useRoster();
-  const salesList = roster.filter((u: RosterUser & { se?: string | null }) => u.role === 'sales' && (me?.role !== 'bm' || up(u.cabang) === up(me?.cabang)));
+  // BM: Sales cabangnya. GM / Admin: semua Sales, plus BM dan RM.
+  const leaderOk = me?.role !== 'bm';
+  const salesList = roster.filter(
+    (u: RosterUser & { se?: string | null }) =>
+      !u.paused && ((u.role === 'sales' && (me?.role !== 'bm' || up(u.cabang) === up(me?.cabang))) || (leaderOk && (u.role === 'bm' || u.role === 'rm'))),
+  );
+  const byRole = (r: string) => salesList.filter((u) => u.role === r).sort((a, b) => up(a.cabang).localeCompare(up(b.cabang)) || a.name.localeCompare(b.name));
+  const ROLE_GROUP: [string, string][] = [['sales', 'Sales'], ['bm', 'BM (Branch Manager)'], ['rm', 'RM (Regional Manager)']];
   const [assignee, setAssignee] = useState('');
   const [due, setDue] = useState(addDays(today, 3));
   const [tujuan, setTujuan] = useState(TUJUAN_PRESET[0]);
@@ -462,7 +471,7 @@ function Assign({ tasks, today, onDone }: { tasks: VisitTask[]; today: string; o
   const add = (c: (typeof picked)[number]) => !picked.some((x) => customerKey(x.customer) === customerKey(c.customer)) && setPicked([...picked, c]);
 
   async function send() {
-    if (!assignee) return toast('Pilih Sales', 'error');
+    if (!assignee) return toast(leaderOk ? 'Pilih yang ditugaskan' : 'Pilih Sales', 'error');
     setBusy(true);
     try {
       const r = await api.post<{ tasks: VisitTask[] }>('/api/visit-tasks', { assigneeId: assignee, dueDate: due, tujuan, catatan, customers: picked });
@@ -492,10 +501,21 @@ function Assign({ tasks, today, onDone }: { tasks: VisitTask[]; today: string; o
     <div className="vt-assign">
       <div className="vt-col">
         <div className="rq-title">{tr("Tugaskan kunjungan")}</div>
-        <label>{tr("Sales *")}
+        <label>{leaderOk ? tr("Ditugaskan ke *") : tr("Sales *")}
           <select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-            <option value="">{tr("— pilih Sales —")}</option>
-            {salesList.map((u) => <option key={u.id} value={u.id}>{u.name}{(u as RosterUser & { se?: string | null }).se ? ` (${(u as RosterUser & { se?: string | null }).se})` : ''} · {u.cabang}</option>)}
+            <option value="">{leaderOk ? tr("— pilih Sales / BM / RM —") : tr("— pilih Sales —")}</option>
+            {ROLE_GROUP.map(([r, label]) => {
+              const list = byRole(r);
+              if (!list.length) return null;
+              const opts = list.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                  {(u as RosterUser & { se?: string | null }).se ? ` (${(u as RosterUser & { se?: string | null }).se})` : ''}
+                  {u.cabang ? ` · ${u.cabang}` : r === 'rm' ? ` · ${tr('Regional')}` : ''}
+                </option>
+              ));
+              return leaderOk ? <optgroup key={r} label={tr(label)}>{opts}</optgroup> : opts;
+            })}
           </select>
         </label>
         <label>{tr("Customer (bisa lebih dari satu) *")}
@@ -520,7 +540,7 @@ function Assign({ tasks, today, onDone }: { tasks: VisitTask[]; today: string; o
         <datalist id="vt-tujuan2">{TUJUAN_PRESET.map((x) => <option key={x} value={x} />)}</datalist>
         <label>{tr("Catatan untuk Sales")}<input type="text" value={catatan} onChange={(e) => setCatatan(e.target.value)} /></label>
         <button type="button" className="btn btn-primary btn-sm" disabled={busy || !assignee || !picked.length} onClick={send}>{tr("Tugaskan")} {picked.length ? `${picked.length} customer` : ''}</button>
-        {isGmLevel(me?.role) && <div className="field-note" style={{ margin: 0 }}>{tr("Tugas dari GM langsung ke Sales; BM cabangnya ikut diberi tahu.")}</div>}
+        {isGmLevel(me?.role) && <div className="field-note" style={{ margin: 0 }}>{tr("GM bisa menugaskan Sales, BM atau RM. Tugas ke Sales: BM cabangnya ikut diberi tahu. BM / RM melaporkan hasilnya di tab Tugas saya.")}</div>}
       </div>
       <div className="vt-col grow">
         <div className="rq-title">{tr("Saran otomatis")} {sugs ? `(${sugs.length})` : ''}</div>

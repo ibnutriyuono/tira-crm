@@ -48,3 +48,47 @@ export async function POST(req: Request) {
   }
   return NextResponse.json({ prospects: updated, skipped });
 }
+
+/**
+ * Koreksi faktur satu DO (Rekap Pengiriman): { id, tglFaktur, noFaktur, alasan }
+ * mengubah tanggal / nomor faktur; { id, batal: true, alasan } membatalkan
+ * status terfaktur (koreksi pengiriman terbuka lagi). Alasan wajib.
+ */
+export async function PATCH(req: Request) {
+  const user = await requireUser();
+  if (isResponse(user)) return user;
+  const denied = await guard(user, 'faktur', 'e');
+  if (denied) return denied;
+  if (!canSetFaktur(user.role)) return NextResponse.json({ error: 'Status faktur diisi oleh Admin Sales / BM.' }, { status: 403 });
+
+  const body = await req.json().catch(() => null);
+  const id = String(body?.id || '');
+  const batal = body?.batal === true;
+  const alasan = String(body?.alasan || '').trim().slice(0, 300);
+  if (alasan.length < 3) return NextResponse.json({ error: 'Alasan koreksi wajib diisi' }, { status: 400 });
+  const scoped = await assertProspectInScope(user, id);
+  if (scoped.error) return scoped.error;
+  if (!scoped.existing.terfaktur) return NextResponse.json({ error: 'DO ini belum terfaktur' }, { status: 400 });
+
+  let data: { terfaktur?: boolean; tglFaktur: string | null; noFaktur: string | null };
+  if (batal) {
+    data = { terfaktur: false, tglFaktur: null, noFaktur: null };
+  } else {
+    const tglFaktur = String(body?.tglFaktur || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(tglFaktur)) return NextResponse.json({ error: 'Tanggal faktur wajib diisi' }, { status: 400 });
+    data = { tglFaktur, noFaktur: String(body?.noFaktur || '').trim().slice(0, 60) || null };
+  }
+  const prospect = await prisma.prospect.update({ where: { id }, data });
+  emitCrmEvent('prospect:updated', prospect);
+  await logActivity({
+    user,
+    action: 'update',
+    entity: 'prospect',
+    entityId: id,
+    summary: batal
+      ? `Membatalkan status terfaktur DO "${prospect.customer}" — alasan: ${alasan}`
+      : `Mengoreksi faktur DO "${prospect.customer}" (${data.tglFaktur}${data.noFaktur ? `, ${data.noFaktur}` : ''}) — alasan: ${alasan}`,
+    changes: diffFields(scoped.existing, prospect, PROSPECT_FIELD_LABELS),
+  });
+  return NextResponse.json({ prospect });
+}

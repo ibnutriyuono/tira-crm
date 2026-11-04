@@ -81,6 +81,8 @@ export interface Prospect {
   leadBy?: string | null;
   leadById?: string | null;
   leadAt?: string | null;
+  leadAssignedAt?: string | null;
+  leadQuotedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -388,7 +390,8 @@ export type NotificationType =
   | 'margin_decided'
   | 'prospect_duplicate'
   | 'lead_new'
-  | 'lead_update';
+  | 'lead_update'
+  | 'lead_overdue';
 
 export interface AppNotification {
   id: string;

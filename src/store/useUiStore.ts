@@ -33,6 +33,12 @@ export type ModalKey =
   | 'competitorLog'
   | 'forecast'
   | 'qcdRecap'
+  | 'deliveryRecap'
+  | 'sppForm'
+  | 'leadResults'
+  | 'campaign'
+  | 'productInsight'
+  | 'marginApprovals'
   | 'salesPlan'
   | 'notifications'
   | 'followUpBoard'
@@ -87,7 +93,9 @@ export interface QcdCtx {
 
 export interface ItemFlowCtx {
   prospectId: string;
-  mode?: 'po' | 'kirim' | 'qcd' | null;
+  mode?: 'po' | 'kirim' | 'qcd' | 'koreksi' | null;
+  /** mode 'koreksi': catatan pengiriman (event 'kirim') yang langsung dibuka koreksinya. */
+  eventId?: string;
   returnTo?: ModalKey;
 }
 
@@ -173,6 +181,8 @@ interface UiState {
   /** `sourceRfqId` promotes a won RFQ; `prospectId` starts one straight from a
       Kanban card, where there is no RFQ to carry the header over from. */
   fupaCtx: { fupaId: string | null; sourceRfqId: string | null; prospectId?: string | null } | null;
+  /** Form SPP FUP A: dokumen yang dibuka dan modal tujuan saat ditutup. */
+  sppCtx: { fupaId: string; returnTo?: ModalKey } | null;
   quotationProspectId: string | null;
   rfqCtx: RfqCtx | null;
   /** Ask the purchasing board to open one document's detail. Set from outside
@@ -274,6 +284,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   profileReturnTo: null,
   vendorEditId: null,
   fupaCtx: null,
+  sppCtx: null,
   quotationProspectId: null,
   rfqCtx: null,
   purchDetailCtx: null,

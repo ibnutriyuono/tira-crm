@@ -2,9 +2,10 @@ import { STATUS_META } from './constants';
 import { leadSourceLabel } from './leads';
 import { bmUserIds, notify, seUserIds } from './notify';
 import { prisma } from './prisma';
+import { emitCrmEvent } from './socket';
 import type { SafeUser } from './types';
 
-type LeadRow = { id: string; customer: string; cabang: string | null; reg: number | null; se: string | null; status: number; leadSource: string | null; leadBy: string | null; leadById: string | null; leadAt: Date | string | null };
+type LeadRow = { id: string; customer: string; cabang: string | null; reg: number | null; se: string | null; status: number; leadSource: string | null; leadBy: string | null; leadById: string | null; leadAt: Date | string | null; leadAssignedAt?: Date | string | null; leadQuotedAt?: Date | string | null; penawaranTerkirim?: boolean };
 
 /**
  * Lead baru: BM cabang tujuan (bila tidak ada BM aktif: RM regionalnya) dan
@@ -70,4 +71,26 @@ export async function notifyLeadProgress(user: SafeUser, before: LeadRow, after:
     title: `Perkembangan lead: ${after.customer}`,
     message: `${after.cabang || '-'}: ${changes.join(', ')} (oleh ${user.name}).`,
   });
+}
+
+/**
+ * Tonggak respons cabang atas lead (sekali saja): Sales pertama ditunjuk dan
+ * penawaran pertama (status >= 2 atau penawaran ditandai terkirim). Dipakai
+ * Hasil Lead (waktu respons per cabang) dan eskalasi lead.
+ */
+export async function stampLeadMilestones(after: LeadRow): Promise<void> {
+  if (!after.leadAt && !after.leadSource) return;
+  const data: { leadAssignedAt?: Date; leadQuotedAt?: Date } = {};
+  if (!after.leadAssignedAt && (after.se || '').trim()) data.leadAssignedAt = new Date();
+  if (!after.leadQuotedAt && (Number(after.status) >= 2 || after.penawaranTerkirim)) {
+    data.leadQuotedAt = new Date();
+    if (!after.leadAssignedAt && !data.leadAssignedAt) data.leadAssignedAt = data.leadQuotedAt;
+  }
+  if (!Object.keys(data).length) return;
+  try {
+    const p = await prisma.prospect.update({ where: { id: after.id }, data });
+    emitCrmEvent('prospect:updated', p);
+  } catch (err) {
+    console.error('[leads] gagal mencap tonggak lead', after.id, err);
+  }
 }

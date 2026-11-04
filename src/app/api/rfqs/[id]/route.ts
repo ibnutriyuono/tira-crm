@@ -1,3 +1,4 @@
+import { linkFupasOfRfq, resolveRfqProspect } from '@/lib/rfq-prospect';
 import { docForRole, normalizeHppItems } from '@/lib/rfq-price';
 import { docScopeWhere } from '@/lib/auth';
 import { normalizeItemLines } from '@/lib/format';
@@ -51,7 +52,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: `No. RFQ "${nomorBaru}" sudah dipakai RFQ lain.` }, { status: 409 });
     }
   }
-  const prospectId = body?.prospectId ?? existing.prospectId;
+  // Menghubungkan RFQ ke prospek (pilih / buat baru) — hanya bila diminta.
+  let prospectId = existing.prospectId;
+  if (body?.createProspect || (body?.prospectId && body.prospectId !== existing.prospectId)) {
+    const linked = await resolveRfqProspect(user, { ...body, cabang: body?.cabang ?? existing.cabang, customer: body?.customer ?? existing.customer, items: Array.isArray(body?.items) ? body.items : existing.items });
+    if ('error' in linked) return linked.error;
+    prospectId = linked.prospectId;
+  }
   // Re-derive the denormalized region whenever the RFQ is repointed at a
   // different prospect, so rm scoping doesn't drift from the source record.
   const reg =
@@ -80,6 +87,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   });
 
   emitCrmEvent('rfq:updated', rfq);
+  if (rfq.prospectId && rfq.prospectId !== existing.prospectId) await linkFupasOfRfq(rfq.id, rfq.prospectId);
   await logActivity({
     user,
     action: 'update',

@@ -1,5 +1,6 @@
 'use client';
 
+import { canRunCampaign } from '@/lib/campaign';
 import { canComposeMail } from '@/lib/compose-email';
 import { quotePermAct } from '@/lib/roles';
 import { isPurchasingRoleClient } from '@/lib/doc-lines';
@@ -17,7 +18,7 @@ import { countNewPurchasingItems } from '@/lib/purchasing-workflow';
 import { countUrgentFollowUps } from '@/lib/reports';
 import { downloadProspectTemplate, exportAllExcel, exportProspectsExcel, logoutNow, saveAllNow } from '@/lib/app-actions';
 import { setDeskPref } from '@/hooks/useDeskMode';
-import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconDoc, IconMail, IconDownload, IconExport, IconFlag, IconImport, IconPlus, IconPresentation, IconRfq, IconSave, IconSearch, IconTarget, IconTemplate, IconUsers } from './icons';
+import { IconActivity, IconBag, IconBarChart, IconBell, IconCalendar, IconCart, IconChartLine, IconCheckSquare, IconCustomers, IconDatabase, IconDoc, IconMail, IconDownload, IconExport, IconFlag, IconImport, IconPlus, IconPresentation, IconRfq, IconSave, IconSearch, IconTarget, IconTemplate, IconTruck, IconUsers } from './icons';
 
 import { useT } from '@/store/useLangStore';
 import { LangSwitch } from './LangSwitch';
@@ -67,8 +68,8 @@ export function TopBar() {
     let alive = true;
     const load = () =>
       api
-        .get<{ open: number; late: number; plans: number }>('/api/visit-tasks?count=1')
-        .then((r) => alive && setVisitBadge(myRole === 'sales' ? r.open : r.late + r.plans))
+        .get<{ open: number; late: number; plans: number; mine?: number }>('/api/visit-tasks?count=1')
+        .then((r) => alive && setVisitBadge(myRole === 'sales' ? r.open : r.late + r.plans + (r.mine || 0)))
         .catch(() => {});
     load();
     const s = getSocket();
@@ -166,6 +167,12 @@ export function TopBar() {
               )}
             </button>
           )}
+          {c('prospek') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('deliveryRecap')}>
+              <IconTruck />
+              {tr("Rekap Pengiriman")}
+            </button>
+          )}
           {!isPurchasingRoleClient(currentUser.role) && c('analisa') && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('gmAnalysis')}>
               <IconPresentation />
@@ -194,6 +201,24 @@ export function TopBar() {
             <button className="btn btn-ghost-dark" onClick={() => openModal('qcdRecap')}>
               <IconCheckSquare />
               {tr("Hasil QCD")}
+            </button>
+          )}
+          {c('marketing') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('leadResults')}>
+              <IconChartLine />
+              {tr("Hasil Lead")}
+            </button>
+          )}
+          {c('marketing') && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('productInsight')}>
+              <IconBarChart />
+              {tr("Insight Produk")}
+            </button>
+          )}
+          {c('marketing') && canRunCampaign(currentUser.role) && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('campaign')}>
+              <IconMail />
+              {tr("Kampanye")}
             </button>
           )}
           {c('forecast') && (
@@ -343,7 +368,7 @@ export function TopBar() {
             </button>
           )}
           {canExportAny(perms) && (
-            <button className="btn btn-ghost-dark" onClick={exportAllExcel} title={tr("Satu file Excel berisi semua data yang boleh Anda unduh (Prospek, RFQ/FUP A, Customer, Key Account, Masalah Pipeline, Rencana, Target, Aktivitas Harian, Perjalanan Dinas, Vendor), tiap jenis di sheet terpisah")}>
+            <button className="btn btn-ghost-dark" onClick={exportAllExcel} title={tr("Satu file Excel berisi semua data yang boleh Anda unduh (Prospek, Pengiriman (DO), RFQ/FUP A, Customer, Key Account, Masalah Pipeline, Rencana, Target, Aktivitas Harian, Perjalanan Dinas, Vendor), tiap jenis di sheet terpisah")}>
               <IconDownload />
               {tr("Export Semua")}
             </button>

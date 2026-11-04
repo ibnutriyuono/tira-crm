@@ -145,6 +145,14 @@ export function FupaModal() {
     }
   }
 
+  /** Simpan dulu (nomor otomatis bila kosong), lalu buka Form SPP (edit, unduh Excel/Word, email). */
+  async function openSppForm() {
+    const id = canNow('rfq', 'e') ? await save(false, 'FUP A disimpan') : fupaId;
+    if (!id) return toast('Simpan FUP A dulu sebelum membuat Form SPP', 'error');
+    useUiStore.setState({ sppCtx: { fupaId: id, returnTo: 'fupa' }, fupaCtx: { fupaId: id, sourceRfqId: ctx?.sourceRfqId ?? null, prospectId: ctx?.prospectId ?? null } });
+    useUiStore.getState().openModal('sppForm');
+  }
+
   async function save(markSent: boolean, successMessage?: string): Promise<string | null> {
     if (!items.some((it) => (it.material || '').trim())) {
       toast('Isi minimal satu material permintaan pembelian', 'error');
@@ -158,6 +166,7 @@ export function FupaModal() {
         : await api.post<{ fupa: Fupa }>('/api/fupas', payload);
       upsertFupa(fupa);
       setFupaId(fupa.id);
+      setNoFupa(fupa.noFupa || '');
       // The source RFQ now carries a pointer to this FUP A.
       if (fupa.sourceRfqId) {
         const src = rfqs.find((r) => r.id === fupa.sourceRfqId);
@@ -201,6 +210,11 @@ export function FupaModal() {
               <IconDownload /> {tr("Excel")}
             </button>
           )}
+          {canNow('rfq', 'x') && (
+            <button type="button" className="btn btn-outline" disabled={busy} onClick={() => void openSppForm()} title={tr("Form Surat Penerimaan Pesanan (FUP A) terisi dari data CRM")}>
+              <IconDownload /> {tr("Form SPP")}
+            </button>
+          )}
           {canNow('rfq', 'e') && (
             <>
               <button type="button" className="btn btn-outline" disabled={busy} onClick={sendEmail}>
@@ -220,7 +234,7 @@ export function FupaModal() {
       <div className="form-grid">
         <div>
           <label>{tr("No. FUP A")}</label>
-          <input type="text" value={noFupa} onChange={(e) => setNoFupa(e.target.value)} placeholder={tr("cth. FUPA/2026/001")} />
+          <input type="text" value={noFupa} onChange={(e) => setNoFupa(e.target.value)} placeholder={tr("Kosongkan — nomor dibuat otomatis")} />
         </div>
         <div>
           <label>{tr("Tanggal")}</label>

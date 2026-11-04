@@ -53,6 +53,12 @@ import { KpiModal } from './modals/KpiModal';
 import { CompetitorLogModal } from './modals/CompetitorLogModal';
 import { ForecastModal } from './modals/ForecastModal';
 import { QcdRecapModal } from './modals/QcdRecapModal';
+import { DeliveryRecapModal } from './modals/DeliveryRecapModal';
+import { SppFormModal } from './modals/SppFormModal';
+import { LeadResultsModal } from './modals/LeadResultsModal';
+import { CampaignModal } from './modals/CampaignModal';
+import { ProductInsightModal } from './modals/ProductInsightModal';
+import { MarginApprovalsModal } from './modals/MarginApprovalsModal';
 import { CustomerFormModal } from './modals/CustomerFormModal';
 import { ImportModal } from './modals/ImportModal';
 import { DatabaseModal } from './modals/DatabaseModal';
@@ -208,6 +214,12 @@ export function CrmApp() {
       <CompetitorLogModal />
       <ForecastModal />
       <QcdRecapModal />
+      <DeliveryRecapModal />
+      <SppFormModal />
+      <LeadResultsModal />
+      <CampaignModal />
+      <ProductInsightModal />
+      <MarginApprovalsModal />
       <DatabaseModal />
       <DbImportConfirmModal />
       <RfqManageModal />

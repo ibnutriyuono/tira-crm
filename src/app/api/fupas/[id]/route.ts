@@ -1,3 +1,4 @@
+import { nextFupaNo } from '@/lib/fupa-number';
 import { docForRole } from '@/lib/rfq-price';
 import { normalizeItemLines } from '@/lib/format';
 import type { Prisma } from '@prisma/client';
@@ -39,7 +40,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const fupa = await prisma.fupa.update({
     where: { id },
     data: {
-      noFupa: body?.noFupa ?? existing.noFupa,
+      noFupa: String(body?.noFupa ?? existing.noFupa ?? '').trim() || (await nextFupaNo(body?.cabang ?? existing.cabang, body?.tglFupa ?? existing.tglFupa)),
       tglFupa: body?.tglFupa ?? existing.tglFupa,
       cabang: body?.cabang ?? existing.cabang,
       customer: body?.customer ?? existing.customer,

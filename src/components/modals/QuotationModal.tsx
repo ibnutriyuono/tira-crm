@@ -51,6 +51,8 @@ interface MarginInfo {
   checked: number;
   lines: { idx: number; checked: boolean; below: boolean; margin?: number | null }[];
   approval: { id: string; status: string; decidedByName: string | null; decisionNote: string | null; createdAt: string } | null;
+  /** Penyetuju yang dibutuhkan: BM / RM / GM / VP (lib/margin-tier.ts). */
+  levelLabel?: string;
 }
 
 const LS = { opts: 'tira.quote.opts', kop: 'tira.quote.kop', kota: 'tira.quote.kota', telp: 'tira.quote.telp', lang: 'tira.quote.lang' };
@@ -109,7 +111,7 @@ export function QuotationModal() {
   const picOptions = useMemo(() => (cust?.pics?.length ? cust.pics : cust?.pic ? [{ id: 'legacy', nama: cust.pic, jabatan: null, phone: cust.phone, email: cust.email, isPrimary: true }] : []), [cust]);
 
   const [tab, setTab] = useState<Tab>('isi');
-  // Margin vs HPP jawaban RFQ: di bawah batas → perlu persetujuan VP (lib/margin-check.ts).
+  // Margin vs HPP jawaban RFQ: di bawah batas → persetujuan bertingkat BM / RM / GM / VP (lib/margin-tier.ts).
   const [margin, setMargin] = useState<MarginInfo | null>(null);
   const [marginAlasan, setMarginAlasan] = useState('');
   const [marginBusy, setMarginBusy] = useState(false);
@@ -316,7 +318,7 @@ export function QuotationModal() {
       setMargin(r);
       if (r.needs) {
         setTab('isi');
-        toast(r.approval?.status === 'menunggu' ? tr('Menunggu persetujuan VP untuk harga ini') : `${tr('Margin di bawah')} ${r.minMargin}% — ${tr('ajukan persetujuan VP dulu')}`, 'error');
+        toast(r.approval?.status === 'menunggu' ? `${tr('Menunggu persetujuan')} ${r.levelLabel || 'VP'} ${tr('untuk harga ini')}` : `${tr('Margin di bawah')} ${r.minMargin}% — ${tr('ajukan persetujuan')} ${r.levelLabel || 'VP'} ${tr('dulu')}`, 'error');
         return false;
       }
       return true;
@@ -333,7 +335,7 @@ export function QuotationModal() {
       const r = await api.post<MarginInfo>('/api/quotations/margin', { prospectId: record.id, items: marginItems, ajukan: true, alasan: marginAlasan, nomor: d.nomor });
       setMargin(r);
       setMarginAlasan('');
-      toast(tr('Pengajuan dikirim ke VP'), 'success');
+      toast(`${tr('Pengajuan dikirim ke')} ${r.levelLabel || margin?.levelLabel || 'VP'}`, 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal mengajukan', 'error');
     } finally {
@@ -616,7 +618,7 @@ export function QuotationModal() {
           <b>
             {margin.needs
               ? margin.approval?.status === 'menunggu'
-                ? `⏳ ${tr('Menunggu persetujuan VP')}`
+                ? `⏳ ${tr('Menunggu persetujuan')} ${margin.levelLabel || 'VP'}`
                 : `⚠ ${margin.below} ${tr('item dengan margin di bawah')} ${margin.minMargin}% ${tr('dari HPP')}`
               : `✓ ${tr('Margin di bawah batas sudah disetujui')}${margin.approval?.decidedByName ? ` — ${margin.approval.decidedByName}` : ''}`}
           </b>
@@ -629,16 +631,16 @@ export function QuotationModal() {
           )}
           {margin.needs && margin.approval?.status !== 'menunggu' && (
             <>
-              <span>{tr('Surat belum bisa diunduh atau dikirim. Naikkan harga item yang ditandai, atau ajukan persetujuan VP.')}</span>
+              <span>{tr('Surat belum bisa diunduh atau dikirim. Naikkan harga item yang ditandai, atau ajukan persetujuan')} <b>{margin.levelLabel || 'VP'}</b>.</span>
               <span className="qm-margin-act">
                 <input type="text" value={marginAlasan} placeholder={tr('Alasan (mis. customer strategis, harga kompetitor)')} onChange={(e) => setMarginAlasan(e.target.value)} />
                 <button type="button" className="btn btn-primary btn-sm" disabled={marginBusy || marginAlasan.trim().length < 5} onClick={ajukanMargin}>
-                  {tr('Ajukan ke VP')}
+                  {tr('Ajukan ke')} {margin.levelLabel || 'VP'}
                 </button>
               </span>
             </>
           )}
-          {margin.needs && margin.approval?.status === 'menunggu' && <span>{tr('Anda akan diberi notifikasi begitu VP memutuskan. Mengubah harga membatalkan pengajuan ini.')}</span>}
+          {margin.needs && margin.approval?.status === 'menunggu' && <span>{tr('Anda akan diberi notifikasi begitu penyetuju memutuskan. Mengubah harga membatalkan pengajuan ini.')}</span>}
         </div>
       )}
       {!mailMode && (<>

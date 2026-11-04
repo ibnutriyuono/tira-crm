@@ -47,7 +47,8 @@ export type NotifType =
   | 'margin_decided'
   | 'prospect_duplicate'
   | 'lead_new'
-  | 'lead_update';
+  | 'lead_update'
+  | 'lead_overdue';
 
 interface NotifyInput {
   userIds: string[];

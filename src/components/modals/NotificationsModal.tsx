@@ -50,6 +50,7 @@ const NOTIF_META: Record<NotificationType, { icon: () => React.JSX.Element; colo
   prospect_duplicate: { icon: IconFlag, color: 'amber' },
   lead_new: { icon: IconFlag, color: 'violet' },
   lead_update: { icon: IconFlag, color: 'steel' },
+  lead_overdue: { icon: IconFlag, color: 'rust' },
 };
 
 function timeAgo(iso: string): string {
