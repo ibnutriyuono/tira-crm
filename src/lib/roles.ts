@@ -34,6 +34,11 @@ export function isOpsLead(role: string | null | undefined): boolean {
   return role === 'gmops' || role === 'vp';
 }
 
+/** Hapus FUP A: hanya Admin, GM, GM Operation dan VP (terlepas dari hak hapus RFQ di Kelola Role). */
+export function canDeleteFupa(role: string | null | undefined): boolean {
+  return role === 'admin' || role === 'gm' || role === 'gmops' || role === 'vp';
+}
+
 /** Persetujuan status AVL vendor (dan vendor baru): GM Operation, VP, Admin. */
 export function canApproveVendor(role: string | null | undefined): boolean {
   return isOpsLead(role) || role === 'admin';

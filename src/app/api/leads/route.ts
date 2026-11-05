@@ -111,8 +111,8 @@ export async function POST(req: Request) {
     entityId: prospect.id,
     summary: `Memasukkan lead "${customer}" (${leadSourceLabel(source)}) untuk cabang ${cabang}${se ? ` · SE ${se}` : ''}`,
   });
-  await notifyLeadCreated(user, prospect);
+  const notified = await notifyLeadCreated(user, prospect);
   await syncCustomerFromLead(user, { customer, cabang, address, kontakNama, kontakJabatan, phone, email, source: leadSourceLabel(source) });
   invalidateMaterialLexicon();
-  return NextResponse.json({ prospect }, { status: 201 });
+  return NextResponse.json({ prospect, notified }, { status: 201 });
 }

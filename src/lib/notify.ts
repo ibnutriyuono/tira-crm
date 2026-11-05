@@ -1,3 +1,4 @@
+import { cabangKey } from './constants';
 import type { Role } from '@prisma/client';
 import { itemsHaveLine } from './doc-lines';
 import { prisma } from './prisma';
@@ -165,12 +166,22 @@ export async function seUserIds(se: string | null | undefined): Promise<string[]
   return rows.map((r) => r.id);
 }
 
+/**
+ * Akun aktif dengan role tertentu di satu cabang. Cabang dibandingkan dalam
+ * bentuk baku (lib/constants cabangKey) — akun yang cabangnya tertulis
+ * "sby ", "Sby" atau "Surabaya" tetap ikut, supaya notifikasi cabang tidak
+ * hilang diam-diam karena beda penulisan.
+ */
+export async function branchUserIds(cabang: string | null | undefined, roles: Role[]): Promise<string[]> {
+  const c = cabangKey(cabang);
+  if (!c) return [];
+  const rows = await prisma.user.findMany({ where: { pausedAt: null, role: { in: roles }, cabang: { not: null } }, select: { id: true, cabang: true } });
+  return rows.filter((r) => cabangKey(r.cabang) === c).map((r) => r.id);
+}
+
 /** BM(s) of a branch. */
 export async function bmUserIds(cabang: string | null | undefined): Promise<string[]> {
-  const c = (cabang || '').trim();
-  if (!c) return [];
-  const rows = await prisma.user.findMany({ where: { pausedAt: null, role: 'bm', cabang: { equals: c, mode: 'insensitive' } }, select: { id: true } });
-  return rows.map((r) => r.id);
+  return branchUserIds(cabang, ['bm']);
 }
 
 /**

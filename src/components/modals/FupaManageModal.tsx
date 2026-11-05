@@ -13,6 +13,7 @@ import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Fupa } from '@/lib/types';
 import { canNow } from '@/hooks/useCan';
+import { canDeleteFupa } from '@/lib/roles';
 
 import { useT } from '@/store/useLangStore';
 function statusColor(status: string): string {
@@ -20,6 +21,7 @@ function statusColor(status: string): string {
 }
 
 export function FupaManageModal() {
+  const currentRole = useDataStore((s) => s.currentUser?.role);
   const tr = useT();
   const modal = useUiStore((s) => s.modal);
   const show = modal === 'fupaManage';
@@ -170,7 +172,7 @@ export function FupaManageModal() {
                             <IconCheck />
                           </button>
                         )}
-                        {canNow('rfq', 'd') && (
+                        {canDeleteFupa(currentRole) && (
                         <button
                           className="icon-btn danger"
                           title={tr("Hapus")}

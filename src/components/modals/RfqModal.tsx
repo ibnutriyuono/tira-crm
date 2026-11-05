@@ -252,9 +252,10 @@ export function RfqModal() {
     setBusy(true);
     try {
       await persistPurchasingContactIfChanged();
-      await saveOrUpdateRecord(true);
+      // WhatsApp hanya mengirim pesan; RFQ masuk modul Purchasing lewat tombol "Kirim ke Purchasing".
+      await saveOrUpdateRecord(false);
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(messageText)}`, '_blank');
-      toast('RFQ dikirim via WhatsApp dan tersimpan di Kelola RFQ', 'success');
+      toast('RFQ dikirim via WhatsApp dan tersimpan di Kelola RFQ — belum masuk modul Purchasing', 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal mengirim RFQ', 'error');
     } finally {
@@ -267,11 +268,11 @@ export function RfqModal() {
     setBusy(true);
     try {
       await persistPurchasingContactIfChanged();
-      await saveOrUpdateRecord(true);
+      await saveOrUpdateRecord(false);
       const subject = encodeURIComponent(`RFQ ${noRfq || ''} - ${cabang || ''} - ${cust || ''}`);
       const text = messageText + '\n\nMohon lampirkan file Excel RFQ hasil unduhan pada email ini sebelum dikirim.';
       window.open(`mailto:${purchEmail}?subject=${subject}&body=${encodeURIComponent(text)}`, '_blank');
-      toast('RFQ dikirim via Email dan tersimpan di Kelola RFQ', 'success');
+      toast('RFQ dikirim via Email dan tersimpan di Kelola RFQ — belum masuk modul Purchasing', 'success');
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal mengirim RFQ', 'error');
     } finally {
@@ -280,9 +281,9 @@ export function RfqModal() {
   }
 
   /**
-   * Hands the RFQ to the internal Purchasing module. Same `markSent` write as
-   * the WA/Email buttons (status -> Terkirim, stamps sentToPurchasingAt), minus
-   * the outgoing message to the external Purchasing contact.
+   * Hands the RFQ to the internal Purchasing module (status -> Terkirim, stamps
+   * sentToPurchasingAt). Only this button does that — WhatsApp / Email just
+   * save the RFQ and open the outgoing message.
    */
   async function onSendPurchasing() {
     if (!validate()) return;

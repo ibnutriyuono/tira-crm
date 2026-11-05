@@ -220,7 +220,7 @@ export function LeadFormModal() {
     if (!list.length) return setError(tr('Isi minimal satu kebutuhan material'));
     setBusy(true);
     try {
-      const r = await api.post<{ prospect: Prospect }>('/api/leads', {
+      const r = await api.post<{ prospect: Prospect; notified?: { bm: number; adminSales: number; rm: number; sales: number } }>('/api/leads', {
         customer,
         phone,
         kontakNama: kontak,
@@ -234,7 +234,10 @@ export function LeadFormModal() {
         materials: list.map(rowToMaterial),
       });
       upsertProspect(r.prospect);
-      toast(`Lead ${r.prospect.customer} dikirim ke cabang ${cabang}${se ? ` · SE ${se}` : ''} — BM diberi tahu`, 'success');
+      const n = r.notified;
+      const who = n ? [n.bm && `BM (${n.bm})`, n.adminSales && `Admin Sales (${n.adminSales})`, n.rm && `RM (${n.rm})`, n.sales && `Sales (${n.sales})`].filter(Boolean).join(', ') : 'BM';
+      if (n && !n.bm && !n.adminSales && !n.sales) toast(`Lead ${r.prospect.customer} tersimpan, tetapi cabang ${cabang} tidak punya akun BM / Admin Sales aktif${n.rm ? ' — hanya RM yang diberi tahu' : ''}. Cek Kelola User.`, 'error');
+      else toast(`Lead ${r.prospect.customer} dikirim ke cabang ${cabang}${se ? ` · SE ${se}` : ''} — diberi tahu: ${who}`, 'success');
       closeModal();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal mengirim lead');

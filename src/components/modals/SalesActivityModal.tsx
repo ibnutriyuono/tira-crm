@@ -19,6 +19,7 @@ import { HASIL_KEYS, HASIL_LABEL, KANAL_BY_TIPE, KANAL_LABEL, contactErrors, ema
 
 import { useT } from '@/store/useLangStore';
 import { isGmLevel } from '@/lib/roles';
+import { customerKey } from '@/lib/reports';
 const plusDays = (ymd: string, n: number) => {
   const d = new Date(`${ymd}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
@@ -93,6 +94,9 @@ export function SalesActivityModal() {
   const [hasil, setHasil] = useState<Hasil | ''>('');
   const [followUp, setFollowUp] = useState('');
   const [langkah, setLangkah] = useState('');
+  // Prospek terkait (null = belum dipilih user → disarankan otomatis bila hanya satu).
+  const [prospectPick, setProspectPick] = useState<string | null>(null);
+  const [linkLocked, setLinkLocked] = useState(false);
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   // Dibuka dari notifikasi follow-up: rencana ini disorot (juga untuk BM yang
@@ -173,6 +177,8 @@ export function SalesActivityModal() {
     setHasil('');
     setFollowUp('');
     setLangkah('');
+    setProspectPick(null);
+    setLinkLocked(false);
     setTried(false);
   }
 
@@ -242,6 +248,16 @@ export function SalesActivityModal() {
   }
 
   const prospectById = useMemo(() => new Map(prospects.map((p) => [p.id, p])), [prospects]);
+  // Prospek customer ini yang masih berjalan (Permintaan s.d. DO) — untuk tautan aktivitas.
+  const custProspects = useMemo(() => {
+    const k = customerKey(customer || '');
+    if (!k) return [] as Prospect[];
+    return prospects
+      .filter((p) => customerKey(p.customer) === k && Number(p.status) >= 1 && Number(p.status) <= 5)
+      .sort((a, b) => Number(a.status) - Number(b.status) || String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  }, [prospects, customer]);
+  const activeOnly = custProspects.filter((p) => Number(p.status) <= 3);
+  const prospectId = prospectPick ?? (!editId && activeOnly.length === 1 ? activeOnly[0].id : '');
 
   const filledPics = useMemo(
     () => pics.map((p) => ({ ...p, nama: p.nama.trim(), jabatan: p.jabatan.trim(), phone: (p.phone || '').trim(), email: (p.email || '').trim() })).filter((p) => p.nama || p.jabatan || p.phone || p.email),
@@ -279,14 +295,19 @@ export function SalesActivityModal() {
         hasil: showHasil ? hasil : null,
         followUp: showHasil && hasil && hasil !== 'tersambung' ? followUp : null,
         langkah: langkah.trim(),
+        ...(linkLocked ? {} : { prospectId: prospectId || null }),
         ...(loc || {}),
       };
       const res = editId
-        ? await api.put<{ activity: SalesActivity }>(`/api/sales-activities/${editId}`, payload)
-        : await api.post<{ activity: SalesActivity; followUpCreated?: boolean }>('/api/sales-activities', payload);
+        ? await api.put<{ activity: SalesActivity; prospectFollowUp?: string | null }>(`/api/sales-activities/${editId}`, payload)
+        : await api.post<{ activity: SalesActivity; followUpCreated?: boolean; prospectFollowUp?: string | null; prospectScheduleDone?: boolean }>('/api/sales-activities', payload);
       const activity = res.activity;
+      const linkedP = activity.prospectId ? prospectById.get(activity.prospectId) : null;
       setActivities((list) => (list.some((a) => a.id === activity.id) ? list.map((a) => (a.id === activity.id ? activity : a)) : [activity, ...list]));
-      const extra = [activity.followUpId ? `rencana follow-up ${formatDateID(followUp)} dibuat` : '', tipe === 'kunjungan' ? (loc ? 'lokasi tercatat' : 'lokasi tidak tersedia') : ''].filter(Boolean).join(' · ');
+      const extra = [
+        res.prospectFollowUp && linkedP ? `jadwal follow-up prospek ${linkedP.customer} ${formatDateID(res.prospectFollowUp)}` : activity.followUpId ? `rencana follow-up ${formatDateID(followUp)} dibuat` : '',
+        'prospectScheduleDone' in res && res.prospectScheduleDone ? 'jadwal follow-up prospek selesai' : '',
+        tipe === 'kunjungan' ? (loc ? 'lokasi tercatat' : 'lokasi tidak tersedia') : ''].filter(Boolean).join(' · ');
       toast(`${editId ? 'Aktivitas diperbarui' : 'Aktivitas tersimpan'}${extra ? ` — ${extra}` : ''}`, 'success');
       resetForm();
       // Rencana follow-up / perubahan bulan: muat ulang supaya daftar & ringkasan bulan benar.
@@ -310,6 +331,9 @@ export function SalesActivityModal() {
     setHasil(a.status === 'rencana' ? '' : (a.hasil as Hasil) || '');
     setFollowUp('');
     setLangkah(a.langkah || '');
+    setProspectPick(a.prospectId || '');
+    // Asal pipeline (konversi) & baris otomatis: tautannya tidak diubah dari form ini.
+    setLinkLocked(!!a.prospectId && a.sumber !== 'tautan' && !(a.status === 'rencana' && a.sumber === 'aktivitas'));
     setTried(false);
     // Menyelesaikan rencana follow-up dari hasil kontak: dicatat hari ini.
     if (a.status === 'rencana') setTanggal(localToday());
@@ -474,8 +498,27 @@ export function SalesActivityModal() {
             </div>
             <div>
               <label>{tr("Customer *")}</label>
-              <CustomerNameInput value={customer} onChange={setCustomer} />
+              <CustomerNameInput value={customer} onChange={(v) => { setCustomer(v); if (!linkLocked) setProspectPick(null); }} />
             </div>
+            {(custProspects.length > 0 || prospectId) && (
+              <div className="full">
+                <label>
+                  {tr("Prospek terkait")}{' '}
+                  <span className="field-note" style={{ display: 'inline', textTransform: 'none' }}>
+                    {linkLocked ? tr("— aktivitas ini asal pipeline / otomatis, tautannya tetap") : tr("— aktivitas & jadwal follow-up masuk ke riwayat prospek ini")}
+                  </span>
+                </label>
+                <select value={prospectId} disabled={linkLocked} onChange={(e) => setProspectPick(e.target.value)}>
+                  <option value="">{tr("— tidak terkait prospek —")}</option>
+                  {(prospectId && !custProspects.some((p) => p.id === prospectId) && prospectById.get(prospectId) ? [prospectById.get(prospectId) as Prospect, ...custProspects] : custProspects).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {STATUS_META[Number(p.status)]?.label || p.status} · {(p.uraian || '-').slice(0, 60)} · {formatRupiah(p.value)}{p.se ? ` · ${p.se}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {!editId && prospectPick === null && activeOnly.length === 1 && <div className="field-note" style={{ margin: '2px 0 0' }}>{tr("Dipilih otomatis — satu-satunya prospek aktif customer ini.")}</div>}
+              </div>
+            )}
             {kanals && (
               <div className="full">
                 <label>
@@ -761,7 +804,7 @@ export function SalesActivityModal() {
                     <td style={{ minWidth: 250 }}>
                       {a.prospectId ? (
                         <span className="badge green" title={p ? `Nilai ${formatRupiah(p.value)}` : undefined}>
-                          {a.sumber === 'followup' ? tr("Follow-up prospek") : tr("Di pipeline")}
+                          {a.sumber === 'followup' ? tr("Follow-up prospek") : a.sumber === 'tautan' ? tr("Terkait prospek") : tr("Di pipeline")}
                           {p ? ` · ${STATUS_META[Number(p.status)]?.label ?? ''}` : ''}
                         </span>
                       ) : canWrite && permProspek && a.sumber !== 'purchasing' && (!owner || a.se.toLowerCase() === owner.toLowerCase()) ? (

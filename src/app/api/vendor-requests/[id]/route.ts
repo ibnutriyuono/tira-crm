@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { normalizeHppItems, docForRole } from '@/lib/rfq-price';
 import { emitCrmEvent } from '@/lib/socket';
 import type { RfqItem } from '@/lib/types';
-import { cleanVrItems, fmtDate, vrFromRow, waNumber, waUrl } from '@/lib/vendor-request';
+import { asVrLang, cleanVrItems, VR_TEXT, vrFromRow, vrReminderText, waNumber, waUrl } from '@/lib/vendor-request';
 import { vrEmailHtml } from '@/lib/vendor-request-server';
 
 /**
@@ -58,11 +58,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body.action === 'reminder') {
     const doc = q.rfqId ? await prisma.rfq.findUnique({ where: { id: q.rfqId }, select: { noRfq: true } }) : await prisma.fupa.findUnique({ where: { id: q.fupaId || '' }, select: { noFupa: true } });
     const no = (doc && ('noRfq' in doc ? doc.noRfq : doc.noFupa)) || 'RFQ';
-    const text = `Dengan hormat${q.vendor.pic ? ` Bapak/Ibu ${q.vendor.pic}` : ''},\n\nMengingatkan permintaan penawaran harga kami (ref. ${no}) tanggal ${fmtDate(q.tglDiminta)}${q.tenggat ? ` dengan tenggat ${fmtDate(q.tenggat)}` : ''}. Mohon kabar harga dan lead time-nya.\n\nTerima kasih,\n${user.name}\nPurchasing – PT. TIRA AUSTENITE, Tbk`;
+    const lang = asVrLang(q.lang);
+    const text = vrReminderText(lang, { pic: q.vendor.pic, docNo: no, tglDiminta: q.tglDiminta, tenggat: q.tenggat, sender: user.name });
     let email: 'ok' | 'gagal' | null = null;
     const to = String(q.vendor.email || '').split(/[;,\s]+/).filter((e) => validEmail(e));
     if ((q.channel === 'email' || q.channel === 'both') && to.length && mailConfigured()) {
-      const r = await sendCustomerMail({ userId: user.id, kind: 'vendor-rfq', senderName: `Purchasing (${user.name})`, replyTo: user.email || undefined, to, cc: [], subject: `Pengingat: permintaan penawaran harga — ${no}`, html: vrEmailHtml(text, []), text, attachments: [] });
+      const r = await sendCustomerMail({ userId: user.id, kind: 'vendor-rfq', senderName: `Purchasing (${user.name})`, replyTo: user.email || undefined, to, cc: [], subject: VR_TEXT[lang].reminderSubject(no), html: vrEmailHtml(text, [], lang), text, attachments: [] });
       email = r.ok ? 'ok' : 'gagal';
     }
     const num = waNumber(q.vendor.wa);

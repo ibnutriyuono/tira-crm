@@ -197,15 +197,27 @@ export async function seTargetScopeWhere(user: SafeUser) {
  * against it — this mirrors the single-file app's cabangRegMap().
  */
 export async function cabangRegMap(): Promise<Record<string, number>> {
-  const rows = await prisma.prospect.findMany({
-    where: { cabang: { not: null }, reg: { not: null } },
-    select: { cabang: true, reg: true },
-    distinct: ['cabang'],
-  });
+  // Regional per cabang = yang PALING BANYAK dipakai prospek cabang itu, bukan
+  // baris pertama yang kebetulan terbaca — satu prospek impor dengan regional
+  // salah tidak boleh memindahkan lead / RFQ baru ke regional lain. Cabang yang
+  // belum punya prospek memakai regional akun BM / Sales-nya.
+  const [rows, users] = await Promise.all([
+    prisma.prospect.groupBy({ by: ['cabang', 'reg'], where: { cabang: { not: null }, reg: { not: null } }, _count: { _all: true } }),
+    prisma.user.groupBy({ by: ['cabang', 'reg'], where: { cabang: { not: null }, reg: { not: null }, pausedAt: null }, _count: { _all: true } }),
+  ]);
+  const best = (list: { cabang: string | null; reg: number | null; _count: { _all: number } }[]) => {
+    const tally: Record<string, { reg: number; n: number }> = {};
+    list.forEach((r) => {
+      if (!r.cabang || r.reg == null) return;
+      const c = r.cabang.trim().toUpperCase();
+      const cur = tally[c];
+      if (!cur || r._count._all > cur.n) tally[c] = { reg: r.reg, n: r._count._all };
+    });
+    return tally;
+  };
   const map: Record<string, number> = {};
-  rows.forEach((r) => {
-    if (r.cabang && r.reg != null) map[r.cabang.toUpperCase()] = r.reg;
-  });
+  Object.entries(best(users)).forEach(([c, v]) => (map[c] = v.reg));
+  Object.entries(best(rows)).forEach(([c, v]) => (map[c] = v.reg));
   return map;
 }
 
@@ -227,7 +239,9 @@ export async function docScopeWhere(
 ) {
   const { cabangField = 'cabang', requestedByField = 'requestedBy', regField = 'reg', table = 'rfq' } = fields;
 
-  if (user.role === 'purchasing05') return { id: { in: await line05DocIds(table) } };
+  // Purchasing hanya menerima dokumen yang sudah "Kirim ke Purchasing" (bukan Draft).
+  if (user.role === 'purchasing05') return { id: { in: await line05DocIds(table) }, status: { not: 'Draft' } };
+  if (user.role === 'purchasing') return { status: { not: 'Draft' } };
 
   if (user.role === 'sales') {
     return {

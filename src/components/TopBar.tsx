@@ -151,6 +151,12 @@ export function TopBar() {
             </button>
           )}
           {currentUser.role === 'admin' && (
+            <button className="btn btn-ghost-dark" onClick={() => openModal('stockUpload')} title={tr("Unggah data stok gudang dari Sage")}>
+              <IconDatabase />
+              {tr("Data Stok")}
+            </button>
+          )}
+          {currentUser.role === 'admin' && (
             <button className="btn btn-ghost-dark" onClick={() => openModal('opsRules')} title={tr("Pengingat & eskalasi Operation, margin minimum Surat Penawaran")}>
               <IconCheckSquare />
               {tr("Batas Waktu & Margin")}

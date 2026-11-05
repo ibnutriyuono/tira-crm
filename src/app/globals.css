@@ -755,6 +755,9 @@ tr.hl-yellow:hover td{ background:rgba(201,130,46,.18); }
 }
 .purch-card:hover{ box-shadow:var(--shadow-1); }
 .purch-card-head{ display:flex; gap:6px; flex-wrap:wrap; }
+.purch-pic{ margin-top:3px; font-size:11px; line-height:1.35; color:var(--text-soft); white-space:nowrap; }
+.purch-pic b{ font-weight:600; color:var(--text); }
+.purch-card .purch-pic{ margin:4px 0 0; }
 .purch-card-no{ font-weight:700; font-size:13px; color:var(--graphite-900); }
 .purch-card-meta{ display:flex; flex-direction:column; font-size:11.5px; color:var(--text-soft); }
 .purch-card-mat{ font-size:12px; }
@@ -1438,6 +1441,8 @@ body:has(.chat-fab) .modal-foot{padding-right:88px}
 .vr-items{display:flex;flex-direction:column;gap:2px;max-height:140px;overflow:auto;background:#fff;border:1px solid var(--border);border-radius:6px;padding:6px 8px}
 .vr-items label{flex-direction:row!important;gap:6px!important;font-weight:400!important;color:var(--text)!important;font-size:13px!important}
 .vr-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.vr-lang{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;font-weight:600}
+.vr-lang .muted{font-weight:400}
 .vr-attach{display:flex;gap:14px;flex-wrap:wrap}
 .vr-attach label{flex-direction:row!important;gap:5px!important;font-weight:400!important;color:var(--text)!important;font-size:13px!important}
 /* Hasil QCD dengan / tanpa RFQ */
@@ -2042,3 +2047,55 @@ button.dk-tile:hover{border-color:var(--steel-500); box-shadow:var(--shadow-1);}
 .rfq-link.need{border-color:#c47f2c; background:#fdf6ec;}
 .rfq-link.warn{border-style:dashed;}
 .rfq-link select{width:100%;}
+
+/* Stok gudang: saran harga di form prospek + modal Data Stok (Admin) */
+.stk-sug{margin-top:8px;padding:8px 10px;border:1px solid #CFE0D6;background:#F3F9F5;border-radius:8px;font-size:12.5px}
+.stk-sug.stk-quiet{border-color:var(--border);background:var(--bg);color:var(--text-soft);display:flex;gap:6px;align-items:center}
+.stk-head{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
+.stk-head b{color:#1D5A37;font-size:13px}
+.stk-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.stk-list li{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;min-width:0}
+.stk-list li.local{border-color:#9CC9AE}
+.stk-l1{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.stk-desc{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.stk-price{margin-left:auto;font-weight:700;font-family:var(--font-ibm-plex-mono),monospace;white-space:nowrap}
+.stk-l2{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:3px}
+.stk-l2 .btn{margin-left:auto}
+.stk-fsv{margin-left:6px;font-size:11px;font-weight:600;padding:1px 6px;border-radius:999px}
+.stk-fsv.green{background:#E3F1E8;color:#1D5A37}.stk-fsv.amber{background:var(--amber-100);color:var(--amber-600)}.stk-fsv.rust{background:#F6E3DE;color:#8C3A26}
+.stk-locs{display:flex;gap:4px;flex-wrap:wrap}
+.stk-locs span{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:0 5px;font-size:11.5px;white-space:nowrap}
+.stk-locs span.here{background:#E3F1E8;border-color:#9CC9AE;color:#1D5A37;font-weight:600}
+.stk-sug .link-btn{margin-top:4px}
+.stk-up{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:10px}
+.stk-up>div{flex:1;min-width:260px}
+.stk-up-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+.stk-table td{vertical-align:top}
+.stk-locs-cell{font-size:11.5px;min-width:180px}
+.chk-inline{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;white-space:nowrap}
+
+/* Panel prospek: margin & perjalanan */
+.dk-mg-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;margin-bottom:8px}
+.dk-mg-sum>div{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 8px;min-width:0}
+.dk-mg-sum small{display:block;font-size:10.5px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em}
+.dk-mg-sum b{font-family:var(--font-ibm-plex-mono),monospace;font-size:13px;white-space:nowrap}
+.dk-tl{list-style:none;margin:0;padding:0 0 0 14px;border-left:2px solid var(--border)}
+.dk-tl li{position:relative;padding:0 0 9px 8px;font-size:12.5px}
+.dk-tl li::before{content:"";position:absolute;left:-20px;top:3px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2px solid #94A3B8}
+.dk-tl li.steel::before{border-color:#456484}.dk-tl li.amber::before{border-color:#C47F2C}.dk-tl li.green::before{border-color:#1D6E42;background:#1D6E42}
+.dk-tl li.rust::before{border-color:#A04028}.dk-tl li.violet::before{border-color:#6D4FA8}
+.dk-tl-t{font-weight:600}
+.dk-tl-s{color:var(--text-soft);font-size:11.5px}
+.dk-act{padding:6px 0;border-bottom:1px dashed var(--border);font-size:12.5px}
+.dk-act.plan{opacity:.85}
+.dk-act-h{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.dk-act-h .muted{margin-left:auto;font-size:11.5px}
+.dk-act-t{margin-top:2px;overflow-wrap:anywhere}
+.dk-rfq{margin-bottom:10px}
+.dk-rfq-m{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11.5px;color:var(--text-soft);margin:-1px 0 4px 2px}
+.dk-msg{display:block;width:100%;text-align:left;padding:7px 9px;margin-bottom:5px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12.5px}
+.dk-msg:hover{border-color:var(--steel-500);background:var(--steel-100)}
+.dk-msg-h{display:flex;gap:4px;align-items:baseline;flex-wrap:wrap}
+.dk-msg-at{margin-left:auto;font-size:11px}
+.dk-msg-t{margin:2px 0;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.dk-rfq .dk-items{table-layout:fixed}.dk-rfq .dk-items td:last-child{width:42%;white-space:normal;overflow-wrap:anywhere}

@@ -116,14 +116,15 @@ export function FupaModal() {
     if (!items.some((it) => (it.material || '').trim())) return toast('Isi minimal satu material permintaan pembelian', 'error');
     const phone = normalizePhone(purchasingContact.wa);
     if (phone.length < 9) return toast('Nomor WhatsApp Purchasing tidak valid. Isi dulu lewat modal RFQ.', 'error');
-    await save(true);
+    // WhatsApp / Email hanya mengirim pesan; FUP A masuk modul Purchasing lewat "Kirim ke Purchasing".
+    await save(false, 'FUP A disimpan — belum masuk modul Purchasing');
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(messageText())}`, '_blank');
   }
 
   async function sendEmail() {
     if (!items.some((it) => (it.material || '').trim())) return toast('Isi minimal satu material permintaan pembelian', 'error');
     if (!purchasingContact.email) return toast('Email Purchasing belum diisi. Isi dulu lewat modal RFQ.', 'error');
-    await save(true);
+    await save(false, 'FUP A disimpan — belum masuk modul Purchasing');
     const subject = encodeURIComponent(`FUP A ${noFupa || ''} - ${cabang || ''} - ${customer || ''}`);
     const body = `${messageText()}\n\nMohon lampirkan file Excel FUP A hasil unduhan pada email ini sebelum dikirim.`;
     window.open(`mailto:${purchasingContact.email}?subject=${subject}&body=${encodeURIComponent(body)}`, '_blank');
@@ -183,9 +184,8 @@ export function FupaModal() {
   }
 
   /**
-   * Hands the FUP A to the internal Purchasing module. Same `markSent` write as
-   * the WA/Email buttons — those additionally open an outgoing message to the
-   * external Purchasing contact, this one stays inside the system.
+   * Hands the FUP A to the internal Purchasing module (status -> Terkirim).
+   * Only this button does that — WhatsApp / Email / Excel / Form SPP just save.
    */
   async function sendToPurchasing() {
     await save(true, 'FUP A berhasil dikirim ke modul Purchasing');

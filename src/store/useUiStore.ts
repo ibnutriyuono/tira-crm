@@ -38,6 +38,7 @@ export type ModalKey =
   | 'leadResults'
   | 'campaign'
   | 'productInsight'
+  | 'stockUpload'
   | 'marginApprovals'
   | 'salesPlan'
   | 'notifications'

@@ -195,6 +195,9 @@ export interface Fupa {
   purchJawaban: string | null;
   sentToPurchasingAt: string | null;
   openedByPurchasingAt: string | null;
+  /** PIC Purchasing yang membuka / menjawab. */
+  openedByName?: string | null;
+  jawabanByName?: string | null;
   noQuote: boolean;
   cancelledAt: string | null;
   cancelledBy: string | null;
@@ -221,6 +224,9 @@ export interface Rfq {
   fupaId: string | null;
   sentToPurchasingAt: string | null;
   openedByPurchasingAt: string | null;
+  /** PIC Purchasing yang membuka / menjawab. */
+  openedByName?: string | null;
+  jawabanByName?: string | null;
   noQuote: boolean;
   cancelledAt: string | null;
   cancelledBy: string | null;

@@ -134,7 +134,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const prev = await prisma.rfq.findUnique({ where: { id }, select: { openedByPurchasingAt: true } });
     if (!prev) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
     if (prev.openedByPurchasingAt) return NextResponse.json({ ok: true });
-    const rfq = await prisma.rfq.update({ where: { id }, data: { openedByPurchasingAt: new Date() } });
+    const rfq = await prisma.rfq.update({ where: { id }, data: { openedByPurchasingAt: new Date(), openedById: user.id, openedByName: user.name } });
     emitCrmEvent('rfq:updated', rfq);
     return NextResponse.json({ rfq: docForRole(rfq, user.role) });
   }
@@ -188,6 +188,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         ...(typeof body.purchNotes === 'string' ? { purchNotes: body.purchNotes } : {}),
         ...(typeof body.purchJawaban === 'string' ? { purchJawaban: body.purchJawaban } : {}),
         ...(body.action === 'send-jawaban' ? { jawabanRfqDikirim: true, jawabanRfqAt: new Date() } : {}),
+        // PIC penjawab: pengirim jawaban, atau yang pertama mengisi harga / COO.
+        ...(body.action === 'send-jawaban' || (!prev.jawabanByName && items.some((it: RfqItem) => it.hargaPurchasing || it.coo))
+          ? { jawabanById: user.id, jawabanByName: user.name }
+          : {}),
       },
     });
     emitCrmEvent('rfq:updated', rfq);

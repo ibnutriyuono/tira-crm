@@ -49,6 +49,7 @@ export interface VendorRequest {
   balasAt: string | null;
   requestedBy: string | null;
   catatan: string | null;
+  lang: VrLang;
   createdAt: string;
 }
 
@@ -83,7 +84,71 @@ export function vrLines(items: RfqItem[], idxs?: number[]): VrLine[] {
 }
 
 const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-export const fmtDate = (d: string | null | undefined) => (d && /^\d{4}-\d{2}-\d{2}/.test(d) ? `${Number(d.slice(8, 10))} ${BLN[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}` : '');
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** Bahasa permintaan harga ke vendor: Indonesia (default) atau Inggris (vendor / mill luar negeri). */
+export type VrLang = 'id' | 'en';
+export const asVrLang = (v: unknown): VrLang => (v === 'en' ? 'en' : 'id');
+export const fmtDate = (d: string | null | undefined, lang: VrLang = 'id') =>
+  d && /^\d{4}-\d{2}-\d{2}/.test(d) ? `${Number(d.slice(8, 10))} ${(lang === 'en' ? MON : BLN)[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}` : '';
+
+/** Teks tetap untuk pesan, lampiran PDF/Excel, WhatsApp dan pengingat. */
+export const VR_TEXT = {
+  id: {
+    subject: (no: string) => `Permintaan penawaran harga — ${no}`,
+    reminderSubject: (no: string) => `Pengingat: permintaan penawaran harga — ${no}`,
+    title: 'Permintaan Penawaran Harga (Request for Quotation)',
+    xlsTitle: 'PT. TIRA AUSTENITE, Tbk — Permintaan Penawaran Harga',
+    ref: 'Ref.',
+    dueBy: 'Mohon dibalas paling lambat',
+    lokasi: 'Lokasi kirim',
+    kontak: 'Kontak',
+    cols: ['No', 'Line', 'Material', 'Dimensi (mm)', 'Pcs', 'Berat (kg)', 'Harga / satuan'],
+    xlsCols: ['NO', 'LINE', 'MATERIAL', 'DIMENSI (MM)', 'PCS', 'BERAT (KG)', 'HARGA / SATUAN', 'MATA UANG', 'LEAD TIME', 'ASAL', 'CATATAN'],
+    pdfNote: 'Mohon cantumkan harga per satuan, mata uang, lead time / ketersediaan stok, negara asal dan masa berlaku penawaran.',
+    attachments: 'Lampiran',
+    waPdf: 'Daftar item (PDF)',
+    waXlsx: 'Daftar item (Excel)',
+    waGambar: 'Gambar kerja',
+  },
+  en: {
+    subject: (no: string) => `Request for quotation — ${no}`,
+    reminderSubject: (no: string) => `Reminder: request for quotation — ${no}`,
+    title: 'Request for Quotation',
+    xlsTitle: 'PT. TIRA AUSTENITE, Tbk — Request for Quotation',
+    ref: 'Ref.',
+    dueBy: 'Please reply by',
+    lokasi: 'Delivery to',
+    kontak: 'Contact',
+    cols: ['No', 'Line', 'Material', 'Dimension (mm)', 'Pcs', 'Weight (kg)', 'Unit price'],
+    xlsCols: ['NO', 'LINE', 'MATERIAL', 'DIMENSION (MM)', 'PCS', 'WEIGHT (KG)', 'UNIT PRICE', 'CURRENCY', 'LEAD TIME', 'ORIGIN', 'REMARKS'],
+    pdfNote: 'Please state the unit price, currency, lead time / stock availability, country of origin and quotation validity.',
+    attachments: 'Attachments',
+    waPdf: 'Item list (PDF)',
+    waXlsx: 'Item list (Excel)',
+    waGambar: 'Drawing',
+  },
+} as const;
+
+/** Nama PIC tanpa sapaan yang sudah tertulis di data vendor ("Pak Herman" → "Herman"), supaya tidak dobel. */
+export const picName = (pic: string | null | undefined) => String(pic || '').trim().replace(/^(bapak|pak|bpk\.?|ibu|bu|mr\.?|mrs\.?|ms\.?)\s+/i, '');
+
+/** Ganti sapaan {pic} dengan nama PIC vendor — atau sapaan umum bila PIC kosong. */
+export function vrGreet(message: string, rawPic: string | null | undefined, vendorNama: string): string {
+  const pic = picName(rawPic);
+  return message
+    .replace(/ Bapak\/Ibu \{pic\}/g, pic ? ` Bapak/Ibu ${pic}` : '')
+    .replace(/Dear Mr\.\/Ms\. \{pic\}/g, pic ? `Dear Mr./Ms. ${pic}` : 'Dear Sir/Madam')
+    .replace(/\{pic\}/g, pic || '')
+    .replace(/\{vendor\}/g, vendorNama);
+}
+
+/** Pesan pengingat ke vendor. */
+export function vrReminderText(lang: VrLang, raw: { pic?: string | null; docNo: string; tglDiminta: string | null; tenggat: string | null; sender: string }): string {
+  const i = { ...raw, pic: picName(raw.pic) };
+  if (lang === 'en')
+    return `${i.pic ? `Dear Mr./Ms. ${i.pic}` : 'Dear Sir/Madam'},\n\nThis is a friendly reminder of our request for quotation (ref. ${i.docNo}) dated ${fmtDate(i.tglDiminta, 'en')}${i.tenggat ? `, due ${fmtDate(i.tenggat, 'en')}` : ''}. We look forward to receiving your price and lead time.\n\nBest regards,\n${i.sender}\nPurchasing – PT. TIRA AUSTENITE, Tbk (Steel Division)`;
+  return `Dengan hormat${i.pic ? ` Bapak/Ibu ${i.pic}` : ''},\n\nMengingatkan permintaan penawaran harga kami (ref. ${i.docNo}) tanggal ${fmtDate(i.tglDiminta)}${i.tenggat ? ` dengan tenggat ${fmtDate(i.tenggat)}` : ''}. Mohon kabar harga dan lead time-nya.\n\nTerima kasih,\n${i.sender}\nPurchasing – PT. TIRA AUSTENITE, Tbk`;
+}
 
 export interface VrMessageInput {
   vendorPic?: string;
@@ -96,7 +161,20 @@ export interface VrMessageInput {
 }
 
 /** Pesan default (bisa diedit Purchasing sebelum dikirim). */
-export function vrDefaultMessage(i: VrMessageInput): string {
+export function vrDefaultMessage(i: VrMessageInput, lang: VrLang = 'id'): string {
+  if (lang === 'en') {
+    const head = `Dear ${i.vendorPic ? `Mr./Ms. ${i.vendorPic}` : 'Sir/Madam'},\n\nPlease send us your best quotation for the following material (ref. ${i.docNo}):`;
+    const rows = i.lines.map((l) => `${l.no}. ${l.material}${l.dimensi ? ` — ${l.dimensi}` : ''} · ${l.pcs || '-'} pcs${l.beratKg ? ` (${l.beratKg} kg)` : ''}`).join('\n');
+    const tail = [
+      i.lokasi ? `Delivery to: ${i.lokasi}` : '',
+      i.tenggat ? `Please reply by ${fmtDate(i.tenggat, 'en')}.` : '',
+      'Kindly state the unit price, currency, lead time / stock availability and country of origin.',
+      i.catatan,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    return `${head}\n${rows}\n\n${tail}\n\nBest regards,\n${i.sender}\nPurchasing – PT. TIRA AUSTENITE, Tbk (Steel Division)`;
+  }
   const head = `Dengan hormat${i.vendorPic ? ` Bapak/Ibu ${i.vendorPic}` : ''},\n\nMohon penawaran harga terbaik untuk material berikut (ref. ${i.docNo}):`;
   const rows = i.lines.map((l) => `${l.no}. ${l.material}${l.dimensi ? ` — ${l.dimensi}` : ''} · ${l.pcs || '-'} pcs${l.beratKg ? ` (${l.beratKg} kg)` : ''}`).join('\n');
   const tail = [
@@ -145,6 +223,7 @@ export function vrFromRow(q: Record<string, unknown> & { vendor?: { nama: string
     balasAt: iso(q.balasAt),
     requestedBy: (q.requestedBy as string) || null,
     catatan: (q.catatan as string) || null,
+    lang: asVrLang(q.lang),
     createdAt: iso(q.createdAt) || '',
   };
 }

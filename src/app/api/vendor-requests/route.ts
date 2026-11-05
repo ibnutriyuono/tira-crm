@@ -10,14 +10,14 @@ import { canSeeVendors } from '@/lib/roles';
 import { getObjectBuffer, isS3Configured, presignGet } from '@/lib/s3';
 import { emitCrmEvent } from '@/lib/socket';
 import type { RfqItem } from '@/lib/types';
-import { vrFromRow, vrLines, waNumber, waUrl } from '@/lib/vendor-request';
+import { asVrLang, VR_TEXT, vrFromRow, vrGreet, vrLines, waNumber, waUrl } from '@/lib/vendor-request';
 import { appBaseUrl, buildVrPdf, buildVrXlsx, vrEmailHtml, vrFileUrl, vrToken } from '@/lib/vendor-request-server';
 
 /**
  * Minta harga ke vendor (Purchasing).
  *   GET  ?rfqId= | ?fupaId=         → { requests }
  *   POST { rfqId | fupaId, vendors: [{ vendorId, channel: email|wa|both }],
- *          idxs?, tenggat, lokasi, subject, message, attach: { pdf, xlsx, gambar } }
+ *          idxs?, tenggat, lokasi, subject, message, attach: { pdf, xlsx, gambar }, lang: id|en }
  *     → email terpisah per vendor (tanpa nama customer) + tautan WhatsApp
  *       (dibuka berurutan di browser). { results: [{ vendorId, requestId, email, waUrl }] }
  */
@@ -72,7 +72,9 @@ export async function POST(req: Request) {
   if (!lines.length) return NextResponse.json({ error: 'Pilih minimal satu item.' }, { status: 400 });
   const tenggat = /^\d{4}-\d{2}-\d{2}$/.test(String(body.tenggat || '')) ? String(body.tenggat) : '';
   const lokasi = String(body.lokasi || '').slice(0, 120);
-  const subject = String(body.subject || `Permintaan penawaran harga — ${doc.no}`).slice(0, 200);
+  const lang = asVrLang(body.lang);
+  const T = VR_TEXT[lang];
+  const subject = String(body.subject || T.subject(doc.no)).slice(0, 200);
   const message = String(body.message || '').slice(0, 8000);
   if (!message.trim()) return NextResponse.json({ error: 'Isi pesan wajib.' }, { status: 400 });
   const attach = (body.attach || {}) as { pdf?: boolean; xlsx?: boolean; gambar?: boolean };
@@ -85,7 +87,7 @@ export async function POST(req: Request) {
   if (wantsEmail && !mailConfigured()) return NextResponse.json({ error: 'Server email belum diatur — pilih WhatsApp saja.', code: 'NO_SMTP' }, { status: 503 });
 
   // Lampiran (dibuat sekali, dipakai untuk semua email).
-  const meta = { docNo: doc.no, tenggat, lokasi, sender: user.name };
+  const meta = { docNo: doc.no, tenggat, lokasi, sender: user.name, lang };
   const files: { filename: string; content: Buffer; contentType: string }[] = [];
   const safeNo = doc.no.replace(/[^\w-]+/g, '_');
   if (attach.pdf) files.push({ filename: `RFQ_Vendor_${safeNo}.pdf`, content: await buildVrPdf(lines, meta), contentType: 'application/pdf' });
@@ -115,15 +117,12 @@ export async function POST(req: Request) {
     if (!v) continue;
     const ch = p.channel === 'email' || p.channel === 'wa' || p.channel === 'both' ? (p.channel as string) : 'email';
     const existing = await prisma.quotation.findFirst({ where: { vendorId: v.id, ...(rfqId ? { rfqId } : { fupaId }) } });
-    const data = { tglDiminta: today, channel: ch, tenggat: tenggat || null, sentAt: new Date(), requestedBy: user.name, catatan: lokasi ? `Lokasi kirim: ${lokasi}` : null };
+    const data = { tglDiminta: today, lang, channel: ch, tenggat: tenggat || null, sentAt: new Date(), requestedBy: user.name, catatan: lokasi ? `Lokasi kirim: ${lokasi}` : null };
     const q = existing
       ? await prisma.quotation.update({ where: { id: existing.id }, data: { ...data, status: 'menunggu', balasAt: null } })
       : await prisma.quotation.create({ data: { ...data, vendorId: v.id, rfqId, fupaId, status: 'menunggu' } });
     if (!q.token) await prisma.quotation.update({ where: { id: q.id }, data: { token: vrToken(q.id) } });
-    const greet = message
-      .replace(/ Bapak\/Ibu \{pic\}/g, v.pic ? ` Bapak/Ibu ${v.pic}` : '')
-      .replace(/\{pic\}/g, v.pic || '')
-      .replace(/\{vendor\}/g, v.nama);
+    const greet = vrGreet(message, v.pic, v.nama);
     const r: (typeof results)[number] = { vendorId: v.id, vendorNama: v.nama, requestId: q.id, email: null, waUrl: null };
     if (ch === 'email' || ch === 'both') {
       const to = String(v.email || '').split(/[;,\s]+/).filter((e) => validEmail(e));
@@ -138,7 +137,7 @@ export async function POST(req: Request) {
           to,
           cc: [],
           subject,
-          html: vrEmailHtml(greet, all.map((f) => f.filename)),
+          html: vrEmailHtml(greet, all.map((f) => f.filename), lang),
           text: greet,
           attachments: all,
         });
@@ -150,9 +149,9 @@ export async function POST(req: Request) {
       const num = waNumber(v.wa);
       if (num) {
         const links = [
-          attach.pdf ? `Daftar item (PDF): ${vrFileUrl(base, q.id, 'pdf')}` : '',
-          attach.xlsx ? `Daftar item (Excel): ${vrFileUrl(base, q.id, 'xlsx')}` : '',
-          ...gambarLinks.filter((g) => g.url).map((g) => `Gambar kerja ${g.name}: ${g.url}`),
+          attach.pdf ? `${T.waPdf}: ${vrFileUrl(base, q.id, 'pdf')}` : '',
+          attach.xlsx ? `${T.waXlsx}: ${vrFileUrl(base, q.id, 'xlsx')}` : '',
+          ...gambarLinks.filter((g) => g.url).map((g) => `${T.waGambar} ${g.name}: ${g.url}`),
         ].filter(Boolean);
         r.waUrl = waUrl(num, links.length ? `${greet}\n\n${links.join('\n')}` : greet);
       }
@@ -173,7 +172,7 @@ export async function POST(req: Request) {
     action: 'create',
     entity: 'quotation',
     entityId: results[0]?.requestId || user.id,
-    summary: `Minta harga ${doc.no} ke ${results.length} vendor (${lines.length} item): ${results.map((r) => r.vendorNama).join(', ')}`,
+    summary: `Minta harga ${doc.no} ke ${results.length} vendor (${lines.length} item${lang === 'en' ? ', bahasa Inggris' : ''}): ${results.map((r) => r.vendorNama).join(', ')}`,
   });
   return NextResponse.json({ results });
 }

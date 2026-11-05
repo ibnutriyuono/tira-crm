@@ -98,6 +98,7 @@ const OR_GROUP_AT: Partial<Record<keyof OpsRules, string>> = {
   rfqTargetHari: 'Operation (RFQ & barang)',
   leadTugasHari: 'Lead Marketing',
   marginMin: 'Persetujuan margin bertingkat',
+  stockMarginPct: 'Stok gudang',
 };
 
 function toDraft(r: OpsRules): Record<keyof OpsRules, string> {

@@ -58,6 +58,7 @@ import { SppFormModal } from './modals/SppFormModal';
 import { LeadResultsModal } from './modals/LeadResultsModal';
 import { CampaignModal } from './modals/CampaignModal';
 import { ProductInsightModal } from './modals/ProductInsightModal';
+import { StockUploadModal } from './modals/StockUploadModal';
 import { MarginApprovalsModal } from './modals/MarginApprovalsModal';
 import { CustomerFormModal } from './modals/CustomerFormModal';
 import { ImportModal } from './modals/ImportModal';
@@ -219,6 +220,7 @@ export function CrmApp() {
       <LeadResultsModal />
       <CampaignModal />
       <ProductInsightModal />
+      <StockUploadModal />
       <MarginApprovalsModal />
       <DatabaseModal />
       <DbImportConfirmModal />

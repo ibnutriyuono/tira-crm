@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma';
 import { emitCrmEvent } from '@/lib/socket';
 import { notify, purchasingUserIds, requesterUserIds } from '@/lib/notify';
 import { guard } from '@/lib/permissions-server';
+import { canDeleteFupa } from '@/lib/roles';
 
 /** Satu FUP A (versi sesuai role) — untuk client ber-hak saat event socket membawa versi tanpa catatan internal. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -92,7 +93,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body?.action === 'mark-opened') {
     if (!canEditPurchasing(user)) return NextResponse.json({ ok: false }, { status: 403 });
     if (existing.openedByPurchasingAt) return NextResponse.json({ ok: true });
-    const fupa = await prisma.fupa.update({ where: { id }, data: { openedByPurchasingAt: new Date() } });
+    const fupa = await prisma.fupa.update({ where: { id }, data: { openedByPurchasingAt: new Date(), openedById: user.id, openedByName: user.name } });
     emitCrmEvent('fupa:updated', fupa);
     return NextResponse.json({ fupa: docForRole(fupa, user.role) });
   }
@@ -144,7 +145,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       data: {
         ...(typeof body.purchNotes === 'string' ? { purchNotes: body.purchNotes } : {}),
         ...(typeof body.purchJawaban === 'string' ? { purchJawaban: body.purchJawaban } : {}),
-        ...(answering ? { jawabanFupaDikirim: true, jawabanFupaAt: new Date() } : {}),
+        ...(answering ? { jawabanFupaDikirim: true, jawabanFupaAt: new Date(), jawabanById: user.id, jawabanByName: user.name } : {}),
       },
     });
     emitCrmEvent('fupa:updated', fupa);
@@ -201,8 +202,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (isResponse(user)) return user;
-  const denied = await guard(user, 'rfq', 'd');
-  if (denied) return denied;
+  if (!canDeleteFupa(user.role)) return NextResponse.json({ error: 'FUP A hanya dapat dihapus oleh Admin, GM, GM Operation atau VP.' }, { status: 403 });
   const { id } = await params;
 
   const existing = await prisma.fupa.findUnique({ where: { id } });

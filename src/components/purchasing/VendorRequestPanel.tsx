@@ -7,10 +7,12 @@ import {
   VR_CHANNEL_LABEL,
   VR_STATUS_META,
   fmtDate,
+  VR_TEXT,
   vrDefaultMessage,
   vrLines,
   type VendorRequest,
   type VrItemPrice,
+  type VrLang,
 } from '@/lib/vendor-request';
 import { AVL_META, avlOf, suggestVendors } from '@/lib/vendor-profile';
 import { useDataStore } from '@/store/useDataStore';
@@ -18,6 +20,10 @@ import { useT } from '@/store/useLangStore';
 import { IconMail, IconWa } from '../icons';
 
 const CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'CNY', 'JPY'];
+/** Vendor impor / berlokasi di luar Indonesia — default permintaan dalam bahasa Inggris. */
+const isForeign = (v: { asal?: string | null; negara?: string | null }) =>
+  (v.asal || '').toLowerCase() === 'impor' || (!!v.negara && !/^(indonesia|id|ri)$/i.test(v.negara.trim()));
+
 const addDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 
 /**
@@ -177,7 +183,7 @@ export function VendorRequestPanel({
                       <b>{r.vendorNama}</b>
                       {r.reminders > 0 && <div className="muted">{tr("diingatkan")} {r.reminders}×</div>}
                     </td>
-                    <td>{VR_CHANNEL_LABEL[r.channel || ''] || r.channel || '-'}</td>
+                    <td>{VR_CHANNEL_LABEL[r.channel || ''] || r.channel || '-'}{r.lang === 'en' && <span className="badge steel" style={{ marginLeft: 6 }} title={tr("Dikirim dalam bahasa Inggris")}>EN</span>}</td>
                     <td>{fmtDate(r.tglDiminta)}</td>
                     <td className={late ? 'vr-late' : ''}>{fmtDate(r.tenggat) || '-'}{late ? ` · ${tr("lewat")}` : ''}</td>
                     <td><span className={`badge ${VR_STATUS_META[r.status].color}`}>{tr(VR_STATUS_META[r.status].label)}</span></td>
@@ -291,12 +297,21 @@ function ComposeVr({
   const [picked, setPicked] = useState<Record<string, string>>({});
   const [idxs, setIdxs] = useState<number[]>(() => items.map((_, i) => i));
   const [tenggat, setTenggat] = useState(addDays(3));
-  const [lokasi, setLokasi] = useState(cabang ? `Gudang ${cabang}` : '');
-  const [subject, setSubject] = useState(`Permintaan penawaran harga — ${noDoc}`);
+  const [lokasiEdit, setLokasi] = useState<string | null>(null);
+  // Bahasa: otomatis Inggris bila semua vendor terpilih impor / luar negeri, sampai Purchasing memilih sendiri.
+  const [langPick, setLangPick] = useState<VrLang | null>(null);
+  const [subjectEdit, setSubjectEdit] = useState<string | null>(null);
   const [attach, setAttach] = useState({ pdf: true, xlsx: false, gambar: true });
   const [busy, setBusy] = useState(false);
   const lines = useMemo(() => vrLines(items, idxs), [items, idxs]);
-  const defaultMsg = useMemo(() => vrDefaultMessage({ vendorPic: '{pic}', docNo: noDoc, lines, tenggat, lokasi, catatan: '', sender }), [noDoc, lines, tenggat, lokasi, sender]);
+  const autoLang: VrLang = useMemo(() => {
+    const vs = vendors.filter((v) => v.id in picked);
+    return vs.length > 0 && vs.every((v) => isForeign(v)) ? 'en' : 'id';
+  }, [vendors, picked]);
+  const lang = langPick || autoLang;
+  const subject = subjectEdit ?? VR_TEXT[lang].subject(noDoc);
+  const lokasi = lokasiEdit ?? (cabang ? (lang === 'en' ? `${cabang} warehouse, Indonesia` : `Gudang ${cabang}`) : '');
+  const defaultMsg = useMemo(() => vrDefaultMessage({ vendorPic: '{pic}', docNo: noDoc, lines, tenggat, lokasi, catatan: '', sender }, lang), [noDoc, lines, tenggat, lokasi, sender, lang]);
   const [message, setMessage] = useState('');
   const [edited, setEdited] = useState(false);
   const msg = edited ? message : defaultMsg;
@@ -329,6 +344,7 @@ function ComposeVr({
         subject,
         message: msg,
         attach,
+        lang,
       });
       const mails = res.results.filter((r) => r.email === 'ok').length;
       const failed = res.results.filter((r) => r.email === 'gagal' || r.email === 'tanpa-email').map((r) => `${r.vendorNama}${r.email === 'tanpa-email' ? ' (tanpa email)' : ''}`);
@@ -402,12 +418,35 @@ function ComposeVr({
           <label>{tr("Tenggat balas")}<input type="date" value={tenggat} onChange={(e) => setTenggat(e.target.value)} /></label>
           <label>{tr("Lokasi kirim")}<input type="text" value={lokasi} onChange={(e) => setLokasi(e.target.value)} /></label>
         </div>
-        <label>{tr("Subjek email")}<input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} /></label>
+        <div className="vr-lang">
+          <span>{tr("Bahasa permintaan")}</span>
+          <div className="view-toggle" role="radiogroup" aria-label={tr("Bahasa permintaan")}>
+            {(['id', 'en'] as const).map((l) => (
+              <button
+                key={l}
+                type="button"
+                role="radio"
+                aria-checked={lang === l}
+                className={lang === l ? 'active' : ''}
+                onClick={() => {
+                  if (edited && l !== lang && !window.confirm(tr('Pesan yang sudah diubah akan diganti teks otomatis dalam bahasa yang dipilih. Lanjutkan?'))) return;
+                  setLangPick(l);
+                  setEdited(false);
+                  setSubjectEdit(null);
+                }}
+              >
+                {l === 'id' ? 'Indonesia' : 'English'}
+              </button>
+            ))}
+          </div>
+          {!langPick && autoLang === 'en' && <span className="muted">{tr("otomatis: vendor impor / luar negeri")}</span>}
+        </div>
+        <label>{tr("Subjek email")}<input type="text" value={subject} onChange={(e) => setSubjectEdit(e.target.value)} /></label>
         <label>
           {tr("Pesan (email & WhatsApp)")} {edited && <button type="button" className="link-btn" onClick={() => setEdited(false)}>{tr("kembalikan otomatis")}</button>}
           <textarea rows={9} value={msg} onChange={(e) => { setEdited(true); setMessage(e.target.value); }} />
         </label>
-        <div className="field-note" style={{ margin: 0 }}>{tr("{pic} diganti nama PIC vendor. Nama customer tidak dikirim ke vendor.")}</div>
+        <div className="field-note" style={{ margin: 0 }}>{tr("{pic} diganti nama PIC vendor. Nama customer tidak dikirim ke vendor.")}{lang === 'en' ? ` ${tr("Lampiran PDF/Excel, tautan WhatsApp dan pengingat juga dalam bahasa Inggris.")}` : ''}</div>
         <div className="vr-attach">
           <label><input type="checkbox" checked={attach.pdf} onChange={(e) => setAttach({ ...attach, pdf: e.target.checked })} /> {tr("Daftar item (PDF)")}</label>
           <label><input type="checkbox" checked={attach.xlsx} onChange={(e) => setAttach({ ...attach, xlsx: e.target.checked })} /> {tr("Daftar item (Excel)")}</label>

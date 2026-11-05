@@ -9,7 +9,7 @@ import { AttachmentList } from '../AttachmentList';
 import { ProspectIssueSection } from '../issues/ProspectIssueSection';
 import { MaterialSpecEditor } from '../MaterialSpecEditor';
 import { CABANG_LIST, STATUS_META } from '@/lib/constants';
-import { formatFileSize, formatRupiah, getProspectMaterials, materialUnitPrice, num } from '@/lib/format';
+import { formatFileSize, formatRupiah, getProspectMaterials, materialUnitPrice, num, todayStr } from '@/lib/format';
 import { ATTACHMENT_MAX_BYTES } from '@/lib/constants';
 import { emptyRow, isFabRow, materialToRow, rowToMaterial, type SpecRow } from '@/lib/material-spec';
 import { isStokKond, legacyStok, stockSummary } from '@/lib/item-stock';
@@ -22,7 +22,9 @@ import { QcdFields } from '../QcdFields';
 import { useRoster } from '../issues/shared';
 import { loseDateProblem } from '@/lib/lose-date';
 import type { Prospect } from '@/lib/types';
-import { canSetFaktur } from '@/lib/roles';
+import { canSeeHpp, canSetFaktur } from '@/lib/roles';
+import { isPurchasingRoleClient } from '@/lib/doc-lines';
+import { loadStockData } from '@/hooks/useStock';
 
 import { FollowUpFields } from '../FollowUpMoveModal';
 import { followUpDateProblem, followUpRequiredOnMove, jakartaDate } from '@/lib/followup-rule';
@@ -209,6 +211,30 @@ export function ProspectFormModal() {
 
   // Daftar Sales (akun dengan kode SE) untuk dropdown; disaring ke cabang yang dipilih.
   const roster = useRoster();
+
+  // Lampiran FUP A (Purchasing): dicetak dari data prospek yang tersimpan.
+  const allRfqs = useDataStore((s) => s.rfqs);
+  const canPrintFupaAtt = canSeeHpp(currentUser?.role) || isPurchasingRoleClient(currentUser?.role || '');
+  const [printing, setPrinting] = useState(false);
+  async function printFupaAtt(mode: 'print' | 'pdf') {
+    if (!editing) return;
+    setPrinting(true);
+    try {
+      const [{ buildPurchaseRequest }, { purchaseRequestPdf, pdfDownload, pdfPrint }, stock] = await Promise.all([import('@/lib/purchase-attachment'), import('@/lib/purch-pdf'), loadStockData()]);
+      const seCode = (editing.se || '').trim().toUpperCase();
+      const u = roster.find((x) => (x.se || '').trim().toUpperCase() === seCode && seCode);
+      const rfqs = allRfqs.filter((r) => r.prospectId === editing.id && !r.cancelledAt);
+      const showHpp = canSeeHpp(currentUser?.role) && !rfqs.some((r) => (r as { hppHidden?: boolean }).hppHidden);
+      const d = buildPurchaseRequest(editing, { rfqs, stock: stock.items, stockAsOf: stock.meta?.asOf || null, salesName: u ? `${u.name} (${seCode})` : seCode || '-', showHpp });
+      const pdf = await purchaseRequestPdf(d, currentUser?.name || '-');
+      if (mode === 'pdf') pdfDownload(pdf, `Lampiran_FUP_A_${editing.customer}_${todayStr()}.pdf`);
+      else pdfPrint(pdf);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Gagal membuat PDF', 'error');
+    } finally {
+      setPrinting(false);
+    }
+  }
   const seOptions = useMemo(() => {
     const cab = cabang.trim().toUpperCase();
     const list = roster
@@ -382,6 +408,12 @@ export function ProspectFormModal() {
       footer={
         <>
           {readOnly && <span className="field-note" style={{ margin: '0 auto 0 0' }}>{tr("Hanya-baca — role Anda tidak memiliki hak mengubah prospek.")}</span>}
+          {canPrintFupaAtt && editing && (
+            <span style={{ display: 'inline-flex', gap: 6, marginRight: 'auto' }}>
+              <button type="button" className="btn btn-outline" disabled={printing} onClick={() => void printFupaAtt('print')} title={tr("Cetak lampiran FUP A dari prospek ini (data tersimpan)")}>🖨 {tr("Cetak lampiran FUP A")}</button>
+              <button type="button" className="btn btn-outline" disabled={printing} onClick={() => void printFupaAtt('pdf')} title={tr("Unduh PDF lampiran FUP A")}>⤓ PDF</button>
+            </span>
+          )}
           <button type="button" className="btn btn-outline" onClick={closeModal}>
             {readOnly ? tr("Tutup") : tr("Batal")}
           </button>
@@ -497,7 +529,7 @@ export function ProspectFormModal() {
         )}
         <div className="full">
           <label>{tr("Daftar Material")}</label>
-          <MaterialSpecEditor variant="prospek" rows={rows} onChange={setRows} hideSummary />
+          <MaterialSpecEditor variant="prospek" rows={rows} onChange={setRows} hideSummary cabang={cabang} />
           {hasFab && (
             <div style={{ marginTop: 10, padding: '10px 12px', border: '1px solid #EEDFC8', borderRadius: 8, background: '#FFFBF4' }}>
               <label style={{ display: 'block', marginBottom: 6 }}>{tr("Gambar kerja Line 05 (maks.")} {formatFileSize(ATTACHMENT_MAX_BYTES)}{tr("/file)")}</label>

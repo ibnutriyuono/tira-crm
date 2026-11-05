@@ -18,7 +18,8 @@ import { isOpenIssue } from '@/lib/issues';
 import { IconEdit, IconTrash, IconWa } from './icons';
 import { AttachmentList } from './AttachmentList';
 import { ItemChat } from './ItemChat';
-import { WORKFLOW_META, WORKFLOW_STAGES, workflowStage } from '@/lib/purchasing-workflow';
+import { WORKFLOW_META, WORKFLOW_STAGES, workflowStage, type WorkflowStage } from '@/lib/purchasing-workflow';
+import type { VendorRequest } from '@/lib/vendor-request';
 import { formatDateID, formatDateTimeID, formatRupiah, normalizeLine, num, todayStr } from '@/lib/format';
 import { api } from '@/lib/api-client';
 import { getSocket } from '@/lib/socket-client';
@@ -48,6 +49,8 @@ interface PurchDoc {
   purchNotes: string | null;
   sentToPurchasingAt: string | null;
   openedByPurchasingAt: string | null;
+  openedByName: string | null;
+  jawabanByName: string | null;
   noQuote: boolean;
   cancelledAt: string | null;
   cancelledBy: string | null;
@@ -86,6 +89,8 @@ function toDoc(r: Rfq | Fupa, jenis: PurchDocType): PurchDoc {
     purchNotes: r.purchNotes,
     sentToPurchasingAt: r.sentToPurchasingAt,
     openedByPurchasingAt: r.openedByPurchasingAt,
+    openedByName: r.openedByName ?? null,
+    jawabanByName: r.jawabanByName ?? null,
     noQuote: r.noQuote,
     jawabanFupaDikirim: isRfq ? undefined : (r as Fupa).jawabanFupaDikirim,
     sourceNoRfq: isRfq ? undefined : (r as Fupa).sourceNoRfq || '-',
@@ -180,6 +185,22 @@ function recordLineKey(d: PurchDoc): string {
 const CURRENCY_OPTIONS = ['IDR', 'USD', 'EUR', 'SGD', 'CNY', 'JPY'];
 const UOM_OPTIONS = ['KG', 'PCS', 'MT', 'LOT', 'M', 'BATANG', 'LEMBAR'];
 
+/** Nama PIC Purchasing di bawah badge status: yang membuka (Diterima) & yang menjawab (Dijawab). */
+function StatusPic({ d }: { d: PurchDoc }) {
+  const tr = useT();
+  const st = workflowStage(d);
+  if (st === 1 || st === 6) return null;
+  const opened = d.openedByName && d.openedByPurchasingAt;
+  const answered = st === 3 || st === 4 ? d.jawabanByName : null;
+  if (!opened && !answered) return null;
+  return (
+    <div className="purch-pic">
+      {opened && <div title={formatDateTimeID(d.openedByPurchasingAt!)}>{tr("Dibuka oleh")} <b>{d.openedByName}</b></div>}
+      {answered && <div title={d.answeredAt ? formatDateTimeID(d.answeredAt) : ''}>{tr("Dijawab oleh")} <b>{answered}</b></div>}
+    </div>
+  );
+}
+
 /** One row of the worklist, shared by the flat and grouped renderings. */
 function PurchasingRow({ d, chatCount, onDetail, onCancel }: { d: PurchDoc; chatCount: number; onDetail: (d: PurchDoc) => void; onCancel: ((d: PurchDoc) => void) | null }) {
   const tr = useT();
@@ -206,7 +227,7 @@ function PurchasingRow({ d, chatCount, onDetail, onCancel }: { d: PurchDoc; chat
       <td className="center">{chatCount ? <span className="item-chat-bubble">{chatCount > 9 ? '9+' : chatCount}</span> : '-'}</td>
       <td>{d.requestedBy || '-'}</td>
       <td className="center">{d.itemCount}</td>
-      <td><span className={`badge ${meta.color}`}>{meta.label}</span></td>
+      <td><span className={`badge ${meta.color}`}>{meta.label}</span><StatusPic d={d} /></td>
       <td>
         <div className="row-actions">
           <button type="button" className="btn btn-outline btn-sm" onClick={() => onDetail(d)}>{tr("Detail")}</button>
@@ -284,9 +305,11 @@ export function PurchasingBoard({
 
   const docs = useMemo(
     () =>
+      // Hanya dokumen yang sudah "Kirim ke Purchasing" — Draft (termasuk yang baru
+      // dikirim lewat WhatsApp / Email) belum masuk antrean Purchasing.
       [
-        ...rfqs.map((r) => toDoc(r, 'RFQ')),
-        ...fupas.map((f) => toDoc(f, 'FUPA')),
+        ...rfqs.filter((r) => r.status !== 'Draft').map((r) => toDoc(r, 'RFQ')),
+        ...fupas.filter((f) => f.status !== 'Draft').map((f) => toDoc(f, 'FUPA')),
       ].sort((a, b) => (b.tglDoc || '').localeCompare(a.tglDoc || '')),
     [rfqs, fupas],
   );
@@ -350,6 +373,43 @@ export function PurchasingBoard({
   }, [docs, jenisFilter, lineFilter, statusFilter, search]);
 
   const lineKpis = useMemo(() => buildLineKpis(docs), [docs]);
+
+  const me = useDataStore((s) => s.currentUser);
+  async function printList(mode: 'print' | 'pdf') {
+    try {
+      const { worklistPdf, pdfDownload, pdfPrint } = await import('@/lib/purch-pdf');
+      const label = [
+        jenisFilter && (jenisFilter === 'RFQ' ? 'RFQ' : 'FUP A'),
+        lineFilter && (lineFilter === NO_LINE ? lineFilter : `Line ${lineFilter}`),
+        statusFilter && WORKFLOW_META[Number(statusFilter) as WorkflowStage]?.label.replace(/^\d+\.\s*/, ''),
+        search.trim() && `cari "${search.trim()}"`,
+      ].filter(Boolean).join(' · ');
+      const doc = await worklistPdf({
+        rows: filtered.map((d) => ({
+          jenis: d.jenis,
+          noDoc: d.noDoc,
+          tglDoc: d.tglDoc,
+          cabang: d.cabang,
+          customer: d.customer,
+          requestedBy: d.requestedBy,
+          items: d.items,
+          stage: workflowStage(d),
+          sentAt: d.sentAt,
+          openedAt: d.openedByPurchasingAt,
+          openedByName: d.openedByName,
+          answeredAt: d.answeredAt,
+          jawabanByName: d.jawabanByName,
+        })),
+        filterLabel: label,
+        printedBy: me?.name || '-',
+      });
+      if (mode === 'pdf') pdfDownload(doc, `Permintaan_Masuk_${todayStr()}.pdf`);
+      else pdfPrint(doc);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Gagal membuat PDF', 'error');
+    }
+  }
+
 
   // groupBy 'line'/'status' takes over ordering entirely (rows are shown
   // section by section, newest first within each section); otherwise the flat
@@ -613,6 +673,8 @@ export function PurchasingBoard({
               ))}
             </select>
             <input type="search" className="search-grow" placeholder={tr("Cari No dokumen / customer / cabang...")} value={search} onChange={(e) => setSearch(e.target.value)} />
+            <button type="button" className="btn btn-outline btn-sm" disabled={!filtered.length} onClick={() => void printList('print')} title={tr("Cetak daftar sesuai filter")}>🖨 {tr("Cetak")}</button>
+            <button type="button" className="btn btn-outline btn-sm" disabled={!filtered.length} onClick={() => void printList('pdf')} title={tr("Unduh PDF daftar sesuai filter")}>⤓ PDF</button>
             <div className="view-toggle">
               <button type="button" className={masukView === 'table' ? 'active' : ''} onClick={() => setMasukView('table')}>{tr("Tabel")}</button>
               <button type="button" className={masukView === 'card' ? 'active' : ''} onClick={() => setMasukView('card')}>{tr("Kartu")}</button>
@@ -646,6 +708,7 @@ export function PurchasingBoard({
                       <span className={`badge ${d.jenis === 'RFQ' ? 'steel' : 'amber'}`}>{d.jenis === 'RFQ' ? 'RFQ' : 'FUP A'}</span>
                       <span className={`badge ${meta.color}`}>{meta.label}</span>
                     </div>
+                    <StatusPic d={d} />
                     <div className="purch-card-no mono">{d.noDoc || '-'}</div>
                     <div className="purch-card-meta">
                       <span>{formatDateID(d.tglDoc)} · {d.cabang || '-'}</span>
@@ -749,6 +812,27 @@ function PurchDetail({
   const me = useDataStore((s) => s.currentUser);
   const canReportIssue = !!me && (isPurchasingRoleClient(me.role) || me.role === 'admin');
   const src = useDataStore((s) => (doc.jenis === 'RFQ' ? s.rfqs.find((r) => r.id === doc.id) : s.fupas.find((f) => f.id === doc.id)));
+  const [printing, setPrinting] = useState(false);
+  async function printDoc(mode: 'print' | 'pdf') {
+    if (!src) return;
+    setPrinting(true);
+    try {
+      const isRfq = doc.jenis === 'RFQ';
+      const f = src as Fupa;
+      // FUP A dicetak dengan tata letak yang sama: kolom FUP A dipetakan ke bentuk RFQ.
+      const rfq = (isRfq ? src : { ...f, noRfq: f.noFupa, tglRfq: f.tglFupa, jawabanRfqAt: f.jawabanFupaAt, jawabanRfqDikirim: f.jawabanFupaDikirim }) as Rfq & { hppHidden?: boolean };
+      const showVendor = canSeeVendors(me?.role);
+      const vendorRequests = showVendor ? (await api.get<{ requests: VendorRequest[] }>(`/api/vendor-requests?${isRfq ? 'rfqId' : 'fupaId'}=${src.id}`).catch(() => ({ requests: [] }))).requests : [];
+      const { rfqPdf, pdfDownload, pdfPrint } = await import('@/lib/purch-pdf');
+      const pdf = await rfqPdf({ rfq, vendorRequests, printedBy: me?.name || '-', showHpp: canSeeHpp(me?.role) && !rfq.hppHidden, showVendor, jenis: doc.jenis });
+      if (mode === 'pdf') pdfDownload(pdf, `${isRfq ? 'RFQ' : 'FUP_A'}_${rfq.noRfq || src.id}.pdf`);
+      else pdfPrint(pdf);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Gagal membuat PDF', 'error');
+    } finally {
+      setPrinting(false);
+    }
+  }
 
   return (
     <div className="dialog-backdrop" role="dialog" aria-modal="true" onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(17,22,28,.45)', display: 'grid', placeItems: 'center', zIndex: 60, padding: 16 }}>
@@ -758,6 +842,12 @@ function PurchDetail({
             {doc.jenis === 'RFQ' ? 'RFQ' : 'FUP A'} {doc.noDoc || tr("(tanpa nomor)")}
           </h2>
           <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+            {src && (
+              <>
+                <button type="button" className="btn btn-outline btn-sm" disabled={printing} onClick={() => void printDoc('print')} title={tr("Cetak dokumen ini")}>🖨 {tr("Cetak")}</button>
+                <button type="button" className="btn btn-outline btn-sm" disabled={printing} onClick={() => void printDoc('pdf')} title={tr("Unduh PDF dokumen ini")}>⤓ PDF</button>
+              </>
+            )}
             {canReportIssue && (
               <button type="button" className="btn btn-outline btn-sm btn-flag" onClick={() => setReport(true)}>⚑ {tr("Laporkan masalah")}</button>
             )}
@@ -807,7 +897,12 @@ function PurchDetail({
             </div>
             {doc.openedByPurchasingAt && (
               <div className="text-muted" style={{ fontSize: 11, marginTop: 4 }}>
-                {tr("Dibuka Purchasing")} {formatDateTimeID(doc.openedByPurchasingAt)}
+                {tr("Dibuka Purchasing")} {formatDateTimeID(doc.openedByPurchasingAt)}{doc.openedByName ? ` · ${doc.openedByName}` : ''}
+              </div>
+            )}
+            {doc.jawabanByName && (workflowStage(doc) === 3 || workflowStage(doc) === 4) && (
+              <div className="text-muted" style={{ fontSize: 11, marginTop: 2 }}>
+                {tr("Dijawab Purchasing")}{doc.answeredAt ? ` ${formatDateTimeID(doc.answeredAt)}` : ''} · {doc.jawabanByName}
               </div>
             )}
           </div>

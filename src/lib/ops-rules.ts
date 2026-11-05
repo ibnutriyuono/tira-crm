@@ -28,6 +28,8 @@ export interface OpsRules {
   leadPenawaranHari: number;
   /** Lead belum sampai penawaran lebih dari N hari sejak masuk → eskalasi RM + Marketing pembuatnya. */
   leadEskalasiHari: number;
+  /** Saran harga jual dari stok gudang = HPP × (1 + N%) — markup, sama seperti margin di jawaban RFQ. */
+  stockMarginPct: number;
 }
 
 export const DEFAULT_OPS_RULES: OpsRules = {
@@ -43,6 +45,7 @@ export const DEFAULT_OPS_RULES: OpsRules = {
   leadTugasHari: 1,
   leadPenawaranHari: 3,
   leadEskalasiHari: 5,
+  stockMarginPct: 35,
 };
 
 export const OPS_RULE_FIELDS: { key: keyof OpsRules; label: string; unit: string; hint: string; min: number; max: number }[] = [
@@ -58,6 +61,7 @@ export const OPS_RULE_FIELDS: { key: keyof OpsRules; label: string; unit: string
   { key: 'marginBm', label: 'Batas persetujuan BM', unit: '%', hint: 'Margin terendah yang cukup disetujui BM cabang.', min: -100, max: 100 },
   { key: 'marginRm', label: 'Batas persetujuan RM', unit: '%', hint: 'Margin terendah yang cukup disetujui RM regional.', min: -100, max: 100 },
   { key: 'marginGm', label: 'Batas persetujuan GM', unit: '%', hint: 'Margin terendah yang cukup disetujui GM; di bawahnya VP.', min: -100, max: 100 },
+  { key: 'stockMarginPct', label: 'Margin saran harga dari stok', unit: '%', hint: 'Saran harga jual minimal = HPP stok × (1 + margin). Tampil ke Sales tanpa angka HPP.', min: 0, max: 300 },
 ];
 
 export function normalizeOpsRules(raw: unknown): OpsRules {

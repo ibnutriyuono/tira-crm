@@ -1,31 +1,55 @@
-import { STATUS_META } from './constants';
+import { cabangRegMap } from './auth';
+import { cabangKey, STATUS_META } from './constants';
 import { leadSourceLabel } from './leads';
-import { bmUserIds, notify, seUserIds } from './notify';
+import { bmUserIds, branchUserIds, notify, seUserIds } from './notify';
 import { prisma } from './prisma';
 import { emitCrmEvent } from './socket';
 import type { SafeUser } from './types';
 
 type LeadRow = { id: string; customer: string; cabang: string | null; reg: number | null; se: string | null; status: number; leadSource: string | null; leadBy: string | null; leadById: string | null; leadAt: Date | string | null; leadAssignedAt?: Date | string | null; leadQuotedAt?: Date | string | null; penawaranTerkirim?: boolean };
 
+/** Regional lead: dari prospek, atau dari peta cabang → regional, atau dari akun BM cabangnya. */
+async function leadReg(p: Pick<LeadRow, 'cabang' | 'reg'>, bm: string[]): Promise<number | null> {
+  if (p.reg != null) return p.reg;
+  const fromMap = (await cabangRegMap())[cabangKey(p.cabang)];
+  if (fromMap != null) return fromMap;
+  if (!bm.length) return null;
+  const u = await prisma.user.findFirst({ where: { id: { in: bm }, reg: { not: null } }, select: { reg: true } });
+  return u?.reg ?? null;
+}
+
 /**
- * Lead baru: BM cabang tujuan (bila tidak ada BM aktif: RM regionalnya) dan
- * Sales yang dipilih Marketing (bila ada) diberi tahu.
+ * Penerima lead di cabang: BM + Admin Sales cabang tujuan, dan RM regionalnya
+ * (tembusan). Cabang dicocokkan dalam bentuk baku (SBY = "sby" = "Surabaya").
  */
-export async function notifyLeadCreated(user: SafeUser, p: LeadRow): Promise<void> {
-  let managers = await bmUserIds(p.cabang);
-  if (!managers.length && p.reg != null) {
-    managers = (await prisma.user.findMany({ where: { pausedAt: null, role: 'rm', reg: p.reg }, select: { id: true } })).map((u) => u.id);
-  }
+export async function leadAudience(p: Pick<LeadRow, 'cabang' | 'reg'>): Promise<{ bm: string[]; admins: string[]; rm: string[] }> {
+  const bm = await bmUserIds(p.cabang);
+  const admins = await branchUserIds(p.cabang, ['salesadmin']);
+  const reg = await leadReg(p, bm);
+  const rm = reg != null ? (await prisma.user.findMany({ where: { pausedAt: null, role: 'rm', reg }, select: { id: true } })).map((u) => u.id) : [];
+  return { bm, admins, rm };
+}
+
+export interface LeadNotified {
+  bm: number;
+  adminSales: number;
+  rm: number;
+  sales: number;
+}
+
+/**
+ * Lead baru: BM + Admin Sales cabang tujuan, RM regionalnya, dan Sales yang
+ * dipilih Marketing (bila ada) diberi tahu. Bila cabang itu tidak punya satu
+ * pun penerima aktif, Marketing pembuatnya dan Admin diberi peringatan —
+ * supaya lead tidak diam-diam tidak sampai ke siapa pun.
+ */
+export async function notifyLeadCreated(user: SafeUser, p: LeadRow): Promise<LeadNotified> {
+  const { bm, admins, rm } = await leadAudience(p);
   const sales = await seUserIds(p.se);
   const src = leadSourceLabel(p.leadSource);
-  await notify({
-    userIds: managers,
-    type: 'lead_new',
-    entity: 'prospect',
-    entityId: p.id,
-    title: `Lead baru dari Marketing: ${p.customer}`,
-    message: `${user.name} memasukkan lead${src ? ` (${src})` : ''} untuk cabang ${p.cabang || '-'}${p.se ? ` — ditugaskan ke SE ${p.se}` : ' — mohon tunjuk Sales yang menangani'}.`,
-  });
+  const msg = `${user.name} memasukkan lead${src ? ` (${src})` : ''} untuk cabang ${p.cabang || '-'}${p.se ? ` — ditugaskan ke SE ${p.se}` : ' — mohon tunjuk Sales yang menangani'}.`;
+  await notify({ userIds: [...bm, ...admins], type: 'lead_new', entity: 'prospect', entityId: p.id, title: `Lead baru dari Marketing: ${p.customer}`, message: msg });
+  await notify({ userIds: rm.filter((id) => !bm.includes(id)), type: 'lead_new', entity: 'prospect', entityId: p.id, title: `Lead baru untuk cabang ${p.cabang || '-'}: ${p.customer}`, message: msg });
   if (sales.length) {
     await notify({
       userIds: sales,
@@ -36,6 +60,18 @@ export async function notifyLeadCreated(user: SafeUser, p: LeadRow): Promise<voi
       message: `Dari ${user.name} (Marketing)${src ? ` · ${src}` : ''}. Mohon segera dihubungi.`,
     });
   }
+  if (!bm.length && !admins.length && !sales.length) {
+    const adminIds = (await prisma.user.findMany({ where: { pausedAt: null, role: 'admin' }, select: { id: true } })).map((u) => u.id);
+    await notify({
+      userIds: [user.id, ...adminIds],
+      type: 'lead_overdue',
+      entity: 'prospect',
+      entityId: p.id,
+      title: `Lead belum sampai ke cabang ${p.cabang || '-'}: ${p.customer}`,
+      message: `Tidak ada akun BM / Admin Sales aktif dengan cabang ${p.cabang || '-'}${rm.length ? ' — hanya RM yang diberi tahu' : ''}. Cek cabang akun di Kelola User, atau tunjuk Sales pada lead ini.`,
+    });
+  }
+  return { bm: bm.length, adminSales: admins.length, rm: rm.length, sales: sales.length };
 }
 
 /**

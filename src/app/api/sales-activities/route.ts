@@ -9,6 +9,7 @@ import { syncCustomerPics } from '@/lib/customer-sync';
 import { guard } from '@/lib/permissions-server';
 import { parseActivityExtras, syncActivityFollowUp } from '@/lib/activity-contact-server';
 import { completeTasksFromActivity } from '@/lib/visit-task-server';
+import { applyActivityToProspect, resolveActivityProspect } from '@/lib/activity-prospect-server';
 
 export async function GET(req: Request) {
   const user = await requireUser();
@@ -50,6 +51,8 @@ export async function POST(req: Request) {
   const ex = parseActivityExtras(body, tipe, tanggal, picRes.pics);
   if ('error' in ex) return NextResponse.json({ error: ex.error }, { status: 400 });
   const { followUp, ...extraCols } = ex.extras;
+  const linked = await resolveActivityProspect(user, body?.prospectId);
+  if ('error' in linked) return NextResponse.json({ error: linked.error }, { status: 400 });
 
   // se / cabang / reg always come from the account, never the request.
   const { reg, cabang } = await resolveProspectScope(user, null);
@@ -65,11 +68,17 @@ export async function POST(req: Request) {
       keterangan: String(body?.keterangan || '').trim() || null,
       pics: picRes.pics as unknown as Prisma.InputJsonValue,
       ...extraCols,
+      prospectId: linked.id,
+      // "tautan": ditautkan manual ke prospek (bukan asal pipeline / konversi).
+      sumber: linked.id ? 'tautan' : null,
       createdBy: user.name || user.username,
     },
   });
-  const followUpId = await syncActivityFollowUp(activity, ex.extras, picRes.pics, user.name || user.username);
-  void followUp;
+  // Tertaut ke prospek: tanggal follow-up menjadi jadwal follow-up prospek itu
+  // (satu rencana "followup"), bukan rencana lepas dari hasil kontak.
+  let followUpId = await syncActivityFollowUp(activity, linked.id ? { ...ex.extras, followUp: null } : ex.extras, picRes.pics, user.name || user.username);
+  const pr = await applyActivityToProspect(user, activity, linked.id ? followUp || null : null);
+  if (pr.followUpSet) followUpId = (await prisma.salesActivity.findFirst({ where: { prospectId: linked.id, status: 'rencana', sumber: 'followup' }, select: { id: true } }))?.id || null;
 
   await logActivity({
     user,
@@ -81,5 +90,5 @@ export async function POST(req: Request) {
   await syncCustomerPics(user, [{ customer, pics: picRes.pics, cabang }], 'Aktivitas Harian');
   // Kunjungan ke customer yang sedang ditugaskan → tugas kunjungan otomatis dilaporkan.
   const tasksDone = await completeTasksFromActivity(activity, user).catch(() => 0);
-  return NextResponse.json({ activity: { ...activity, followUpId }, followUpCreated: !!followUpId, tasksDone }, { status: 201 });
+  return NextResponse.json({ activity: { ...activity, followUpId }, followUpCreated: !!followUpId, prospectFollowUp: pr.followUpSet, prospectScheduleDone: pr.scheduleCleared, tasksDone }, { status: 201 });
 }

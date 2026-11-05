@@ -2,6 +2,17 @@ import { liveLabels } from './i18n';
 
 export const CABANG_LIST = ['BLP', 'MDN', 'SBY', 'PKB', 'CLG', 'BDG', 'MKS', 'CLP', 'PLB', 'PDG', 'DKI', 'BJM', 'SMG'];
 
+/** Nama kota → kode cabang, untuk akun / data yang cabangnya ditulis nama kota. */
+const CABANG_BY_NAME: Record<string, string> = {
+  BALIKPAPAN: 'BLP', MEDAN: 'MDN', SURABAYA: 'SBY', PEKANBARU: 'PKB', CILEGON: 'CLG', BANDUNG: 'BDG', MAKASSAR: 'MKS',
+  CILACAP: 'CLP', PALEMBANG: 'PLB', PADANG: 'PDG', JAKARTA: 'DKI', 'DKI JAKARTA': 'DKI', BANJARMASIN: 'BJM', SEMARANG: 'SMG',
+};
+/** Kode cabang baku: " sby " → "SBY", "Surabaya" → "SBY". */
+export function cabangKey(v: string | null | undefined): string {
+  const k = String(v || '').trim().toUpperCase().replace(/\s+/g, ' ');
+  return CABANG_BY_NAME[k] || k;
+}
+
 export const STATUS_META: Record<number, { label: string; color: string }> = {
   0: { label: 'Sales Activity', color: 'slate' },
   1: { label: 'Permintaan', color: 'steel' },

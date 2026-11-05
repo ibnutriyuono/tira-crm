@@ -379,6 +379,11 @@ model Rfq {
   /// Stamped once, the first time a Purchasing/Admin user opens this
   /// document's detail — drives stage 2 "Diterima". Never re-stamped.
   openedByPurchasingAt DateTime?
+  /// PIC Purchasing yang pertama membuka (Diterima) dan yang menjawab (Dijawab).
+  openedById    String?
+  openedByName  String?
+  jawabanById   String?
+  jawabanByName String?
   /// The only manually-set stage: Purchasing marks this when no vendor can
   /// quote at all. Loses to Dijawab/Selesai so a finished document never
   /// reverts. See lib/purchasing-workflow.ts.
@@ -473,6 +478,11 @@ model Fupa {
   /// Stamped once, the first time a Purchasing/Admin user opens this
   /// document's detail — drives stage 2 "Diterima". Never re-stamped.
   openedByPurchasingAt DateTime?
+  /// PIC Purchasing yang pertama membuka (Diterima) dan yang menjawab (Dijawab).
+  openedById    String?
+  openedByName  String?
+  jawabanById   String?
+  jawabanByName String?
   /// The only manually-set stage: Purchasing marks this when no vendor can
   /// quote at all. Loses to Dijawab/Selesai so a finished document never
   /// reverts. See lib/purchasing-workflow.ts.
@@ -534,6 +544,8 @@ model Quotation {
   balasAt     DateTime?
   /// Token tautan unduh lampiran untuk WhatsApp (tanpa login).
   token       String?
+  /// Bahasa permintaan ke vendor: id | en (lampiran WA & pengingat ikut bahasa ini).
+  lang        String   @default("id")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1043,4 +1055,32 @@ model Campaign {
   createdAt   DateTime @default(now())
 
   @@index([sentAt])
+}
+
+/// Posisi stok gudang (snapshot Inventory Value Report Sage), diunggah manual
+/// oleh Admin sampai integrasi Sage. Setiap unggahan mengganti seluruh isi.
+model StockItem {
+  id          String   @id @default(cuid())
+  itemNo      String
+  line        String?
+  description String
+  size        String?
+  unit        String?
+  qty         Float
+  /// HPP per satuan (Ext. Cost ÷ Qty, atau kolom /kg bila diisi). Null = belum ada.
+  hpp         Float?
+  /// Kode FSV Sage: 1 fast, 2 slow, 3 very slow.
+  fsv         Int?
+  ageDays     Int?
+  /// Qty per lokasi gudang: { "Jakarta": 120, "Surabaya": 40 }.
+  locations   Json     @default("{}")
+  grade       String?
+  /// Grade tanpa akhiran -D / -G, kunci pencocokan (huruf besar, tanpa spasi).
+  gradeKey    String?
+  variant     String?
+  bentuk      String?
+  dim         Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@index([gradeKey])
 }

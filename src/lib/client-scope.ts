@@ -93,9 +93,12 @@ export function matchesDocScope(user: SafeUser, doc: Rfq | Fupa, regionCabangs?:
       return (regionCabangs ?? new Set<string>()).has(doc.cabang.trim().toLowerCase());
     }
     // PIC Line 05: only documents holding a Line 05 item (mirrors line05DocIds).
+    // Purchasing hanya menerima dokumen yang sudah "Kirim ke Purchasing" (bukan Draft).
     case 'purchasing05':
-      return itemsHaveLine(doc.items);
-    // gm, admin and purchasing see everything.
+      return doc.status !== 'Draft' && itemsHaveLine(doc.items);
+    case 'purchasing':
+      return doc.status !== 'Draft';
+    // gm and admin see everything.
     default:
       return true;
   }

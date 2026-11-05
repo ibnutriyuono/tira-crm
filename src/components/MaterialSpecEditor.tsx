@@ -21,6 +21,7 @@ import {
 } from '@/lib/material-spec';
 
 import { useT } from '@/store/useLangStore';
+import { StockSuggest } from './StockSuggest';
 import { useMaterialLexicon } from '@/hooks/useMaterialLexicon';
 import { findGrade, gradeOptions, parseWithLexicon } from '@/lib/material-learn';
 import { STOK_KEYS, STOK_META, needsArrival, type StokKond } from '@/lib/item-stock';
@@ -33,6 +34,8 @@ interface Props {
   renderRowExtra?: (row: SpecRow, idx: number) => React.ReactNode;
   /** The form already shows its own totals. */
   hideSummary?: boolean;
+  /** Prospek: cabang prospek — stok gudang di cabang ini ditandai "Ready stock". */
+  cabang?: string;
 }
 
 const kg = (n: number) => n.toLocaleString('id-ID', { maximumFractionDigits: 2 });
@@ -42,7 +45,7 @@ const kg = (n: number) => n.toLocaleString('id-ID', { maximumFractionDigits: 2 }
  * Bentuk decides which dimension boxes show; berat/pc (rounded up) and the
  * uraian are filled in from them, and either can still be typed over.
  */
-export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hideSummary }: Props) {
+export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hideSummary, cabang = '' }: Props) {
   const tr = useT();
   const [paste, setPaste] = useState('');
   const [showPaste, setShowPaste] = useState(false);
@@ -307,6 +310,15 @@ export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hi
                 </>
               ) : null}
             </div>
+            {prospek && !fab && (
+              <StockSuggest
+                grade={r.grade}
+                bentuk={r.bentuk}
+                dim={r.dim}
+                cabang={cabang}
+                onUse={(p) => update(idx, { ...(p.hargaKg ? { hargaKg: p.hargaKg } : {}), ...(p.stok && !r.stok ? { stok: p.stok } : {}) })}
+              />
+            )}
             {prospek && (
               <div className="msr-stock">
                 <div className="msr-f" style={{ width: 190 }}>

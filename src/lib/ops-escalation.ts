@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
-import { bmUserIds, notify, opsLeadIds, purchasingUserIds, seUserIds, vpIds } from './notify';
+import { leadAudience } from './leads-server';
+import { notify, opsLeadIds, purchasingUserIds, seUserIds, vpIds } from './notify';
 import { normalizeOpsRules, type OpsRules } from './ops-rules';
 import { buildPoIndent } from './po-indent';
 import { rfqAsWorkflowDoc, workflowStage } from './purchasing-workflow';
@@ -36,7 +37,11 @@ export async function sweepOpsEscalation(opts: { force?: boolean; today?: string
     const rules = await getOpsRules();
     const today = opts.today || jakartaToday();
     const row = await prisma.setting.findUnique({ where: { key: SENT_KEY } });
-    const sent = { rfq: {}, eta: {}, lead: {}, ...((row?.value as Record<string, Record<string, number>>) || {}) } as { rfq: Record<string, number>; eta: Record<string, number>; lead: Record<string, number> };
+    const raw = (row?.value as Record<string, Record<string, number>>) || {};
+    // Status pengingat lead disimpan di "lead2": versi lama ("lead") bisa menandai
+    // pengingat terkirim padahal tidak ada penerimanya (akun cabang tidak cocok),
+    // jadi lead yang masih terlambat diingatkan sekali lagi ke penerima yang benar.
+    const sent = { rfq: raw.rfq || {}, eta: raw.eta || {}, lead: raw.lead2 || {} };
     const next: typeof sent = { rfq: {}, eta: {}, lead: {} };
     let changed = false;
 
@@ -98,20 +103,23 @@ export async function sweepOpsEscalation(opts: { force?: boolean; today?: string
       let lvl = was;
       const se = (p.se || '').trim();
       const where = `${p.cabang || '-'} · ${p.customer}`;
-      if (!se && age > rules.leadTugasHari && !(was & 1)) {
-        await notify({ userIds: await bmUserIds(p.cabang), type: 'lead_overdue', entity: 'prospect', entityId: p.id, title: `Lead belum ditunjuk Sales ${age} hari: ${p.customer}`, message: `${where} — lead dari Marketing${p.leadBy ? ` (${p.leadBy})` : ''}. Mohon tunjuk Sales yang menangani.` });
+      const aud = await leadAudience(p);
+      // Tingkat hanya ditandai terkirim bila memang ada penerimanya — akun cabang yang
+      // baru dibetulkan masih akan menerima pengingat pada sapuan berikutnya.
+      const branch = [...aud.bm, ...aud.admins];
+      if (!se && age > rules.leadTugasHari && !(was & 1) && branch.length) {
+        await notify({ userIds: branch, type: 'lead_overdue', entity: 'prospect', entityId: p.id, title: `Lead belum ditunjuk Sales ${age} hari: ${p.customer}`, message: `${where} — lead dari Marketing${p.leadBy ? ` (${p.leadBy})` : ''}. Mohon tunjuk Sales yang menangani.` });
         lvl |= 1;
       }
       if (se) {
         const since = dayDiff((p.leadAssignedAt || p.leadAt!).toISOString().slice(0, 10), today);
         if (since > rules.leadPenawaranHari && !(was & 2)) {
-          await notify({ userIds: [...(await seUserIds(se)), ...(await bmUserIds(p.cabang))], type: 'lead_overdue', entity: 'prospect', entityId: p.id, title: `Lead belum ada penawaran ${since} hari: ${p.customer}`, message: `${where} · SE ${se} — mohon segera hubungi customer & kirim penawaran.` });
+          await notify({ userIds: [...(await seUserIds(se)), ...aud.bm], type: 'lead_overdue', entity: 'prospect', entityId: p.id, title: `Lead belum ada penawaran ${since} hari: ${p.customer}`, message: `${where} · SE ${se} — mohon segera hubungi customer & kirim penawaran.` });
           lvl |= 2;
         }
       }
       if (age > rules.leadEskalasiHari && !(was & 4)) {
-        const rms = p.reg != null ? (await prisma.user.findMany({ where: { pausedAt: null, role: 'rm', reg: p.reg }, select: { id: true } })).map((u) => u.id) : [];
-        const to = Array.from(new Set([...rms, ...(p.leadById ? [p.leadById] : [])]));
+        const to = Array.from(new Set([...aud.rm, ...(p.leadById ? [p.leadById] : [])]));
         await notify({ userIds: to, type: 'lead_overdue', entity: 'prospect', entityId: p.id, title: `Eskalasi lead: ${age} hari belum ada penawaran`, message: `${where} · ${se ? `SE ${se}` : 'belum ada Sales'} — batas ${rules.leadEskalasiHari} hari.` });
         lvl |= 4;
       }
@@ -121,7 +129,7 @@ export async function sweepOpsEscalation(opts: { force?: boolean; today?: string
 
     // Simpan hanya yang masih aktif (RFQ terjawab / barang tiba otomatis terhapus).
     if (changed || Object.keys(sent.rfq).length !== Object.keys(next.rfq).length || Object.keys(sent.eta).length !== Object.keys(next.eta).length || Object.keys(sent.lead).length !== Object.keys(next.lead).length) {
-      const value = next as unknown as Prisma.InputJsonValue;
+      const value = { rfq: next.rfq, eta: next.eta, lead2: next.lead } as unknown as Prisma.InputJsonValue;
       await prisma.setting.upsert({ where: { key: SENT_KEY }, update: { value }, create: { key: SENT_KEY, value } });
     }
   } catch (err) {

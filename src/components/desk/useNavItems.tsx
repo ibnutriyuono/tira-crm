@@ -146,6 +146,7 @@ export function useNavItems(tr: (s: string) => string): { items: NavItem[]; unre
       role === 'admin' && { id: 'db', label: tr('Kelola Database'), group: 'Admin', icon: <IconDatabase />, run: open('database') },
       role === 'admin' && { id: 'users', label: tr('Kelola User'), group: 'Admin', icon: <IconUsers />, run: open('users'), keys: 'password reset akun' },
       role === 'admin' && { id: 'roles', label: tr('Kelola Role'), group: 'Admin', icon: <IconUsers />, run: open('roles'), keys: 'hak akses permission' },
+      role === 'admin' && { id: 'stock', label: tr('Data Stok Gudang'), group: 'Admin', icon: <IconDatabase />, run: open('stockUpload'), keys: 'sage inventory upload stok hpp gudang' },
       role === 'admin' && { id: 'ops', label: tr('Batas Waktu & Margin'), group: 'Admin', icon: <IconCheckSquare />, run: open('opsRules'), keys: 'eskalasi sla' },
       c('log') && { id: 'log', label: tr('Log Aktivitas'), group: 'Admin', icon: <IconActivity />, run: open('activity'), keys: 'audit riwayat' },
       // Data

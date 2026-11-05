@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import type { RfqItem } from '@/lib/types';
-import { vrLines } from '@/lib/vendor-request';
+import { asVrLang, vrLines } from '@/lib/vendor-request';
 import { buildVrPdf, buildVrXlsx, vrToken } from '@/lib/vendor-request-server';
 import { timingSafeEqual } from 'crypto';
 
@@ -22,7 +22,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!doc) return new NextResponse('Tautan tidak valid', { status: 404 });
   const no = ('noRfq' in doc ? doc.noRfq : (doc as { noFupa: string | null }).noFupa) || 'RFQ';
   const lines = vrLines((doc.items as unknown as RfqItem[]) || []);
-  const meta = { docNo: no, tenggat: q.tenggat || '', lokasi: (q.catatan || '').replace(/^Lokasi kirim:\s*/, ''), sender: q.requestedBy || 'Purchasing' };
+  const meta = { docNo: no, tenggat: q.tenggat || '', lokasi: (q.catatan || '').replace(/^Lokasi kirim:\s*/, ''), sender: q.requestedBy || 'Purchasing', lang: asVrLang(q.lang) };
   const safe = no.replace(/[^\w-]+/g, '_');
   const buf = f === 'pdf' ? await buildVrPdf(lines, meta) : await buildVrXlsx(lines, meta);
   return new NextResponse(new Uint8Array(buf), {

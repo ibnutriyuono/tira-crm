@@ -8,6 +8,7 @@ import { syncCustomerPics } from '@/lib/customer-sync';
 import { TIPE_KEYS, activityOwner, normalizeActivityPics, validTanggal } from '@/lib/sales-activity';
 import { guard } from '@/lib/permissions-server';
 import { parseActivityExtras, syncActivityFollowUp } from '@/lib/activity-contact-server';
+import { applyActivityToProspect, resolveActivityProspect } from '@/lib/activity-prospect-server';
 
 async function loadOwn(userSe: string, id: string) {
   const existing = await prisma.salesActivity.findUnique({ where: { id } });
@@ -62,7 +63,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const ex = parseActivityExtras(body, tipe, tanggal, picRes.pics);
   if ('error' in ex) return NextResponse.json({ error: ex.error }, { status: 400 });
   const { followUp, ...extraCols } = ex.extras;
-  void followUp;
+  // Tautan prospek dari form hanya untuk aktivitas biasa / yang ditautkan manual;
+  // asal pipeline (konversi) dan baris otomatis lain tetap pada prospeknya.
+  const ex0 = own.existing!;
+  const linkable = completingPlan || ex0.sumber === 'tautan' || (!ex0.sumber && !ex0.prospectId);
+  const linked = linkable && body && 'prospectId' in body ? await resolveActivityProspect(user, body.prospectId) : { id: ex0.prospectId };
+  if ('error' in linked) return NextResponse.json({ error: linked.error }, { status: 400 });
+  const linkCols = linkable ? { prospectId: linked.id, sumber: linked.id ? 'tautan' : null } : {};
 
   const updated = await prisma.salesActivity.update({
     where: { id },
@@ -74,9 +81,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       pics: picRes.pics as unknown as Prisma.InputJsonValue,
       ...extraCols,
       ...(completingPlan ? { status: 'selesai', sumber: null } : {}),
+      ...linkCols,
     },
   });
-  const followUpId = await syncActivityFollowUp(updated, ex.extras, picRes.pics, user.name || user.username);
+  const viaProspect = linkable && !!linked.id;
+  let followUpId = await syncActivityFollowUp(updated, viaProspect ? { ...ex.extras, followUp: null } : ex.extras, picRes.pics, user.name || user.username);
+  const pr = viaProspect ? await applyActivityToProspect(user, updated, followUp || null) : { followUpSet: null, scheduleCleared: false };
+  if (pr.followUpSet) followUpId = (await prisma.salesActivity.findFirst({ where: { prospectId: linked.id, status: 'rencana', sumber: 'followup' }, select: { id: true } }))?.id || null;
   const activity = { ...updated, followUpId };
   await logActivity({ user, action: 'update', entity: 'salesActivity', entityId: id, summary: `Mengubah aktivitas ${tipe} ke "${customer}" (${tanggal})` });
   await syncCustomerPics(user, [{ customer, pics: picRes.pics, cabang: own.existing!.cabang }], 'Aktivitas Harian');
