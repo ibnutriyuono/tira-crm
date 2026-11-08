@@ -7,6 +7,7 @@ import { formatDateID, formatRupiah, num } from '@/lib/format';
 import { canSeeAdminQueue, canSetFaktur } from '@/lib/roles';
 import { localToday } from '@/lib/sales-activity';
 import type { Prospect } from '@/lib/types';
+import { STATUS_META } from '@/lib/constants';
 import { buildPoIndent, type PoIndentItem } from '@/lib/po-indent';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
@@ -30,8 +31,15 @@ export function missingDocs(p: Prospect): string[] {
 
 /** Jumlah tugas terbuka (untuk badge tombol Antrian Admin). */
 export function adminTaskCount(prospects: Prospect[]): number {
-  return prospects.filter((p) => (num(p.status) === 5 && !p.terfaktur) || missingDocs(p).length > 0 || (num(p.status) >= 1 && num(p.status) <= 3 && !p.penawaranTerkirim) || arrivedItems(p).length > 0).length;
+  return prospects.filter((p) => (num(p.status) === 5 && !p.terfaktur) || missingDocs(p).length > 0 || (penawaranPending(p)) || arrivedItems(p).length > 0).length;
 }
+
+/**
+ * Penawaran belum ditandai terkirim, untuk prospek yang sudah di pipeline
+ * Penawaran Harga (2) sampai Lose Order (6). Sales Activity (0) dan
+ * Permintaan / potensi (1) tidak dihitung.
+ */
+export const penawaranPending = (p: Prospect) => num(p.status) >= 2 && num(p.status) <= 6 && !p.penawaranTerkirim;
 
 /** Item Indent/Import yang sudah tiba di gudang (status dari Purchasing) tapi belum terkirim. */
 export function arrivedItems(p: Prospect): PoIndentItem[] {
@@ -81,7 +89,7 @@ export function AdminQueueModal() {
   const pending = useMemo(
     () =>
       list
-        .filter((p) => num(p.status) >= 1 && num(p.status) <= 3 && !p.penawaranTerkirim)
+        .filter((p) => penawaranPending(p))
         .map((p) => ({ p, age: daysSince(p.tglPenawaran || p.createdAt, today) }))
         .sort((a, b) => (b.age ?? 0) - (a.age ?? 0)),
     [list, today],
@@ -264,13 +272,14 @@ export function AdminQueueModal() {
       {tab === 'penawaran' && (
         <div className="table-wrap" style={{ borderTop: 'none' }}>
           <table className="simple-table">
-            <thead><tr><th>{tr("Customer")}</th><th>SE</th><th>{tr("Tgl penawaran")}</th><th>{tr("Umur")}</th><th>{tr("Nilai")}</th><th></th></tr></thead>
+            <thead><tr><th>{tr("Customer")}</th><th>SE</th><th>{tr("Status")}</th><th>{tr("Tgl penawaran")}</th><th>{tr("Umur")}</th><th>{tr("Nilai")}</th><th></th></tr></thead>
             <tbody>
-              {pending.length === 0 && <tr><td colSpan={6} className="field-note">{tr("Tidak ada penawaran pending.")}</td></tr>}
+              {pending.length === 0 && <tr><td colSpan={7} className="field-note">{tr("Tidak ada penawaran pending.")}</td></tr>}
               {pending.map(({ p, age }) => (
                 <tr key={p.id}>
                   <td style={{ fontWeight: 600 }}>{p.customer}</td>
                   <td>{p.se || '-'}</td>
+                  <td><span className={`badge ${num(p.status) === 6 ? 'rust' : num(p.status) >= 4 ? 'green' : 'steel'}`}>{tr(STATUS_META[num(p.status)]?.label || String(p.status))}</span></td>
                   <td>{p.tglPenawaran ? formatDateID(p.tglPenawaran) : '-'}</td>
                   <td>{age == null ? '-' : <span className={`badge ${age > 7 ? 'rust' : age > 3 ? 'amber' : 'slate'}`}>{age} {tr("hari")}</span>}</td>
                   <td className="mono">{formatRupiah(num(p.value))}</td>

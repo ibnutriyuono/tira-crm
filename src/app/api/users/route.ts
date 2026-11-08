@@ -55,6 +55,8 @@ export async function POST(req: Request) {
       reg: body?.reg ? Number(body.reg) : null,
       email: emailRaw || null,
       passwordHash,
+      createdBy: user.name,
+      createdById: user.id,
     },
   });
 

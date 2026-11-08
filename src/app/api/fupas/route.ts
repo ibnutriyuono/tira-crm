@@ -7,6 +7,7 @@ import { logActivity } from '@/lib/activity';
 import { isResponse, requireUser } from '@/lib/api-helpers';
 import { cabangRegMap, docScopeWhere } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { notifyFupaSubmitted } from '@/lib/fupa-notify';
 import { emitCrmEvent } from '@/lib/socket';
 import { notify, purchasingUserIds } from '@/lib/notify';
 import { guard } from '@/lib/permissions-server';
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
     summary: `Membuat FUP A ${fupa.noFupa || '(tanpa nomor)'} untuk "${fupa.customer || '-'}" (${fupa.status})`,
   });
   if (fupa.status === 'Terkirim') {
+    await notifyFupaSubmitted(user, fupa);
     await notify({
       userIds: await purchasingUserIds(fupa.items),
       type: 'fupa_new',

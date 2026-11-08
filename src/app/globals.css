@@ -2099,3 +2099,18 @@ button.dk-tile:hover{border-color:var(--steel-500); box-shadow:var(--shadow-1);}
 .dk-msg-at{margin-left:auto;font-size:11px}
 .dk-msg-t{margin:2px 0;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .dk-rfq .dk-items{table-layout:fixed}.dk-rfq .dk-items td:last-child{width:42%;white-space:normal;overflow-wrap:anywhere}
+
+/* Kelola User: pencarian, kelompok & audit */
+.users-tools{margin:0 0 10px;gap:8px;flex-wrap:wrap}
+.users-status-filter .btn-audit{margin-left:6px}
+.users-grp td{background:var(--steel-100,#E8EEF4);font-weight:700;color:var(--navy,#1B2430);padding:6px 10px;font-size:12.5px;letter-spacing:.02em}
+.users-audit-cell{font-size:12px;min-width:200px}
+.users-flags{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
+.users-flags .badge{font-size:10.5px}
+.users-audit{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;background:var(--bg)}
+.users-audit-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ua-chip{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer}
+.ua-chip b{margin-right:3px}
+.ua-chip.merah b{color:#A04028}.ua-chip.kuning b{color:#B26A12}.ua-chip.info b{color:var(--text-soft)}
+.ua-chip.on{outline:2px solid var(--steel-500,#456484)}
+.ua-chip:disabled{opacity:.45;cursor:default}

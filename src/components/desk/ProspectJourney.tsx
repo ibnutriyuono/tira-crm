@@ -14,9 +14,9 @@ import { WORKFLOW_META, fupaAsWorkflowDoc, rfqAsWorkflowDoc, workflowStage } fro
 
 interface JEvent { id: string; type: EventType; tgl: string | null; docNo: string | null; title: string; items: ItemEventLine[]; actorName: string; createdAt: string }
 interface JStatus { at: string; by: string; action: string; summary: string }
-interface JApproval { id: string; nomor: string | null; status: string; level: string; requestedByName: string; decidedByName: string | null; decidedAt: string | null; createdAt: string; lowestMargin: number | null }
-interface JMarginLine { idx: number; margin: number | null; below: boolean; hpp?: number | null; price?: number | null; uom?: string; rfqNo: string; kg: number; nilai: number }
-interface JMargin { level: 'margin' | 'full'; minMargin: number; lines: JMarginLine[]; total: { margin: number | null; checked: number; hpp?: number | null; nilai?: number | null; laba?: number | null } }
+interface JApproval { id: string; nomor: string | null; status: string; level: string; requestedByName: string; decidedByName: string | null; decidedAt: string | null; createdAt: string; lowestMargin: number | null; basis?: string; maxDiscount?: number | null }
+interface JMarginLine { idx: number; margin: number | null; below: boolean; discount?: number | null; hpp?: number | null; price?: number | null; ref?: number | null; uom?: string; rfqNo: string; kg: number; nilai: number }
+interface JMargin { level: 'margin' | 'full'; minMargin: number; discSe?: number; lines: JMarginLine[]; total: { margin: number | null; checked: number; hpp?: number | null; nilai?: number | null; laba?: number | null } }
 interface JMsg { id: string; entity: 'prospect' | 'rfq' | 'fupa'; entityId: string; thread: string; author: string; role: string | null; text: string; createdAt: string }
 interface JAct { id: string; tanggal: string; tipe: string; kanal: string | null; hasil: string | null; keterangan: string | null; langkah: string | null; status: string; sumber: string | null; se: string; createdBy: string | null; createdAt: string }
 interface Journey { events: JEvent[]; status: JStatus[]; approvals: JApproval[]; margin: JMargin | null; discussions: JMsg[]; activities: JAct[] }
@@ -98,8 +98,8 @@ export function ProspectJourney({ p, rfqs, fupas }: { p: Prospect; rfqs: Rfq[]; 
     if (!j?.events.some((e) => e.type === 'tawar') && p.tglPenawaran) push(p.tglPenawaran, { title: `${tr('Penawaran')} ${p.penawaranTerkirim ? tr('terkirim') : tr('(pending)')}`, tone: 'steel' });
     if (!j?.events.some((e) => e.type === 'po') && p.tglPO) push(p.tglPO, { title: `PO ${realNo(p.noPo)}`, tone: 'amber' });
     (j?.approvals || []).forEach((a) => {
-      push(a.createdAt, { title: `${tr('Pengajuan margin')} · ${tr('perlu')} ${MARGIN_LEVEL_LABEL[asLevel(a.level)]}`, sub: a.lowestMargin != null ? `${tr('margin terendah')} ${pct(a.lowestMargin)}` : undefined, who: a.requestedByName, tone: 'violet' });
-      if (a.decidedAt) push(a.decidedAt, { title: a.status === 'disetujui' ? tr('Margin disetujui') : tr('Margin ditolak'), who: a.decidedByName || '', tone: a.status === 'disetujui' ? 'green' : 'rust' });
+      push(a.createdAt, { title: `${a.basis === 'diskon' ? tr('Pengajuan diskon') : tr('Pengajuan margin')} · ${tr('perlu')} ${MARGIN_LEVEL_LABEL[asLevel(a.level)]}`, sub: a.basis === 'diskon' ? (a.maxDiscount != null ? `${tr('diskon terbesar')} ${pct(a.maxDiscount)}` : undefined) : a.lowestMargin != null ? `${tr('margin terendah')} ${pct(a.lowestMargin)}` : undefined, who: a.requestedByName, tone: 'violet' });
+      if (a.decidedAt) push(a.decidedAt, { title: a.status === 'disetujui' ? (a.basis === 'diskon' ? tr('Diskon disetujui') : tr('Margin disetujui')) : a.basis === 'diskon' ? tr('Diskon ditolak') : tr('Margin ditolak'), who: a.decidedByName || '', tone: a.status === 'disetujui' ? 'green' : 'rust' });
     });
     myFupas.forEach((f) => {
       push(f.sentToPurchasingAt || (f.status !== 'Draft' ? f.updatedAt : null), { title: `FUP A ${f.noFupa || ''} ${tr('dikirim ke Purchasing')}`, who: f.requestedBy || '', tone: 'amber' });
@@ -153,7 +153,7 @@ export function ProspectJourney({ p, rfqs, fupas }: { p: Prospect; rfqs: Rfq[]; 
 
       {m && (
         <section className="dk-sec">
-          <h4>{m.level === 'full' ? tr('HPP & margin') : tr('Margin')} <small className="muted" style={{ textTransform: 'none', letterSpacing: 0 }}>· {tr('dari jawaban RFQ')} · {tr('batas')} {m.minMargin}%</small></h4>
+          <h4>{m.level === 'full' ? tr('HPP & margin') : tr('Margin')} <small className="muted" style={{ textTransform: 'none', letterSpacing: 0 }}>· {tr('dari jawaban RFQ')} · {tr('target')} {m.minMargin}% · {tr('diskon Sales maks.')} {m.discSe ?? 5}%</small></h4>
           {m.total.checked === 0 ? (
             <div className="muted">{tr('Belum ada HPP dari jawaban RFQ yang cocok dengan item prospek ini.')}</div>
           ) : (
@@ -179,7 +179,10 @@ export function ProspectJourney({ p, rfqs, fupas }: { p: Prospect; rfqs: Rfq[]; 
                           <small className="muted" style={{ display: 'block' }}>{l.price ? `${tr('jual')} ${rp(l.price)}` : ''}{l.uom ? `/${l.uom.toLowerCase()}` : ''}</small>
                         </td>
                       )}
-                      <td className={`r mono${l.below ? ' dk-bad' : ''}`}>{pct(l.margin)}</td>
+                      <td className={`r mono${l.margin != null && l.margin < m.minMargin ? ' dk-bad' : ''}`}>
+                        {pct(l.margin)}
+                        {l.discount != null && l.discount > 0 && <small className={l.below ? 'dk-bad' : 'muted'} style={{ display: 'block' }}>{tr('diskon')} {pct(l.discount)}</small>}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

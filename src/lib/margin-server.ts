@@ -19,6 +19,9 @@ export interface MarginApprovalView {
   minMargin: number;
   level: MarginLevel;
   lowestMargin: number | null;
+  /** 'diskon' (aturan sekarang) | 'margin' (pengajuan lama). */
+  basis: string;
+  maxDiscount: number | null;
   /** User ini boleh memutuskan pengajuan ini. */
   canDecide?: boolean;
   requestedByName: string;
@@ -39,18 +42,23 @@ export function cleanQuoteItems(v: unknown): QuoteLineIn[] {
   });
 }
 
+/** Sisi aman untuk role tanpa HPP: harga jual Purchasing & diskon boleh, HPP & margin tidak. */
+export function publicLine(l: MarginLine) {
+  return { idx: l.idx, checked: l.checked, below: l.below, ref: l.ref, discount: l.discount };
+}
+
 /**
- * Status margin surat: item di bawah batas, tingkat penyetuju yang dibutuhkan
- * (BM / RM / GM / VP menurut margin terendah), dan persetujuan yang berlaku
- * untuk harga yang sama. Pembuat surat yang wewenangnya sudah cukup tidak
- * perlu persetujuan.
+ * Status diskon surat: item dengan diskon di atas batas Sales, tingkat
+ * penyetuju yang dibutuhkan (BM / GM / VP menurut diskon terbesar), dan
+ * persetujuan yang berlaku untuk harga yang sama. Pembuat surat yang
+ * wewenangnya sudah cukup tidak perlu persetujuan.
  */
 export async function marginStatus(user: SafeUser, prospectId: string, items: QuoteLineIn[]) {
   const rules = await getOpsRules();
-  const lines = await checkQuoteMargins(prospectId, items, rules.marginMin);
+  const lines = await checkQuoteMargins(prospectId, items, rules.discSe);
   const below = lines.filter((l) => l.below);
-  const lowest = below.length ? Math.min(...below.map((l) => (l.margin == null ? -Infinity : l.margin))) : null;
-  const level: MarginLevel | null = lowest == null ? null : requiredLevel(lowest, rules);
+  const maxDisc = below.length ? Math.max(...below.map((l) => l.discount ?? 0)) : null;
+  const level: MarginLevel | null = maxDisc == null ? null : requiredLevel(maxDisc, rules);
   const key = priceKey(items);
   const latest = await prisma.marginApproval.findFirst({ where: { prospectId, priceKey: key }, orderBy: { createdAt: 'desc' } });
   const self = !!level && marginRank(user.role) >= levelRank(level);
@@ -58,13 +66,18 @@ export async function marginStatus(user: SafeUser, prospectId: string, items: Qu
   const needs = below.length > 0 && !self && !approved;
   const hpp = canSeeHpp(user.role);
   return {
-    minMargin: rules.marginMin,
+    discSe: rules.discSe,
+    discBm: rules.discBm,
+    discGm: rules.discGm,
+    discVp: rules.discVp,
+    maxDiscount: maxDisc,
+    overVp: maxDisc != null && maxDisc > rules.discVp + 1e-9,
     level,
     levelLabel: level ? MARGIN_LEVEL_LABEL[level] : '',
     needs,
     checked: lines.filter((l) => l.checked).length,
     below: below.length,
-    lines: lines.map((l) => (hpp ? l : { idx: l.idx, checked: l.checked, below: l.below })),
+    lines: lines.map((l) => (hpp ? l : publicLine(l))),
     approval: latest ? { id: latest.id, status: latest.status, decidedByName: latest.decidedByName, decisionNote: latest.decisionNote, decidedAt: latest.decidedAt?.toISOString() ?? null, createdAt: latest.createdAt.toISOString() } : null,
     key,
   };
@@ -121,16 +134,18 @@ export function approvalView(a: Awaited<ReturnType<typeof prisma.marginApproval.
     minMargin: a.minMargin,
     level: asLevel(a.level),
     lowestMargin: a.lowestMargin ?? null,
+    basis: a.basis,
+    maxDiscount: a.maxDiscount ?? null,
     requestedByName: a.requestedByName,
     decidedByName: a.decidedByName,
     decisionNote: a.decisionNote,
     decidedAt: a.decidedAt ? a.decidedAt.toISOString() : null,
     createdAt: a.createdAt.toISOString(),
-    // BM: persentase margin saja, tanpa HPP / harga pembanding.
+    // BM: diskon + persentase margin, tanpa HPP. Role lain tanpa HPP: diskon & harga saja.
     ...(withLines === 'margin'
-      ? { lines: (a.items as unknown as (MarginLine & { uraian: string })[]).map((l) => ({ ...l, hpp: null, price: null, rfqNo: '' })) }
+      ? { lines: (a.items as unknown as (MarginLine & { uraian: string })[]).map((l) => ({ ...l, hpp: null, rfqNo: '' })) }
       : withLines
         ? { lines: a.items as unknown as (MarginLine & { uraian: string })[] }
-        : {}),
+        : { lines: (a.items as unknown as (MarginLine & { uraian: string })[]).map((l) => ({ ...l, hpp: null, margin: null, rfqNo: '' })) }),
   };
 }

@@ -1194,7 +1194,7 @@ function RfqAnswerPanel({ rfqId, readOnly }: { rfqId: string; readOnly: boolean 
                       )}
                     </span>
                   ) : (
-                    <span className={`mono ${hp ? 'hpp-sell' : ''}`} title={hp ? tr("HPP × kurs × (1 + margin%)") : undefined}>
+                    <span className={`mono ${hp ? 'hpp-sell' : ''}`} title={hp ? tr("HPP × kurs ÷ (1 − margin%)") : undefined}>
                       {(hp ? sellPrice(it) || it.hargaPurchasing : it.hargaPurchasing) ? `${hp || (it.currency || 'IDR') === 'IDR' ? 'Rp ' : `${it.currency} `}${Math.round((hp ? sellPrice(it) || it.hargaPurchasing : it.hargaPurchasing) || 0).toLocaleString('id-ID')}` : '-'}
                     </span>
                   )}

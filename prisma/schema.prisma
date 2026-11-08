@@ -91,6 +91,12 @@ model User {
   /// Alasan jeda (opsional) dan nama Admin yang menjeda — tampil di Kelola User.
   pausedReason String?
   pausedBy     String?
+  /// Siapa yang membuat akun (Kelola User). Null = dibuat di luar Kelola User
+  /// (seed, impor database, langsung di database) — dikelompokkan di audit.
+  createdBy    String?
+  createdById  String?
+  /// Login berhasil terakhir.
+  lastLoginAt  DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -1018,6 +1024,10 @@ model MarginApproval {
   level           String    @default("vp")
   /// Margin item terendah (%) saat diajukan — dasar tingkat persetujuan.
   lowestMargin    Float?
+  /// diskon (sejak phase62: diskon dari harga jual Purchasing) | margin (pengajuan lama).
+  basis           String    @default("margin")
+  /// Diskon item terbesar (%) dari harga jual Purchasing saat diajukan.
+  maxDiscount     Float?
   reg             Int?
   alasan          String?
   /// menunggu | disetujui | ditolak

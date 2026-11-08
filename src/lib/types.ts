@@ -361,6 +361,7 @@ export interface AnnualTarget {
 export type NotificationType =
   | 'rfq_new'
   | 'fupa_new'
+  | 'fupa_submitted'
   | 'rfq_answered'
   | 'fupa_answered'
   | 'rfq_done'

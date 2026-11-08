@@ -45,6 +45,7 @@ export function AttachmentList({ rfqId, fupaId, prospectId, vendorId, withProspe
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [lastError, setLastError] = useState('');
 
   const load = useCallback(async () => {
     if (!parentId) return;
@@ -73,6 +74,7 @@ export function AttachmentList({ rfqId, fupaId, prospectId, vendorId, withProspe
     // not by its value — a brand-new document has a null id either way.
     const field = vendorId !== undefined ? 'vendorId' : prospectId !== undefined ? 'prospectId' : fupaId !== undefined ? 'fupaId' : 'rfqId';
     setBusy(true);
+    setLastError('');
     for (const file of Array.from(files)) {
       const body = new FormData();
       body.append('file', file);
@@ -82,10 +84,16 @@ export function AttachmentList({ rfqId, fupaId, prospectId, vendorId, withProspe
         // would break the multipart boundary.
         const res = await fetch('/api/attachments', { method: 'POST', body });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data?.error || 'Gagal mengunggah file.');
+        if (!res.ok) {
+          // Respons bukan JSON (mis. 413 dari nginx / proxy) → pesan sesuai kode status.
+          const msg = data?.error || (res.status === 413 ? 'File terlalu besar untuk server (batas proxy / nginx).' : `Gagal mengunggah file (kode ${res.status}).`);
+          throw new Error(`${file.name}: ${msg}`);
+        }
         setItems((prev) => [...prev, data.attachment]);
       } catch (err) {
-        toast(err instanceof Error ? err.message : 'Gagal mengunggah file.', 'error');
+        const msg = err instanceof Error ? err.message : 'Gagal mengunggah file.';
+        setLastError(msg);
+        toast(msg, 'error');
       }
     }
     setBusy(false);
@@ -126,10 +134,12 @@ export function AttachmentList({ rfqId, fupaId, prospectId, vendorId, withProspe
         >
           <IconUpload />
           <span>{busy ? tr("Mengunggah…") : tr("Klik atau tarik file ke sini untuk melampirkan (foto, PDF, dokumen)")}</span>
-          <input ref={inputRef} type="file" multiple hidden onChange={(e) => upload(e.target.files)} />
+          {/* stopPropagation: klik input (dari inputRef.click) jangan memicu onClick kotak lagi. */}
+          <input ref={inputRef} type="file" multiple hidden onClick={(e) => e.stopPropagation()} onChange={(e) => upload(e.target.files)} />
         </div>
       )}
 
+      {lastError && <div className="import-summary if-warn" style={{ marginTop: 8 }}>{lastError}</div>}
       {items.length === 0 ? (
         <div className="import-summary" style={{ marginTop: 10 }}>{tr("Belum ada lampiran.")}</div>
       ) : (

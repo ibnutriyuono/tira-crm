@@ -15,7 +15,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const a = await prisma.marginApproval.findUnique({ where: { id } });
   if (!a) return NextResponse.json({ error: 'Pengajuan tidak ditemukan' }, { status: 404 });
-  if (!(await canDecideMargin(user, a))) return NextResponse.json({ error: `Margin ini perlu persetujuan ${MARGIN_LEVEL_LABEL[asLevel(a.level)]} atau di atasnya${a.level === 'bm' ? ' (BM cabangnya)' : a.level === 'rm' ? ' (RM regionalnya)' : ''}.` }, { status: 403 });
+  if (!(await canDecideMargin(user, a))) return NextResponse.json({ error: `Pengajuan ini perlu persetujuan ${MARGIN_LEVEL_LABEL[asLevel(a.level)]} atau di atasnya${a.level === 'bm' ? ' (BM cabangnya)' : a.level === 'rm' ? ' (RM regionalnya)' : ''}.` }, { status: 403 });
   if (a.status !== 'menunggu') return NextResponse.json({ error: 'Pengajuan ini sudah diputuskan.' }, { status: 409 });
   const b = ((await req.json().catch(() => null)) || {}) as Record<string, unknown>;
   const action = String(b.action || '');
@@ -32,9 +32,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     type: 'margin_decided',
     entity: 'prospect',
     entityId: a.prospectId,
-    title: `${action === 'setuju' ? '✓ Margin disetujui' : '✕ Margin ditolak'}: ${a.customer}`,
+    title: `${action === 'setuju' ? (a.basis === 'diskon' ? '✓ Diskon disetujui' : '✓ Margin disetujui') : (a.basis === 'diskon' ? '✕ Diskon ditolak' : '✕ Margin ditolak')}: ${a.customer}`,
     message: `${user.name}${catatan ? ` — ${catatan}` : ''}. ${action === 'setuju' ? 'Surat Penawaran dengan harga tersebut sudah bisa diunduh / dikirim.' : 'Revisi harga lalu ajukan lagi bila perlu.'}`.slice(0, 300),
   });
-  await logActivity({ user, action: 'status_change', entity: 'quotation', entityId: a.prospectId, summary: `${action === 'setuju' ? 'Menyetujui' : 'Menolak'} margin Surat Penawaran ${a.customer}${catatan ? ` — ${catatan}` : ''}` });
+  await logActivity({ user, action: 'status_change', entity: 'quotation', entityId: a.prospectId, summary: `${action === 'setuju' ? 'Menyetujui' : 'Menolak'} ${a.basis === 'diskon' ? 'diskon' : 'margin'} Surat Penawaran ${a.customer}${catatan ? ` — ${catatan}` : ''}` });
   return NextResponse.json({ approval: approvalView(fresh, canSeeHpp(user.role) ? true : user.role === 'bm' ? 'margin' : false) });
 }

@@ -1,13 +1,14 @@
 /**
- * Persetujuan margin Surat Penawaran bertingkat (client-safe).
- * Margin item terendah menentukan siapa yang cukup menyetujui:
- *   ≥ marginMin            → tanpa persetujuan
- *   ≥ marginBm             → BM cabang
- *   ≥ marginRm             → RM regional
- *   ≥ marginGm             → GM
- *   di bawah marginGm      → VP
+ * Persetujuan diskon Surat Penawaran bertingkat (client-safe).
+ * Diskon = (harga jual Purchasing − harga surat) ÷ harga jual Purchasing.
+ * Diskon item terbesar menentukan siapa yang cukup menyetujui:
+ *   ≤ discSe   → tanpa persetujuan (Sales / SE)
+ *   ≤ discBm   → BM cabang (RM regional juga boleh)
+ *   ≤ discGm   → GM
+ *   > discGm   → VP (di atas discVp ditandai melewati batas VP)
  * Penyetuju tingkat lebih tinggi selalu boleh menyetujui tingkat di bawahnya;
  * pembuat surat yang tingkatnya sudah cukup tidak perlu persetujuan.
+ * Tingkat 'rm' hanya ada di pengajuan lama (sebelum aturan diskon).
  */
 import type { OpsRules } from './ops-rules';
 
@@ -21,10 +22,10 @@ export function marginRank(role: string | null | undefined): number {
 }
 export const levelRank = (l: MarginLevel) => MARGIN_LEVELS.indexOf(l) + 1;
 
-export function requiredLevel(lowest: number, rules: Pick<OpsRules, 'marginBm' | 'marginRm' | 'marginGm'>): MarginLevel {
-  if (lowest >= rules.marginBm - 1e-9) return 'bm';
-  if (lowest >= rules.marginRm - 1e-9) return 'rm';
-  if (lowest >= rules.marginGm - 1e-9) return 'gm';
+/** Tingkat penyetuju untuk diskon terbesar (%). */
+export function requiredLevel(maxDisc: number, rules: Pick<OpsRules, 'discBm' | 'discGm'>): MarginLevel {
+  if (maxDisc <= rules.discBm + 1e-9) return 'bm';
+  if (maxDisc <= rules.discGm + 1e-9) return 'gm';
   return 'vp';
 }
 

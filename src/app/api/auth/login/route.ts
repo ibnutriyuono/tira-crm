@@ -43,6 +43,7 @@ export async function POST(req: Request) {
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, COOKIE_OPTIONS);
 
+  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
   const safe = toSafeUser(user);
   await logActivity({ user: safe, action: 'login', entity: 'session', summary: `${safe.name} login ke sistem` });
   return NextResponse.json({ user: safe });

@@ -90,7 +90,7 @@ export function StockUploadModal() {
           </div>
           <div className="field-note" style={{ margin: '4px 0 0' }}>
             {tr('Format: Inventory Value Report Steel Division dari Sage (kolom Item No, Line, Description, Size, Unit, Quantity, Ext. Cost, /kg, FSV, lokasi gudang). Unggahan baru menggantikan seluruh data lama.')}{' '}
-            {tr('Saran harga jual minimal = HPP × (1 +')} {marginPct}%{tr(') — ubah di Batas Waktu & Margin. Sales hanya melihat saran harga, tidak melihat HPP.')}
+            {tr('Saran harga jual minimal = HPP ÷ (1 −')} {marginPct}%{tr(') — margin 35% berarti HPP ÷ 0,65. Ubah di Batas Waktu & Margin. Sales hanya melihat saran harga, tidak melihat HPP.')}
           </div>
         </div>
         <label className={`btn btn-primary${busy ? ' disabled' : ''}`}>

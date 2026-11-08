@@ -17,7 +17,7 @@ export interface NotifCategory {
 }
 
 export const NOTIF_CATEGORIES: NotifCategory[] = [
-  { key: 'rfq', label: 'RFQ / FUP A', hint: 'baru masuk (Purchasing), dijawab, selesai, dibatalkan', def: 'langsung', types: ['rfq_new', 'fupa_new', 'rfq_answered', 'fupa_answered', 'rfq_done', 'fupa_done', 'rfq_cancelled', 'fupa_cancelled'] },
+  { key: 'rfq', label: 'RFQ / FUP A', hint: 'baru masuk (Purchasing), FUP A dikirim atas nama Sales, dijawab, selesai, dibatalkan', def: 'langsung', types: ['rfq_new', 'fupa_new', 'fupa_submitted', 'rfq_answered', 'fupa_answered', 'rfq_done', 'fupa_done', 'rfq_cancelled', 'fupa_cancelled'] },
   { key: 'chat', label: 'Diskusi baru di kartu', hint: 'prospek, RFQ, FUP A', def: 'ringkasan', types: ['prospect_chat', 'rfq_chat', 'fupa_chat'] },
   { key: 'fu', label: 'Follow-up hari ini / terlambat', hint: 'jadwal follow-up prospek', def: 'ringkasan', types: ['followup_due', 'followup_overdue'] },
   { key: 'issue', label: 'Masalah pipeline', hint: 'usulan, ditugaskan, perkembangan, eskalasi', def: 'langsung', types: ['issue_proposed', 'issue_new', 'issue_update', 'issue_escalated'] },

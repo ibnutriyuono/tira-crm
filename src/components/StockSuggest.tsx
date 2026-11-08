@@ -10,7 +10,7 @@ const rp = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
 
 /**
  * Saran dari stok gudang untuk satu baris material prospek — tampil di atas
- * "Kondisi stok": saran harga jual minimal (HPP stok × (1 + margin), tanpa
+ * "Kondisi stok": saran harga jual minimal (HPP stok ÷ (1 − margin), tanpa
  * menampilkan HPP), posisi stok per gudang, kondisi (FSV + umur), dan semua
  * varian grade (-D / -G) yang ada. "Pakai" mengisi Harga/kg (bila satuan kg)
  * dan Kondisi stok (Ready / Ready cabang lain) bila masih kosong.

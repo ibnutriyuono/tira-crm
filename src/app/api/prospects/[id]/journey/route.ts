@@ -50,7 +50,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     prisma.marginApproval.findMany({
       where: { prospectId: id },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, nomor: true, status: true, level: true, requestedByName: true, decidedByName: true, decidedAt: true, createdAt: true, lowestMargin: true },
+      select: { id: true, nomor: true, status: true, level: true, requestedByName: true, decidedByName: true, decidedAt: true, createdAt: true, lowestMargin: true, basis: true, maxDiscount: true },
     }),
     // Diskusi: thread prospek + RFQ / FUP A terkait yang boleh dilihat user ini.
     prisma.itemMessage.findMany({
@@ -77,8 +77,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const marginOnly = !full && user.role === 'bm';
   let margin: null | {
     level: 'margin' | 'full';
+    /** Target margin (sama dengan margin saran harga stok). */
     minMargin: number;
-    lines: { idx: number; margin: number | null; below: boolean; hpp?: number | null; price?: number | null; uom?: string; rfqNo: string; kg: number; nilai: number }[];
+    /** Batas diskon Sales dari harga jual Purchasing. */
+    discSe: number;
+    lines: { idx: number; margin: number | null; below: boolean; discount: number | null; hpp?: number | null; price?: number | null; ref?: number | null; uom?: string; rfqNo: string; kg: number; nilai: number }[];
     total: { margin: number | null; checked: number; hpp?: number | null; nilai?: number | null; laba?: number | null };
   } = null;
 
@@ -95,7 +98,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       hargaKg: num(r.hargaKg),
       harga: isFabRow(r) ? num(r.hargaUnit) : num(r.hargaKg) * rowBeratPc(r),
     }));
-    const checked = await checkQuoteMargins(id, quote, rules.marginMin);
+    const checked = await checkQuoteMargins(id, quote, rules.discSe);
     let sumHpp = 0;
     let sumNilai = 0;
     let n = 0;
@@ -103,18 +106,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       const kg = (quote[i].beratPc || 0) * (quote[i].qty || 0);
       const isKg = !c.uom || /^kg$/i.test(c.uom);
       const units = isKg ? kg : quote[i].qty || 0;
-      if (c.checked && c.hpp && c.price) {
+      if (c.checked && c.hpp && c.price && c.margin != null) {
         sumHpp += c.hpp * units;
         sumNilai += c.price * units;
         n++;
       }
-      const base = { idx: c.idx, margin: c.checked ? c.margin : null, below: c.below, rfqNo: c.rfqNo, kg, nilai: (c.price || 0) * units };
-      return full ? { ...base, hpp: c.hpp, price: c.price, uom: c.uom } : { ...base, nilai: 0 };
+      const base = { idx: c.idx, margin: c.checked ? c.margin : null, below: c.below, discount: c.checked ? c.discount : null, rfqNo: c.rfqNo, kg, nilai: (c.price || 0) * units };
+      return full ? { ...base, hpp: c.hpp, price: c.price, ref: c.ref, uom: c.uom } : { ...base, nilai: 0 };
     });
-    const tot = sumHpp > 0 ? Math.round((sumNilai / sumHpp - 1) * 1000) / 10 : null;
+    const tot = sumHpp > 0 && sumNilai > 0 ? Math.round((1 - sumHpp / sumNilai) * 1000) / 10 : null;
     margin = {
       level: full ? 'full' : 'margin',
-      minMargin: rules.marginMin,
+      minMargin: rules.stockMarginPct,
+      discSe: rules.discSe,
       lines,
       total: full ? { margin: tot, checked: n, hpp: sumHpp || null, nilai: sumNilai || null, laba: sumHpp ? sumNilai - sumHpp : null } : { margin: tot, checked: n },
     };

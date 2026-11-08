@@ -56,7 +56,7 @@ export function OpsRulesModal() {
         </>
       }
     >
-      <p className="field-note" style={{ marginTop: 0 }}>{tr('Dipakai pengingat & eskalasi otomatis (RFQ belum dijawab, barang telat, lead Marketing) dan persetujuan margin bertingkat BM → RM → GM → VP di Surat Penawaran.')}</p>
+      <p className="field-note" style={{ marginTop: 0 }}>{tr('Dipakai pengingat & eskalasi otomatis (RFQ belum dijawab, barang telat, lead Marketing) dan persetujuan diskon bertingkat Sales → BM → GM → VP di Surat Penawaran.')}</p>
       <div className="or-grid">
         {OPS_RULE_FIELDS.map((f, i) => (
           <Fragment key={f.key}>
@@ -86,7 +86,7 @@ export function OpsRulesModal() {
           {tr('Lead Marketing')}: {tr('tanpa Sales')} &gt; {preview.leadTugasHari} {tr('hari')} → BM · {tr('tanpa penawaran')} &gt; {preview.leadPenawaranHari} {tr('hari')} → Sales + BM · &gt; {preview.leadEskalasiHari} {tr('hari')} → RM + Marketing
         </span>
         <span>
-          {tr('Margin Surat Penawaran')}: ≥ {preview.marginMin}% {tr('langsung')} · ≥ {preview.marginBm}% → BM · ≥ {preview.marginRm}% → RM · ≥ {preview.marginGm}% → GM · &lt; {preview.marginGm}% → VP
+          {tr('Diskon dari harga jual Purchasing')}: ≤ {preview.discSe}% {tr('Sales langsung')} · ≤ {preview.discBm}% → BM · ≤ {preview.discGm}% → GM · ≤ {preview.discVp}% → VP · &gt; {preview.discVp}% → {tr('VP (pengecualian)')}
         </span>
         <span className="muted">{tr('Penyetuju tingkat lebih tinggi boleh menyetujui tingkat di bawahnya; pembuat surat yang wewenangnya sudah cukup tidak perlu mengajukan.')}</span>
       </div>
@@ -97,7 +97,7 @@ export function OpsRulesModal() {
 const OR_GROUP_AT: Partial<Record<keyof OpsRules, string>> = {
   rfqTargetHari: 'Operation (RFQ & barang)',
   leadTugasHari: 'Lead Marketing',
-  marginMin: 'Persetujuan margin bertingkat',
+  discSe: 'Persetujuan diskon bertingkat',
   stockMarginPct: 'Stok gudang',
 };
 

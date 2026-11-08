@@ -57,7 +57,7 @@ function useVisitBadge(role: string | undefined) {
   return n;
 }
 
-/** Badge Persetujuan Margin: pengajuan yang boleh diputuskan user ini. */
+/** Badge Persetujuan Diskon: pengajuan yang boleh diputuskan user ini. */
 function useMarginBadge(role: string | undefined) {
   const [n, setN] = useState(0);
   useEffect(() => {
@@ -113,7 +113,7 @@ export function useNavItems(tr: (s: string) => string): { items: NavItem[]; unre
       c('prospek') && role !== 'marketing' && { id: 'followup', label: tr('Follow-up'), group: 'Kerja', icon: <IconCalendar />, run: open('followUpBoard'), badge: countUrgentFollowUps(prospects), keys: 'papan jatuh tempo terlambat' },
       ['sales', 'bm', 'rm', 'gm', 'vp', 'admin', 'salesadmin'].includes(role) && { id: 'tugas', label: tr('Tugas Kunjungan'), group: 'Kerja', icon: <IconFlag />, run: open('visitTasks'), badge: visitBadge, keys: 'rencana mingguan' },
       !purch && c('masalah') && { id: 'masalah', label: tr('Masalah'), group: 'Kerja', icon: <span aria-hidden="true">⚑</span>, run: open('pipelineIssues'), badge: issueCount, keys: 'issue kendala pipeline' },
-      ['bm', 'rm', 'gm', 'vp', 'admin'].includes(role) && { id: 'margin', label: tr('Persetujuan Margin'), group: 'Kerja', icon: <IconCheckSquare />, run: open('marginApprovals'), badge: marginBadge, keys: 'diskon margin hpp approval surat penawaran' },
+      ['bm', 'rm', 'gm', 'vp', 'admin'].includes(role) && { id: 'margin', label: tr('Persetujuan Diskon'), group: 'Kerja', icon: <IconCheckSquare />, run: open('marginApprovals'), badge: marginBadge, keys: 'diskon margin hpp approval surat penawaran' },
       c('faktur') && { id: 'antrian', label: tr('Antrian Admin'), group: 'Kerja', icon: <IconCheckSquare />, run: open('adminQueue'), badge: role === 'salesadmin' ? adminTaskCount(prospects) : 0, keys: 'faktur do pengiriman' },
       // Penjualan
       c('prospek', 'e') && { id: 'tambah', label: tr('Tambah Prospek'), group: 'Penjualan', icon: <IconPlus />, run: () => { useUiStore.setState({ editProspectId: null, prospectFormQuote: false }); useUiStore.getState().openModal('prospectForm'); }, keys: 'baru prospek' },

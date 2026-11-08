@@ -165,7 +165,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const prev = await prisma.rfq.findUnique({ where: { id } });
     if (!prev) return NextResponse.json({ error: 'RFQ tidak ditemukan' }, { status: 404 });
 
-    // HPP × kurs × (1 + margin%) → harga jual dihitung ulang di server (lib/rfq-price.ts).
+    // HPP × kurs ÷ (1 − margin%) → harga jual dihitung ulang di server (lib/rfq-price.ts).
     const items = Array.isArray(body?.items) ? normalizeHppItems(normalizeItemLines(body.items as RfqItem[])) : ((prev.items as unknown as RfqItem[]) ?? []);
 
     if (body.action === 'send-jawaban') {

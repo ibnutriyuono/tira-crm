@@ -41,17 +41,23 @@ function generateDefaultNomor(r: Prospect): string {
   return `${seq}/TA-STL-${r.cabang || 'PST'}/${ROMAN[now.getMonth()]}/${now.getFullYear()}`;
 }
 
+const pct1 = (v: number) => `${v.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
+
 const JABATAN: Record<string, string> = { sales: 'Sales Engineer', bm: 'Branch Manager', rm: 'Regional Manager', gm: 'General Manager', vp: 'Vice President', salesadmin: 'Admin Sales' };
 
 // Pilihan tampilan, kop, kota & telepon penanda tangan diingat per browser.
 interface MarginInfo {
   needs: boolean;
-  minMargin: number;
+  /** Batas diskon Sales (SE) tanpa persetujuan (%). */
+  discSe: number;
+  discVp: number;
+  maxDiscount: number | null;
+  overVp: boolean;
   below: number;
   checked: number;
-  lines: { idx: number; checked: boolean; below: boolean; margin?: number | null }[];
+  lines: { idx: number; checked: boolean; below: boolean; ref?: number | null; discount?: number | null; margin?: number | null }[];
   approval: { id: string; status: string; decidedByName: string | null; decisionNote: string | null; createdAt: string } | null;
-  /** Penyetuju yang dibutuhkan: BM / RM / GM / VP (lib/margin-tier.ts). */
+  /** Penyetuju yang dibutuhkan: BM / GM / VP (lib/margin-tier.ts). */
   levelLabel?: string;
 }
 
@@ -111,7 +117,7 @@ export function QuotationModal() {
   const picOptions = useMemo(() => (cust?.pics?.length ? cust.pics : cust?.pic ? [{ id: 'legacy', nama: cust.pic, jabatan: null, phone: cust.phone, email: cust.email, isPrimary: true }] : []), [cust]);
 
   const [tab, setTab] = useState<Tab>('isi');
-  // Margin vs HPP jawaban RFQ: di bawah batas → persetujuan bertingkat BM / RM / GM / VP (lib/margin-tier.ts).
+  // Diskon dari harga jual Purchasing (jawaban RFQ): di atas batas Sales → persetujuan BM / GM / VP (lib/margin-tier.ts).
   const [margin, setMargin] = useState<MarginInfo | null>(null);
   const [marginAlasan, setMarginAlasan] = useState('');
   const [marginBusy, setMarginBusy] = useState(false);
@@ -318,12 +324,12 @@ export function QuotationModal() {
       setMargin(r);
       if (r.needs) {
         setTab('isi');
-        toast(r.approval?.status === 'menunggu' ? `${tr('Menunggu persetujuan')} ${r.levelLabel || 'VP'} ${tr('untuk harga ini')}` : `${tr('Margin di bawah')} ${r.minMargin}% — ${tr('ajukan persetujuan')} ${r.levelLabel || 'VP'} ${tr('dulu')}`, 'error');
+        toast(r.approval?.status === 'menunggu' ? `${tr('Menunggu persetujuan')} ${r.levelLabel || 'VP'} ${tr('untuk harga ini')}` : `${tr('Diskon di atas')} ${r.discSe}% — ${tr('ajukan persetujuan')} ${r.levelLabel || 'VP'} ${tr('dulu')}`, 'error');
         return false;
       }
       return true;
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal memeriksa margin', 'error');
+      toast(err instanceof Error ? err.message : 'Gagal memeriksa diskon', 'error');
       return false;
     }
   }
@@ -619,9 +625,10 @@ export function QuotationModal() {
             {margin.needs
               ? margin.approval?.status === 'menunggu'
                 ? `⏳ ${tr('Menunggu persetujuan')} ${margin.levelLabel || 'VP'}`
-                : `⚠ ${margin.below} ${tr('item dengan margin di bawah')} ${margin.minMargin}% ${tr('dari HPP')}`
-              : `✓ ${tr('Margin di bawah batas sudah disetujui')}${margin.approval?.decidedByName ? ` — ${margin.approval.decidedByName}` : ''}`}
+                : `⚠ ${margin.below} ${tr('item diskon di atas')} ${margin.discSe}% ${tr('dari harga jual Purchasing')}${margin.maxDiscount != null ? ` (${tr('terbesar')} ${pct1(margin.maxDiscount)})` : ''}`
+              : `✓ ${tr('Diskon di atas batas sudah disetujui')}${margin.approval?.decidedByName ? ` — ${margin.approval.decidedByName}` : ''}`}
           </b>
+          {margin.needs && margin.overVp && <span>{tr('Diskon melewati batas VP')} {margin.discVp}% — {tr('tetap diajukan ke VP sebagai pengecualian.')}</span>}
           {margin.needs && margin.approval?.status === 'ditolak' && (
             <span>
               {tr('Pengajuan sebelumnya ditolak')}
@@ -631,7 +638,7 @@ export function QuotationModal() {
           )}
           {margin.needs && margin.approval?.status !== 'menunggu' && (
             <>
-              <span>{tr('Surat belum bisa diunduh atau dikirim. Naikkan harga item yang ditandai, atau ajukan persetujuan')} <b>{margin.levelLabel || 'VP'}</b>.</span>
+              <span>{tr('Surat belum bisa diunduh atau dikirim. Kurangi diskon item yang ditandai, atau ajukan persetujuan')} <b>{margin.levelLabel || 'VP'}</b>.</span>
               <span className="qm-margin-act">
                 <input type="text" value={marginAlasan} placeholder={tr('Alasan (mis. customer strategis, harga kompetitor)')} onChange={(e) => setMarginAlasan(e.target.value)} />
                 <button type="button" className="btn btn-primary btn-sm" disabled={marginBusy || marginAlasan.trim().length < 5} onClick={ajukanMargin}>
@@ -728,7 +735,7 @@ export function QuotationModal() {
               const perKg = it.beratPc > 0 && it.hargaKg > 0;
               const ml = margin?.lines.find((l) => l.idx === idx);
               return (
-                <div className={`qitem-row${ml?.below ? ' qm-low' : ''}`} key={idx} title={ml?.below ? (ml.margin != null ? `${tr('Margin')} ${ml.margin.toLocaleString('id-ID')}% — ${tr('di bawah')} ${margin?.minMargin}%` : `${tr('Di bawah margin minimum')} ${margin?.minMargin}%`) : ml?.checked && ml.margin != null ? `${tr('Margin')} ${ml.margin.toLocaleString('id-ID')}%` : undefined}>
+                <div className={`qitem-row${ml?.below ? ' qm-low' : ''}`} key={idx} title={ml?.checked && ml.discount != null ? `${tr('Harga jual Purchasing')} Rp ${(ml.ref || 0).toLocaleString('id-ID')} · ${ml.discount > 0 ? `${tr('diskon')} ${pct1(ml.discount)}` : tr('tanpa diskon')}${ml.below ? ` — ${tr('di atas batas')} ${margin?.discSe}%` : ''}${ml.margin != null ? ` · ${tr('margin')} ${pct1(ml.margin)}` : ''}` : undefined}>
                   <input type="text" aria-label={tr("Line")} placeholder={tr("Line")} value={it.line} onChange={(e) => setItem(idx, { line: e.target.value })} />
                   <input type="text" aria-label={tr("Uraian material")} placeholder={tr("Uraian material")} value={it.uraian} onChange={(e) => setItem(idx, { uraian: e.target.value })} />
                   <input type="number" aria-label={tr("Qty")} min={0} step="any" value={it.qty} onChange={(e) => setItem(idx, { qty: num(e.target.value) })} />

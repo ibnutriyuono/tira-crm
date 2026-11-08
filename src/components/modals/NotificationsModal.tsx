@@ -14,6 +14,7 @@ import { useT } from '@/store/useLangStore';
 const NOTIF_META: Record<NotificationType, { icon: () => React.JSX.Element; color: string }> = {
   rfq_new: { icon: IconRfq, color: 'steel' },
   fupa_new: { icon: IconBag, color: 'steel' },
+  fupa_submitted: { icon: IconBag, color: 'amber' },
   rfq_answered: { icon: IconCheck, color: 'green' },
   fupa_answered: { icon: IconCheck, color: 'green' },
   rfq_done: { icon: IconCheck, color: 'green' },

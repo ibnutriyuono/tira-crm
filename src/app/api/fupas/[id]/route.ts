@@ -9,6 +9,7 @@ import { isResponse, requireUser } from '@/lib/api-helpers';
 import { canEditPurchasing, docScopeWhere } from '@/lib/auth';
 import { itemsHaveLine } from '@/lib/doc-lines';
 import { prisma } from '@/lib/prisma';
+import { notifyFupaSubmitted } from '@/lib/fupa-notify';
 import { emitCrmEvent } from '@/lib/socket';
 import { notify, purchasingUserIds, requesterUserIds } from '@/lib/notify';
 import { guard } from '@/lib/permissions-server';
@@ -63,6 +64,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     changes: diffFields(existing, fupa, FUPA_FIELD_LABELS),
   });
   if (existing.status !== 'Terkirim' && fupa.status === 'Terkirim') {
+    await notifyFupaSubmitted(user, fupa);
     await notify({
       userIds: await purchasingUserIds(fupa.items),
       type: 'fupa_new',

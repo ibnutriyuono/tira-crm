@@ -57,10 +57,10 @@ export async function POST(req: Request) {
     const scoped = await assertProspectInScope(user, prospectId);
     if (scoped.error) return scoped.error;
   }
-  // Margin di bawah batas tanpa persetujuan VP: surat tidak boleh dikirim.
+  // Diskon di atas batas Sales tanpa persetujuan: surat tidak boleh dikirim.
   if (prospectId && Array.isArray(body.items)) {
     const m = await marginStatus(user, prospectId, cleanQuoteItems(body.items));
-    if (m.needs) return NextResponse.json({ error: `Margin ${m.below} item di bawah ${m.minMargin}% — perlu persetujuan VP sebelum surat dikirim.`, code: 'MARGIN' }, { status: 409 });
+    if (m.needs) return NextResponse.json({ error: `${m.below} item diskon di atas ${m.discSe}% dari harga jual Purchasing — perlu persetujuan ${m.levelLabel || 'VP'} sebelum surat dikirim.`, code: 'MARGIN' }, { status: 409 });
   }
 
   const to = emails(body.to);

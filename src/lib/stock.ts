@@ -6,7 +6,7 @@
  *   dibaca menjadi grade + varian (-D / -G) + bentuk + ukuran.
  * - Prospek dengan grade yang sama (semua varian: dasar, -D, -G) dan tebal /
  *   diameter yang sama ditawarkan sebagai opsi stok, dengan posisi gudang,
- *   kondisi (FSV + umur) dan saran harga jual minimal = HPP × (1 + margin%).
+ *   kondisi (FSV + umur) dan saran harga jual minimal = HPP ÷ (1 − margin%).
  * - HPP tidak pernah dikirim ke client lewat /api/stock — hanya saran harga.
  *
  * Client-safe (tanpa import server).
@@ -124,10 +124,11 @@ export function parseStockDesc(desc: string): { grade: string; gradeKey: string;
   return { grade, gradeKey: key, variant, bentuk, dim };
 }
 
-/** Saran harga jual minimal: HPP × (1 + margin%), dibulatkan ke atas ke Rp 100. */
+/** Saran harga jual minimal: HPP ÷ (1 − margin%) — margin 35% → HPP ÷ 0,65 — dibulatkan ke atas ke Rp 100. */
 export function saranHarga(hpp: number | null | undefined, marginPct: number): number | null {
   if (!hpp || hpp <= 0) return null;
-  return Math.ceil((hpp * (1 + marginPct / 100)) / 100) * 100;
+  const m = Math.min(marginPct, 95);
+  return Math.ceil(hpp / (1 - m / 100) / 100) * 100;
 }
 
 export interface StockNeed {

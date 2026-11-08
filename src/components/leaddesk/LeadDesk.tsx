@@ -290,7 +290,7 @@ export function LeadDesk({ onOpenRfq, onGoTab }: LeadDeskProps) {
         { lb: tr('OMZET BULAN INI'), v: formatRupiah(ach.real), sub: ach.target ? `${Math.round((ach.real / ach.target) * 100)}% ${tr('dari target')}` : tr('target belum diisi'), tone: ach.target && ach.real < ach.target * ach.pace ? 'org' : 'grn' },
         { lb: tr('OMZET YTD'), v: ach.ytdTarget ? `${Math.round((ach.ytdReal / ach.ytdTarget) * 100)}%` : '–', sub: `${formatRupiah(ach.ytdReal)}`, tone: 'grn' },
         { lb: tr('PIPELINE TERBUKA'), v: formatRupiah(pipeline), sub: ach.target ? `${tr('coverage')} ${fmt1(pipeline / Math.max(1, ach.target - ach.real))}×` : '', tone: 'blu' },
-        { lb: tr('MARGIN RATA-RATA'), v: avgMargin == null ? '–' : `${fmt1(avgMargin)}%`, sub: tr('jawaban RFQ ber-HPP'), tone: avgMargin != null && avgMargin < rules.marginMin ? 'red' : 'grn' },
+        { lb: tr('MARGIN RATA-RATA'), v: avgMargin == null ? '–' : `${fmt1(avgMargin)}%`, sub: tr('jawaban RFQ ber-HPP'), tone: avgMargin != null && avgMargin < rules.stockMarginPct ? 'red' : 'grn' },
         { lb: tr('BARANG TELAT'), v: String(lateItems.length), sub: tr('Operation'), tone: 'red' },
         { lb: tr('MENUNGGU VP'), v: String(marginWait.length + escIssues.length), sub: `${marginWait.length} ${tr('margin')} · ${escIssues.length} ${tr('eskalasi')}`, tone: 'vio' },
       ];
@@ -442,7 +442,7 @@ export function LeadDesk({ onOpenRfq, onGoTab }: LeadDeskProps) {
             : [
                 { h: tr('Sales (GM)'), lines: [[tr('Pipeline terbuka'), formatRupiah(pipeline)], [tr('Prospek Negosiasi'), String(nego.length)], [tr('Masalah Sales terbuka'), String(issues.filter((i) => i.sumber !== 'purchasing' && isOpenIssue(i)).length)]] },
                 { h: tr('Operation (GM Operation)'), lines: [[tr('RFQ belum dijawab'), String(unanswered.length)], [tr('Barang telat'), `${lateItems.length} item`], [tr('Masalah Purchasing terbuka'), String(purchOpen.length + purchIssues.length)]] },
-                { h: tr('Margin & harga'), lines: [[tr('Margin rata-rata RFQ'), avgMargin == null ? '–' : `${fmt1(avgMargin)}%`], [tr('Batas margin minimum'), `${rules.marginMin}%`], [tr('Pengajuan margin menunggu'), String(marginWait.length)]] },
+                { h: tr('Margin & harga'), lines: [[tr('Margin rata-rata RFQ'), avgMargin == null ? '–' : `${fmt1(avgMargin)}%`], [tr('Target margin'), `${rules.stockMarginPct}%`], [tr('Batas diskon Sales / BM / GM / VP'), `${rules.discSe} / ${rules.discBm} / ${rules.discGm} / ${rules.discVp}%`], [tr('Pengajuan diskon menunggu'), String(marginWait.length)]] },
               ]
           ).map((b) => (
             <div key={b.h} className="ld-low-col">

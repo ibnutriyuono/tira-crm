@@ -657,7 +657,7 @@ export async function purchaseRequestPdf(d: PrDoc, printedBy: string): Promise<J
     { label: 'Nilai jual ke customer', value: nilai ? idr(nilai) : '-', foot: 'harga/kg x berat', c: GREEN },
     { label: 'Ada di stok gudang', value: `${fromStock} / ${d.lines.length}`, foot: d.stockAsOf ? `item cocok · stok per ${fDate(d.stockAsOf)}` : 'data stok belum diunggah', c: fromStock ? AMBER : MUTED },
   ];
-  if (d.showHpp) tiles.push({ label: 'Estimasi HPP (dari RFQ)', value: hppTot ? idr(hppTot) : '-', foot: hppTot && nilaiWithHpp ? `margin ±${(((nilaiWithHpp - hppTot) / hppTot) * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}% atas HPP` : 'belum ada HPP di jawaban RFQ', c: AMBER });
+  if (d.showHpp) tiles.push({ label: 'Estimasi HPP (dari RFQ)', value: hppTot ? idr(hppTot) : '-', foot: hppTot && nilaiWithHpp ? `margin ±${(((nilaiWithHpp - hppTot) / nilaiWithHpp) * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}% dari harga jual` : 'belum ada HPP di jawaban RFQ', c: AMBER });
   p.tiles(tiles);
 
   p.section('Barang yang diajukan', d.noPo ? 'qty mengikuti PO customer' : 'qty mengikuti penawaran — belum ada PO');

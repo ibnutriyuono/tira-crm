@@ -15,7 +15,8 @@ const fmt1 = (n: number) => n.toLocaleString('id-ID', { maximumFractionDigits: 1
 const STATUS_BADGE: Record<string, string> = { menunggu: 'amber', disetujui: 'green', ditolak: 'rust' };
 
 /**
- * Persetujuan Margin: pengajuan Surat Penawaran dengan margin di bawah batas,
+ * Persetujuan Diskon: pengajuan Surat Penawaran dengan diskon dari harga jual
+ * Purchasing di atas batas Sales (pengajuan lama: margin di bawah batas),
  * untuk BM (cabangnya), RM (regionalnya), GM, VP & Admin. Tingkat yang
  * dibutuhkan mengikuti margin terendah (Batas Waktu & Margin); tombol
  * Setujui / Tolak hanya untuk yang berwenang. BM melihat persentase margin,
@@ -54,7 +55,7 @@ export function MarginApprovalsModal() {
     setBusy(true);
     try {
       await api.patch(`/api/margin-approvals/${a.id}`, { action, catatan: noteId === a.id ? note.trim() : '' });
-      toast(action === 'setuju' ? tr('Margin disetujui — pengaju diberi tahu') : tr('Pengajuan margin ditolak'), 'success');
+      toast(action === 'setuju' ? tr('Disetujui — pengaju diberi tahu') : tr('Pengajuan ditolak'), 'success');
       setNoteId('');
       setNote('');
       load();
@@ -70,13 +71,13 @@ export function MarginApprovalsModal() {
   const list = tab === 'menunggu' ? [...mine, ...wait.filter((a) => !a.canDecide)] : (rows || []).filter((a) => a.status !== 'menunggu');
 
   return (
-    <Modal show={show} onClose={closeModal} title={tr('Persetujuan Margin')} xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr('Tutup')}</button>}>
+    <Modal show={show} onClose={closeModal} title={tr('Persetujuan Diskon')} xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr('Tutup')}</button>}>
       <div className="ma-tiers">
-        <span>{tr('Margin surat')}: ≥ {rules.marginMin}% {tr('langsung')}</span>
-        <span className="badge steel">≥ {rules.marginBm}% BM</span>
-        <span className="badge steel">≥ {rules.marginRm}% RM</span>
-        <span className="badge steel">≥ {rules.marginGm}% GM</span>
-        <span className="badge violet">&lt; {rules.marginGm}% VP</span>
+        <span>{tr('Diskon dari harga jual Purchasing')}: ≤ {rules.discSe}% {tr('Sales langsung')}</span>
+        <span className="badge steel">≤ {rules.discBm}% BM</span>
+        <span className="badge steel">≤ {rules.discGm}% GM</span>
+        <span className="badge violet">≤ {rules.discVp}% VP</span>
+        <span className="badge rust">&gt; {rules.discVp}% {tr('VP (pengecualian)')}</span>
       </div>
       <div className="ea-tabs" role="tablist" style={{ marginBottom: 10 }}>
         <button type="button" role="tab" aria-selected={tab === 'menunggu'} className={tab === 'menunggu' ? 'on' : ''} onClick={() => setTab('menunggu')}>
@@ -85,7 +86,7 @@ export function MarginApprovalsModal() {
         <button type="button" role="tab" aria-selected={tab === 'riwayat'} className={tab === 'riwayat' ? 'on' : ''} onClick={() => setTab('riwayat')}>{tr('Riwayat 60 hari')}</button>
       </div>
       {!rows && <div className="field-note">{tr('Memuat…')}</div>}
-      {rows && list.length === 0 && <div className="field-note">{tab === 'menunggu' ? tr('Tidak ada pengajuan margin yang menunggu.') : tr('Belum ada riwayat.')}</div>}
+      {rows && list.length === 0 && <div className="field-note">{tab === 'menunggu' ? tr('Tidak ada pengajuan yang menunggu.') : tr('Belum ada riwayat.')}</div>}
       <div className="ma-list">
         {list.map((a) => {
           const low = (a.lines || []).filter((l) => l.below);
@@ -100,13 +101,41 @@ export function MarginApprovalsModal() {
                 </div>
                 <div className="ma-tags">
                   <span className="badge violet" title={tr('Tingkat persetujuan yang dibutuhkan')}>{tr('Perlu')} {MARGIN_LEVEL_LABEL[a.level]}</span>
-                  {a.lowestMargin != null && <span className="badge rust">{tr('Terendah')} {fmt1(a.lowestMargin)}%</span>}
+                  {a.basis === 'diskon'
+                    ? a.maxDiscount != null && <span className="badge rust">{tr('Diskon terbesar')} {fmt1(a.maxDiscount)}%</span>
+                    : a.lowestMargin != null && <span className="badge rust">{tr('Margin terendah')} {fmt1(a.lowestMargin)}%</span>}
                   <span className={`badge ${STATUS_BADGE[a.status] || 'slate'}`}>{tr(a.status)}</span>
                 </div>
               </div>
-              {low.length > 0 && (
+              {low.length > 0 && a.basis === 'diskon' && (
                 <table className="simple-table ma-lines">
-                  <thead><tr><th>{tr('Item di bawah')} {a.minMargin}%</th><th className="r">{tr('Margin')}</th>{low.some((l) => l.hpp != null) && <><th className="r">HPP</th><th className="r">{tr('Harga surat')}</th></>}</tr></thead>
+                  <thead>
+                    <tr>
+                      <th>{tr('Item diskon di atas')} {a.minMargin}%</th>
+                      <th className="r">{tr('Harga jual Purchasing')}</th>
+                      <th className="r">{tr('Harga surat')}</th>
+                      <th className="r">{tr('Diskon')}</th>
+                      {low.some((l) => l.margin != null) && <th className="r">{tr('Margin')}</th>}
+                      {low.some((l) => l.hpp != null) && <th className="r">HPP</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {low.map((l) => (
+                      <tr key={l.idx}>
+                        <td>{l.uraian || `Item ${l.idx + 1}`}</td>
+                        <td className="r mono">{l.ref != null ? l.ref.toLocaleString('id-ID') : '–'}{l.uom ? ` /${l.uom.toLowerCase()}` : ''}</td>
+                        <td className="r mono">{l.price != null ? l.price.toLocaleString('id-ID') : '–'}</td>
+                        <td className="r mono"><b>{l.discount == null ? '–' : `${fmt1(l.discount)}%`}</b></td>
+                        {low.some((x) => x.margin != null) && <td className="r mono">{l.margin == null ? '–' : `${fmt1(l.margin)}%`}</td>}
+                        {low.some((x) => x.hpp != null) && <td className="r mono">{l.hpp != null ? l.hpp.toLocaleString('id-ID') : '–'}</td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {low.length > 0 && a.basis !== 'diskon' && (
+                <table className="simple-table ma-lines">
+                  <thead><tr><th>{tr('Item di bawah margin')} {a.minMargin}%</th><th className="r">{tr('Margin')}</th>{low.some((l) => l.hpp != null) && <><th className="r">HPP</th><th className="r">{tr('Harga surat')}</th></>}</tr></thead>
                   <tbody>
                     {low.map((l) => (
                       <tr key={l.idx}>

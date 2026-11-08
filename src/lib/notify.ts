@@ -13,6 +13,7 @@ import { emailNewNotifications } from './email-notify';
 export type NotifType =
   | 'rfq_new'
   | 'fupa_new'
+  | 'fupa_submitted'
   | 'rfq_answered'
   | 'fupa_answered'
   | 'rfq_done'

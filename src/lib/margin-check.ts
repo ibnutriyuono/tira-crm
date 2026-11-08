@@ -5,10 +5,12 @@ import { hasHpp, hppIdr, type RfqHppFields } from './rfq-price';
 import type { RfqItem } from './types';
 
 /**
- * Persetujuan margin VP di Surat Penawaran. Harga di surat dibanding HPP
- * (Rupiah) dari jawaban RFQ prospek yang sama; margin = harga / HPP − 1.
- * Server-only: HPP & margin tidak pernah dikirim ke Sales — Sales hanya
- * menerima tanda "di bawah batas" per item.
+ * Cek diskon Surat Penawaran. Harga di surat dibanding harga jual Purchasing
+ * (jawaban RFQ prospek yang sama, Rupiah):
+ *     diskon = (harga jual Purchasing − harga surat) ÷ harga jual Purchasing
+ * Diskon di atas batas Sales (SE) perlu persetujuan bertingkat BM / GM / VP.
+ * Harga jual Purchasing & diskon boleh dilihat Sales; HPP & margin hanya
+ * untuk role yang boleh melihat HPP (server membuangnya untuk role lain).
  */
 export interface QuoteLineIn {
   line?: string;
@@ -24,7 +26,12 @@ export interface MarginLine {
   idx: number;
   /** Ada HPP pembanding di jawaban RFQ. */
   checked: boolean;
+  /** Diskon melewati batas Sales (SE). */
   below: boolean;
+  /** Harga jual Purchasing per UOM (Rupiah) — dasar diskon. */
+  ref: number | null;
+  /** Diskon % dari harga jual Purchasing (negatif = di atas harga jual). */
+  discount: number | null;
   /** Hanya untuk role yang boleh melihat HPP. */
   margin: number | null;
   hpp: number | null;
@@ -74,25 +81,29 @@ function bestMatch(it: QuoteLineIn, cands: { item: RfqItem & RfqHppFields; rfqNo
   return bestScore >= 2 ? (best as Cand | null) : null;
 }
 
-export async function checkQuoteMargins(prospectId: string, items: QuoteLineIn[], minMargin: number): Promise<MarginLine[]> {
+export async function checkQuoteMargins(prospectId: string, items: QuoteLineIn[], maxDisc: number): Promise<MarginLine[]> {
   const rfqs = await prisma.rfq.findMany({ where: { prospectId, cancelledAt: null }, orderBy: { createdAt: 'desc' } });
   const cands: { item: RfqItem & RfqHppFields; rfqNo: string }[] = [];
   rfqs.forEach((r) => {
     const list = (Array.isArray(r.items) ? r.items : []) as unknown as (RfqItem & RfqHppFields)[];
     list.forEach((item) => {
-      if (hasHpp(item) && !item.noQuote) cands.push({ item, rfqNo: r.noRfq || 'RFQ' });
+      const idr = !item.currency || String(item.currency).toUpperCase() === 'IDR';
+      if (!item.noQuote && idr && n(item.hargaPurchasing) > 0) cands.push({ item, rfqNo: r.noRfq || 'RFQ' });
     });
   });
   return items.map((it, idx) => {
     const m = cands.length ? bestMatch(it, cands) : null;
-    if (!m) return { idx, checked: false, below: false, margin: null, hpp: null, price: null, uom: '', rfqNo: '' };
+    if (!m) return { idx, checked: false, below: false, ref: null, discount: null, margin: null, hpp: null, price: null, uom: '', rfqNo: '' };
     const uom = String(m.item.uom || 'KG').toUpperCase();
-    const hpp = hppIdr(m.item);
+    const hpp = hasHpp(m.item) ? hppIdr(m.item) : 0;
+    const ref = n(m.item.hargaPurchasing);
     let price: number | null = null;
     if (isKg(uom)) price = n(it.hargaKg) > 0 ? n(it.hargaKg) : n(it.beratPc) > 0 && n(it.harga) > 0 ? n(it.harga) / n(it.beratPc) : null;
     else price = n(it.harga) > 0 ? n(it.harga) : null;
-    if (!price || !(hpp > 0)) return { idx, checked: false, below: false, margin: null, hpp: hpp || null, price, uom, rfqNo: m.rfqNo };
-    const margin = (price / hpp - 1) * 100;
-    return { idx, checked: true, below: margin < minMargin - 1e-9, margin: Math.round(margin * 10) / 10, hpp, price, uom, rfqNo: m.rfqNo };
+    if (!price) return { idx, checked: false, below: false, ref, discount: null, margin: null, hpp: hpp || null, price, uom, rfqNo: m.rfqNo };
+    const discount = Math.round(((ref - price) / ref) * 1000) / 10;
+    // Gross margin atas harga jual: (harga − HPP) ÷ harga.
+    const margin = hpp > 0 ? Math.round(((price - hpp) / price) * 1000) / 10 : null;
+    return { idx, checked: true, below: discount > maxDisc + 1e-9, ref, discount, margin, hpp: hpp || null, price, uom, rfqNo: m.rfqNo };
   });
 }

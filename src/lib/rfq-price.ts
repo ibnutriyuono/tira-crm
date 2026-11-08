@@ -5,8 +5,9 @@ import type { RfqItem } from './types';
  * HPP & margin di jawaban RFQ.
  *
  * Purchasing mengisi per item: harga vendor (HPP) dalam mata uang vendor,
- * kurs ke Rupiah bila bukan IDR, dan margin % (markup dari HPP):
- *     harga jual = HPP × kurs × (1 + margin%)
+ * kurs ke Rupiah bila bukan IDR, dan margin % (gross margin atas harga jual):
+ *     harga jual = HPP × kurs ÷ (1 − margin%)      (margin 35% → HPP ÷ 0,65)
+ *     margin     = (harga jual − HPP) ÷ harga jual
  * Harga jual disimpan di `hargaPurchasing` (IDR) — itu yang diterima Sales,
  * Admin Sales dan BM. HPP, kurs, margin dan vendor hanya untuk RM, GM, Admin,
  * Purchasing dan PIC Line 05: server membuangnya untuk role lain (bootstrap,
@@ -19,7 +20,7 @@ export interface RfqHppFields {
   hppCur?: string;
   /** IDR per 1 `hppCur` (1 untuk IDR). */
   kurs?: number;
-  /** Markup % dari HPP. */
+  /** Gross margin % atas harga jual (harga = HPP ÷ (1 − margin)). */
   margin?: number;
   vendorId?: string;
   vendorNama?: string;
@@ -42,18 +43,29 @@ export function hppIdr(it: Partial<RfqItem & RfqHppFields>): number {
   return n(it.hpp) * (cur === 'IDR' ? 1 : n(it.kurs));
 }
 
-/** Harga jual Rupiah dari HPP × kurs × (1 + margin%), dibulatkan ke Rupiah. */
+/** Harga jual dari gross margin: HPP ÷ (1 − margin%). Margin 35% → HPP ÷ 0,65. */
+export function priceFromMargin(hpp: number, marginPct: number): number {
+  const m = Math.min(n(marginPct), 95);
+  return hpp > 0 ? hpp / (1 - m / 100) : 0;
+}
+
+/** Gross margin % = (harga − HPP) ÷ harga. */
+export function grossMargin(hpp: number, price: number): number | null {
+  return hpp > 0 && price > 0 ? ((price - hpp) / price) * 100 : null;
+}
+
+/** Harga jual Rupiah = HPP × kurs ÷ (1 − margin%), dibulatkan ke Rupiah. */
 export function sellPrice(it: Partial<RfqItem & RfqHppFields>): number {
   const base = hppIdr(it);
   if (!(base > 0)) return 0;
-  return Math.round(base * (1 + n(it.margin) / 100));
+  return Math.round(priceFromMargin(base, n(it.margin)));
 }
 
 /** Margin % aktual dari harga jual vs HPP (untuk tampilan RM/GM). */
 export function actualMargin(it: Partial<RfqItem & RfqHppFields>): number | null {
   const base = hppIdr(it);
   const sell = n(it.hargaPurchasing);
-  return base > 0 && sell > 0 ? ((sell - base) / base) * 100 : null;
+  return grossMargin(base, sell);
 }
 
 /**
@@ -73,7 +85,7 @@ export function normalizeHppItems(items: RfqItem[]): RfqItem[] {
     it.hpp = n(it.hpp);
     it.hppCur = String(it.hppCur || 'IDR').toUpperCase().slice(0, 5);
     it.kurs = it.hppCur === 'IDR' ? 1 : n(it.kurs);
-    it.margin = Math.max(-100, Math.min(1000, n(it.margin)));
+    it.margin = Math.max(-100, Math.min(95, n(it.margin)));
     if (it.hppCur !== 'IDR' && !(it.kurs > 0)) {
       // Tanpa kurs harga jual tidak bisa dihitung — biarkan harga yang diketik.
       return it;
