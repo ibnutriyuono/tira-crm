@@ -55,7 +55,7 @@ interface MarginInfo {
   overVp: boolean;
   below: number;
   checked: number;
-  lines: { idx: number; checked: boolean; below: boolean; ref?: number | null; discount?: number | null; margin?: number | null }[];
+  lines: { idx: number; checked: boolean; below: boolean; ref?: number | null; refSrc?: 'rfq' | 'stok'; discount?: number | null; margin?: number | null }[];
   approval: { id: string; status: string; decidedByName: string | null; decisionNote: string | null; createdAt: string } | null;
   /** Penyetuju yang dibutuhkan: BM / GM / VP (lib/margin-tier.ts). */
   levelLabel?: string;
@@ -625,7 +625,7 @@ export function QuotationModal() {
             {margin.needs
               ? margin.approval?.status === 'menunggu'
                 ? `⏳ ${tr('Menunggu persetujuan')} ${margin.levelLabel || 'VP'}`
-                : `⚠ ${margin.below} ${tr('item diskon di atas')} ${margin.discSe}% ${tr('dari harga jual Purchasing')}${margin.maxDiscount != null ? ` (${tr('terbesar')} ${pct1(margin.maxDiscount)})` : ''}`
+                : `⚠ ${margin.below} ${tr('item diskon di atas')} ${margin.discSe}% ${tr('dari harga jual Purchasing / saran stok')}${margin.maxDiscount != null ? ` (${tr('terbesar')} ${pct1(margin.maxDiscount)})` : ''}`
               : `✓ ${tr('Diskon di atas batas sudah disetujui')}${margin.approval?.decidedByName ? ` — ${margin.approval.decidedByName}` : ''}`}
           </b>
           {margin.needs && margin.overVp && <span>{tr('Diskon melewati batas VP')} {margin.discVp}% — {tr('tetap diajukan ke VP sebagai pengecualian.')}</span>}
@@ -735,7 +735,7 @@ export function QuotationModal() {
               const perKg = it.beratPc > 0 && it.hargaKg > 0;
               const ml = margin?.lines.find((l) => l.idx === idx);
               return (
-                <div className={`qitem-row${ml?.below ? ' qm-low' : ''}`} key={idx} title={ml?.checked && ml.discount != null ? `${tr('Harga jual Purchasing')} Rp ${(ml.ref || 0).toLocaleString('id-ID')} · ${ml.discount > 0 ? `${tr('diskon')} ${pct1(ml.discount)}` : tr('tanpa diskon')}${ml.below ? ` — ${tr('di atas batas')} ${margin?.discSe}%` : ''}${ml.margin != null ? ` · ${tr('margin')} ${pct1(ml.margin)}` : ''}` : undefined}>
+                <div className={`qitem-row${ml?.below ? ' qm-low' : ''}`} key={idx} title={ml?.checked && ml.discount != null ? `${ml.refSrc === 'stok' ? tr('Saran harga stok') : tr('Harga jual Purchasing')} Rp ${(ml.ref || 0).toLocaleString('id-ID')} · ${ml.discount > 0 ? `${tr('diskon')} ${pct1(ml.discount)}` : tr('tanpa diskon')}${ml.below ? ` — ${tr('di atas batas')} ${margin?.discSe}%` : ''}${ml.margin != null ? ` · ${tr('margin')} ${pct1(ml.margin)}` : ''}` : undefined}>
                   <input type="text" aria-label={tr("Line")} placeholder={tr("Line")} value={it.line} onChange={(e) => setItem(idx, { line: e.target.value })} />
                   <input type="text" aria-label={tr("Uraian material")} placeholder={tr("Uraian material")} value={it.uraian} onChange={(e) => setItem(idx, { uraian: e.target.value })} />
                   <input type="number" aria-label={tr("Qty")} min={0} step="any" value={it.qty} onChange={(e) => setItem(idx, { qty: num(e.target.value) })} />

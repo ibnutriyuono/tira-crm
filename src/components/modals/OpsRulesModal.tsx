@@ -86,7 +86,7 @@ export function OpsRulesModal() {
           {tr('Lead Marketing')}: {tr('tanpa Sales')} &gt; {preview.leadTugasHari} {tr('hari')} → BM · {tr('tanpa penawaran')} &gt; {preview.leadPenawaranHari} {tr('hari')} → Sales + BM · &gt; {preview.leadEskalasiHari} {tr('hari')} → RM + Marketing
         </span>
         <span>
-          {tr('Diskon dari harga jual Purchasing')}: ≤ {preview.discSe}% {tr('Sales langsung')} · ≤ {preview.discBm}% → BM · ≤ {preview.discGm}% → GM · ≤ {preview.discVp}% → VP · &gt; {preview.discVp}% → {tr('VP (pengecualian)')}
+          {tr('Diskon dari harga jual Purchasing / saran stok')}: ≤ {preview.discSe}% {tr('Sales langsung')} · ≤ {preview.discBm}% → BM · ≤ {preview.discGm}% → GM · ≤ {preview.discVp}% → VP · &gt; {preview.discVp}% → {tr('VP (pengecualian)')}
         </span>
         <span className="muted">{tr('Penyetuju tingkat lebih tinggi boleh menyetujui tingkat di bawahnya; pembuat surat yang wewenangnya sudah cukup tidak perlu mengajukan.')}</span>
       </div>

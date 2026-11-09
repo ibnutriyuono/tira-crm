@@ -73,7 +73,7 @@ export function MarginApprovalsModal() {
   return (
     <Modal show={show} onClose={closeModal} title={tr('Persetujuan Diskon')} xwide footer={<button type="button" className="btn btn-outline" onClick={closeModal}>{tr('Tutup')}</button>}>
       <div className="ma-tiers">
-        <span>{tr('Diskon dari harga jual Purchasing')}: ≤ {rules.discSe}% {tr('Sales langsung')}</span>
+        <span>{tr('Diskon dari harga jual Purchasing / saran stok')}: ≤ {rules.discSe}% {tr('Sales langsung')}</span>
         <span className="badge steel">≤ {rules.discBm}% BM</span>
         <span className="badge steel">≤ {rules.discGm}% GM</span>
         <span className="badge violet">≤ {rules.discVp}% VP</span>
@@ -112,7 +112,7 @@ export function MarginApprovalsModal() {
                   <thead>
                     <tr>
                       <th>{tr('Item diskon di atas')} {a.minMargin}%</th>
-                      <th className="r">{tr('Harga jual Purchasing')}</th>
+                      <th className="r">{tr('Harga jual acuan')}</th>
                       <th className="r">{tr('Harga surat')}</th>
                       <th className="r">{tr('Diskon')}</th>
                       {low.some((l) => l.margin != null) && <th className="r">{tr('Margin')}</th>}
@@ -123,7 +123,7 @@ export function MarginApprovalsModal() {
                     {low.map((l) => (
                       <tr key={l.idx}>
                         <td>{l.uraian || `Item ${l.idx + 1}`}</td>
-                        <td className="r mono">{l.ref != null ? l.ref.toLocaleString('id-ID') : '–'}{l.uom ? ` /${l.uom.toLowerCase()}` : ''}</td>
+                        <td className="r mono">{l.ref != null ? l.ref.toLocaleString('id-ID') : '–'}{l.uom ? ` /${l.uom.toLowerCase()}` : ''}<small className="muted" style={{ display: 'block' }}>{l.refSrc === 'stok' ? tr('saran stok') : tr('Purchasing')}</small></td>
                         <td className="r mono">{l.price != null ? l.price.toLocaleString('id-ID') : '–'}</td>
                         <td className="r mono"><b>{l.discount == null ? '–' : `${fmt1(l.discount)}%`}</b></td>
                         {low.some((x) => x.margin != null) && <td className="r mono">{l.margin == null ? '–' : `${fmt1(l.margin)}%`}</td>}

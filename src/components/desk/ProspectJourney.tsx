@@ -15,7 +15,7 @@ import { WORKFLOW_META, fupaAsWorkflowDoc, rfqAsWorkflowDoc, workflowStage } fro
 interface JEvent { id: string; type: EventType; tgl: string | null; docNo: string | null; title: string; items: ItemEventLine[]; actorName: string; createdAt: string }
 interface JStatus { at: string; by: string; action: string; summary: string }
 interface JApproval { id: string; nomor: string | null; status: string; level: string; requestedByName: string; decidedByName: string | null; decidedAt: string | null; createdAt: string; lowestMargin: number | null; basis?: string; maxDiscount?: number | null }
-interface JMarginLine { idx: number; margin: number | null; below: boolean; discount?: number | null; hpp?: number | null; price?: number | null; ref?: number | null; uom?: string; rfqNo: string; kg: number; nilai: number }
+interface JMarginLine { idx: number; margin: number | null; below: boolean; discount?: number | null; hpp?: number | null; price?: number | null; ref?: number | null; refSrc?: 'rfq' | 'stok'; refDesc?: string; perPcs?: boolean; uom?: string; rfqNo: string; kg: number; nilai: number }
 interface JMargin { level: 'margin' | 'full'; minMargin: number; discSe?: number; lines: JMarginLine[]; total: { margin: number | null; checked: number; hpp?: number | null; nilai?: number | null; laba?: number | null } }
 interface JMsg { id: string; entity: 'prospect' | 'rfq' | 'fupa'; entityId: string; thread: string; author: string; role: string | null; text: string; createdAt: string }
 interface JAct { id: string; tanggal: string; tipe: string; kanal: string | null; hasil: string | null; keterangan: string | null; langkah: string | null; status: string; sumber: string | null; se: string; createdBy: string | null; createdAt: string }
@@ -153,41 +153,61 @@ export function ProspectJourney({ p, rfqs, fupas }: { p: Prospect; rfqs: Rfq[]; 
 
       {m && (
         <section className="dk-sec">
-          <h4>{m.level === 'full' ? tr('HPP & margin') : tr('Margin')} <small className="muted" style={{ textTransform: 'none', letterSpacing: 0 }}>· {tr('dari jawaban RFQ')} · {tr('target')} {m.minMargin}% · {tr('diskon Sales maks.')} {m.discSe ?? 5}%</small></h4>
-          {m.total.checked === 0 ? (
-            <div className="muted">{tr('Belum ada HPP dari jawaban RFQ yang cocok dengan item prospek ini.')}</div>
+          <h4>{m.level === 'full' ? tr('HPP & margin') : tr('Margin')}</h4>
+          <div className="dk-mg-note">
+            {tr('Dari jawaban RFQ, atau stok gudang bila belum ada')} · {tr('target')} {m.minMargin}% · {tr('diskon Sales maks.')} {m.discSe ?? 5}%
+          </div>
+          {!m.lines.some((l) => l.ref != null) ? (
+            <div className="muted">{tr('Belum ada harga dari jawaban RFQ atau stok gudang yang cocok dengan item prospek ini.')}</div>
           ) : (
             <>
-              <div className="dk-mg-sum">
-                <div><small>{tr('Margin')}</small><b className={m.total.margin != null && m.total.margin < m.minMargin ? 'dk-bad' : ''}>{pct(m.total.margin)}</b></div>
-                {m.level === 'full' && (
-                  <>
-                    <div><small>{tr('Total HPP')}</small><b>{rp(m.total.hpp)}</b></div>
-                    <div><small>{tr('Nilai jual')}</small><b>{rp(m.total.nilai)}</b></div>
-                    <div><small>{tr('Laba kotor')}</small><b className={(m.total.laba || 0) < 0 ? 'dk-bad' : ''}>{rp(m.total.laba)}</b></div>
-                  </>
-                )}
-              </div>
-              <table className="dk-items">
-                <tbody>
-                  {m.lines.map((l) => (
-                    <tr key={l.idx}>
-                      <td>{mats[l.idx]?.uraian || `Item ${l.idx + 1}`}{l.rfqNo && <small className="muted" style={{ display: 'block' }}>{l.rfqNo}</small>}</td>
-                      {m.level === 'full' && (
-                        <td className="r mono" title={tr('HPP / harga jual per satuan')}>
-                          {l.hpp ? rp(l.hpp) : '–'}
-                          <small className="muted" style={{ display: 'block' }}>{l.price ? `${tr('jual')} ${rp(l.price)}` : ''}{l.uom ? `/${l.uom.toLowerCase()}` : ''}</small>
-                        </td>
+              {m.total.checked > 0 && (
+                <div className="dk-mg-sum">
+                  <div className="wide">
+                    <small>{tr('Margin')}</small>
+                    <b className={m.total.margin != null && m.total.margin < m.minMargin ? 'dk-bad' : 'dk-ok'}>{pct(m.total.margin)}</b>
+                  </div>
+                  {m.level === 'full' && (
+                    <>
+                      <div><small>{tr('Nilai jual')}</small><b>{rp(m.total.nilai)}</b></div>
+                      <div><small>{tr('Total HPP')}</small><b>{rp(m.total.hpp)}</b></div>
+                      <div className="wide"><small>{tr('Laba kotor')}</small><b className={(m.total.laba || 0) < 0 ? 'dk-bad' : ''}>{rp(m.total.laba)}</b></div>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="dk-mg-lines">
+                {m.lines.map((l) => {
+                  const u = l.uom ? `/${l.uom.toLowerCase()}` : '';
+                  return (
+                    <div key={l.idx} className={`dk-mg-line${l.below || (l.margin != null && l.margin < 0) ? ' warn' : ''}`}>
+                      <div className="dk-mg-h">
+                        <span className="dk-mg-name">{mats[l.idx]?.uraian || `Item ${l.idx + 1}`}</span>
+                        {l.margin != null && <span className={`badge ${l.margin < 0 ? 'rust' : l.margin < m.minMargin ? 'amber' : 'green'}`}>{tr('margin')} {pct(l.margin)}</span>}
+                      </div>
+                      {l.ref == null ? (
+                        <div className="muted">{tr('Belum ada harga dari RFQ / stok')}</div>
+                      ) : (
+                        <>
+                          <div className="dk-mg-src">
+                            {l.refSrc === 'stok' ? <>▣ {tr('Stok gudang')} · {l.refDesc || l.rfqNo}</> : <>{l.rfqNo || tr('Jawaban RFQ')}</>}
+                          </div>
+                          <dl className="dk-mg-kv">
+                            {m.level === 'full' && <><dt>HPP</dt><dd>{l.hpp ? `${rp(l.hpp)}${u}` : '–'}</dd></>}
+                            <dt>{l.refSrc === 'stok' ? tr('Saran harga stok') : tr('Harga jual Purchasing')}</dt><dd>{rp(l.ref)}{u}</dd>
+                            <dt>{tr('Harga penawaran')}</dt>
+                            <dd>
+                              {l.price ? `${rp(l.price)}${u}` : '–'}
+                              {l.discount != null && l.discount > 0 && <span className={`badge ${l.below ? 'rust' : 'slate'}`}>{tr('diskon')} {pct(l.discount)}</span>}
+                            </dd>
+                          </dl>
+                          {l.perPcs && <div className="dk-mg-warn">{tr('Harga di jawaban RFQ tertulis per KG tapi angkanya per batang/pcs — dihitung per kg (÷ berat/pc). Minta Purchasing membetulkan satuannya.')}</div>}
+                        </>
                       )}
-                      <td className={`r mono${l.margin != null && l.margin < m.minMargin ? ' dk-bad' : ''}`}>
-                        {pct(l.margin)}
-                        {l.discount != null && l.discount > 0 && <small className={l.below ? 'dk-bad' : 'muted'} style={{ display: 'block' }}>{tr('diskon')} {pct(l.discount)}</small>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {m.total.checked < m.lines.length && <small className="muted">{m.lines.length - m.total.checked} {tr('item belum punya HPP pembanding')}</small>}
+                    </div>
+                  );
+                })}
+              </div>
             </>
           )}
         </section>

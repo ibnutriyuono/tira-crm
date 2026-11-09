@@ -57,7 +57,7 @@ export const OPS_RULE_FIELDS: { key: keyof OpsRules; label: string; unit: string
   { key: 'leadTugasHari', label: 'Lead belum ditunjuk Sales → BM', unit: 'hari', hint: 'Lead dari Marketing tanpa Sales lewat batas ini: BM diingatkan.', min: 1, max: 30 },
   { key: 'leadPenawaranHari', label: 'Lead belum ada penawaran → Sales', unit: 'hari', hint: 'Sejak Sales ditunjuk; BM ikut diberi tahu.', min: 1, max: 30 },
   { key: 'leadEskalasiHari', label: 'Eskalasi lead ke RM', unit: 'hari', hint: 'Sejak lead masuk belum sampai penawaran: RM & Marketing pembuatnya diberi tahu.', min: 1, max: 60 },
-  { key: 'discSe', label: 'Diskon Sales (SE) tanpa persetujuan', unit: '%', hint: 'Diskon dari harga jual Purchasing sampai batas ini langsung bisa dikirim.', min: 0, max: 100 },
+  { key: 'discSe', label: 'Diskon Sales (SE) tanpa persetujuan', unit: '%', hint: 'Diskon dari harga jual Purchasing / saran harga stok sampai batas ini langsung bisa dikirim.', min: 0, max: 100 },
   { key: 'discBm', label: 'Batas diskon BM', unit: '%', hint: 'Diskon sampai batas ini cukup disetujui BM cabang.', min: 0, max: 100 },
   { key: 'discGm', label: 'Batas diskon GM', unit: '%', hint: 'Diskon sampai batas ini cukup disetujui GM.', min: 0, max: 100 },
   { key: 'discVp', label: 'Batas diskon VP', unit: '%', hint: 'Diskon sampai batas ini disetujui VP; di atasnya tetap ke VP dengan tanda melewati batas.', min: 0, max: 100 },

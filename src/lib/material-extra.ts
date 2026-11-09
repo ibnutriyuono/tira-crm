@@ -42,6 +42,8 @@ export function pickSpecExtra(m: unknown): Record<string, unknown> {
   // QCD per item (lib/item-qcd.ts).
   const qcd = cleanItemQcd(o.qcd);
   if (qcd) out.qcd = qcd;
+  // Stok gudang yang dipilih Sales ("Pakai" di saran stok) — patokan saran harga & cek diskon.
+  if (typeof o.stokItemNo === 'string' && o.stokItemNo.trim()) out.stokItemNo = o.stokItemNo.trim().slice(0, 40);
   // Kondisi stok & target kedatangan per item (lib/item-stock.ts).
   Object.assign(out, pickStockExtra(o));
   if (o.beratPc !== undefined && o.uraian === undefined) {

@@ -316,7 +316,8 @@ export function MaterialSpecEditor({ variant, rows, onChange, renderRowExtra, hi
                 bentuk={r.bentuk}
                 dim={r.dim}
                 cabang={cabang}
-                onUse={(p) => update(idx, { ...(p.hargaKg ? { hargaKg: p.hargaKg } : {}), ...(p.stok && !r.stok ? { stok: p.stok } : {}) })}
+                chosen={String(r.src?.stokItemNo || '')}
+                onUse={(p) => update(idx, { ...(p.hargaKg ? { hargaKg: p.hargaKg } : {}), ...(p.stok && !r.stok ? { stok: p.stok } : {}), src: { ...(r.src || {}), stokItemNo: p.itemNo } })}
               />
             )}
             {prospek && (

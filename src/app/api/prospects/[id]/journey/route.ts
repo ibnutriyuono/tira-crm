@@ -19,7 +19,8 @@ import type { Material, Prospect } from '@/lib/types';
  *  - RM, GM, GM Operation, VP, Admin & Purchasing: HPP/kg, harga/kg, margin,
  *    total HPP dan laba kotor;
  *  - Sales & role lain: tanpa margin.
- * Margin dihitung dari HPP jawaban RFQ yang terhubung ke prospek ini.
+ * Margin dihitung dari HPP jawaban RFQ yang terhubung ke prospek ini, atau —
+ * bila belum ada — dari HPP stok gudang yang dipilih / paling cocok.
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -81,7 +82,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     minMargin: number;
     /** Batas diskon Sales dari harga jual Purchasing. */
     discSe: number;
-    lines: { idx: number; margin: number | null; below: boolean; discount: number | null; hpp?: number | null; price?: number | null; ref?: number | null; uom?: string; rfqNo: string; kg: number; nilai: number }[];
+    lines: { idx: number; margin: number | null; below: boolean; discount: number | null; hpp?: number | null; price?: number | null; ref?: number | null; refSrc?: 'rfq' | 'stok'; refDesc?: string; perPcs?: boolean; uom?: string; rfqNo: string; kg: number; nilai: number }[];
     total: { margin: number | null; checked: number; hpp?: number | null; nilai?: number | null; laba?: number | null };
   } = null;
 
@@ -111,8 +112,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         sumNilai += c.price * units;
         n++;
       }
-      const base = { idx: c.idx, margin: c.checked ? c.margin : null, below: c.below, discount: c.checked ? c.discount : null, rfqNo: c.rfqNo, kg, nilai: (c.price || 0) * units };
-      return full ? { ...base, hpp: c.hpp, price: c.price, ref: c.ref, uom: c.uom } : { ...base, nilai: 0 };
+      const base = {
+        idx: c.idx, margin: c.checked ? c.margin : null, below: c.below, discount: c.checked ? c.discount : null, rfqNo: c.rfqNo, kg, nilai: (c.price || 0) * units,
+        price: c.price, ref: c.ref, uom: c.uom, refSrc: c.refSrc, refDesc: c.refDesc, perPcs: c.perPcs,
+      };
+      return full ? { ...base, hpp: c.hpp } : { ...base, nilai: 0 };
     });
     const tot = sumHpp > 0 && sumNilai > 0 ? Math.round((1 - sumHpp / sumNilai) * 1000) / 10 : null;
     margin = {

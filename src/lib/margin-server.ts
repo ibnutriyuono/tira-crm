@@ -44,7 +44,7 @@ export function cleanQuoteItems(v: unknown): QuoteLineIn[] {
 
 /** Sisi aman untuk role tanpa HPP: harga jual Purchasing & diskon boleh, HPP & margin tidak. */
 export function publicLine(l: MarginLine) {
-  return { idx: l.idx, checked: l.checked, below: l.below, ref: l.ref, discount: l.discount };
+  return { idx: l.idx, checked: l.checked, below: l.below, ref: l.ref, refSrc: l.refSrc, refDesc: l.refDesc, perPcs: l.perPcs, discount: l.discount };
 }
 
 /**
@@ -89,6 +89,11 @@ export async function marginStatus(user: SafeUser, prospectId: string, items: Qu
  * itu, naik ke tingkat berikutnya; terakhir Admin.
  */
 export async function marginApproverIdsFor(level: MarginLevel, scope: { cabang: string | null; reg: number | null }): Promise<string[]> {
+  return (await marginApproversFor(level, scope)).map((r) => r.id);
+}
+
+/** Penyetuju untuk satu tingkat: tingkat itu dulu, lalu naik bila kosong (BM → RM → GM → VP → Admin). */
+export async function marginApproversFor(level: MarginLevel, scope: { cabang: string | null; reg: number | null }): Promise<{ id: string; name: string; role: string }[]> {
   for (const l of ['bm', 'rm', 'gm', 'vp'].slice(levelRank(level) - 1) as MarginLevel[]) {
     const where =
       l === 'bm'
@@ -101,10 +106,10 @@ export async function marginApproverIdsFor(level: MarginLevel, scope: { cabang: 
             : null
           : { role: l };
     if (!where) continue;
-    const rows = await prisma.user.findMany({ where: { ...where, pausedAt: null }, select: { id: true } });
-    if (rows.length) return rows.map((r) => r.id);
+    const rows = await prisma.user.findMany({ where: { ...where, pausedAt: null }, select: { id: true, name: true, role: true }, orderBy: { name: 'asc' } });
+    if (rows.length) return rows;
   }
-  return (await prisma.user.findMany({ where: { role: 'admin', pausedAt: null }, select: { id: true } })).map((r) => r.id);
+  return prisma.user.findMany({ where: { role: 'admin', pausedAt: null }, select: { id: true, name: true, role: true }, orderBy: { name: 'asc' } });
 }
 
 /** Boleh memutuskan: wewenang ≥ tingkat pengajuan, di cakupannya (BM cabang, RM regional). VP belum ada → GM. */
