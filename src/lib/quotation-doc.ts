@@ -28,9 +28,13 @@ export interface QuoteSigner {
 
 export type QuoteLang = 'id' | 'en';
 
+export type QuoteJenis = 'penawaran' | 'negosiasi';
+
 export interface QuoteData {
   /** Bahasa surat: Indonesia (bawaan) atau Inggris. */
   lang?: QuoteLang;
+  /** Jenis surat: Surat Penawaran (bawaan) atau Surat Negosiasi (prospek di tahap Negosiasi). */
+  jenis?: QuoteJenis;
   nomor: string;
   tanggal: string;
   kota: string;
@@ -154,9 +158,38 @@ const QL = {
   },
 };
 export type QuoteLabels = (typeof QL)['id'];
-export const quoteLabels = (lang?: QuoteLang): QuoteLabels => QL[lang === 'en' ? 'en' : 'id'];
+
+/** Teks yang berbeda untuk Surat Negosiasi (prospek di tahap Negosiasi). */
+const QL_NEGO: Record<QuoteLang, Pick<QuoteLabels, 'intro' | 'penutup' | 'headerDoc' | 'judulDoc'>> = {
+  id: {
+    intro: 'Menindaklanjuti pembicaraan dan negosiasi harga dengan Bapak/Ibu, bersama ini kami sampaikan harga negosiasi dengan rincian sebagai berikut:',
+    penutup: (to: string) => `Demikian surat negosiasi ini kami sampaikan. Besar harapan kami harga ini dapat diterima dan kita dapat bekerja sama dengan ${to || 'Bapak/Ibu'}. Atas perhatian dan kepercayaan Bapak/Ibu, kami ucapkan terima kasih.`,
+    headerDoc: 'Surat Negosiasi No.',
+    judulDoc: 'Surat Negosiasi',
+  },
+  en: {
+    intro: 'Following our discussion and price negotiation, we are pleased to submit our negotiated prices as follows:',
+    penutup: (to: string) => `We hope these negotiated prices are acceptable and look forward to working with ${to || 'you'}. Thank you for your attention and trust.`,
+    headerDoc: 'Negotiation No.',
+    judulDoc: 'Price Negotiation',
+  },
+};
+
+export const quoteLabels = (lang?: QuoteLang, jenis?: QuoteJenis): QuoteLabels => {
+  const l: QuoteLang = lang === 'en' ? 'en' : 'id';
+  return jenis === 'negosiasi' ? { ...QL[l], ...QL_NEGO[l] } : QL[l];
+};
+
+/** Nama jenis surat untuk judul layar, aktivitas & pesan. */
+export const quoteJenisLabel = (jenis?: QuoteJenis, lang?: QuoteLang) => quoteLabels(lang, jenis).judulDoc;
+
+/** Jenis surat bawaan dari tahap prospek: tahap Negosiasi (3) → Surat Negosiasi. */
+export const quoteJenisFor = (status: number | null | undefined): QuoteJenis => (Number(status) === 3 ? 'negosiasi' : 'penawaran');
 
 /** Isian bawaan per bahasa (perihal, syarat). */
+/** Perihal bawaan Surat Negosiasi. */
+export const NEGO_PERIHAL: Record<QuoteLang, string> = { id: 'Negosiasi Harga', en: 'Price Negotiation' };
+
 export const QUOTE_DEFAULTS: Record<QuoteLang, { perihal: string; pembayaran: string; pengiriman: string; berlaku: string }> = {
   id: { perihal: 'Penawaran Harga', pembayaran: '30 hari setelah invoice diterima', pengiriman: '2-4 minggu setelah PO diterima / sesuai kondisi stock', berlaku: '14 hari kerja sejak tanggal penawaran' },
   en: { perihal: 'Price Quotation', pembayaran: '30 days after receipt of invoice', pengiriman: '2-4 weeks after receipt of PO / subject to stock availability', berlaku: '14 working days from the quotation date' },
@@ -184,7 +217,7 @@ export interface QuoteCol {
 /** Kolom tabel sesuai opsi; berat & harga/kg hanya muncul bila ada material yang dihitung per kg. */
 export function quoteColumns(d: QuoteData, o: QuoteOpts): QuoteCol[] {
   const perKg = d.items.some((it) => it.beratPc > 0 && it.hargaKg > 0);
-  const L = quoteLabels(d.lang);
+  const L = quoteLabels(d.lang, d.jenis);
   const cols: QuoteCol[] = [{ key: 'no', label: L.colNo, w: 5, align: 'center', cell: (_it, i) => String(i + 1) }];
   if (o.colLine) cols.push({ key: 'line', label: L.colLine, w: 6, align: 'center', cell: (it) => it.line || '-' });
   cols.push({ key: 'uraian', label: L.colUraian, w: 30, align: 'left', cell: (it) => it.uraian });
@@ -206,7 +239,7 @@ export interface QuoteTotals {
 
 export function quoteTotals(d: QuoteData, o: QuoteOpts): QuoteTotals {
   const sum = d.items.reduce((s, it) => s + lineTotal(it), 0);
-  const L = quoteLabels(d.lang);
+  const L = quoteLabels(d.lang, d.jenis);
   if (d.ppnInclude) {
     const dpp = Math.round(sum / (1 + PPN_RATE));
     const rows = o.ppnRinci
@@ -280,7 +313,7 @@ export function formatTanggalSurat(iso: string, lang?: QuoteLang): string {
 
 /** Teks tetap surat (dipakai pratinjau & .docx). */
 export function quoteTexts(d: QuoteData) {
-  const L = quoteLabels(d.lang);
+  const L = quoteLabels(d.lang, d.jenis);
   return {
     company: 'PT. TIRA AUSTENITE, Tbk',
     division: 'STEEL DIVISION',
@@ -293,7 +326,7 @@ export function quoteTexts(d: QuoteData) {
 
 /** Baris Syarat & Ketentuan yang tampil (label, isi). */
 export function quoteTerms(d: QuoteData, o: QuoteOpts): [string, string][] {
-  const L = quoteLabels(d.lang);
+  const L = quoteLabels(d.lang, d.jenis);
   const t: [string, string][] = [];
   if (o.pembayaran && d.pembayaran.trim()) t.push([L.pembayaran, d.pembayaran.trim()]);
   if (o.pengiriman && d.pengiriman.trim()) t.push([L.pengiriman, d.pengiriman.trim()]);
@@ -309,7 +342,7 @@ const br = (s: string) => esc(s).replace(/\n/g, '<br>');
 /** Pratinjau surat (HTML) — tata letak sama dengan file .docx. */
 export function quoteHtml(d: QuoteData, o: QuoteOpts, logoSrc: string, signatureSrc = ''): string {
   const tx = quoteTexts(d);
-  const L = quoteLabels(d.lang);
+  const L = quoteLabels(d.lang, d.jenis);
   const cols = quoteColumns(d, o);
   const tot = quoteTotals(d, o);
   const wsum = cols.reduce((s, c) => s + c.w, 0);

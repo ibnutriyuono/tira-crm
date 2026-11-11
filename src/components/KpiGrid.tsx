@@ -1,6 +1,6 @@
 'use client';
 
-import { classify, formatRupiah, num } from '@/lib/format';
+import { classify, formatRupiah, num, isPenawaranPending } from '@/lib/format';
 import type { Prospect } from '@/lib/types';
 
 import { useT } from '@/store/useLangStore';
@@ -15,7 +15,7 @@ export function KpiGrid({ list }: { list: Prospect[] }) {
   const wonValue = won.reduce((s, r) => s + num(r.value), 0);
   const closedCount = won.length + lost.length;
   const winRate = closedCount > 0 ? (won.length / closedCount) * 100 : 0;
-  const pendingPenawaran = list.filter((r) => !r.penawaranTerkirim && classify(r) === 'Aktif');
+  const pendingPenawaran = list.filter((r) => isPenawaranPending(r));
   // DO rows split by invoice status: invoiced counts as Omzet, the rest is
   // GIT (goods in transit).
   const doList = list.filter((r) => num(r.status) === 5);

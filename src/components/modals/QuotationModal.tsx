@@ -15,6 +15,10 @@ import { activityOwner } from '@/lib/sales-activity';
 import { canQuoteOnBehalf } from '@/lib/roles';
 import {
   QUOTE_DEFAULTS,
+  NEGO_PERIHAL,
+  quoteJenisFor,
+  quoteJenisLabel,
+  type QuoteJenis,
   QUOTE_OPT_GROUPS,
   defaultQuoteOpts,
   lineTotal,
@@ -157,13 +161,16 @@ export function QuotationModal() {
     const savedLang = lsGet(LS.lang);
     const lang: QuoteLang = savedLang === 'en' || savedLang === 'id' ? savedLang : getLang();
     const def = QUOTE_DEFAULTS[lang];
+    // Prospek di tahap Negosiasi → Surat Negosiasi (bisa diganti di isian Jenis surat).
+    const jenis = quoteJenisFor(record.status);
     setD({
       lang,
+      jenis,
       nomor: generateDefaultNomor(record),
       tanggal: todayStr(),
       kota: lsGet(LS.kota) || '',
       lampiran: '-',
-      perihal: `${def.perihal} ${record.uraian || ''}`.trim().slice(0, 120),
+      perihal: `${jenis === 'negosiasi' ? NEGO_PERIHAL[lang] : def.perihal} ${record.uraian || ''}`.trim().slice(0, 120),
       kepada: record.customer || '',
       pic: picLabel(primary),
       alamat: cust?.address || '',
@@ -265,14 +272,25 @@ export function QuotationModal() {
     const from = QUOTE_DEFAULTS[d.lang || 'id'];
     const to = QUOTE_DEFAULTS[next];
     const swap = (v: string, a: string, b: string) => (v.trim() === a ? b : v);
+    const pf = d.jenis === 'negosiasi' ? NEGO_PERIHAL[d.lang || 'id'] : from.perihal;
+    const pt = d.jenis === 'negosiasi' ? NEGO_PERIHAL[next] : to.perihal;
     set({
       lang: next,
-      perihal: d.perihal.startsWith(from.perihal) ? to.perihal + d.perihal.slice(from.perihal.length) : d.perihal,
+      perihal: d.perihal.startsWith(pf) ? pt + d.perihal.slice(pf.length) : d.perihal,
       pembayaran: swap(d.pembayaran, from.pembayaran, to.pembayaran),
       pengiriman: swap(d.pengiriman, from.pengiriman, to.pengiriman),
       berlaku: swap(d.berlaku, from.berlaku, to.berlaku),
     });
     lsSet(LS.lang, next);
+  }
+
+  /** Ganti jenis surat; perihal yang masih bawaan ikut diganti. */
+  function switchJenis(next: QuoteJenis) {
+    if (!d || (d.jenis || 'penawaran') === next) return;
+    const l = d.lang || 'id';
+    const from = (d.jenis || 'penawaran') === 'negosiasi' ? NEGO_PERIHAL[l] : QUOTE_DEFAULTS[l].perihal;
+    const to = next === 'negosiasi' ? NEGO_PERIHAL[l] : QUOTE_DEFAULTS[l].perihal;
+    set({ jenis: next, perihal: d.perihal.startsWith(from) ? to + d.perihal.slice(from.length) : d.perihal });
   }
 
   function remember() {
@@ -291,6 +309,7 @@ export function QuotationModal() {
       const r = await api.post<{ created: boolean; owner: string }>('/api/sales-activities/quotation', {
         prospectId: record.id,
         nomor: d.nomor,
+        jenis: d.jenis || 'penawaran',
         tanggal: d.tanggal,
         customer: d.kepada,
         pic: d.pic,
@@ -374,7 +393,7 @@ export function QuotationModal() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Penawaran_${escapeForFilename(d.kepada || 'Customer')}_${d.tanggal || todayStr()}.docx`;
+      link.download = `${d.jenis === 'negosiasi' ? 'Negosiasi' : 'Penawaran'}_${escapeForFilename(d.kepada || 'Customer')}_${d.tanggal || todayStr()}.docx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -389,7 +408,7 @@ export function QuotationModal() {
     }
   }
 
-  const baseName = () => `Penawaran_${escapeForFilename(d?.kepada || 'Customer')}_${escapeForFilename(d?.nomor || '')}`.replace(/_+$/, '');
+  const baseName = () => `${d?.jenis === 'negosiasi' ? 'Negosiasi' : 'Penawaran'}_${escapeForFilename(d?.kepada || 'Customer')}_${escapeForFilename(d?.nomor || '')}`.replace(/_+$/, '');
 
   async function makePdf(): Promise<Blob> {
     const { loadLogo } = await import('@/lib/quotation-docx');
@@ -449,7 +468,7 @@ export function QuotationModal() {
       remember();
       const pdf = await makePdf();
       const name = `${baseName()}.pdf`;
-      const text = `${d.pic ? `Yth. ${d.pic},\n\n` : ''}Bersama ini kami kirimkan Surat Penawaran No. ${d.nomor} untuk ${d.kepada}. Mohon dapat dipelajari, kami siap membantu bila ada pertanyaan.\n\nSalam,\n${d.signer.nama || currentUser?.name || ''}\nPT. TIRA AUSTENITE, Tbk`;
+      const text = `${d.pic ? `Yth. ${d.pic},\n\n` : ''}Bersama ini kami kirimkan ${quoteJenisLabel(d.jenis)} No. ${d.nomor} untuk ${d.kepada}. Mohon dapat dipelajari, kami siap membantu bila ada pertanyaan.\n\nSalam,\n${d.signer.nama || currentUser?.name || ''}\nPT. TIRA AUSTENITE, Tbk`;
       const file = new File([pdf], name, { type: 'application/pdf' });
       const nav = navigator as Navigator & { canShare?: (data: { files: File[] }) => boolean };
       if (window.isSecureContext && nav.canShare && nav.canShare({ files: [file] })) {
@@ -534,7 +553,7 @@ export function QuotationModal() {
     <Modal
       show={show}
       onClose={closeModal}
-      title={tr("Buat Surat Penawaran")}
+      title={d?.jenis === 'negosiasi' ? tr('Buat Surat Negosiasi') : tr('Buat Surat Penawaran')}
       xwide
       footer={
         mailMode ? (
@@ -667,6 +686,14 @@ export function QuotationModal() {
 
       {tab === 'isi' && (
         <div className="form-grid">
+          <div className="full q-lang">
+            <label>{tr("Jenis surat")}</label>
+            <div className="seg">
+              <button type="button" className={`btn btn-sm ${(d.jenis || 'penawaran') === 'penawaran' ? 'btn-primary' : 'btn-outline'}`} onClick={() => switchJenis('penawaran')}>{tr("Surat Penawaran")}</button>
+              <button type="button" className={`btn btn-sm ${d.jenis === 'negosiasi' ? 'btn-primary' : 'btn-outline'}`} onClick={() => switchJenis('negosiasi')}>{tr("Surat Negosiasi")}</button>
+            </div>
+            <span className="field-note" style={{ margin: 0 }}>{tr("Prospek di tahap Negosiasi otomatis memakai Surat Negosiasi: judul, perihal, kalimat pembuka & penutup, dan subjek email ikut berganti.")}</span>
+          </div>
           <div className="full q-lang">
             <label>{tr("Bahasa surat")}</label>
             <div className="seg">

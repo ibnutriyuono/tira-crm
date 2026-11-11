@@ -113,6 +113,19 @@ export async function DELETE(req: Request) {
     remaining = next;
   }
 
+  // Rencana Mingguan: baris yang dihapus tetap terlihat di riwayat perubahan.
+  const gone = body?.index != null ? [current[Number(body.index)]] : current;
+  await prisma.salesPlanChange.create({
+    data: {
+      periode, se: plan.se, cabang: plan.cabang, reg: plan.reg, action: 'hapus',
+      minggu: (gone[0] as { minggu?: number | null })?.minggu ?? null,
+      prospectId: (gone[0] as { sourceProspectId?: string | null })?.sourceProspectId ?? null,
+      items: gone as never,
+      nilai: gone.reduce((a, r) => a + Number((r as { qty?: unknown }).qty || 0) * Number((r as { harga?: unknown }).harga || 0), 0),
+      reason: 'Dihapus di Rencana Bulanan', byName: user.name || user.username,
+    },
+  });
+
   if (remaining.length === 0) {
     await prisma.salesPlan.delete({ where: { id: plan.id } });
     emitCrmEvent('salesPlan:deleted', { id: plan.id });

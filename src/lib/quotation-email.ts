@@ -3,10 +3,12 @@
  * dan email yang benar-benar dikirim server, supaya yang dilihat = yang
  * diterima customer. Murni (tanpa import server / browser API).
  */
-import { formatTanggalSurat, quoteTotals, rupiah, type QuoteData, type QuoteLang, type QuoteOpts } from './quotation-doc';
+import { formatTanggalSurat, quoteTotals, rupiah, type QuoteData, type QuoteJenis, type QuoteLang, type QuoteOpts } from './quotation-doc';
 
 export interface QuoteEmailSummary {
   lang: QuoteLang;
+  /** Surat Penawaran (bawaan) atau Surat Negosiasi. */
+  jenis?: QuoteJenis;
   nomor: string;
   tanggal: string;
   perihal: string;
@@ -42,6 +44,13 @@ const T = {
   },
 };
 
+const T_NEGO = {
+  id: { ringkasan: 'Ringkasan Negosiasi Harga', total: 'Total Harga Negosiasi', subject: 'Negosiasi Harga' },
+  en: { ringkasan: 'Negotiated Price Summary', total: 'Negotiated Total', subject: 'Price Negotiation' },
+};
+/** Teks email sesuai bahasa & jenis surat. */
+const tFor = (lang: QuoteLang, jenis?: QuoteJenis) => (jenis === 'negosiasi' ? { ...T[lang], ...T_NEGO[lang] } : T[lang]);
+
 const esc = (s: string) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 const qtyFmt = (n: number) => Number(n || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 });
 
@@ -55,6 +64,7 @@ export function quoteEmailSummary(d: QuoteData, o: QuoteOpts): QuoteEmailSummary
   const tot = quoteTotals(d, o);
   return {
     lang,
+    ...(d.jenis === 'negosiasi' ? { jenis: d.jenis } : {}),
     nomor: d.nomor,
     tanggal: formatTanggalSurat(d.tanggal, lang),
     perihal: d.perihal,
@@ -72,11 +82,34 @@ export function defaultEmailSubject(d: QuoteData): string {
   const first = d.items.find((it) => it.uraian.trim())?.uraian.trim() || '';
   const more = d.items.filter((it) => it.uraian.trim()).length - 1;
   const what = first ? ` — ${first}${more > 0 ? (lang === 'en' ? ` (+${more} items)` : ` (+${more} item)`) : ''}` : '';
-  return `${T[lang].subject} No. ${d.nomor}${what}`.slice(0, 200);
+  return `${tFor(lang, d.jenis).subject} No. ${d.nomor}${what}`.slice(0, 200);
 }
 
 export function defaultEmailMessage(d: QuoteData): string {
   const nama = greetName(d);
+  const nego = d.jenis === 'negosiasi';
+  if (d.lang === 'en' && nego) {
+    return [
+      `Dear ${nama ? `Mr./Ms. ${nama}` : 'Sir/Madam'},`,
+      '',
+      `Following our recent discussion, please find attached our Price Negotiation letter No. ${d.nomor} for ${d.kepada || 'your company'} with the negotiated prices.`,
+      '',
+      'A summary is shown below, and the complete letter is attached as a PDF.',
+      '',
+      'Should you have any questions, simply reply to this email or contact us directly. We look forward to your confirmation.',
+    ].join('\n');
+  }
+  if (nego) {
+    return [
+      `Yth. ${nama ? `Bapak/Ibu ${nama}` : 'Bapak/Ibu'},`,
+      '',
+      `Menindaklanjuti pembicaraan kita, bersama email ini kami sampaikan Surat Negosiasi Harga No. ${d.nomor} untuk ${d.kepada || 'Bapak/Ibu'}.`,
+      '',
+      'Ringkasan harga negosiasi kami cantumkan di bawah ini, sedangkan surat lengkap terlampir dalam format PDF.',
+      '',
+      'Apabila ada pertanyaan, silakan membalas email ini atau menghubungi kami langsung. Kami menantikan konfirmasi dari Bapak/Ibu.',
+    ].join('\n');
+  }
   if (d.lang === 'en') {
     return [
       `Dear ${nama ? `Mr./Ms. ${nama}` : 'Sir/Madam'},`,
@@ -102,7 +135,7 @@ export function defaultEmailMessage(d: QuoteData): string {
 /** Teks polos (untuk klien email tanpa HTML & aplikasi email biasa). */
 export function quoteEmailText(input: QuoteEmailInput): string {
   const s = input.summary;
-  const t = T[s.lang];
+  const t = tFor(s.lang, s.jenis);
   const lines = [
     input.message.trim(),
     '',
@@ -130,7 +163,7 @@ export function quoteEmailText(input: QuoteEmailInput): string {
 /** Email HTML (tabel + gaya inline, aman untuk Gmail/Outlook). */
 export function quoteEmailHtml(input: QuoteEmailInput): string {
   const s = input.summary;
-  const t = T[s.lang];
+  const t = tFor(s.lang, s.jenis);
   const paras = input.message
     .trim()
     .split(/\n{2,}/)

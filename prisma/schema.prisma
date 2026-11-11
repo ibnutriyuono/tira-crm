@@ -588,6 +588,34 @@ model SalesPlan {
   @@index([reg])
 }
 
+/// Riwayat perubahan rencana penjualan mingguan (tambah / pindah minggu /
+/// hapus) — rencana aktif tetap di SalesPlan.items; baris yang dihapus
+/// hanya tersisa di sini, lengkap dengan alasan, pelaku dan isinya.
+model SalesPlanChange {
+  id         String   @id @default(cuid())
+  periode    String // "YYYY-MM"
+  se         String
+  cabang     String?
+  reg        Int?
+  /// tambah | pindah | hapus
+  action     String
+  /// Minggu ke- (1–5) rencana yang terdampak; pindah: minggu tujuan.
+  minggu     Int?
+  fromMinggu Int?
+  prospectId String?
+  customer   String?
+  /// Baris rencana yang ditambah / dihapus (SalesPlanItem[]).
+  items      Json     @default("[]")
+  nilai      Float    @default(0)
+  reason     String?
+  byName     String?
+  createdAt  DateTime @default(now())
+
+  @@index([periode])
+  @@index([cabang])
+  @@index([prospectId])
+}
+
 model BudgetTarget {
   id        String   @id @default(cuid())
   cabang    String

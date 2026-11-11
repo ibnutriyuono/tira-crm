@@ -1,4 +1,4 @@
-import { classify, num } from './format';
+import { classify, isPenawaranPending, num } from './format';
 import { createdInRange, localDateOf, type CreatedRange } from './new-records';
 import type { Prospect } from './types';
 
@@ -48,7 +48,7 @@ export function getFilteredProspects(records: Prospect[], f: FilterState): Prosp
   if (f.fStatus !== '') list = list.filter((r) => num(r.status) === Number(f.fStatus));
   if (f.fKlas) list = list.filter((r) => classify(r) === f.fKlas);
   if (f.fPenawaran === 'sent') list = list.filter((r) => !!r.penawaranTerkirim);
-  else if (f.fPenawaran === 'pending') list = list.filter((r) => !r.penawaranTerkirim);
+  else if (f.fPenawaran === 'pending') list = list.filter((r) => isPenawaranPending(r));
   // Bulan/Tahun: PO -> bulan PO, DO terfaktur -> bulan faktur, GIT & tahap
   // lain -> bulan perubahan status (sama dengan filter bulan kolom Kanban).
   if (f.fBulan) list = list.filter((r) => periodDate(r).slice(5, 7) === f.fBulan);

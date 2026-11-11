@@ -260,3 +260,13 @@ export function IconFlag() {
     </svg>
   );
 }
+
+/** Kalender dengan tanda + — "+ Rencana Penjualan". */
+export function IconPlanAdd() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M3 9h18M8 2v4M16 2v4M12 12v6M9 15h6" />
+    </svg>
+  );
+}

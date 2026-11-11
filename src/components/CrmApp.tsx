@@ -45,6 +45,7 @@ import { RolesModal } from './modals/RolesModal';
 import { MarketingModal } from './modals/MarketingModal';
 import { CancelDocModal } from './modals/CancelDocModal';
 import { SalesPlanModal } from './modals/SalesPlanModal';
+import { WeeklyPlanModal } from './modals/WeeklyPlanModal';
 import { NotificationsModal } from './modals/NotificationsModal';
 import { FollowUpBoardModal } from './modals/FollowUpBoardModal';
 import { GmAnalysisModal } from './modals/GmAnalysisModal';
@@ -204,6 +205,7 @@ export function CrmApp() {
       <MarketingModal />
       <CancelDocModal />
       <SalesPlanModal />
+      <WeeklyPlanModal />
       <NotificationsModal />
       <FollowUpBoardModal />
       <GmAnalysisModal />

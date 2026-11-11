@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api-client';
 import { CABANG_LIST, STAGE_PROBABILITY, STATUS_META } from '@/lib/constants';
 import { buildCustomerAnalysis } from '@/lib/exec-more';
-import { classify, formatDateID, num } from '@/lib/format';
+import { classify, formatDateID, num, isPenawaranPending } from '@/lib/format';
 import { isOpenIssue } from '@/lib/issues';
 import { rfqAsWorkflowDoc, workflowStage } from '@/lib/purchasing-workflow';
 import { buildAgingList } from '@/lib/reports';
@@ -125,7 +125,7 @@ export function DeskHome({ onPage }: { onPage: (p: 'pipeline') => void }) {
   const fuDue = active.filter((p) => p.followUpAt && p.followUpAt <= today);
   const fuLate = fuDue.filter((p) => (p.followUpAt || '') < today);
   const noFu = active.filter((p) => !p.followUpAt);
-  const unsent = active.filter((p) => num(p.status) >= 2 && !p.penawaranTerkirim);
+  const unsent = active.filter((p) => isPenawaranPending(p));
 
   // ---- daftar kerja hari ini
   const todos = useMemo(() => {

@@ -537,6 +537,31 @@ export interface SalesPlanItem {
    * period it was planned for (see buildProspectStarCounts in reports.ts).
    * Manually-typed rows never have this. */
   sourceProspectId?: string | null;
+  /** Minggu ke- (1–5) target PO dalam bulan rencana — Rencana Mingguan. Kosong = belum dijadwalkan. */
+  minggu?: number | null;
+  catatan?: string | null;
+  /** Kapan & oleh siapa baris ini masuk rencana (ISO datetime). */
+  addedAt?: string | null;
+  addedBy?: string | null;
+}
+
+/** Riwayat perubahan Rencana Mingguan (tambah / pindah minggu / hapus). */
+export interface SalesPlanChange {
+  id: string;
+  periode: string;
+  se: string;
+  cabang: string | null;
+  reg: number | null;
+  action: 'tambah' | 'pindah' | 'ubah' | 'hapus';
+  minggu: number | null;
+  fromMinggu: number | null;
+  prospectId: string | null;
+  customer: string | null;
+  items: SalesPlanItem[];
+  nilai: number;
+  reason: string | null;
+  byName: string | null;
+  createdAt: string;
 }
 
 export interface SalesPlan {

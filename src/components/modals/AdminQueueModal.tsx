@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import { api } from '@/lib/api-client';
-import { formatDateID, formatRupiah, num } from '@/lib/format';
+import { formatDateID, formatRupiah, num, isPenawaranPending } from '@/lib/format';
 import { canSeeAdminQueue, canSetFaktur } from '@/lib/roles';
 import { localToday } from '@/lib/sales-activity';
 import type { Prospect } from '@/lib/types';
@@ -34,12 +34,8 @@ export function adminTaskCount(prospects: Prospect[]): number {
   return prospects.filter((p) => (num(p.status) === 5 && !p.terfaktur) || missingDocs(p).length > 0 || (penawaranPending(p)) || arrivedItems(p).length > 0).length;
 }
 
-/**
- * Penawaran belum ditandai terkirim, untuk prospek yang sudah di pipeline
- * Penawaran Harga (2) sampai Lose Order (6). Sales Activity (0) dan
- * Permintaan / potensi (1) tidak dihitung.
- */
-export const penawaranPending = (p: Prospect) => num(p.status) >= 2 && num(p.status) <= 6 && !p.penawaranTerkirim;
+/** Penawaran pending: hanya prospek di tahap 2 · Penawaran Harga yang penawarannya belum terkirim. */
+export const penawaranPending = (p: Prospect) => isPenawaranPending(p);
 
 /** Item Indent/Import yang sudah tiba di gudang (status dari Purchasing) tapi belum terkirim. */
 export function arrivedItems(p: Prospect): PoIndentItem[] {

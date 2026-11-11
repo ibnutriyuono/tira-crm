@@ -52,7 +52,8 @@ export async function POST(req: Request) {
   const kanal = body?.kanal === 'email' || body?.kanal === 'wa' ? String(body.kanal) : null;
   const ringkas = String(body?.ringkas || '').trim().slice(0, 400);
   const total = String(body?.total || '').trim().slice(0, 40);
-  const keterangan = [`Surat penawaran No. ${nomor}`, ringkas, total && `total ${total}`, onBehalf && `dibuat oleh ${user.name}`].filter(Boolean).join(' · ').slice(0, 2000);
+  const jenisLabel = body?.jenis === 'negosiasi' ? 'Surat negosiasi' : 'Surat penawaran';
+  const keterangan = [`${jenisLabel} No. ${nomor}`, ringkas, total && `total ${total}`, onBehalf && `dibuat oleh ${user.name}`].filter(Boolean).join(' · ').slice(0, 2000);
   const pics = parsePicText(String(body?.pic || '')).slice(0, 6).map((p, i) => ({ nama: p.nama, jabatan: p.jabatan || '', dihubungi: i === 0 }));
   const { reg, cabang } = onBehalf && prospect ? { reg: prospect.reg, cabang: (prospect.cabang || '').trim().toUpperCase() } : await resolveProspectScope(user, null);
 

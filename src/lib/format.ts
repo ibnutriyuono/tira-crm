@@ -185,3 +185,9 @@ export function materialsWithValue(r: Pick<Prospect, 'materials' | 'qty' | 'valu
   }
   return mats.map((m, i) => ({ ...m, nilai: vals[i] }));
 }
+
+/**
+ * Penawaran pending: prospek di tahap 2 · Penawaran Harga yang penawarannya
+ * belum ditandai terkirim ke customer. Tahap lain tidak dihitung.
+ */
+export const isPenawaranPending = (p: { status?: unknown; penawaranTerkirim?: boolean | null }) => num(p.status) === 2 && !p.penawaranTerkirim;

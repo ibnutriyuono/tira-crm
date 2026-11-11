@@ -48,7 +48,7 @@ export async function buildQuotePdf(d: QuoteData, o: QuoteOpts, logo: LogoImage 
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
   const tx = quoteTexts(d);
-  const L = quoteLabels(d.lang);
+  const L = quoteLabels(d.lang, d.jenis);
   const cols = quoteColumns(d, o);
   const tot = quoteTotals(d, o);
   const terms = quoteTerms(d, o);

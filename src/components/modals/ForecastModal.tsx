@@ -12,6 +12,7 @@ import { buildSalesPlanDetail, canEditSalesPlanFor } from '@/lib/sales-plan-view
 import { IconTrash } from '../icons';
 import type { AnnualTarget, BudgetTarget, RosterUser, SalesPlan } from '@/lib/types';
 import { SeTargetSection, buildAllocations } from '../forecast/SeTargetSection';
+import { WeeklyPlanTab } from '../forecast/WeeklyPlanTab';
 import { seTargetOf } from '@/lib/se-target';
 import { yearMonthTarget } from '@/lib/kpi';
 import { useCan } from '@/hooks/useCan';
@@ -84,6 +85,7 @@ export function ForecastModal() {
 
   const [periode, setPeriode] = useState(currentPeriode());
   const [planCabang, setPlanCabang] = useState('');
+  const [tab, setTab] = useState<'bulanan' | 'mingguan' | 'aging'>('bulanan');
   const [deleting, setDeleting] = useState('');
   const seTargets = useDataStore((s) => s.seTargets);
   const [roster, setRoster] = useState<RosterUser[]>([]);
@@ -221,6 +223,25 @@ export function ForecastModal() {
         <label style={{ fontSize: 12, textTransform: 'none' }}>{tr("Periode")}</label>
         <input type="month" className="btn-sm" value={periode} onChange={(e) => setPeriode(e.target.value)} />
       </div>
+
+      <div className="ea-tabs" role="tablist" style={{ marginBottom: 12 }}>
+        {(
+          [
+            ['bulanan', tr('Target & Rencana Bulanan')],
+            ['mingguan', tr('Rencana Mingguan')],
+            ['aging', `${tr('Aging Alert')} (${agingRows.length})`],
+          ] as const
+        ).map(([k, l]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'mingguan' && <WeeklyPlanTab periode={periode} />}
+
+      {tab === 'bulanan' && (
+      <>
 
       {ownAlloc && (ownAlloc.status === 'empty' || ownAlloc.status === 'short') && (
         <div className="import-summary if-warn" style={{ marginTop: 0, marginBottom: 10 }}>
@@ -541,6 +562,11 @@ export function ForecastModal() {
         </>
       )}
 
+      </>
+      )}
+
+      {tab === 'aging' && (
+      <>
       <h4 style={{ marginTop: 18, marginBottom: 6 }}>{tr("Aging Alert — Pipeline Macet")}</h4>
       {agingRows.length === 0 ? (
         <div className="import-summary" style={{ marginTop: 0 }}>
@@ -569,6 +595,8 @@ export function ForecastModal() {
             </tbody>
           </table>
         </div>
+      )}
+      </>
       )}
     </Modal>
   );

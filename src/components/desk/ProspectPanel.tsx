@@ -13,7 +13,8 @@ import { useT } from '@/store/useLangStore';
 import { LeadBadge } from '../LeadBadge';
 import { KamBadge } from '../KamBadge';
 import { ProspectJourney } from './ProspectJourney';
-import { IconDoc, IconEdit, IconRfq, IconWa } from '../icons';
+import { IconDoc, IconEdit, IconPlanAdd, IconRfq, IconWa } from '../icons';
+import { periodeOf, prospectPlanRows } from '@/lib/weekly-plan';
 
 const STAGES = [1, 2, 3, 4, 5];
 const dayDiff = (a: string, b: string) => Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a.slice(0, 10)}T00:00:00`).getTime()) / 86400000);
@@ -33,6 +34,8 @@ export function ProspectPanel({ id }: { id: string }) {
   const canE = useCan('prospek', 'e');
   const canX = useCan('prospek', quotePermAct(me?.role));
   const canRfq = useCan('rfq', 'e');
+  const canPlan = useCan('rencana', 'e');
+  const salesPlans = useDataStore((s) => s.salesPlans);
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
   const close = () => useUiStore.setState({ deskPanelId: null });
 
@@ -57,6 +60,7 @@ export function ProspectPanel({ id }: { id: string }) {
   const st = num(p.status);
   const klas = classify(p);
   const meta = STATUS_META[st] || STATUS_META[0];
+  const planRow = prospectPlanRows(salesPlans, p.id, periodeOf())[0] || null;
   const inStage = Math.max(0, dayDiff(String(p.statusChangedAt || p.updatedAt), today));
   const fuLate = p.followUpAt ? p.followUpAt < today : false;
   const mats = materialsWithValue(p);
@@ -180,6 +184,11 @@ export function ProspectPanel({ id }: { id: string }) {
         {canX && <button type="button" className="btn btn-outline btn-sm" onClick={() => { set({ quotationProspectId: p.id }); open('quotation'); }}><IconDoc /> {tr('Surat Penawaran')}</button>}
         {canRfq && klas === 'Aktif' && <button type="button" className="btn btn-outline btn-sm" onClick={() => { set({ rfqCtx: { prospectId: p.id, rfqId: null } }); open('rfq'); }}><IconRfq /> RFQ</button>}
         {klas === 'Won' && <button type="button" className="btn btn-outline btn-sm" onClick={() => set({ itemFlowCtx: { prospectId: p.id }, modal: 'itemFlow' })}>{tr('Status Item')}</button>}
+        {canPlan && (klas === 'Aktif' || (num(p.status) === 4 && !p.terfaktur) || planRow) && (
+          <button type="button" className={`btn btn-sm ${planRow ? 'btn-outline plan-on' : 'btn-plan'}`} title={tr('Masukkan ke Rencana Penjualan mingguan')} onClick={() => { set({ weeklyPlanCtx: { prospectId: p.id } }); open('weeklyPlan'); }}>
+            <IconPlanAdd /> {planRow ? `✓ ${tr('Rencana')} W${planRow.item.minggu || '?'}` : tr('Rencana Penjualan')}
+          </button>
+        )}
         <button type="button" className="btn btn-primary btn-sm" onClick={() => { set({ editProspectId: p.id }); open('prospectForm'); }}><IconEdit /> {canE ? tr('Edit') : tr('Lihat')}</button>
       </div>
     </aside>

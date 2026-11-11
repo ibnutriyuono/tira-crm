@@ -119,7 +119,7 @@ export function deriveFromMaterials(materials: Material[]) {
 }
 
 /** Cleans SalesPlan line items and sums their value — same shape of helper as deriveFromMaterials, simpler unit-price rule (qty*harga, no beratPc/hargaKg conversion since a sales plan is a straight value estimate, not a priced RFQ line). */
-export function deriveFromSalesPlanItems(items: { line?: unknown; uraian?: unknown; qty?: unknown; harga?: unknown; sourceProspectId?: unknown }[]) {
+export function deriveFromSalesPlanItems(items: { line?: unknown; uraian?: unknown; qty?: unknown; harga?: unknown; sourceProspectId?: unknown; minggu?: unknown; catatan?: unknown; addedAt?: unknown; addedBy?: unknown }[]) {
   const clean = (Array.isArray(items) ? items : [])
     .map((m) => ({
       line: normalizeLine(m.line),
@@ -130,6 +130,11 @@ export function deriveFromSalesPlanItems(items: { line?: unknown; uraian?: unkno
       // hand — kept through cleaning so a prospect's star count (see
       // buildProspectStarCounts) survives the round trip to the database.
       sourceProspectId: typeof m.sourceProspectId === 'string' && m.sourceProspectId ? m.sourceProspectId : null,
+      // Rencana Mingguan: minggu target PO (1–5) dan jejak siapa / kapan baris masuk rencana.
+      minggu: Number.isInteger(Number(m.minggu)) && Number(m.minggu) >= 1 && Number(m.minggu) <= 5 ? Number(m.minggu) : null,
+      catatan: typeof m.catatan === 'string' && m.catatan.trim() ? m.catatan.trim().slice(0, 300) : null,
+      addedAt: typeof m.addedAt === 'string' && m.addedAt ? m.addedAt.slice(0, 40) : null,
+      addedBy: typeof m.addedBy === 'string' && m.addedBy ? m.addedBy.slice(0, 80) : null,
     }))
     .filter((m) => m.uraian || m.qty || m.harga);
   return { items: clean, value: clean.reduce((s, m) => s + m.qty * m.harga, 0) };

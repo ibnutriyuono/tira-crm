@@ -8,7 +8,7 @@ import { buildProspectStarCounts } from '@/lib/reports';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
-import { IconDoc, IconEdit, IconRfq, IconTrash, IconWa } from './icons';
+import { IconDoc, IconEdit, IconPlanAdd, IconRfq, IconTrash, IconWa } from './icons';
 import { Pagination } from './Pagination';
 import { useCan } from '@/hooks/useCan';
 import { NewBadge } from './NewBadge';
@@ -47,6 +47,7 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
   // Ikon Surat Penawaran (Admin Sales: hak Tambah/Ubah, lainnya: Download).
   const canX = useCan('prospek', quotePermAct(role));
   const canRfq = useCan('rfq', 'e');
+  const canPlan = useCan('rencana', 'e');
   // Above the empty-list early return — hooks cannot run conditionally.
   const purchCounts = useProspectPurchasingCounts(true);
   const salesPlans = useDataStore((s) => s.salesPlans);
@@ -182,6 +183,19 @@ export function ProspectTable({ filtered, total }: { filtered: Prospect[]; total
                         }}
                       >
                         <IconRfq />
+                      </button>
+                      )}
+                      {canPlan && (classify(r) === 'Aktif' || (num(r.status) === 4 && !r.terfaktur)) && (
+                      <button
+                        className="icon-btn plan-btn"
+                        title={tr("+ Rencana Penjualan (minggu target PO)")}
+                        aria-label={tr("+ Rencana Penjualan")}
+                        onClick={() => {
+                          useUiStore.setState({ weeklyPlanCtx: { prospectId: r.id } });
+                          openModal('weeklyPlan');
+                        }}
+                      >
+                        <IconPlanAdd />
                       </button>
                       )}
                       <button

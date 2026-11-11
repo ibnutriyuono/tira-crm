@@ -41,6 +41,7 @@ export type ModalKey =
   | 'stockUpload'
   | 'marginApprovals'
   | 'salesPlan'
+  | 'weeklyPlan'
   | 'notifications'
   | 'followUpBoard'
   | 'gmAnalysis'
@@ -81,6 +82,14 @@ export interface SalesPlanCtx {
   se: string;
   cabang: string;
   periode: string;
+}
+/** "+ Rencana Penjualan" — prospek tertentu, atau pilih prospek (dari Rencana Mingguan) dengan saringan cabang / SE. */
+export interface WeeklyPlanCtx {
+  prospectId: string | null;
+  periode?: string;
+  minggu?: number;
+  cabang?: string | null;
+  se?: string | null;
 }
 export interface QcdCtx {
   mode: 'prospectForm' | 'kanban';
@@ -165,6 +174,7 @@ interface UiState {
   cancelDocCtx: CancelDocCtx | null;
   followUpCtx: FollowUpCtx | null;
   salesPlanCtx: SalesPlanCtx | null;
+  weeklyPlanCtx: WeeklyPlanCtx | null;
   /** Opens Aktivitas Harian with these fields filled (e.g. from Marketing > Reaktivasi); returnTo reopens that screen on close. */
   activityPrefill: { customer: string; keterangan?: string; tipe?: string; returnTo?: ModalKey } | null;
   /** Buka Aktivitas Harian langsung di satu aktivitas/rencana (dari notifikasi follow-up). */
@@ -275,6 +285,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   cancelDocCtx: null,
   followUpCtx: null,
   salesPlanCtx: null,
+  weeklyPlanCtx: null,
   activityPrefill: null,
   activityFocus: null,
   issueFocus: null,

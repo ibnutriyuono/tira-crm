@@ -12,14 +12,14 @@ import { IssueBadge } from './issues/shared';
 import { LeadBadge } from './LeadBadge';
 import { useMemo, useState } from 'react';
 import { KANBAN_STATUSES, STATUS_META } from '@/lib/constants';
-import { classify, formatDateID, formatRupiah, klasBadgeColor, num, valueHighlightClass } from '@/lib/format';
+import { classify, formatDateID, formatRupiah, klasBadgeColor, num, valueHighlightClass, isPenawaranPending } from '@/lib/format';
 import { buildProspectStarCounts } from '@/lib/reports';
 import { qcdRequiredOnMove } from '@/lib/qcd';
 import { api } from '@/lib/api-client';
 import { useDataStore } from '@/store/useDataStore';
 import { useUiStore } from '@/store/useUiStore';
 import type { Prospect } from '@/lib/types';
-import { IconCart, IconDoc, IconEdit, IconRfq, IconTrash, IconWa } from './icons';
+import { IconCart, IconDoc, IconEdit, IconPlanAdd, IconRfq, IconTrash, IconWa } from './icons';
 import { changeDate, periodDate } from '@/lib/filter';
 import { NewBadge } from './NewBadge';
 import { ProspectPurchasingBubble, useProspectPurchasingCounts } from './ProspectPurchasingBubble';
@@ -42,6 +42,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
   // Ikon Surat Penawaran (Admin Sales: hak Tambah/Ubah, lainnya: Download).
   const canX = useCan('prospek', quotePermAct(currentUser?.role));
   const canRfq = useCan('rfq', 'e');
+  const canPlan = useCan('rencana', 'e');
   const canDelete = useCan('prospek', 'd') && (isGmLevel(currentUser?.role) || currentUser?.role === 'admin');
   const [dragging, setDragging] = useState(false);
   const deskActive = useUiStore((s) => s.deskActive);
@@ -80,7 +81,7 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
         </span>
       </div>
       <div className="kc-meta-row">
-        <span className={`badge ${r.penawaranTerkirim ? 'green' : 'rust pending-dot'}`}>{r.penawaranTerkirim ? tr("Penawaran Terkirim") : tr("Penawaran Pending")}</span>
+        {r.penawaranTerkirim ? <span className="badge green">{tr("Penawaran Terkirim")}</span> : isPenawaranPending(r) ? <span className="badge rust pending-dot">{tr("Penawaran Pending")}</span> : null}
         <IssueBadge prospectId={r.id} />
         <LeadBadge p={r} compact />
       </div>
@@ -137,6 +138,20 @@ function KanbanCard({ r, purchCount, starCount }: { r: Prospect; purchCount?: nu
           }}
         >
           <IconRfq />
+        </button>
+        )}
+        {canPlan && (klas === 'Aktif' || (num(r.status) === 4 && !r.terfaktur)) && (
+        <button
+          className="icon-btn plan-btn"
+          title={tr("+ Rencana Penjualan (minggu target PO)")}
+          aria-label={tr("+ Rencana Penjualan")}
+          onClick={(e) => {
+            e.stopPropagation();
+            useUiStore.setState({ weeklyPlanCtx: { prospectId: r.id } });
+            openModal('weeklyPlan');
+          }}
+        >
+          <IconPlanAdd />
         </button>
         )}
         {canRfq && (

@@ -79,6 +79,7 @@ export async function POST(req: Request) {
   if (!s || !s.nomor) return NextResponse.json({ error: 'Ringkasan penawaran tidak lengkap.' }, { status: 400 });
   const summary: QuoteEmailSummary = {
     lang: s.lang === 'en' ? 'en' : 'id',
+    ...(s.jenis === 'negosiasi' ? { jenis: 'negosiasi' as const } : {}),
     nomor: str(s.nomor, 80),
     tanggal: str(s.tanggal, 40),
     perihal: str(s.perihal, 200),
@@ -120,7 +121,7 @@ export async function POST(req: Request) {
     action: 'update',
     entity: 'prospect',
     entityId: prospectId || summary.nomor,
-    summary: `Mengirim surat penawaran No. ${summary.nomor} via email ke ${to.join(', ')}${cc.length ? ` (cc ${cc.join(', ')})` : ''}${summary.signer.nama && summary.signer.nama !== user.name ? ` atas nama ${summary.signer.nama}` : ''}`,
+    summary: `Mengirim ${summary.jenis === 'negosiasi' ? 'surat negosiasi' : 'surat penawaran'} No. ${summary.nomor} via email ke ${to.join(', ')}${cc.length ? ` (cc ${cc.join(', ')})` : ''}${summary.signer.nama && summary.signer.nama !== user.name ? ` atas nama ${summary.signer.nama}` : ''}`,
   });
   return NextResponse.json({ ok: true, to, cc });
 }

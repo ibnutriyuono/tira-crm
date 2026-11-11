@@ -123,11 +123,11 @@ export function MarginApprovalsModal() {
                     {low.map((l) => (
                       <tr key={l.idx}>
                         <td>{l.uraian || `Item ${l.idx + 1}`}</td>
-                        <td className="r mono">{l.ref != null ? l.ref.toLocaleString('id-ID') : '–'}{l.uom ? ` /${l.uom.toLowerCase()}` : ''}<small className="muted" style={{ display: 'block' }}>{l.refSrc === 'stok' ? tr('saran stok') : tr('Purchasing')}</small></td>
-                        <td className="r mono">{l.price != null ? l.price.toLocaleString('id-ID') : '–'}</td>
+                        <td className="r mono">{l.ref != null ? l.ref.toLocaleString('id-ID', { maximumFractionDigits: 0 }) : '–'}{l.uom ? ` /${l.uom.toLowerCase()}` : ''}<small className="muted" style={{ display: 'block' }}>{l.refSrc === 'stok' ? tr('saran stok') : tr('Purchasing')}</small></td>
+                        <td className="r mono">{l.price != null ? l.price.toLocaleString('id-ID', { maximumFractionDigits: 0 }) : '–'}</td>
                         <td className="r mono"><b>{l.discount == null ? '–' : `${fmt1(l.discount)}%`}</b></td>
                         {low.some((x) => x.margin != null) && <td className="r mono">{l.margin == null ? '–' : `${fmt1(l.margin)}%`}</td>}
-                        {low.some((x) => x.hpp != null) && <td className="r mono">{l.hpp != null ? l.hpp.toLocaleString('id-ID') : '–'}</td>}
+                        {low.some((x) => x.hpp != null) && <td className="r mono">{l.hpp != null ? l.hpp.toLocaleString('id-ID', { maximumFractionDigits: 0 }) : '–'}</td>}
                       </tr>
                     ))}
                   </tbody>
@@ -143,8 +143,8 @@ export function MarginApprovalsModal() {
                         <td className="r mono">{l.margin == null ? '–' : `${fmt1(l.margin)}%`}</td>
                         {low.some((x) => x.hpp != null) && (
                           <>
-                            <td className="r mono">{l.hpp != null ? l.hpp.toLocaleString('id-ID') : '–'}</td>
-                            <td className="r mono">{l.price != null ? l.price.toLocaleString('id-ID') : '–'}{l.uom ? ` /${l.uom.toLowerCase()}` : ''}</td>
+                            <td className="r mono">{l.hpp != null ? l.hpp.toLocaleString('id-ID', { maximumFractionDigits: 0 }) : '–'}</td>
+                            <td className="r mono">{l.price != null ? l.price.toLocaleString('id-ID', { maximumFractionDigits: 0 }) : '–'}{l.uom ? ` /${l.uom.toLowerCase()}` : ''}</td>
                           </>
                         )}
                       </tr>

@@ -28,7 +28,7 @@ export async function buildQuoteDocx(d: QuoteData, o: QuoteOpts, logo: LogoImage
   const { AlignmentType, BorderStyle, Document, Footer, Header, ImageRun, Packer, PageNumber, Paragraph, ShadingType, Table, TableCell, TableLayoutType, TableRow, TabStopType, TextRun, VerticalAlign, WidthType } = D;
 
   const tx = quoteTexts(d);
-  const L = quoteLabels(d.lang);
+  const L = quoteLabels(d.lang, d.jenis);
   const cols = quoteColumns(d, o);
   const tot = quoteTotals(d, o);
   const terms = quoteTerms(d, o);
