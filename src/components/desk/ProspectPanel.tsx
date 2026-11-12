@@ -13,6 +13,7 @@ import { useT } from '@/store/useLangStore';
 import { LeadBadge } from '../LeadBadge';
 import { KamBadge } from '../KamBadge';
 import { ProspectJourney } from './ProspectJourney';
+import { ProspectKontrak } from '../kontrak/ProspectKontrak';
 import { IconDoc, IconEdit, IconPlanAdd, IconRfq, IconWa } from '../icons';
 import { periodeOf, prospectPlanRows } from '@/lib/weekly-plan';
 
@@ -170,6 +171,8 @@ export function ProspectPanel({ id }: { id: string }) {
             ))}
           </section>
         )}
+
+        <ProspectKontrak p={p} />
 
         {p.keterangan && (
           <section className="dk-sec">

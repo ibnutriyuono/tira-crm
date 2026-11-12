@@ -398,13 +398,16 @@ export type NotificationType =
   | 'prospect_duplicate'
   | 'lead_new'
   | 'lead_update'
-  | 'lead_overdue';
+  | 'lead_overdue'
+  | 'kontrak_request'
+  | 'kontrak_decided'
+  | 'kontrak_reminder';
 
 export interface AppNotification {
   id: string;
   userId: string;
   type: NotificationType;
-  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target' | 'activity' | 'issue' | 'announcement' | 'visitTask' | 'visitPlan';
+  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target' | 'activity' | 'issue' | 'announcement' | 'visitTask' | 'visitPlan' | 'kontrak';
   entityId: string;
   title: string;
   message: string;
@@ -613,7 +616,8 @@ export type ActivityEntity =
   | 'activityTarget'
   | 'visitTrip'
   | 'chat'
-  | 'customerGroup';
+  | 'customerGroup'
+  | 'kontrak';
 
 export type ActivityChanges = Record<string, { label: string; from: unknown; to: unknown }>;
 

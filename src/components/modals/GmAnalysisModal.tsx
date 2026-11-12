@@ -14,6 +14,9 @@ import { formatRupiah } from '@/lib/format';
 import { buildExecAnalysis, execScopeFor, inScope, localPeriode, type ExecAnalysis } from '@/lib/exec-analysis';
 import { PipelineTab } from '../analisa/PipelineTab';
 import { ProductTab } from '../analisa/ProductTab';
+import { LeadTimeTab } from '../analisa/LeadTimeTab';
+import { sentMapOf, type LtEvent, type LtJanji } from '@/lib/lead-time';
+import { CABANG_LIST } from '@/lib/constants';
 import { TargetTab } from '../analisa/TargetTab';
 import { ActivityTab } from '../analisa/ActivityTab';
 import { BranchTab } from '../analisa/BranchTab';
@@ -75,7 +78,12 @@ export function GmAnalysisModal() {
     { label: 'Tahun lalu', from: `${Number(thisMonth.slice(0, 4)) - 1}-01`, to: `${Number(thisMonth.slice(0, 4)) - 1}-12` },
   ];
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<'sales' | 'target' | 'product' | 'pipeline' | 'aktivitas' | 'cabang' | 'customer' | 'segmen' | 'operasional'>('sales');
+  // Purchasing (GM Purchasing & tim): hanya tab Product dan Lead Time, cakupan nasional.
+  const purchView = currentUser?.role === 'purchasing';
+  const [tab, setTab] = useState<'sales' | 'target' | 'product' | 'leadtime' | 'pipeline' | 'aktivitas' | 'cabang' | 'customer' | 'segmen' | 'operasional'>(purchView ? 'product' : 'sales');
+  useEffect(() => {
+    if (purchView && tab !== 'product' && tab !== 'leadtime') setTab('product');
+  }, [purchView, tab]);
   // Dibuka dari pintasan "Peta kunjungan" (KPI Aktivitas / Beranda): langsung ke tab Aktivitas › peta.
   const focus = useUiStore((s) => s.analysisFocus);
   useEffect(() => {
@@ -115,10 +123,32 @@ export function GmAnalysisModal() {
 
   // The modal key is only client state; the scope check here is what keeps a
   // role with no sales data (purchasing) from rendering anything.
-  const scope = useMemo(() => (currentUser ? execScopeFor(currentUser, prospects) : null), [currentUser, prospects]);
+  const scope = useMemo(
+    () => (!currentUser ? null : currentUser.role === 'purchasing' ? { kind: 'nasional' as const, label: 'Nasional', cabangs: CABANG_LIST } : execScopeFor(currentUser, prospects)),
+    [currentUser, prospects],
+  );
+  // Status Item (event PO / kirim per item) + janji RFQ: dimuat saat tab Product / Lead Time dibuka.
+  const [lt, setLt] = useState<{ events: LtEvent[]; janji: LtJanji[] } | null>(null);
+  const needLt = show && (tab === 'product' || tab === 'leadtime');
+  useEffect(() => {
+    if (!needLt || lt) return;
+    let alive = true;
+    api
+      .get<{ events: LtEvent[]; janji: LtJanji[] }>('/api/analisa/lead-time')
+      .catch(() => ({ events: [] as LtEvent[], janji: [] as LtJanji[] }))
+      .then((d) => alive && setLt({ events: d.events || [], janji: d.janji || [] }));
+    return () => {
+      alive = false;
+    };
+  }, [needLt, lt]);
+  // Data baru setiap kali modal dibuka lagi.
+  useEffect(() => {
+    if (!show) setLt(null);
+  }, [show]);
+  const sentMap = useMemo(() => (lt ? sentMapOf(lt.events) : null), [lt]);
   const a = useMemo<ExecAnalysis | null>(
-    () => (scope && show ? buildExecAnalysis(prospects, budgetTargets, salesPlans, scope, periode, formatRupiah, new Date(), periodeTo) : null),
-    [scope, show, prospects, budgetTargets, salesPlans, periode, periodeTo],
+    () => (scope && show && !purchView ? buildExecAnalysis(prospects, budgetTargets, salesPlans, scope, periode, formatRupiah, new Date(), periodeTo) : null),
+    [scope, show, purchView, prospects, budgetTargets, salesPlans, periode, periodeTo],
   );
 
   const scopedProspects = useMemo(() => (!scope ? [] : scope.kind === 'se' ? prospects : prospects.filter(inScope(scope))), [scope, prospects]);
@@ -211,7 +241,7 @@ export function GmAnalysisModal() {
           <button type="button" className="btn btn-outline" onClick={closeModal}>
             {tr("Tutup")}
           </button>
-          {tab === 'sales' && canNow('analisa', 'x') && (
+          {tab === 'sales' && !purchView && canNow('analisa', 'x') && (
             <button type="button" className="btn btn-primary" disabled={busy || !a} onClick={onGeneratePpt}>
               <IconDownload /> {busy ? tr("Membuat PPT…") : tr("Buat PPT")}
             </button>
@@ -220,18 +250,23 @@ export function GmAnalysisModal() {
       }
     >
       <div className="ea-tabs" role="tablist">
-        {(
-          [
+        {(purchView
+          ? ([
+              ['product', tr("Product")],
+              ['leadtime', tr("Lead Time")],
+            ] as const)
+          : ([
             ['sales', tr("Sales")],
             ['target', tr("Target")],
             ['product', tr("Product")],
+            ['leadtime', tr("Lead Time")],
             ['pipeline', tr("Pipeline")],
             ...(canNow('aktivitas', 'v') ? [['aktivitas', tr("Aktivitas")] as const] : []),
             ...(scope.kind === 'nasional' || scope.kind === 'regional' ? [['cabang', tr("Cabang")] as const] : []),
             ['customer', tr("Customer")],
             ['segmen', tr("Segmen")],
             ['operasional', tr("Operasional")],
-          ] as const
+          ] as const)
         ).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
             {l}
@@ -239,7 +274,8 @@ export function GmAnalysisModal() {
         ))}
       </div>
       {show && tab === 'target' && <TargetTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={scope.cabangs} isSe={scope.kind === 'se'} />}
-      {show && tab === 'product' && <ProductTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={tabCabangs} thisMonth={thisMonth} />}
+      {show && tab === 'product' && <ProductTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={tabCabangs} thisMonth={thisMonth} sentMap={sentMap} />}
+      {show && tab === 'leadtime' && <LeadTimeTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={tabCabangs} thisMonth={thisMonth} data={lt} />}
       {show && tab === 'pipeline' && <PipelineTab prospects={scopedProspects} scopeLabel={scope.label} cabangs={tabCabangs} thisMonth={thisMonth} />}
       {show && tab === 'aktivitas' && <ActivityTab activities={acts} prospects={scopedProspects} cabangs={tabCabangs} thisMonth={thisMonth} isStaff={isStaff} isSe={scope.kind === 'se'} />}
       {show && tab === 'cabang' && <BranchTab scope={scope} prospects={scopedProspects} activities={canNow('aktivitas', 'v') ? acts : null} thisMonth={thisMonth} isStaff={isStaff} />}

@@ -48,6 +48,9 @@ const NOTIF_META: Record<NotificationType, { icon: () => React.JSX.Element; colo
   ops_escalated: { icon: IconFlag, color: 'rust' },
   margin_request: { icon: IconFlag, color: 'violet' },
   margin_decided: { icon: IconFlag, color: 'green' },
+  kontrak_request: { icon: IconFlag, color: 'violet' },
+  kontrak_decided: { icon: IconFlag, color: 'green' },
+  kontrak_reminder: { icon: IconFlag, color: 'amber' },
   prospect_duplicate: { icon: IconFlag, color: 'amber' },
   lead_new: { icon: IconFlag, color: 'violet' },
   lead_update: { icon: IconFlag, color: 'steel' },
@@ -79,6 +82,11 @@ export function openNotification(n: AppNotification) {
   }
   // Pengumuman dari Admin / GM: cukup ditandai dibaca, isinya sudah tampil di daftar.
   if (n.entity === 'announcement') return;
+  if (n.entity === 'kontrak') {
+    useUiStore.setState({ kontrakCtx: { id: n.entityId, view: 'detail' } });
+    useUiStore.getState().openModal('kontrak');
+    return;
+  }
   if (n.type === 'margin_request') {
     // VP: daftar persetujuan margin di Ruang Pimpinan.
     useUiStore.getState().openModal('leadDesk');

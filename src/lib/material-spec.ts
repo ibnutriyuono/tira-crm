@@ -110,7 +110,7 @@ export function parseMaterialText(text: string): { bentuk: string; grade: string
   else if (/\bunp\b|channel|kanal/.test(t)) bentuk = 'Profil UNP';
   else if (/beam|\bwf\b|\biwf\b|\bhb\b/.test(t)) bentuk = 'Beam';
   else if (/flat/.test(t)) bentuk = 'Flat Bar';
-  else if (/plate|\bplt\b|\bpl\b|#/.test(t)) bentuk = 'Plate';
+  else if (/plate|\bpelat\b|\bplat\b|\bplt\b|\bpl\b|#/.test(t)) bentuk = 'Plate';
   else if (/pipe|pipa/.test(t)) bentuk = 'Pipe';
   else if (/hollow/.test(t)) bentuk = 'Hollow';
   else if (/square|\bsq\b/.test(t)) bentuk = 'Square Bar';
@@ -124,6 +124,15 @@ export function parseMaterialText(text: string): { bentuk: string; grade: string
       grade = g;
       t = t.replace(re, ' ');
       break;
+    }
+  }
+  // Grade di luar daftar saran: "Pelat Creusabro 4800 t16 x 2000 x 6000" →
+  // kata di antara "pelat" dan ukuran pertama (supaya 4800 tidak terbaca tebal).
+  if (!grade && bentuk === 'Plate') {
+    const gm = t.match(/\b(?:pelat|plat|plate)\.?\s+([a-z][a-z0-9\- ]*?)\s+(?:t\s*)?\d+(?:[.,]\d+)?\s*(?:mm)?\s*[x×*]/);
+    if (gm && !/^(tebal|tbl|uk|ukuran|size)$/.test(gm[1].trim())) {
+      grade = gm[1].trim().toUpperCase();
+      t = t.replace(gm[1], ' ');
     }
   }
   let pcs = '';

@@ -17,6 +17,8 @@ import { canNow } from '@/hooks/useCan';
 
 import { useT } from '@/store/useLangStore';
 import { isGmLevel } from '@/lib/roles';
+import { KontrakCell, kontrakOf, useKontrakLite } from '../kontrak/CustomerKontrak';
+import { kontrakState } from '@/lib/kontrak';
 export function CustomersModal() {
   const tr = useT();
   const modal = useUiStore((s) => s.modal);
@@ -34,6 +36,9 @@ export function CustomersModal() {
   const [fSegmen, setFSegmen] = useState('');
   const [fSub, setFSub] = useState('');
   const [segEdit, setSegEdit] = useState(false);
+  const [fKontrak, setFKontrak] = useState<'' | 'aktif' | 'soon' | 'tanpa'>('');
+  const kontrak = useKontrakLite(show);
+  const showKontrak = canNow('kontrak', 'v');
   const { segments: taxonomy } = useSegments();
   // Dibuka dari pengingat (Beranda / Profil): langsung saring "perlu dilengkapi".
   const segFocus = useUiStore((s) => s.customersSegFocus);
@@ -66,6 +71,15 @@ export function CustomersModal() {
     else if (fSegmen) base = base.filter((c) => (fSegmen === '-' ? !c.segmen : (c.segmen || index.get(customerKey(c.name))?.segmen) === fSegmen));
     if (fSub) base = base.filter((c) => c.subSegmen === fSub);
     if (fStatus) base = base.filter((c) => index.get(customerKey(c.name))?.status === fStatus);
+    if (fKontrak) {
+      const today = todayStr();
+      base = base.filter((c) => {
+        const ss = kontrakOf(kontrak.list, c.name).map((k) => kontrakState(k, today));
+        if (fKontrak === 'aktif') return ss.some((x) => x === 'aktif' || x === 'akanHabis');
+        if (fKontrak === 'soon') return ss.includes('akanHabis');
+        return !ss.some((x) => x === 'aktif' || x === 'akanHabis');
+      });
+    }
     if (!search) return base;
     const q = search.toLowerCase();
     return base.filter(
@@ -75,7 +89,7 @@ export function CustomersModal() {
         (c.pics || []).some((p) => (p.nama || '').toLowerCase().includes(q) || (p.jabatan || '').toLowerCase().includes(q)) ||
         (getPrimaryPic(c)?.nama || '').toLowerCase().includes(q),
     );
-  }, [customers, search, fSegmen, fSub, fStatus, index]);
+  }, [customers, search, fSegmen, fSub, fStatus, index, fKontrak, kontrak.list]);
 
   async function exportExcel() {
     if (customers.length === 0) return toast('Tidak ada data customer untuk diexport', 'error');
@@ -168,6 +182,14 @@ export function CustomersModal() {
         {currentUser?.role === 'admin' && (
           <button type="button" className="btn btn-outline btn-sm" onClick={() => setSegEdit((v) => !v)}>{tr("Kelola Segmen")}</button>
         )}
+        {showKontrak && (
+          <select className="btn-sm" value={fKontrak} onChange={(e) => setFKontrak(e.target.value as typeof fKontrak)} aria-label={tr('Kontrak')}>
+            <option value="">{tr('Kontrak: semua')}</option>
+            <option value="aktif">{tr('Ada kontrak aktif')}</option>
+            <option value="soon">{tr('Kontrak akan habis')}</option>
+            <option value="tanpa">{tr('Tanpa kontrak aktif')}</option>
+          </select>
+        )}
         <span className="field-note" style={{ margin: 0 }}>{list.length} {tr("dari")} {customers.length} {tr("customer")}{loaded ? '' : tr(" · memuat aktivitas…")}</span>
       </div>
       {segEdit && <SegmentsEditor usage={usage} onClose={() => setSegEdit(false)} />}
@@ -190,6 +212,7 @@ export function CustomersModal() {
                 <th title={tr("Skor kesehatan 0–100")}>{tr("Skor")}</th>
                 <th>{tr("Order Terakhir")}</th>
                 <th>{tr("Prospek")}</th>
+                {showKontrak && <th>{tr('Kontrak')}</th>}
                 <th>{tr("Aksi")}</th>
               </tr>
             </thead>
@@ -227,6 +250,7 @@ export function CustomersModal() {
                     <td>{f && loaded ? <span className={`cp-score ${scoreColor(f.score)}`}>{f.score}</span> : '…'}</td>
                     <td style={{ whiteSpace: 'nowrap', fontSize: 12.5 }}>{f?.lastOrder ? <>{formatDateID(f.lastOrder)}<div className="field-note" style={{ margin: 0 }}>{f.daysSinceOrder} {tr("hari lalu")}</div></> : '-'}</td>
                     <td className="center">{cnt}</td>
+                    {showKontrak && <td><KontrakCell c={c} list={kontrak.list} onChanged={kontrak.reload} /></td>}
                     <td>
                       <div className="row-actions">
                         <button type="button" className="btn btn-primary btn-sm" onClick={() => openProfile(c.name)}>

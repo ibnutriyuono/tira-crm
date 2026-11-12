@@ -85,12 +85,25 @@ export interface TrendRow {
   offMonth: string;
   poMonth: string;
   sentMonth: string;
+  /**
+   * Terkirim per bulan dari Status Item (event kirim per item). Bila ada,
+   * basis "terkirim" memakai ini, bukan sentMonth (tgl delivery prospek =
+   * pengiriman pertama saja).
+   */
+  sentSplit?: { month: string; qty: number }[];
+  /** Index & id item di prospek (urutan material), untuk dicocokkan ke event per item. */
+  idx: number;
+  itemId: string;
+  dim: Dims;
 }
+
+/** Tanggal kirim per item: prospectId -> itemId -> [{ tgl, qty }] (event 'kirim'). */
+export type ItemSentMap = Map<string, Map<string, { tgl: string; qty: number }[]>>;
 
 const month = (d: string | null | undefined) => (d && /^\d{4}-\d{2}/.test(d) ? d.slice(0, 7) : '');
 const toNum = (v: unknown) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
 
-export function buildTrendRows(prospects: Prospect[]): TrendRow[] {
+export function buildTrendRows(prospects: Prospect[], sentMap?: ItemSentMap | null): TrendRow[] {
   const out: TrendRow[] = [];
   prospects.forEach((p) => {
     const status = num(p.status);
@@ -143,10 +156,32 @@ export function buildTrendRows(prospects: Prospect[]): TrendRow[] {
         offMonth,
         poMonth,
         sentMonth,
+        sentSplit: splitOf(sentMap?.get(p.id)?.get(f?.itemId || ''), status === 4 || status === 5 ? f?.sent || 0 : 0),
+        idx: i,
+        itemId: f?.itemId || '',
+        dim,
       });
     });
   });
   return out;
+}
+
+/** Bagi qty terkirim item ke bulan-bulan event kirimnya; sisa yang tidak tercatat di event ikut bulan pertama. */
+function splitOf(list: { tgl: string; qty: number }[] | undefined, sent: number): { month: string; qty: number }[] | undefined {
+  if (!list || !list.length || !(sent > 0)) return undefined;
+  const by = new Map<string, number>();
+  let tot = 0;
+  list.forEach((e) => {
+    const mo = month(e.tgl);
+    if (!mo || !(e.qty > 0)) return;
+    by.set(mo, (by.get(mo) || 0) + e.qty);
+    tot += e.qty;
+  });
+  if (!by.size) return undefined;
+  const out = Array.from(by.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([m, q]) => ({ month: m, qty: q }));
+  // Qty item bisa dikoreksi di luar event; jaga total = qty terkirim item.
+  const k = sent / tot;
+  return out.map((x) => ({ month: x.month, qty: x.qty * k }));
 }
 
 /** YYYY-MM list of `n` months ending at `end` (inclusive), oldest first. */
@@ -162,9 +197,14 @@ export function monthsEnding(end: string, n: number): string[] {
 
 const qtyFor = (r: TrendRow, b: Basis) => (b === 'minta' ? r.reqQty : b === 'off' ? r.offQty : b === 'po' ? r.poQty : r.sentQty);
 const monthFor = (r: TrendRow, b: Basis) => (b === 'minta' || b === 'off' ? r.offMonth : b === 'po' ? r.poMonth : r.sentMonth);
+const scale = (r: TrendRow, m: Measure, q: number) => (m === 'pcs' ? q : m === 'kg' ? q * r.kgPc : q * r.unitPrice);
 export function measureOf(r: TrendRow, b: Basis, m: Measure): number {
-  const q = qtyFor(r, b);
-  return m === 'pcs' ? q : m === 'kg' ? q * r.kgPc : q * r.unitPrice;
+  return scale(r, m, qtyFor(r, b));
+}
+/** Jumlah baris pada basis `b` untuk bulan yang lolos `keep` (terkirim: per bulan kirim item bila tercatat). */
+export function amountIn(r: TrendRow, b: Basis, m: Measure, keep: (mo: string) => boolean): number {
+  if (b === 'kirim' && r.sentSplit) return r.sentSplit.reduce((s, x) => s + (keep(x.month) ? scale(r, m, x.qty) : 0), 0);
+  return keep(monthFor(r, b)) ? measureOf(r, b, m) : 0;
 }
 
 export interface GradeStat {
@@ -226,7 +266,8 @@ export function analyzeTrend(all: TrendRow[], opts: { end: string; period: numbe
   // Which shape group to show: asked for, else the biggest one this period.
   const groupTotals: Record<string, number> = {};
   steel.forEach((r) => {
-    if (inPeriod.has(monthFor(r, opts.basis))) groupTotals[r.group] = (groupTotals[r.group] || 0) + measureOf(r, opts.basis, 'kg');
+    const v = amountIn(r, opts.basis, 'kg', (mo) => inPeriod.has(mo));
+    if (v) groupTotals[r.group] = (groupTotals[r.group] || 0) + v;
   });
   const groupKey = opts.group || Object.entries(groupTotals).sort((a, b) => b[1] - a[1])[0]?.[0] || 'bar';
   const group = SHAPE_GROUPS.find((g) => g.key === groupKey) || SHAPE_GROUPS[0];
@@ -241,7 +282,7 @@ export function analyzeTrend(all: TrendRow[], opts: { end: string; period: numbe
   });
 
   const sumOf = (list: TrendRow[], b: Basis, m: Measure, keep: (mo: string) => boolean) =>
-    list.reduce((s, r) => s + (keep(monthFor(r, b)) ? measureOf(r, b, m) : 0), 0);
+    list.reduce((s, r) => s + amountIn(r, b, m, keep), 0);
 
   const grades: GradeStat[] = Array.from(byGrade.entries()).map(([key, list]) => {
     const inP = (b: Basis) => list.filter((r) => inPeriod.has(monthFor(r, b)));
@@ -254,7 +295,10 @@ export function analyzeTrend(all: TrendRow[], opts: { end: string; period: numbe
     const last = sumOf(list, opts.basis, opts.measure, (mo) => last3.has(mo));
     const prev = sumOf(list, opts.basis, opts.measure, (mo) => prev3.has(mo));
     const bucketTot = new Map<string, number>();
-    list.forEach((r) => inPeriod.has(monthFor(r, opts.basis)) && bucketTot.set(r.bucket, (bucketTot.get(r.bucket) || 0) + measureOf(r, opts.basis, opts.measure)));
+    list.forEach((r) => {
+      const v = amountIn(r, opts.basis, opts.measure, (mo) => inPeriod.has(mo));
+      if (v) bucketTot.set(r.bucket, (bucketTot.get(r.bucket) || 0) + v);
+    });
     return {
       key,
       grade: list[0].grade,
@@ -280,7 +324,7 @@ export function analyzeTrend(all: TrendRow[], opts: { end: string; period: numbe
 
   const heat = grades.map((g) => {
     const list = byGrade.get(g.key) || [];
-    const cells = buckets.map((bk) => list.reduce((s, r) => s + (r.bucket === bk && inPeriod.has(monthFor(r, opts.basis)) ? measureOf(r, opts.basis, opts.measure) : 0), 0));
+    const cells = buckets.map((bk) => list.reduce((s, r) => s + (r.bucket === bk ? amountIn(r, opts.basis, opts.measure, (mo) => inPeriod.has(mo)) : 0), 0));
     return { key: g.key, grade: g.grade, cells, total: cells.reduce((a, b) => a + b, 0) };
   });
   const heatMax = Math.max(0, ...heat.flatMap((h) => h.cells));

@@ -27,9 +27,10 @@ export const PERM_MODULES: ModuleDef[] = [
   { key: 'rfq', label: 'RFQ / FUP A', hint: 'permintaan harga & pengadaan', group: 'PENJUALAN', acts: ['v', 'e', 'd', 'x'] },
   { key: 'masalah', label: 'Masalah Pipeline', hint: 'lapor & tindak lanjut masalah prospek, papan Pareto', group: 'PENJUALAN', acts: ['v', 'e', 'x'] },
   { key: 'kam', label: 'Key Account', hint: 'grup, tier, tim akun, account plan', group: 'PENJUALAN', acts: ['v', 'e', 'd', 'x'] },
+  { key: 'kontrak', label: 'Kontrak Harga', hint: 'kontrak harga / qty tahunan customer, realisasi, pengingat', group: 'PENJUALAN', acts: ['v', 'e', 'd', 'x'] },
   { key: 'forecast', label: 'Forecast & Target', hint: 'target cabang, tahunan, per Sales', group: 'TARGET & ANALISA', acts: ['v', 'e', 'x'] },
   { key: 'kpi', label: 'KPI & KPI Aktivitas', hint: 'scorecard, target aktivitas', group: 'TARGET & ANALISA', acts: ['v', 'e', 'x'] },
-  { key: 'analisa', label: 'Analisa Eksekutif', hint: 'Sales, Target, Product, Pipeline, PPT', group: 'TARGET & ANALISA', acts: ['v', 'x'] },
+  { key: 'analisa', label: 'Analisa Eksekutif', hint: 'Sales, Target, Product, Lead Time, Pipeline, PPT', group: 'TARGET & ANALISA', acts: ['v', 'x'] },
   { key: 'marketing', label: 'Marketing & Customer Intelligence', hint: 'reaktivasi, log kompetitor, hasil QCD', group: 'TARGET & ANALISA', acts: ['v', 'e', 'x'] },
   { key: 'faktur', label: 'Faktur & Antrian Admin', hint: 'status terfaktur, tgl/no faktur', group: 'OPERASIONAL', acts: ['v', 'e', 'x'] },
   { key: 'trip', label: 'Perjalanan Dinas', hint: 'rencana, persetujuan, realisasi', group: 'OPERASIONAL', acts: ['v', 'e', 'd', 'x'] },
@@ -77,20 +78,22 @@ const KAM_ED = L(['e', 'd'], 'Grup & tim Key Account diatur GM / RM');
 const PURCH_ED = L(['e', 'd'], 'Vendor & penawaran dikerjakan Purchasing');
 const NO_PLAN = L(['e', 'd'], 'Rencana diisi Sales sendiri / BM cabangnya / GM');
 const NOT_IN_PURCH = L(ALL, 'Tidak ada di tampilan Purchasing');
+const KONTRAK_ED = L(['e', 'd'], 'Kontrak diinput Admin Sales; pimpinan menyetujui');
 
 export const ROLE_LIMITS: Record<string, Partial<Record<string, Limit>>> = {
-  sales: { prospek: PROSPEK_D, forecast: TARGET_E, kpi: TARGET_E, kam: KAM_ED, faktur: L(ALL, 'Antrian Admin untuk Admin Sales, BM, RM, GM'), purch: PURCH_ED },
+  sales: { kontrak: KONTRAK_ED, prospek: PROSPEK_D, forecast: TARGET_E, kpi: TARGET_E, kam: KAM_ED, faktur: L(ALL, 'Antrian Admin untuk Admin Sales, BM, RM, GM'), purch: PURCH_ED },
   salesadmin: { prospek: PROSPEK_D, rencana: NO_PLAN, forecast: TARGET_E, kpi: TARGET_E, kam: KAM_ED, trip: L(ALL, 'Perjalanan dinas untuk Sales, BM, RM, GM'), purch: PURCH_ED },
-  bm: { prospek: PROSPEK_D, kam: KAM_ED, purch: PURCH_ED },
-  rm: { prospek: PROSPEK_D, rencana: L(['e', 'd'], 'RM hanya melihat rencana penjualan'), kam: L(['d'], 'Hapus grup Key Account hanya GM & Admin'), purch: PURCH_ED },
-  gm: { purch: PURCH_ED },
-  vp: { purch: PURCH_ED },
+  bm: { prospek: PROSPEK_D, kam: KAM_ED, kontrak: KONTRAK_ED, purch: PURCH_ED },
+  rm: { kontrak: KONTRAK_ED, prospek: PROSPEK_D, rencana: L(['e', 'd'], 'RM hanya melihat rencana penjualan'), kam: L(['d'], 'Hapus grup Key Account hanya GM & Admin'), purch: PURCH_ED },
+  gm: { kontrak: KONTRAK_ED, purch: PURCH_ED },
+  vp: { kontrak: KONTRAK_ED, purch: PURCH_ED },
   gmops: {
     prospek: L(['e', 'd'], 'Pipeline Sales hanya baca untuk GM Operation'),
     rencana: L(ALL, 'Rencana penjualan dikelola Sales / BM / GM'),
     customer: L(['e', 'd'], 'Data customer dikelola tim Sales'),
     rfq: L(['d'], 'RFQ / FUP A dihapus oleh pengirimnya'),
     kam: KAM_ED,
+    kontrak: KONTRAK_ED,
     forecast: TARGET_E,
     kpi: TARGET_E,
     faktur: L(ALL, 'Antrian Admin untuk Admin Sales, BM, RM, GM'),
@@ -105,6 +108,7 @@ export const ROLE_LIMITS: Record<string, Partial<Record<string, Limit>>> = {
     forecast: TARGET_E,
     kpi: TARGET_E,
     kam: KAM_ED,
+    kontrak: KONTRAK_ED,
     faktur: L(ALL, 'Antrian Admin untuk Admin Sales, BM, RM, GM'),
     trip: L(ALL, 'Perjalanan dinas untuk Sales, BM, RM, GM, VP'),
     purch: L(ALL, 'Data Purchasing & vendor tidak untuk Marketing'),
@@ -112,11 +116,13 @@ export const ROLE_LIMITS: Record<string, Partial<Record<string, Limit>>> = {
   },
   purchasing: {
     rfq: L(ALL, 'Untuk Purchasing diatur lewat modul Purchasing'),
-    rencana: NOT_IN_PURCH, forecast: NOT_IN_PURCH, kpi: NOT_IN_PURCH, analisa: NOT_IN_PURCH,
+    kontrak: NOT_IN_PURCH, rencana: NOT_IN_PURCH, forecast: NOT_IN_PURCH, kpi: NOT_IN_PURCH,
+    // Analisa Eksekutif untuk Purchasing hanya tab Product & Lead Time (tanpa PPT).
+    analisa: L(['x'], 'Purchasing hanya melihat tab Product & Lead Time'),
     marketing: NOT_IN_PURCH, faktur: NOT_IN_PURCH, trip: NOT_IN_PURCH, log: NOT_IN_PURCH,
   },
 };
-ROLE_LIMITS.purchasing05 = ROLE_LIMITS.purchasing;
+ROLE_LIMITS.purchasing05 = { ...ROLE_LIMITS.purchasing, analisa: NOT_IN_PURCH };
 
 /** Alasan bila aksi ini tidak tersedia untuk tipe dasar `base`, atau null. */
 export function limitReason(base: string | null | undefined, mod: string, act: PermAct): string | null {

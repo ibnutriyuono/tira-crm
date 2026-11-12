@@ -50,12 +50,15 @@ export type NotifType =
   | 'prospect_duplicate'
   | 'lead_new'
   | 'lead_update'
-  | 'lead_overdue';
+  | 'lead_overdue'
+  | 'kontrak_request'
+  | 'kontrak_decided'
+  | 'kontrak_reminder';
 
 interface NotifyInput {
   userIds: string[];
   type: NotifType;
-  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target' | 'activity' | 'issue' | 'visitTask' | 'visitPlan' | 'announcement';
+  entity: 'rfq' | 'fupa' | 'visitTrip' | 'prospect' | 'target' | 'activity' | 'issue' | 'visitTask' | 'visitPlan' | 'announcement' | 'kontrak';
   entityId: string;
   title: string;
   message: string;

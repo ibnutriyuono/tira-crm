@@ -5,7 +5,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PurchasingBoard } from './PurchasingBoard';
-import { IconBag, IconBell, IconCalendar } from './icons';
+import { IconBag, IconBell, IconCalendar, IconPresentation } from './icons';
+import { GmAnalysisModal } from './modals/GmAnalysisModal';
 import { ROLE_LABELS } from '@/lib/constants';
 import { api } from '@/lib/api-client';
 import { ToastHost } from './ToastHost';
@@ -36,6 +37,8 @@ export function PurchasingPageClient() {
   const currentUser = useDataStore((s) => s.currentUser);
   // Semua role punya Aktivitas Harian (Kelola Role menentukan tampil / tidak).
   const canAktivitas = useCan('aktivitas', 'v');
+  // Analisa Eksekutif (tab Product & Lead Time) untuk Purchasing; PIC Line 05 tidak.
+  const canAnalisa = useCan('analisa', 'v') && currentUser?.role === 'purchasing';
   const notifications = useDataStore((s) => s.notifications);
   const unreadNotifCount = notifications.filter((n) => !n.readAt).length;
   const openModal = useUiStore((s) => s.openModal);
@@ -100,6 +103,12 @@ export function PurchasingPageClient() {
                 {tr("Aktivitas Harian")}
               </button>
             )}
+            {canAnalisa && (
+              <button type="button" className="btn btn-ghost-dark btn-sm" onClick={() => openModal('gmAnalysis')}>
+                <IconPresentation />
+                {tr("Analisa")}
+              </button>
+            )}
             <LangSwitch dark />
             <button type="button" className="btn btn-outline-dark btn-sm" onClick={() => openModal('account')}>{tr("Akun Saya")}</button>
             <button type="button" className="btn btn-outline-dark btn-sm" onClick={logout}>{tr("Keluar")}</button>
@@ -118,6 +127,7 @@ export function PurchasingPageClient() {
       <LeadDeskModal />
       <AccountModal />
       <SalesActivityModal />
+      {canAnalisa && <GmAnalysisModal />}
       <ToastHost />
       <TeamChatWidget />
     </>

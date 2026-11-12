@@ -3,6 +3,7 @@ import { runDailyDigest } from '@/lib/email-notify';
 import { sweepFollowUpNotifications } from '@/lib/followup-notify';
 import { sweepIssueEscalation } from '@/lib/issues-server';
 import { sweepOpsEscalation } from '@/lib/ops-escalation';
+import { sweepKontrakReminders } from '@/lib/kontrak-server';
 
 /**
  * Dipanggil penjadwal di server.js tiap 5 menit (header x-cron-key =
@@ -16,6 +17,7 @@ export async function POST(req: Request) {
   await sweepFollowUpNotifications();
   await sweepIssueEscalation();
   await sweepOpsEscalation();
+  await sweepKontrakReminders();
   const result = await runDailyDigest();
   return NextResponse.json(result);
 }

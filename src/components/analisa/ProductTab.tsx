@@ -11,6 +11,7 @@ import {
   analyzeTrend,
   buildTrendRows,
   type Basis,
+  type ItemSentMap,
   type Measure,
 } from '@/lib/material-trend';
 import type { Prospect } from '@/lib/types';
@@ -44,7 +45,7 @@ const MEASURE_LABEL: Record<Measure, string> = { kg: 'Tonase', pcs: 'Pcs', nilai
  * Analisa Eksekutif > Product: tren material per grade dan ukuran dari data
  * penawaran (lib/material-trend.ts), dalam cakupan role yang membukanya.
  */
-export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { prospects: Prospect[]; scopeLabel: string; cabangs: string[] | null; thisMonth: string }) {
+export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth, sentMap = null }: { prospects: Prospect[]; scopeLabel: string; cabangs: string[] | null; thisMonth: string; sentMap?: ItemSentMap | null }) {
   const tr = useT();
   const toast = useDataStore((s) => s.toast);
   const [cabang, setCabang] = useState('');
@@ -54,7 +55,7 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth }: { pros
   const [measure, setMeasure] = useState<Measure>('kg');
   const [sel, setSel] = useState('');
 
-  const rows = useMemo(() => buildTrendRows(cabang ? prospects.filter((p) => (p.cabang || '').trim().toUpperCase() === cabang) : prospects), [prospects, cabang]);
+  const rows = useMemo(() => buildTrendRows(cabang ? prospects.filter((p) => (p.cabang || '').trim().toUpperCase() === cabang) : prospects, sentMap), [prospects, cabang, sentMap]);
   const t = useMemo(() => analyzeTrend(rows, { end: range.to || thisMonth, start: range.from || thisMonth, period: 12, group, basis, measure }), [rows, range, thisMonth, group, basis, measure]);
   const selKey = sel && t.grades.some((g) => g.key === sel) ? sel : t.grades[0]?.key || '';
   const selGrade = t.grades.find((g) => g.key === selKey);

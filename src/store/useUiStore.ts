@@ -42,6 +42,7 @@ export type ModalKey =
   | 'marginApprovals'
   | 'salesPlan'
   | 'weeklyPlan'
+  | 'kontrak'
   | 'notifications'
   | 'followUpBoard'
   | 'gmAnalysis'
@@ -67,6 +68,18 @@ export interface CancelDocCtx {
   customer: string | null;
   /** true = dokumen sedang dibatalkan, modal menawarkan pengaktifan kembali. */
   cancelled: boolean;
+}
+/** Kontrak Harga: buka daftar, detail, form (baru / dari prospek / dari customer), atau Cari realisasi. */
+export interface KontrakCtx {
+  id?: string | null;
+  view?: 'list' | 'detail' | 'form' | 'cari';
+  /** Form baru dari prospek (Jadikan kontrak). */
+  prospectId?: string | null;
+  /** Form baru dari Kelola Customer. */
+  customer?: string | null;
+  cabang?: string | null;
+  /** Kembali ke modal ini saat ditutup. */
+  returnTo?: 'customers' | 'customerProfile' | null;
 }
 export interface DeleteCtx {
   mode: DeleteMode;
@@ -174,6 +187,7 @@ interface UiState {
   cancelDocCtx: CancelDocCtx | null;
   followUpCtx: FollowUpCtx | null;
   salesPlanCtx: SalesPlanCtx | null;
+  kontrakCtx: KontrakCtx | null;
   weeklyPlanCtx: WeeklyPlanCtx | null;
   /** Opens Aktivitas Harian with these fields filled (e.g. from Marketing > Reaktivasi); returnTo reopens that screen on close. */
   activityPrefill: { customer: string; keterangan?: string; tipe?: string; returnTo?: ModalKey } | null;
@@ -285,6 +299,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   cancelDocCtx: null,
   followUpCtx: null,
   salesPlanCtx: null,
+  kontrakCtx: null,
   weeklyPlanCtx: null,
   activityPrefill: null,
   activityFocus: null,

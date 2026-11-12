@@ -25,6 +25,7 @@ export const NOTIF_CATEGORIES: NotifCategory[] = [
   { key: 'target', label: 'Target', hint: 'target cabang perlu dibagi, target Sales ditetapkan', def: 'ringkasan', types: ['target_allocate', 'target_assigned'] },
   { key: 'admin', label: 'Antrian Admin', hint: 'tugas faktur & dokumen PO/DO', def: 'ringkasan', types: ['admin_task'] },
   { key: 'ops', label: 'Eskalasi Operation & persetujuan margin', hint: 'RFQ belum dijawab, persetujuan margin VP diajukan / diputuskan', def: 'langsung', types: ['ops_escalated', 'margin_request', 'margin_decided'] },
+  { key: 'kontrak', label: 'Kontrak harga customer', hint: 'persetujuan kontrak, keputusan, kontrak akan habis, harga vendor material baru', def: 'langsung', types: ['kontrak_request', 'kontrak_decided', 'kontrak_reminder'] },
   { key: 'lead', label: 'Lead dari Marketing', hint: 'lead baru untuk cabang / Anda, perkembangan lead yang Anda masukkan, lead terlambat ditindaklanjuti', def: 'langsung', types: ['lead_new', 'lead_update', 'lead_overdue'] },
   { key: 'dup', label: 'Prospek ganda / mirip', hint: 'prospek tetap disimpan walau mirip prospek SE lain', def: 'ringkasan', types: ['prospect_duplicate'] },
   { key: 'kam', label: 'Key Account lintas cabang', hint: 'prospek/RFQ grup di cabang lain', def: 'mati', types: ['kam_cross_branch'] },

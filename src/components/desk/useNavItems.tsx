@@ -124,6 +124,7 @@ export function useNavItems(tr: (s: string) => string): { items: NavItem[]; unre
       canComposeMail(role) && { id: 'mail', label: tr('Kirim Email'), group: 'Penjualan', icon: <IconMail />, run: open('mailCompose'), keys: 'pengumuman email' },
       // Customer
       c('customer') && { id: 'customer', label: tr('Kelola Customer'), group: 'Customer', icon: <IconCustomers />, run: open('customers') },
+      !purch && c('kontrak') && { id: 'kontrak', label: tr('Kontrak Harga'), group: 'Customer', icon: <IconDoc />, run: () => { useUiStore.setState({ kontrakCtx: null }); useUiStore.getState().openModal('kontrak'); }, keys: 'kontrak harga tahunan qty komitmen customer' },
       !purch && c('kam') && { id: 'kam', label: tr('Key Account'), group: 'Customer', icon: <IconTarget />, run: open('keyAccount'), keys: 'kam strategic' },
       c('marketing') && { id: 'intel', label: tr('Customer Intelligence'), group: 'Customer', icon: <IconSearch />, run: open('customerIntel') },
       c('marketing') && { id: 'marketing', label: tr('Marketing'), group: 'Customer', icon: <IconCustomers />, run: open('marketing') },

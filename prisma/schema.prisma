@@ -879,6 +879,7 @@ enum ActivityEntity {
   visitTrip
   chat
   customerGroup
+  kontrak
 }
 
 // Append-only audit trail. Every actor field is a *snapshot* taken at write
@@ -1121,4 +1122,135 @@ model StockItem {
   createdAt   DateTime @default(now())
 
   @@index([gradeKey])
+}
+
+/// Kontrak harga / qty tahunan dengan customer (grup customer, beberapa cabang).
+/// Diinput Admin Sales; harga kontrak di bawah harga acuan mengikuti persetujuan
+/// diskon (SE / BM / GM / VP). Item = grade (semua dimensi / tebal / dimensi
+/// tertentu) atau material non-katalog (spesifikasi + part number customer).
+/// Realisasi = item prospek PO/DO yang dihubungkan (KontrakLink) + saldo awal.
+model Kontrak {
+  id            String         @id @default(cuid())
+  /// KH-2026-001
+  nomor         String         @unique
+  /// Nomor kontrak dari customer.
+  noCustomer    String?
+  /// harga | qty | hq (harga + qty)
+  jenis         String         @default("hq")
+  /// tetap | tinjau | kurs
+  skemaHarga    String         @default("tetap")
+  skemaCatatan  String?
+  groupId       String?
+  /// Nama grup customer, atau nama customer bila tanpa grup.
+  grupNama      String
+  /// Nama entitas customer yang terikat kontrak (string[]).
+  entitas       Json           @default("[]")
+  /// Cabang berlaku (string[]).
+  cabangs       Json           @default("[]")
+  /// Cabang pemilik (Admin Sales penginput).
+  cabang        String
+  reg           Int?
+  tglMulai      String
+  tglAkhir      String
+  top           String?
+  franco        String?
+  catatan       String?
+  /// draft | menunggu | aktif | ditolak | batal (habis dihitung dari tanggal)
+  status        String         @default("draft")
+  /// Tingkat persetujuan diskon yang dibutuhkan: bm | gm | vp | null (tanpa persetujuan).
+  level         String?
+  maxDiscount   Float?
+  /// Ada item material baru → persetujuan kesiapan pasokan GM Operation.
+  butuhPasokan  Boolean        @default(false)
+  /// [{ jenis: 'diskon'|'pasokan', level, status: menunggu|disetujui|ditolak, byId, byName, note, at }]
+  approvals     Json           @default("[]")
+  /// Perpanjangan dari kontrak ini.
+  prevId        String?
+  /// Dibuat dari prospek (Jadikan kontrak).
+  prospectId    String?
+  /// Pengingat yang sudah terkirim { "h90": "2026-10-02", ... }.
+  remindersSent Json           @default("{}")
+  createdById   String
+  createdByName String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  items         KontrakItem[]
+  links         KontrakLink[]
+  logs          KontrakLog[]
+
+  @@index([status])
+  @@index([cabang])
+  @@index([groupId])
+}
+
+model KontrakItem {
+  id            String   @id @default(cuid())
+  kontrakId     String
+  kontrak       Kontrak  @relation(fields: [kontrakId], references: [id], onDelete: Cascade)
+  urut          Int      @default(0)
+  /// grade (semua dimensi) | tebal | dimensi | spek (non-katalog)
+  cakupan       String   @default("grade")
+  grade         String?
+  gradeKey      String?
+  bentuk        String?
+  tebalMin      Float?
+  tebalMax      Float?
+  /// tebal / dimensi: [{ id, tebal, lebar, panjang, harga, acuan, acuanSrc }]
+  dims          Json     @default("[]")
+  /// spek: nama, spesifikasi, part number customer, kategori.
+  nama          String?
+  spesifikasi   String?
+  partNo        String?
+  kategori      String?
+  /// kg (baja) atau satuan non-katalog: pcs / set / meter / roll.
+  satuan        String   @default("kg")
+  /// grade / spek: harga kontrak per satuan.
+  harga         Float?
+  /// grade: acuan per dimensi [{ label, tebal, acuan, src }]; spek: [{ label, acuan, src }].
+  acuan         Json     @default("[]")
+  /// Komitmen qty per tahun (kg untuk baja, satuan untuk non-katalog).
+  qtyKomitmen   Float?
+  materialBaru  Boolean  @default(false)
+  /// Harga vendor (jawaban RFQ) berlaku sampai (YYYY-MM-DD).
+  vendorBerlaku String?
+  /// Realisasi awal (sebelum CRM / tidak tercatat).
+  saldoQty      Float    @default(0)
+  saldoNilai    Float    @default(0)
+  saldoTgl      String?
+  saldoKet      String?
+  links         KontrakLink[]
+
+  @@index([kontrakId])
+}
+
+/// Item prospek (PO/DO) yang dihitung sebagai realisasi kontrak.
+model KontrakLink {
+  id            String      @id @default(cuid())
+  kontrakId     String
+  kontrak       Kontrak     @relation(fields: [kontrakId], references: [id], onDelete: Cascade)
+  kontrakItemId String
+  item          KontrakItem @relation(fields: [kontrakItemId], references: [id], onDelete: Cascade)
+  dimId         String?
+  prospectId    String
+  /// itemId material prospek (atau idx:n untuk data lama).
+  itemId        String
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime    @default(now())
+
+  @@unique([prospectId, itemId])
+  @@index([kontrakId])
+  @@index([prospectId])
+}
+
+model KontrakLog {
+  id        String   @id @default(cuid())
+  kontrakId String
+  kontrak   Kontrak  @relation(fields: [kontrakId], references: [id], onDelete: Cascade)
+  aksi      String
+  ket       String?
+  byName    String?
+  createdAt DateTime @default(now())
+
+  @@index([kontrakId])
 }
