@@ -95,6 +95,10 @@ export interface TrendRow {
   idx: number;
   itemId: string;
   dim: Dims;
+  /** Untuk Cek data: berat/pcs yang diketik, berat hitungan ukuran, SE prospek. */
+  kgTyped: number;
+  kgAuto: number;
+  se: string;
 }
 
 /** Tanggal kirim per item: prospectId -> itemId -> [{ tgl, qty }] (event 'kirim'). */
@@ -131,7 +135,8 @@ export function buildTrendRows(prospects: Prospect[], sentMap?: ItemSentMap | nu
       }
       const key = gradeKey(grade);
       const g = groupOf(bentuk);
-      const kgPc = fab ? 0 : num(m.beratPc) || roundUpKg(autoWeight(bentuk, dim));
+      const kgAuto = fab ? 0 : roundUpKg(autoWeight(bentuk, dim));
+      const kgPc = fab ? 0 : num(m.beratPc) || kgAuto;
       out.push({
         prospectId: p.id,
         customer: p.customer,
@@ -160,6 +165,9 @@ export function buildTrendRows(prospects: Prospect[], sentMap?: ItemSentMap | nu
         idx: i,
         itemId: f?.itemId || '',
         dim,
+        kgTyped: fab ? 0 : num(m.beratPc),
+        kgAuto,
+        se: (p.se || '').toUpperCase(),
       });
     });
   });

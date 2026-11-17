@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { IconDownload } from '../icons';
+import { CEK_LABEL, RPKG_MAX, RPKG_MIN, cekData } from '@/lib/data-check';
 import { appendSheet } from '@/lib/exports';
 import { formatRupiah } from '@/lib/format';
 import { formatTon } from '@/lib/item-flow';
@@ -16,6 +17,7 @@ import {
 } from '@/lib/material-trend';
 import type { Prospect } from '@/lib/types';
 import { useDataStore } from '@/store/useDataStore';
+import { useUiStore } from '@/store/useUiStore';
 import { canNow } from '@/hooks/useCan';
 
 import { tNow, useT } from '@/store/useLangStore';
@@ -54,9 +56,23 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth, sentMap 
   const [basis, setBasis] = useState<Basis>('off');
   const [measure, setMeasure] = useState<Measure>('kg');
   const [sel, setSel] = useState('');
+  const [cekOpen, setCekOpen] = useState(false);
+  const [cekAll, setCekAll] = useState(false);
 
   const rows = useMemo(() => buildTrendRows(cabang ? prospects.filter((p) => (p.cabang || '').trim().toUpperCase() === cabang) : prospects, sentMap), [prospects, cabang, sentMap]);
   const t = useMemo(() => analyzeTrend(rows, { end: range.to || thisMonth, start: range.from || thisMonth, period: 12, group, basis, measure }), [rows, range, thisMonth, group, basis, measure]);
+  // Cek data: item ditawarkan / PO di periode yang angkanya janggal (semua bentuk).
+  const cek = useMemo(() => {
+    const inP = new Set(t.months);
+    return cekData(rows.filter((r) => inP.has(r.offMonth) || (r.poQty > 0 && inP.has(r.poMonth))));
+  }, [rows, t.months]);
+  const cekGrades = useMemo(() => new Set(cek.filter((c) => c.row.group === t.group.key).map((c) => c.row.gradeKey)), [cek, t.group.key]);
+  // Halaman Purchasing tidak punya form prospek; Purchasing cukup melihat & export.
+  const canFix = useDataStore((s) => s.currentUser?.role) !== 'purchasing' && canNow('prospek', 'e');
+  const editProspect = (id: string) => {
+    useUiStore.setState({ editProspectId: id });
+    useUiStore.getState().openModal('prospectForm');
+  };
   const selKey = sel && t.grades.some((g) => g.key === sel) ? sel : t.grades[0]?.key || '';
   const selGrade = t.grades.find((g) => g.key === selKey);
   const monthly = useMemo(() => (selKey ? t.monthly(selKey) : []), [t, selKey]);
@@ -101,6 +117,15 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth, sentMap 
         numFormats: { 6: '0%' },
       });
     }
+    if (cek.length) {
+      appendSheet(XLSX, wb, {
+        sheetName: 'Cek Data',
+        header: ['CUSTOMER', 'CABANG', 'SE', 'STATUS', 'ITEM', 'GRADE', 'BENTUK', 'QTY', 'BERAT/PCS TERCATAT', 'BERAT/PCS HITUNGAN UKURAN', 'HARGA/PCS', 'RP/KG', 'KG DITAWARKAN / PO', 'MASALAH'],
+        rows: cek.map((c) => [c.row.customer, c.row.cabang, c.row.se, c.row.status, c.row.label, c.row.grade, c.row.bentuk || '-', c.row.poQty || c.row.offQty, c.row.kgTyped || '', c.row.kgAuto || '', Math.round(c.row.unitPrice), Math.round(c.rpKg), Math.round(c.kg), c.kinds.map((k, i) => `${CEK_LABEL[k]}: ${c.notes[i]}`).join('; ')]),
+        colWidths: [{ wch: 28 }, { wch: 8 }, { wch: 6 }, { wch: 7 }, { wch: 36 }, { wch: 14 }, { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 60 }],
+        numFormats: { 8: '#,##0', 9: '#,##0', 10: '#,##0', 11: '#,##0', 12: '#,##0' },
+      });
+    }
     XLSX.writeFile(wb, `Tren_Material_${t.group.key}_${scopeText.replace(/[^\w-]+/g, '_')}_${t.months[0]}_sd_${t.months[t.months.length - 1]}.xlsx`);
     toast('Export tren material berhasil', 'success');
   }
@@ -140,6 +165,16 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth, sentMap 
           {seg<Measure>('pcs', measure, setMeasure, 'Pcs')}
           {seg<Measure>('nilai', measure, setMeasure, 'Nilai')}
         </span>
+        <button
+          type="button"
+          className={`btn btn-sm ${cekOpen ? 'btn-primary' : 'btn-outline'}`}
+          style={!cekOpen && cek.length ? { borderColor: '#C9822B', color: '#8A5A12' } : undefined}
+          onClick={() => setCekOpen(!cekOpen)}
+          aria-expanded={cekOpen}
+          title={tr("Item dengan berat/pcs atau harga yang janggal pada periode ini")}
+        >
+          ⚠ {tr("Cek data")} <span className="mono">{cek.length}</span>
+        </button>
         {canNow('analisa', 'x') && (
           <button type="button" className="btn btn-outline btn-sm" onClick={exportExcel}>
             <IconDownload /> {tr("Excel")}
@@ -183,6 +218,57 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth, sentMap 
         </div>
       </div>
 
+      {cekOpen && (
+        <Sec title={`${tr("Cek data")} — ${cek.length} ${tr("item janggal")}`} note={`${periodText} · ${scopeText}. ${tr("Semua bentuk; urut tonase terbesar. Perbaiki lewat Edit Prospek — angka analisa langsung ikut benar.")}`}>
+          {cek.length === 0 ? (
+            <div className="field-note">{tr("Tidak ada item janggal pada periode ini.")}</div>
+          ) : (
+            <>
+              <div className="table-wrap" style={{ borderTop: 'none' }}>
+                <table className="simple-table" style={{ minWidth: 1000 }}>
+                  <thead>
+                    <tr>
+                      <th>{tr("Prospek")}</th><th>{tr("Item")}</th><th>{tr("Grade / bentuk")}</th><th style={{ textAlign: 'right' }}>{tr("Qty")}</th>
+                      <th style={{ textAlign: 'right' }}>{tr("Berat/pcs")}</th><th style={{ textAlign: 'right' }}>{tr("Rp/kg")}</th><th style={{ textAlign: 'right' }}>{tr("Tonase")}</th><th>{tr("Masalah")}</th><th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(cekAll ? cek : cek.slice(0, 15)).map((c) => (
+                      <tr key={`${c.row.prospectId}:${c.row.idx}`}>
+                        <td>{c.row.customer}<div style={{ fontSize: 11, color: 'var(--text-soft)' }}>{c.row.cabang}{c.row.se ? ` · ${c.row.se}` : ''} · {c.row.poQty > 0 ? 'PO' : tr('penawaran')}</div></td>
+                        <td style={{ maxWidth: 260 }}>{c.row.label}</td>
+                        <td>{c.row.grade}<div style={{ fontSize: 11, color: 'var(--text-soft)' }}>{c.row.bentuk || '-'}</div></td>
+                        <td className="mono" style={{ textAlign: 'right' }}>{(c.row.poQty || c.row.offQty).toLocaleString('id-ID')}</td>
+                        <td className="mono" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {c.row.kgPc ? `${Math.round(c.row.kgPc).toLocaleString('id-ID')} kg` : '-'}
+                          {c.row.kgTyped > 0 && c.row.kgAuto > 0 && c.row.kgTyped !== c.row.kgAuto && <div style={{ fontSize: 11, color: 'var(--text-soft)' }}>{tr("ukuran")} {c.row.kgAuto.toLocaleString('id-ID')} kg</div>}
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{c.rpKg ? formatRupiah(Math.round(c.rpKg)) : '-'}</td>
+                        <td className="mono" style={{ textAlign: 'right' }}>{formatTon(c.kg, 1)}</td>
+                        <td style={{ fontSize: 12 }}>
+                          {c.kinds.map((k, i) => (
+                            <div key={k}><span className="badge amber" style={{ fontSize: 10.5 }}>{tr(CEK_LABEL[k])}</span> {c.notes[i]}</div>
+                          ))}
+                        </td>
+                        <td>{canFix && <button type="button" className="btn btn-outline btn-sm" onClick={() => editProspect(c.row.prospectId)}>{tr("Edit")}</button>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {cek.length > 15 && (
+                <button type="button" className="btn btn-sm btn-outline" style={{ marginTop: 8 }} onClick={() => setCekAll(!cekAll)}>
+                  {cekAll ? tr("Tampilkan 15 teratas") : `${tr("Tampilkan semua")} (${cek.length})`}
+                </button>
+              )}
+              <div className="field-note" style={{ marginTop: 8 }}>
+                {tr("Ditandai bila: berat/pcs kosong · berat/pcs yang diketik lebih dari 2,5× atau kurang dari 0,4× hitungan ukuran · Rp/kg di bawah")} {formatRupiah(RPKG_MIN)} {tr("atau di atas")} {formatRupiah(RPKG_MAX)} · {tr("Rp/kg kurang dari 0,4× atau lebih dari 2,5× median grade yang sama (min. 4 item) · item sudah PO tanpa harga.")}
+              </div>
+            </>
+          )}
+        </Sec>
+      )}
+
       <Sec title={`Top Grade — urut ${label}`} note={tr("Klik baris untuk grafik bulanan grade tersebut.")}>
         {t.grades.length === 0 ? (
           <div className="field-note">{tr("Belum ada material")} {t.group.label} {tr("pada periode ini.")}</div>
@@ -210,7 +296,16 @@ export function ProductTab({ prospects, scopeLabel, cabangs, thisMonth, sentMap 
                       <td className="mono" style={{ textAlign: 'right' }}>{formatTon(g.offKg, 1)}</td>
                       <td className="mono" style={{ textAlign: 'right' }}>{formatTon(g.poKg, 1)}</td>
                       <td className="mono" style={{ textAlign: 'right' }}>{formatTon(g.sentKg, 1)}</td>
-                      <td className="mono" style={{ textAlign: 'right' }}>{g.rpKg ? formatRupiah(Math.round(g.rpKg)) : '-'}</td>
+                      <td className="mono" style={{ textAlign: 'right' }}>
+                        {g.rpKg ? formatRupiah(Math.round(g.rpKg)) : '-'}
+                        {cekGrades.has(g.key) && (
+                          <div>
+                            <button type="button" className="link-btn" style={{ fontSize: 11, color: '#8A5A12' }} onClick={(e) => { e.stopPropagation(); setCekOpen(true); }}>
+                              ⚠ {tr("cek data")}
+                            </button>
+                          </div>
+                        )}
+                      </td>
                       <td style={{ minWidth: 90 }}>
                         <div className="line-kpi-bar"><span style={{ width: `${Math.min(100, Math.round((g.conv || 0) * 100))}%` }} /></div>
                         <span className="mono" style={{ fontSize: 11 }}>{pct(g.conv)}</span>

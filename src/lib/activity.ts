@@ -20,7 +20,10 @@ interface LogInput {
 async function clientIp(): Promise<string | null> {
   try {
     const h = await headers();
-    // nginx sets X-Forwarded-For; the left-most entry is the original client.
+    // server.js mengisi x-client-ip (alamat koneksi, atau X-Forwarded-For bila
+    // TRUST_PROXY=1 di belakang Nginx / Cloudflare) dan membuang kiriman klien.
+    const cip = h.get('x-client-ip');
+    if (cip) return cip;
     const fwd = h.get('x-forwarded-for');
     if (fwd) return fwd.split(',')[0].trim();
     return h.get('x-real-ip');

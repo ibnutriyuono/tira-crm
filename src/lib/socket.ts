@@ -16,5 +16,10 @@ export function emitCrmEvent(event: string, payload: unknown) {
   if ((event.startsWith('rfq:') || event.startsWith('fupa:')) && payload && typeof payload === 'object' && 'items' in payload) {
     payload = stripPurchSecrets(payload as { items?: unknown; purchNotes?: string | null });
   }
-  io.to('crm').emit(event, payload);
+  // Data vendor hanya ke role yang boleh melihat vendor (lib/roles.ts#canSeeVendors).
+  io.to(event.startsWith('vendor:') ? 'vendor' : 'crm').emit(event, payload);
+  // Akun dijeda / dihapus: putuskan koneksi real-time-nya saat itu juga.
+  if ((event === 'user:paused' || event === 'user:deleted') && payload && typeof payload === 'object' && 'id' in payload) {
+    setTimeout(() => io.in(`u:${String((payload as { id: unknown }).id)}`).disconnectSockets(true), 500);
+  }
 }

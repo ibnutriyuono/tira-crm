@@ -16,6 +16,21 @@ const hostname = process.env.HOST || 'localhost';
 const port = Number(process.env.PORT) || 3000;
 
 const app = next({ dev, hostname, port });
+
+// Di belakang Nginx / Cloudflare set TRUST_PROXY=1 supaya alamat klien diambil
+// dari X-Forwarded-For; tanpa proxy header itu bisa dipalsukan, jadi diabaikan.
+const TRUST_PROXY = process.env.TRUST_PROXY === '1';
+const MAX_SOCKETS_PER_USER = 10;
+const MAX_SOCKETS_PER_IP = 60;
+function clientIp(req) {
+  if (TRUST_PROXY) {
+    const cf = req.headers['cf-connecting-ip'];
+    if (cf) return String(cf);
+    const fwd = req.headers['x-forwarded-for'];
+    if (fwd) return String(fwd).split(',')[0].trim();
+  }
+  return (req.socket && req.socket.remoteAddress) || 'unknown';
+}
 const handle = app.getRequestHandler();
 
 // Notifikasi email: tiap 5 menit minta server sendiri menjalankan pengecekan
@@ -36,18 +51,61 @@ function startEmailScheduler() {
 
 app.prepare().then(() => {
   const httpServer = createServer((req, res) => {
+    // Alamat klien untuk log & batas login: jangan percaya header kiriman klien.
+    delete req.headers['x-client-ip'];
+    req.headers['x-client-ip'] = clientIp(req);
     const parsedUrl = parse(req.url, true);
     handle(req, res, parsedUrl);
   });
+  // Koneksi lambat (slowloris) tidak boleh menahan server lama-lama.
+  httpServer.headersTimeout = 20 * 1000;
+  httpServer.requestTimeout = 120 * 1000;
 
   const io = new Server(httpServer, {
     path: '/socket.io',
+    // Browser hanya menerima push; tidak ada pesan besar dari klien.
+    maxHttpBufferSize: 16 * 1024,
+    connectTimeout: 10 * 1000,
+  });
+
+  // Hanya browser yang sudah login boleh tersambung. Sesi diperiksa oleh
+  // /api/auth/socket (cookie diteruskan apa adanya; akun dijeda ditolak).
+  const selfHost = hostname === '0.0.0.0' || hostname === '::' ? '127.0.0.1' : hostname;
+  const perIp = new Map();
+  io.use(async (socket, nextFn) => {
+    try {
+      const ip = clientIp(socket.request);
+      if ((perIp.get(ip) || 0) >= MAX_SOCKETS_PER_IP) return nextFn(new Error('too_many_connections'));
+      const cookie = socket.handshake.headers.cookie;
+      if (!cookie) return nextFn(new Error('unauthorized'));
+      const r = await fetch(`http://${selfHost}:${port}/api/auth/socket`, { headers: { cookie, 'x-client-ip': ip } });
+      if (!r.ok) return nextFn(new Error('unauthorized'));
+      const me = await r.json();
+      if (!me || !me.id) return nextFn(new Error('unauthorized'));
+      if ((await io.in(`u:${me.id}`).fetchSockets()).length >= MAX_SOCKETS_PER_USER) return nextFn(new Error('too_many_connections'));
+      socket.data.user = me;
+      socket.data.ip = ip;
+      nextFn();
+    } catch (err) {
+      console.error('[socket] auth:', err.message);
+      nextFn(new Error('unauthorized'));
+    }
   });
 
   io.on('connection', (socket) => {
-    // Single shared "crm" room — this app is a single-tenant internal CRM,
-    // so every connected client should see every change.
+    const me = socket.data.user;
+    const ip = socket.data.ip;
+    perIp.set(ip, (perIp.get(ip) || 0) + 1);
+    socket.on('disconnect', () => {
+      const n = (perIp.get(ip) || 1) - 1;
+      if (n > 0) perIp.set(ip, n);
+      else perIp.delete(ip);
+    });
+    // "crm" = semua user login; "vendor" = role yang boleh melihat data vendor;
+    // "u:<id>" = untuk memutus koneksi saat akun dijeda / dihapus.
     socket.join('crm');
+    socket.join(`u:${me.id}`);
+    if (me.vendors) socket.join('vendor');
   });
 
   globalThis.__io = io;
